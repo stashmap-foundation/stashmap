@@ -1,227 +1,246 @@
-# Knowstr collaboration model v3
+# Knowstr collaboration
 
-Knowstr is a markdown-first graph editor. Users think in small text blocks, arrange them into documents, link them into a graph, and keep the underlying files readable and editable as normal markdown.
+Knowstr is a markdown-first, node-based graph editor. Users think in small text blocks — nodes — and arrange them into documents, which are nothing more than containers: nodes carry durable IDs, move freely between documents, and keep the underlying files readable, editable markdown. Rows are ranked with relevance markers; node-level `basedOn` and content-addressed `snapshot` metadata already round-trip through markdown.
 
-The collaboration problem is not shared mutable editing. In an agent-centric world, every person has their own second brain, with their own graph, structure, priorities, and agents. Collaboration should let people work on the same question, document, or subtree without giving anyone the ability to overwrite someone else's concrete graph entities.
+The collaboration feature built on top of this is **a node-identity diff engine**: Knowstr can tell you — across any pile of files, folders, or copies — what is related to your nodes, what changed, and who changed it. Everything people do with it — sharing, comparing, taking — is plain file operations plus two commands.
 
-The model is three rules:
+It is not shared mutable editing. Nobody can overwrite anyone else's documents; people converge by seeing each other's changes as suggestions and taking what they want.
 
-> 1. **Anything you can see, you can read.** Visibility comes from joining: a shared folder, a person you follow, a link you open, a group.
-> 2. **Anything you edit becomes yours.** There are no read-only error walls. Editing someone else's document transparently creates your own copy, with lineage back to the original. The original is never touched.
-> 3. **Differences become suggestions.** Wherever someone else's version shares lineage with your nodes, the difference renders as a `(?)` suggestion in your view. Accept what you want, ignore the rest.
+## The model
 
-It looks and feels like one common document — everyone sees a merged view — but every write goes to the writer's own layer. Nobody can overwrite anyone else's concrete entities, by construction rather than by configuration.
+> Your workspace is yours: Knowstr writes only there, and node IDs inside it are unique.
+>
+> Copies made by any means keep their IDs, so relatedness is observable wherever copies end up; materializing a suggestion settles the relation into an explicit `basedOn` edge.
+>
+> `knowstr diff <address>` correlates your workspace against anything you point it at and reports, with attribution, how related nodes have drifted apart.
 
-This is not Google Docs and not shared mutable node IDs. The closest familiar models are Google Docs suggestion mode (everyone but the owner is always suggesting) and Git (fork, status, diff, accept) — users bring the mental model with them.
+There is no setup. No registration, no configuration, no identity, no required state. The only persistent artifacts are the markdown files themselves and an invisible snapshot cache.
 
-## Core capabilities
+## Two vocabularies, and no third
 
-The model is transport-agnostic. It needs exactly three capabilities, and each transport provides them with whatever it natively has:
+Collaboration introduces no new syntax. It reuses the two vocabularies the editor already has:
 
-| Capability | Filesystem / CLI | Web / Nostr |
+1. **Node attributes**, in HTML comments: `id` (durable identity), `basedOn` (lineage), `snapshot` (baseline reference). All relational state is node-level — never document-level, because documents are just containers and nodes outlive their containers.
+2. **Relevance markers**, as row prefixes: `(!)` relevant, `(?)` maybe relevant, `(~)` little relevant, `(x)` not relevant, `(+)`/`(-)` confirming/contra argument. This is how users rank rows — their own, and, it turns out, everyone else's.
+
+A suggestion is therefore nothing special: **an ordinary row that arrives in your document at `(?)` carrying `basedOn`** — "maybe relevant, with lineage." The whole collaboration feature reduces to producing such rows and letting normal editing take it from there.
+
+## Core mechanics
+
+### Relations are born by copying and settled by materializing
+
+Two nodes are related in exactly two ways:
+
+- **Same ID** — a *born* relation. Node IDs are unique; the same ID appearing in two places cannot be coincidence, it means a copy happened. `cp`, email attachments, drag-and-drop — every copying tool in existence creates this relation for free.
+- **`basedOn`** — a *settled* relation: a fresh node that records which node it derives from. Settled relations are directional, survive any rewording, and keep each side's graph internally unambiguous.
+
+Born relations age badly under divergence (no direction, no per-pair baseline); settled relations are built for it. Knowstr converts born into settled only at the moments when it actually knows the direction — never at copy time, where nothing can be known:
+
+- **materializing a suggestion** (see the lifecycle below) mints a fresh ID with `basedOn`;
+- **saving a fetched document** whose in-file `track:` address declares its upstream (see `show`) re-mints the whole document with `basedOn` per node;
+- **explicit `fork`** (staged layer).
+
+Text equality is never used to establish identity, lineage, or suppression. Coincident wording means nothing.
+
+### Baselines: invisible, lazy, self-healing
+
+To say *who* changed something, a diff needs the common ancestor. The first time Knowstr observes a relation, it stores the other side's content as a snapshot — content-addressed (`snap_sha256_<hash of content>`), immutable, kept in one global store per machine at `~/.knowstr/snapshots/`, shared by the CLI and the app so both always see the same baselines (snapshot events on relays later). Nodes reference their baseline through the `snapshot="…"` attribute they already carry.
+
+Properties that follow: identical content stores once regardless of how many workspaces hold it; losing the store is harmless because the next observation re-baselines (suggestions degrade for one window, then recover; nothing corrupts); no index exists beyond the markdown itself.
+
+The honest limit of laziness: changes the other side made *before* first observation become part of the baseline instead of suggestions. Eventually consistent about history, always correct about structure.
+
+### One hard rule inside the workspace
+
+Duplicate node IDs across workspace documents are rejected by `save`, with guidance:
+
+```text
+error: holidays.md and drafts/holidays-v2.md both contain id:1
+  - if drafts/holidays-v2.md is a variant, give it fresh IDs (future: knowstr fork)
+  - if it's a backup, move it out or add it to .knowstrignore
+```
+
+Duplicates *outside* the workspace are never an error — they are the natural representation of several people's versions existing side by side.
+
+## The suggestion lifecycle: materialize, then re-rank
+
+This is the heart of the design, and it has exactly one engine operation. **There is no "accept."**
+
+```text
+suggestion              computed view: lineage drift found by diff. Not in your
+                        file, nothing settled, vanishes when the comparison closes.
+    │
+    │  MATERIALIZE      the only engine transition.
+    │                   (--write on the CLI; "take" in the app)
+    ▼
+(?) row in your file    an ordinary node: the proposed text, basedOn, an ID
+                        minted at the next save. Yours now. Lineage settled.
+    │
+    │  re-rank          plain editing — the engine is not involved.
+    ▼
+(!) / unmarked / (+) / (-)    you took it
+(x)                            you declined it — row and lineage stay, suppressing it forever
+deleted line                   you removed it entirely (see open problems)
+```
+
+Materialized at `(?)` means exactly what `(?)` always means: *maybe relevant* — now with provenance attached. The row settles its lineage at the next `save` whether or not you ever touch it again; a row left at `(?)` is simply maybe-relevant content in your document. Its `basedOn` permanently accounts for the source node, reword-proof: that suggestion never comes back, no matter how either side rewords.
+
+Everything after materialization is ordinary editing in the vocabulary you already use to rank your own content. Promoting to `(!)` or removing the marker is "taking" the suggestion; marking `(x)` is declining it while keeping the lineage record (so it stays suppressed); deleting the line removes it entirely. The engine does not distinguish these — it sees relevance edits on a normal node. Suppression never requires the engine to remember anything: the file is the memory.
+
+## The commands
+
+### `knowstr save [path …]`
+
+The write-side janitor. Operates on the current directory (or explicit paths):
+
+- assigns missing document and node IDs;
+- preserves existing `basedOn`, `snapshot`, `track`, and `knowstr_vote_id` metadata;
+- rejects duplicate IDs within the workspace;
+- needs **no marker awareness**: a materialized suggestion row is an ordinary node with `basedOn` and a missing ID — standard normalization mints the ID, keeps `basedOn`, and baselines the edge. The `(?)` prefix is ordinary relevance vocabulary, parsed like on any other row;
+- settles fetched documents whose `track:` declares a foreign upstream: fresh IDs, `basedOn` per node, baseline from the stored snapshot.
+
+`save` writes only the workspace. It never reads or writes anything outside it.
+
+### `knowstr diff <address> [--write]`
+
+The product. An address is a file or a folder (later a link or group).
+
+What it does:
+
+1. reads the address — **read-only, always**;
+2. correlates by node IDs and `basedOn` edges against the workspace — **per node, not per document**: because nodes move between containers, one foreign file may relate to several of your documents, and suggestions land wherever the related nodes live today;
+3. establishes baselines on first sight (the one side effect: a write to the content-addressed snapshot store);
+4. computes three-way diffs per related lineage;
+5. reports.
+
+Every foreign document falls into one of three buckets: **your deposit** (content-identical counterpart — ok, or stale when your copy has moved on), **shared lineage, diverged** (produces suggestions), or **unrelated** (shares nothing).
+
+```text
+$ knowstr diff ~/Dropbox/team
+travel-plans.md
+  ~ team/holidays.md          your deposit (identical) — ok
+  ~ team/bob-holidays.md      shared lineage, diverged:
+      (?) Montenegro           new on their side
+      Kroatia                  yours, not in their copy
+unrelated there: 1 document (kapital-ch3.md)
+```
+
+Correlation rules:
+
+- **per-file namespaces** at the address: the same ID in two files there means two variants of one lineage, never a collision;
+- **mirror detection**: a content-identical counterpart is reported as your deposit, never as suggestions;
+- **cross-sibling dedupe**: a suggestion is keyed by what it proposes, not by which file proposes it — the same addition in three siblings is one `(?)` row;
+- **nearest-shared-ancestor anchoring**: a suggestion attaches under the closest node you actually have; a foreign subtree whose ancestors you share nowhere falls into the unrelated bucket;
+- **relevance is workspace-relative**: unrelated documents at a *folder* address are summarized as a count (named when few) — `diff` against a stranger's huge folder degrades to one line, not a flood. A single-*file* address was pointed at deliberately and is always reported by name.
+
+What it does **not** do: never writes the address; never writes the workspace except under `--write`; keeps no memory of previous runs — there is no "new since last time", only "present there, absent here"; imports nothing, merges nothing, resolves nothing; doesn't browse (that is `show`).
+
+`--write` is the bulk materializer: every suggestion lands in your files as a `(?)` row carrying provenance:
+
+```md
+- (?) Montenegro <!-- basedOn="a5" -->
+```
+
+Your documents become the inbox; triage by re-ranking in your editor, whenever you like. The materialized markup carries the source node ID — provenance, not text — which is what makes the whole lifecycle reword-proof.
+
+### `knowstr show <address>`
+
+Read-only render to stdout. Two uses:
+
+- render a document or node as portable markdown (export, inspection);
+- **fetch**: `knowstr show <link> > holidays.md`. Because Knowstr is the courier here, it knows the exact content at fetch time and stores the snapshot as a side effect. The fetched file carries the publisher's `track:` address, so the next `save` settles it into a clean `basedOn` fork with a perfect baseline — direction declared by the document, no questions asked.
+
+## The app
+
+The desktop and web apps wrap the same engine, and the diff renders entirely in UI the editor already has — split panes, overlay rows, relevance controls. No new components, no new concepts.
+
+**Handing over an address.** The CLI takes a parameter; Electron takes a dropped file or folder (or a picker); the web takes an opened or pasted link — clicking a knowstr link someone sent you *is* `knowstr diff <address>`. Web cannot address the filesystem; desktop can do both.
+
+**Drop = `diff`, take = `--write`.** Dropping is always safe: it opens a read-only comparison, computes everything in memory, writes nothing, and closing it forgets the whole thing (a re-drop recreates it in seconds). For a folder, the comparison opens as a summary — one row per related document, deposit status, unrelated count, and a single **"take all as `(?)`"** button, which is the bulk `--write` for the whole comparison:
+
+```text
+Dropped: ~/Dropbox/team (12 files)
+  3 of your documents have 9 suggestions          [ take all as (?) ]
+  ├─ travel-plans.md   5 suggestions
+  ├─ budget.md         3 suggestions
+  └─ reading.md        1 suggestion
+  2 deposits ok, 1 stale · unrelated: 4 documents
+```
+
+Clicking through opens your document — editable, with `(?)` overlay rows sitting exactly where they would land, each attributed to its source file — beside the foreign document, read-only, in a second pane.
+
+**Overlay rows are ghosts: any real interaction materializes them.** Set a relevance on one (the same selector every row has — choosing `(!)`, `(?)`, or `(x)` *is* "take as…"), start editing its text, or drag it somewhere in your tree — each gesture creates the ordinary node-with-`basedOn` first, then proceeds. After a restart, overlays are gone (they were a view); materialized rows remain (they are content).
+
+**Unrelated documents get one button: "add to workspace."** App-mediated import settles at the door — fresh IDs, `basedOn` per node, baseline from the dropped bytes — because the app, unlike `cp`, knows the direction at crossing time. Import is just the take-everything special case of the same flow; nothing ever crosses the boundary silently. The same applies to all app-mediated copying (paste, drop, open-link).
+
+The app writes only on the user's own actions. There is no watcher-driven background saving; the filesystem watcher only reflects external edits into the view.
+
+**On the web, your workspace is the graph under your key**, bound at login — the npub is to the web what the directory is to the disk. Which gives the logged-out state a crisp identity: **no key, no workspace — the logged-out web app is a pure viewer.** It renders any address read-only; it is what a shared link opens into for someone without Knowstr. There are no placeholder identities and no pre-login editing: writing requires a workspace, everywhere. And because a key is free, local, and instant, "try it" costs one click: a visitor landing on knowstr.com with no address and no key gets a single button — generate a key, copy it to the clipboard, log in — and is typing seconds later. The same click makes one thing unmissable: the copied key *is* the account — there is no recovery, no reset, no server holding a second copy — store it somewhere safe.
+
+## The walkthrough
+
+Alice writes `holidays.md`, runs `knowstr save` (IDs stamped), and copies it into the team folder. Bob copies it out, adds `- Kroatia`, saves (his node gets an ID; alice's keep theirs — a born relation now spans both copies). Alice meanwhile adds Montenegro to her copy.
+
+```sh
+knowstr diff ~/Dropbox/team --write   # alice's Montenegro lands as a (?) row
+vim holidays.md                       # bob re-ranks it: deletes the marker (or sets (!))
+knowstr save                          # ID minted, basedOn kept, edge baselined
+cp holidays.md ~/Dropbox/team/bob-holidays.md
+```
+
+Alice runs `knowstr diff ~/Dropbox/team` and sees Kroatia as `(?)` — bob's deposited file carries his `basedOn` and `snapshot` metadata, which is exactly the baseline her diff needs to attribute the change to him. She takes it the same way. Their files converge in content while remaining two documents with mutual lineage — agreement without shared mutable state.
+
+Nobody ran a setup command. Neither can overwrite the other. Every tool that can copy a file is already a Knowstr-compatible collaboration tool.
+
+**Late healing.** If bob had received the file with no context at all (an email, months ago) and absorbed it as his own, nothing is lost: the first time a `diff` exposes both sides, the shared IDs reveal the relation, a baseline is taken from that moment, and suggestions flow from then on. Whatever alice changed before first contact is missed; nothing corrupts. A context-free copy is fundamentally indistinguishable from original content — Knowstr handles it by converging late instead of guessing early.
+
+## Topologies
+
+These are usage patterns, not features — Knowstr only ever sees "an address":
+
+| Arrangement | How | Who reads whom |
 | --- | --- | --- |
-| **Visibility** — which documents of others you can see | joined folders | people you follow, opened share links, groups (future) |
-| **Ownership** — whose document it is | `author` in frontmatter | the event signature |
-| **Lineage** — what a copy came from, with a baseline | `basedOn` + `snapshot` in node comments, snapshots in `.knowstr/snapshots/` | `basedOn` + immutable snapshot events |
+| **Team folder** | everyone deposits copies into one folder, everyone diffs it | all ↔ all |
+| **Follower** | alice deposits into her own public folder; followers diff it | one → many |
+| **Pairwise, ad hoc** | bob emails a file; carol diffs (or drops) the attachment directly | one ↔ one |
 
-Ownership lives in the document, not in its location, and Knowstr imposes no folder structure. The only configuration in the entire model is visibility: which folders/people/groups you have joined.
+A deposit is a `cp` toward the folder; it is a projection of the owner's workspace truth, refreshed by re-copying (the diff report nags when a deposit goes stale). Simultaneous editing of one shared file is the transport's job (git merge, Dropbox conflict copies) — Knowstr reads whatever ends up there and never writes it.
 
-### 1. Ownership decides editability
+## Staged layers
 
-Every Knowstr document carries its owner: `author` frontmatter on the filesystem, the signing key on Nostr. Knowstr only ever writes documents you own. Foreign-owned documents are readable everywhere and writable nowhere — editing one forks it (rule 2).
+Each layer exists to relieve a specific friction in the nucleus, in the order the pain proves itself. None changes the model.
 
-Ownership metadata is not access control. Real permissions belong to the transport: filesystem rights, Git, sync tooling, relay policy, signatures. Ownership decides what *Knowstr* will write, and that guarantee is unconditional: Knowstr never rewrites a foreign-owned document, no matter where it sits.
+1. **`fork <file>`** — eager settling: fresh IDs + `basedOn` + baseline on demand. Also the answer `save` suggests for workspace-duplicate rejections, and the basis for deliberate self-variants. The editor already surfaces self-variants: a fork shows on its original as a version row ("another version of this document, +5/−2") with its drift as `(?)` suggestions — workspace-internal today; the app phase feeds the same rows from foreign addresses.
+2. **`share <file>`** — publishing to relays: the one verb that needs an identity. Stamps a durable `track:` address (a knowstr.com link) into the document so every copy of it, however it travels, is self-connecting. Relays then become a **rendezvous**: queryable by the node IDs themselves, so variants of your documents are discoverable without anyone sending links. Honest limits to settle there: discovery only happens on relays both sides use (a default relay set is what makes it feel like one global place), snapshot events must move to a non-replaceable kind, and the local↔relay sync story (encryption or access-controlled relays) must be settled before private content publishes.
+3. **Groups** — a shared address with membership: an access-controlled relay is rendezvous, storage, and membership in one thing users already understand ("the group's server"). Token/membership management out of scope.
 
-### 2. Editing forks: copies with lineage
+Also staged: `detach` (deliberately break lineage), voting aggregates over `knowstr_vote_id` (the field is preserved today and stays preserved), and `accept <ref>` as sugar for materialize-plus-set-relevance in one command.
 
-Crossing from someone else's document into your graph happens by editing it, and the result is always a fork:
+## Open problems
 
-- a fresh `knowstr_doc_id` — the copy is a new document container;
-- your ownership;
-- fresh local node IDs (UUIDs);
-- `basedOn` on each copied node, pointing at the original node ID;
-- a `snapshot` — an immutable record of the original as you copied it, the baseline for later diffs.
+Decisions we have deliberately not made yet. The nucleus is complete without them.
 
-Foreign node IDs never enter your editable graph. `basedOn` is provenance, not identity.
+### Where do updates come from, automatically?
 
-In the app, the fork is transparent: you touch a foreign document, your copy is created, your edits land there. On the filesystem, the fork happens at `knowstr save`: a foreign-authored file sitting in your own tree can only mean you copied it there to make it yours, so `save` performs the fork bookkeeping and reports it. `cp` is the consent.
+The nucleus runs entirely on **explicit addresses** — typed on the CLI, dropped on the desktop, opened as a link on the web — and every use case works that way today. Remembering addresses so the user doesn't repeat the gesture is a convenience layer with several competing designs: `track:` addresses carried inside files (self-connecting documents — but fragment copies and groups strain it), a small workspace-level "places I'm in" list, relays-as-rendezvous (the `share` layer's discovery property promoted to the mechanism), sender-delivers-to-your-inbox, and an ambient local crawler. Each fails some use case the others handle. Decide from usage pain, not theory.
 
-### 3. Suggestions are a computed view
+### When does the baseline advance?
 
-A suggestion is the rendered difference between your node and its lineage relatives, computed from a three-way diff:
+Materialized rows suppress themselves through lineage — including `(x)` declines — so this question is narrower than it looks: it only governs **rows the user deletes outright**. Delete a materialized row and only an *advanced* base lets the three-way diff read the absence as your deletion and stay silent; a frozen base re-offers it forever. Candidates: advance at `--write` time (an offer, once made, is recorded), or never advance (deletions resurface). Never-materialized suggestions resurfacing is correct behavior — undecided is undecided.
 
-```text
-base   = the snapshot recorded when your lineage edge was created
-theirs = the original author's node now
-mine   = your node now
-```
+### Change types beyond added/absent
 
-Because suggestions are recomputed from graph state and lineage, there is no run log, no suggestion inbox, and no tombstones. Ignoring a suggestion costs nothing; it simply remains visible until the upstream reverts or you accept. Accepting mints a local node with `basedOn` and a fresh snapshot baseline for that edge, so it is never re-suggested.
+The three-way diff currently sees presence and absence of children. Modifications (rewording a node) and re-rankings (`(!)` → `(x)`) are invisible — yet re-ranking is exactly the signal that matters for weighting use cases (investors ranking locations), and modification is what an updated task document mostly consists of. Needs: modified/re-ranked as attributable suggestion types, and a materialization form for each.
 
-Suggestions are never stored as data in your documents. They are a view:
+## Invariants
 
-- the app renders them live as `(?)` rows in the tree;
-- the CLI prints them on request, or materializes them temporarily into your files (see below).
-
-## Documents and nodes
-
-- A document is a markdown container for one or more root nodes, identified by `knowstr_doc_id`. Documents have identity but not lineage; nodes have lineage.
-- Node IDs are UUIDs, globally unique in practice. Explicit safe IDs from markdown are preserved exactly.
-- `basedOn` and `snapshot` belong together: they describe a node-level lineage edge and the exact source state used as the baseline. Snapshot lookup is node-centric, never inherited from a root/document unless it explicitly represents the same copied baseline.
-- Snapshots are immutable, created when a lineage edge is created (fork/accept), never by ordinary suggestion computation. Snapshot IDs may be content hashes. Durable storage: `.knowstr/snapshots/<snapshot-id>.md` for filesystem workspaces, immutable events for Nostr.
-- `knowstr_vote_id`, if set, is preserved. Voting aggregates are future work.
-- A plain markdown file with no Knowstr metadata is valid; `knowstr save` may add frontmatter, document IDs, and node IDs.
-
-## Filesystem + CLI
-
-### Spaces are plain folders
-
-A space is any folder you join — an FTP drop, a Dropbox share, a Git checkout, a team repo with its own layout. Knowstr imposes no structure on it; ownership is read from the documents, not from paths. Per-author subfolders are a nice convention for humans, never a requirement.
-
-```sh
-knowstr join ../shared-space
-```
-
-Files inside joined folders are never claimed or rewritten by Knowstr. The transport (Git, sync, permissions) governs who may write there; Knowstr only ever writes your own files.
-
-### Forking from the CLI
-
-```sh
-cp shared-space/alice/houses.md .
-knowstr save
-```
-
-Before, the copy still carries alice's metadata — that is the signal, and the provenance:
-
-```md
----
-knowstr_doc_id: kdoc_8f6b
-author: alice
----
-# Houses <!-- id:a1 -->
-- Brick house <!-- id:a2 -->
-```
-
-`knowstr save` sees a foreign-authored file in your workspace and forks it:
-
-```md
----
-knowstr_doc_id: kdoc_3c2e
-author: you
----
-# Houses <!-- id:u1 basedOn="a1" snapshot="snap_sha256_…" -->
-- Brick house <!-- id:u2 basedOn="a2" snapshot="snap_sha256_…" -->
-```
-
-```text
-houses.md: forked from alice (2 nodes linked, snapshot created)
-```
-
-Alice's original is untouched. Nothing is silent: `save` reports every fork it performs.
-
-The claiming rules of `save` in one place:
-
-- your own files: normalized as always (IDs assigned, lineage metadata preserved);
-- unowned plain markdown in your workspace: claimed as yours (ownership stamped along with IDs);
-- foreign-authored files in your workspace: forked, with lineage and snapshot, reported;
-- anything inside a joined folder: never touched.
-
-### Suggestions in the terminal and in the editor
-
-`knowstr status` computes suggestions on request:
-
-```text
-$ knowstr status
-houses.md (based on alice):
-  (?) Wooden house                   new under "Houses"
-  (?) Brick house -> "Stone house"   alice edited, your copy unchanged
-2 suggestions.
-```
-
-`knowstr accept houses.md:1` takes one. `--json` on `status`/`diff` is the agent/LLM surface.
-
-For editor-centric users, the file itself is the interface:
-
-```sh
-knowstr status --write
-```
-
-materializes suggestions as marked proposal rows in your file. A suggestion row is an ordinary node line with `basedOn` but no `id`, carrying the `(?)` marker:
-
-```md
-# Houses <!-- id:u1 basedOn="a1" -->
-- Brick house <!-- id:u2 basedOn="a2" -->
-- (?) Wooden house <!-- basedOn="a3" -->
-```
-
-Your editor is the accept button: remove the `(?)` marker to accept, delete the line (or leave it marked) to pass. The next `knowstr save` needs no special accept logic — an unmarked row with `basedOn` and a missing `id` goes through ordinary normalization: the ID is minted, `basedOn` is preserved, and a snapshot baseline is created for the new lineage edge. Rows still marked `(?)` are stripped, because suggestions are a view. The origin author is recoverable from `basedOn` (scoped-ref form where a bare ID would be ambiguous across sources). The clean file is canonical; materialized markup is a temporary working view, and `save` always returns the file to canonical state.
-
-### CLI commands
-
-| Command | Purpose |
-| --- | --- |
-| `knowstr init` | create local state and identity, once; required for stateful commands, never created implicitly |
-| `knowstr join <folder>` | add a folder to your visibility; `list`/`remove` to manage |
-| `knowstr save [file …]` | normalize markdown; stamp IDs and ownership; perform fork bookkeeping; resolve materialized suggestion markup. Standalone explicit-path mode works without a workspace and stays stateless |
-| `knowstr status [--write] [--json]` | compute suggestions; `--write` materializes them into your files |
-| `knowstr diff <doc> [--json]` | show a suggestion in detail |
-| `knowstr accept <ref>` | take a suggestion into your document |
-| `knowstr show <address>` | render a visible document/node as portable markdown; read-only |
-
-No command ingests other people's markdown into your graph; the only crossing is the fork performed by `save` or by accepting a suggestion.
-
-## Web + Nostr
-
-The same model with the web's native materials, and no folders anywhere:
-
-- **Visibility**: people you follow, share links you open (`/d/<author>/<doc-id>`, `/r/<node-id>`), and later groups — a membership-scoped visibility set (token management out of scope).
-- **Ownership**: the event signature. Stronger than frontmatter, same role.
-- **Fork-on-write**: opening a foreign document shows it read-only; touching it creates your copy with `basedOn` and a snapshot event, and your edits land there. A first-edit affordance ("this creates your copy") keeps the fork explicit without ceremony.
-- **Suggestions**: rendered live as `(?)` rows wherever lineage relatives differ — no status command, no refresh.
-- **Snapshots**: immutable Nostr events, cached locally; filesystem-backed storage when running in Electron.
-
-App equivalents of the CLI surface: onboarding = `init`; Follow / Open link / Join group = `join`; continuous editing = `save`; live `(?)` overlays = `status`; expanding a `(?)` row = `diff`; the ✓ on a row = `accept`; read-only document view = `show`.
-
-## Workflows
-
-### Alice shares, investors respond
-
-Alice shares `locations.md` into the investors' space (folder or group). Investors open it and put relevance markers on locations or add new ones — each is transparently writing their own fork. Alice's view of her document shows attributed `(?)` overlays: who weighted what, who proposed Montenegro. She accepts what she finds valuable. Nobody ran a setup command; the result is permanent, living documents rather than a forum thread.
-
-### The entrepreneur round-trip
-
-Carol's LLM compiles a task document from her private graph and sends it to an employee. The employee opens it and edits — their copy, lineage preserved through the node IDs the file carries — and sends it back over any transport. Carol opens the returned file; the employee's changes appear as suggestions against her graph, and her LLM consumes `knowstr status --json` / `knowstr diff --json` to integrate them. The snapshot baseline was created by her own export, automatically.
-
-### The student club
-
-The club shares excerpts in a folder or group. Each student's annotations are their own layer on the common lineage. Bob sees fellow students' annotations as `(?)` suggestions next to his own notes — valuable input, never replacing his own work, non-destructive by construction.
-
-### Opsec club
-
-Members of a token-gated group see everyone's content; each member's own arrangement is their own graph. This is the model working natively: shared visibility, personal layers, no shared mutable state.
-
-### External shared repos still work
-
-A team may keep editing a common markdown repo directly through Git — that is external collaboration, governed by Git. Any member joins the repo as a folder; its documents are visible, foreign-owned, and fork-on-edit like everything else. Knowstr never writes there.
-
-## Safety invariants
-
-- Ownership, carried in the document, decides what Knowstr writes. Knowstr never writes a foreign-owned document.
-- Files inside joined folders are never claimed, normalized, or rewritten.
-- Crossing from foreign into mine is always a fork: fresh document ID, my ownership, minted node IDs, `basedOn`, snapshot. Foreign node IDs never become my editable nodes.
-- Forks are never silent: the app shows a first-edit affordance; `save` reports every fork.
-- Suggestions are a computed view, never stored data; ordinary suggestion computation creates no snapshots and mutates nothing.
-- Materialized `(?)` markup is temporary; `save` returns files to canonical state.
-- Snapshots are immutable, node-centric baselines created only when lineage edges are created.
-- Documents have identity but not lineage; nodes carry lineage through `basedOn`.
-- `knowstr_doc_id` is not a voting scope; `knowstr_vote_id`, if set, is preserved.
-- `.knowstr` is created only by explicit `knowstr init`. Standalone `knowstr save <paths>` stays stateless.
-- Transport security, access control, merge conflicts, and signatures are handled outside the core graph model.
-
-## Future work
-
-- **Groups** as a first-class visibility scope on Nostr (membership/token management out of scope).
-- **Voting aggregates** over `knowstr_vote_id`.
-- **Permanent dismissal** of suggestions, if ignoring proves insufficient in practice.
-- **Read-only flags** for own folders (e.g. consuming your own archive without claiming it).
-- **`knowstr aggregate`** and richer agent surfaces over `status --json`.
+- Knowstr writes only the user's workspace. Addresses are read-only, always.
+- Node IDs are unique within a workspace; duplicates elsewhere are variants, not errors.
+- Identity, lineage, and suppression come from IDs and `basedOn` only — never from text equality, never from author metadata, never from run logs.
+- All relational state is node-level (`id`, `basedOn`, `snapshot`); documents are containers, nothing more.
+- `diff` is stateless and workspace-relative; a suggestion is a computed view until materialized; **materialization is the only engine transition** — everything after it is ordinary editing of ordinary nodes.
+- `(?)` is the editor's normal relevance vocabulary; "accept" is not an operation anywhere in the system.
+- Snapshots are immutable, content-addressed, node-referenced, and disposable (loss self-heals by re-baselining).
+- Re-minting IDs happens only in the workspace, only at moments that know the direction: materialization, settling a `track:`-declared fetch, app-mediated copying, and the explicit `fork` layer.
+- A context-free copy is unknowable until first contact; Knowstr converges late instead of guessing early.
+- Transport security, access control, merge conflicts on shared files, and signatures belong to the transport, not the graph model.

@@ -12,6 +12,7 @@ import {
   parseDocumentRouteUrl,
   parseNodeRouteUrl,
   parseSourceFromSearch,
+  addressForSource,
   resolveAddress,
 } from "./navigationUrl";
 import { usePlanner } from "./planner";
@@ -42,18 +43,22 @@ type HistoryState = {
   activePaneIndex: number;
 };
 
-function paneToUrl(activePane: Pane): string | undefined {
-  if (activePane.documentId) {
+function paneToUrl(
+  activePane: Pane,
+  myPublicKey: PublicKey | undefined
+): string | undefined {
+  const address = addressForSource(activePane.sourceId, myPublicKey);
+  if (activePane.documentId && address) {
     return buildDocumentRouteUrl(
-      activePane.sourceId,
+      address,
       activePane.documentId,
       activePane.scrollToId
     );
   }
-  if (activePane.rootNodeId) {
+  if (activePane.rootNodeId && address) {
     return buildNodeRouteUrl(
       activePane.rootNodeId,
-      activePane.sourceId,
+      address,
       activePane.scrollToId
     );
   }
@@ -125,7 +130,7 @@ export function NavigationStateProvider({
     if (!activePane) {
       return;
     }
-    const fullUrl = paneToUrl(activePane);
+    const fullUrl = paneToUrl(activePane, user?.publicKey);
 
     if (fullUrl === undefined) {
       return;

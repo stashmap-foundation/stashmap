@@ -53,6 +53,7 @@ import { UserRelayContextProvider } from "./UserRelayContext";
 import { StashmapDB } from "./infra/nostr/cache/indexedDB";
 import { createEmptyGraphIndex } from "./graphIndex";
 import { buildNodeRouteUrl } from "./navigationUrl";
+import { decodePublicKeyInputSync } from "./infra/nostr/publicKeys";
 import { processEvents } from "./eventProcessing";
 
 import { PaneIndexProvider } from "./SplitPanesContext";
@@ -280,10 +281,11 @@ function normalizeTestInitialRoute(
   }
 
   const querySource = new URLSearchParams(search).get("source");
-  const sourceId: SourceId = querySource || LOCAL;
+  const decodedSource = decodePublicKeyInputSync(querySource || "");
+  const sourceId: SourceId = decodedSource ?? querySource ?? LOCAL;
   const eventAuthor =
     querySource && querySource !== LOCAL
-      ? (querySource as PublicKey)
+      ? decodedSource ?? (querySource as PublicKey)
       : options.user?.publicKey || ALICE.publicKey;
   const eventKnowledgeDB = options.relayPool
     ? processEvents(List(options.relayPool.getEvents())).get(eventAuthor)
@@ -308,7 +310,9 @@ function normalizeTestInitialRoute(
     },
     undefined
   );
-  return targetNode ? buildNodeRouteUrl(targetNode.id, sourceId) : route;
+  return targetNode
+    ? buildNodeRouteUrl(targetNode.id, querySource ?? LOCAL)
+    : route;
 }
 
 export function renderApis(

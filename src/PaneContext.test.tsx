@@ -1,5 +1,6 @@
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { nip19 } from "nostr-tools";
 import {
   ALICE,
   BOB,
@@ -334,4 +335,62 @@ test("/r/ URL takes priority over stale history state", async () => {
   [O] Paris
   [O] London
   `);
+});
+
+test("Same URL renders editable workspace for owner and read-only panes for others", async () => {
+  const [alice, bob, anon] = setup([ALICE, BOB, ANON]);
+
+  renderApp(alice());
+  await type("My Notes{Enter}{Tab}Cities{Enter}{Tab}Paris{Escape}");
+
+  const ownerNpub = nip19.npubEncode(requireUser(alice()).publicKey);
+  const sharedUrl = readonlyRoute(ownerNpub, "My Notes", "Cities");
+  cleanup();
+
+  window.history.pushState({}, "", "/");
+  renderApp({ ...alice(), initialRoute: sharedUrl });
+  await expectTree(`
+Cities
+  Paris
+  `);
+  expect(screen.queryByText("READONLY")).toBeNull();
+  cleanup();
+
+  window.history.pushState({}, "", "/");
+  renderApp({ ...bob(), initialRoute: sharedUrl });
+  await screen.findByText("READONLY");
+  await expectTree(`
+[O] Cities
+  [O] Paris
+  `);
+  cleanup();
+
+  window.history.pushState({}, "", "/");
+  renderApp({ ...anon(), initialRoute: sharedUrl });
+  await screen.findByText("READONLY");
+  await expectTree(`
+[O] Cities
+  [O] Paris
+  `);
+});
+
+test("Navigating own content puts the absolute npub address in the address bar", async () => {
+  const [alice] = setup([ALICE]);
+
+  renderApp(alice());
+  await type("My Notes{Enter}{Tab}Cities{Escape}");
+
+  const ownerNpub = nip19.npubEncode(requireUser(alice()).publicKey);
+  const sharedUrl = readonlyRoute(ownerNpub, "My Notes", "Cities");
+  cleanup();
+
+  window.history.pushState({}, "", "/");
+  renderApp({ ...alice(), initialRoute: sharedUrl });
+  await expectTree(`
+Cities
+  `);
+
+  await waitFor(() => {
+    expect(window.location.search).toContain(ownerNpub);
+  });
 });

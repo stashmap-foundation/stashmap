@@ -37,3 +37,7 @@ export function decodePublicKeyInputSync(
 
   return undefined;
 }
+
+export function encodePublicKeyAddress(publicKey: PublicKey): string {
+  return nip19.npubEncode(publicKey);
+}

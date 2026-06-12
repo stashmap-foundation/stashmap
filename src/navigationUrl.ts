@@ -1,4 +1,8 @@
 import { LOCAL } from "./core/nodeRef";
+import {
+  decodePublicKeyInputSync,
+  encodePublicKeyAddress,
+} from "./infra/nostr/publicKeys";
 
 export function resolveAddress(
   address: SourceId | undefined,
@@ -7,10 +11,21 @@ export function resolveAddress(
   if (!address || address === LOCAL) {
     return LOCAL;
   }
-  if (myPublicKey !== undefined && address === myPublicKey) {
+  const normalized = decodePublicKeyInputSync(address) ?? address;
+  if (myPublicKey !== undefined && normalized === myPublicKey) {
     return LOCAL;
   }
-  return address;
+  return normalized;
+}
+
+export function addressForSource(
+  sourceId: SourceId,
+  myPublicKey: PublicKey | undefined
+): string | undefined {
+  if (sourceId !== LOCAL) {
+    return sourceId;
+  }
+  return myPublicKey ? encodePublicKeyAddress(myPublicKey) : undefined;
 }
 
 export function buildNodeRouteUrl(

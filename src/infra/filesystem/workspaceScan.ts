@@ -9,6 +9,7 @@ import {
 } from "../../core/Document";
 import { WalkContext } from "../../core/markdownNodes";
 import { MarkdownTreeNode, parseMarkdown } from "../../core/markdownTree";
+import { isValidSnapshotId } from "../../nodesDocumentEvent";
 
 export type WorkspaceSaveProfile = {
   pubkey: PublicKey;
@@ -118,6 +119,13 @@ function collectExplicitNodeIds(trees: MarkdownTreeNode[]): string[] {
   ]);
 }
 
+function collectSnapshotIds(trees: MarkdownTreeNode[]): string[] {
+  return trees.flatMap((tree) => [
+    ...(tree.snapshotId !== undefined ? [tree.snapshotId] : []),
+    ...collectSnapshotIds(tree.children),
+  ]);
+}
+
 function describeDuplicate(id: string, paths: string[]): string {
   const uniquePaths = [...new Set(paths)].sort();
   if (uniquePaths.length === 1) {
@@ -127,10 +135,10 @@ function describeDuplicate(id: string, paths: string[]): string {
 }
 
 function checkDuplicateNodeIds(
-  files: ReadonlyArray<{ relativePath: string; content: string }>
+  files: ReadonlyArray<{ relativePath: string; tree: MarkdownTreeNode[] }>
 ): void {
   const pathsById = files.reduce((acc, file) => {
-    collectExplicitNodeIds(parseMarkdown(file.content).tree).forEach((id) => {
+    collectExplicitNodeIds(file.tree).forEach((id) => {
       acc.set(id, [...(acc.get(id) ?? []), file.relativePath]);
     });
     return acc;
@@ -153,6 +161,22 @@ function checkDuplicateNodeIds(
       "  - if it's a backup, move it out or add it to .knowstrignore",
     ].join("\n")
   );
+}
+
+function checkSnapshotIds(
+  files: ReadonlyArray<{ relativePath: string; tree: MarkdownTreeNode[] }>
+): void {
+  const malformed = files.flatMap((file) =>
+    collectSnapshotIds(file.tree)
+      .filter((snapshotId) => !isValidSnapshotId(snapshotId))
+      .map(
+        (snapshotId) =>
+          `${file.relativePath}: invalid snapshot id "${snapshotId}" (expected snap_sha256_<64 lowercase hex chars>)`
+      )
+  );
+  if (malformed.length > 0) {
+    throw new Error(malformed.join("\n"));
+  }
 }
 
 type ScanAcc = {
@@ -202,7 +226,12 @@ export async function scanWorkspaceDocuments(
     }))
   );
 
-  checkDuplicateNodeIds(files);
+  const parsedTrees = files.map((file) => ({
+    relativePath: file.relativePath,
+    tree: parseMarkdown(file.content).tree,
+  }));
+  checkDuplicateNodeIds(parsedTrees);
+  checkSnapshotIds(parsedTrees);
 
   const final = files.reduce<ScanAcc>(
     (acc, file) => {

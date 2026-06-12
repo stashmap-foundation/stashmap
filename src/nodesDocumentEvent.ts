@@ -13,6 +13,10 @@ export function snapshotIdForContent(content: string): string {
   return `snap_sha256_${bytesToHex(sha256(new TextEncoder().encode(content)))}`;
 }
 
+export function isValidSnapshotId(snapshotId: string): boolean {
+  return /^snap_sha256_[0-9a-f]{64}$/u.test(snapshotId);
+}
+
 export function buildDocumentEvent(
   document: Document,
   pubkey: PublicKey,

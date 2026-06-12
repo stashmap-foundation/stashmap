@@ -82,3 +82,20 @@ test("node-level basedOn and snapshot survive parse and render", () => {
     `snapshot="${childSnapshot}"`
   );
 });
+
+test("parseToDocument tolerates malformed snapshot ids in foreign documents", () => {
+  const markdown = [
+    '# Houses <!-- id:u1 basedOn="a1" snapshot="garbage" -->',
+    "",
+    "- Brick house",
+    "",
+  ].join("\n");
+
+  const { nodes } = parseToDocumentPreservingExplicitIds(
+    TEST_PUBKEY,
+    markdown,
+    { docIdFallback: "doc-1" }
+  );
+
+  expect(nodes.get("u1")?.snapshotId).toBe("garbage");
+});

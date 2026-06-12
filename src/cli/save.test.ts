@@ -272,6 +272,36 @@ test("save rejects a node id repeated within one file", async () => {
   });
 });
 
+test("save rejects malformed node snapshot ids with the file path", async () => {
+  const { path: workspaceDir } = knowstrInit();
+  write(
+    workspaceDir,
+    "a.md",
+    '# Alpha\n- item one <!-- id:n1 basedOn="n0" snapshot="not-a-snapshot" -->\n'
+  );
+
+  await expect(knowstrSave(workspaceDir)).rejects.toMatchObject({
+    message: expect.stringMatching(
+      /a\.md: invalid snapshot id "not-a-snapshot" \(expected snap_sha256_<64 lowercase hex chars>\)/u
+    ),
+  });
+});
+
+test("save preserves well-formed node snapshot ids", async () => {
+  const { path: workspaceDir } = knowstrInit();
+  const snapshotId = `snap_sha256_${"ab".repeat(32)}`;
+  write(
+    workspaceDir,
+    "a.md",
+    `# Alpha\n- item one <!-- id:n1 basedOn="n0" snapshot="${snapshotId}" -->\n`
+  );
+
+  await knowstrSave(workspaceDir);
+
+  const raw = fs.readFileSync(path.join(workspaceDir, "a.md"), "utf8");
+  expect(raw).toContain(`snapshot="${snapshotId}"`);
+});
+
 test("save preserves safe explicit markdown ids exactly", async () => {
   const { path: workspaceDir } = knowstrInit();
   write(

@@ -43,7 +43,7 @@ type SerializeReduceState = SerializeResult & {
 function getSerializableNodeBody(
   knowledgeDBs: KnowledgeDBs,
   node: GraphNode,
-  author: PublicKey
+  author: SourceId
 ): string | undefined {
   if (isBlockLink(node)) {
     const targetNodeID = getBlockLinkTarget(node);
@@ -79,7 +79,7 @@ function getSerializableNodeAttrs(
 
 function serializeNodeSequence(
   knowledgeDBs: KnowledgeDBs,
-  author: PublicKey,
+  author: SourceId,
   nodes: readonly GraphNode[],
   indent: string,
   current: SerializeResult,

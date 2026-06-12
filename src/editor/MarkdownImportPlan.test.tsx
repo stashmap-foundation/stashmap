@@ -1,5 +1,6 @@
 import { List, Map as ImmutableMap } from "immutable";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { LOCAL } from "../core/nodeRef";
 import { createPlan, buildDocumentEvents } from "../planner";
 import { getChildNodes, getNode, getSemanticID } from "../core/connections";
 import { isStandaloneRoot } from "../core/systemRoots";
@@ -46,7 +47,7 @@ function flattenTexts(nodes: MarkdownTreeNode[]): string[] {
 function nodeChildren(
   knowledgeDBs: KnowledgeDBs,
   node: GraphNode | undefined,
-  myself: PublicKey
+  myself: SourceId
 ): List<GraphNode> {
   return node ? getChildNodes(knowledgeDBs, node, myself) : List<GraphNode>();
 }
@@ -225,9 +226,9 @@ test("Empty-root markdown file drop opens one document with all roots from the f
 
   const pane = plan.panes[0];
   const document = pane.documentId
-    ? plan.documents.get(documentKeyOf(plan.user.publicKey, pane.documentId))
+    ? plan.documents.get(documentKeyOf(LOCAL, pane.documentId))
     : undefined;
-  const nodes = plan.knowledgeDBs.get(plan.user.publicKey)?.nodes;
+  const nodes = plan.knowledgeDBs.get(LOCAL)?.nodes;
   const topTexts = document?.topNodeShortIds.map((id) => {
     const node = nodes?.get(id);
     return node ? nodeText(node) : undefined;
@@ -264,7 +265,7 @@ test("Empty-root markdown file drop creates a wrapper document for multiple file
 
   const pane = plan.panes[0];
   const wrapperDocument = pane.documentId
-    ? plan.documents.get(documentKeyOf(plan.user.publicKey, pane.documentId))
+    ? plan.documents.get(documentKeyOf(LOCAL, pane.documentId))
     : undefined;
   const importedDocuments = plan.documents
     .valueSeq()
@@ -274,14 +275,14 @@ test("Empty-root markdown file drop creates a wrapper document for multiple file
         document.systemRole !== "log"
     )
     .toArray();
-  const nodes = plan.knowledgeDBs.get(plan.user.publicKey)?.nodes;
+  const nodes = plan.knowledgeDBs.get(LOCAL)?.nodes;
   const wrapperRoot = wrapperDocument
     ? nodes?.get(wrapperDocument.topNodeShortIds[0])
     : undefined;
   const wrapperLinks = nodeChildren(
     plan.knowledgeDBs,
     wrapperRoot,
-    plan.user.publicKey
+    LOCAL
   ).toArray();
   const importedRootTexts = importedDocuments.map((document) =>
     document.topNodeShortIds.map((id) => {
@@ -299,9 +300,9 @@ test("Empty-root markdown file drop creates a wrapper document for multiple file
     parsedWrapper.document.topNodeShortIds[0]
   );
   const parsedKnowledgeDBs = parsedWrapper
-    ? ImmutableMap<PublicKey, KnowledgeData>([
+    ? ImmutableMap<SourceId, KnowledgeData>([
         [
-          plan.user.publicKey,
+          LOCAL,
           {
             ...newDB(),
             nodes: parsedWrapper.nodes,
@@ -311,11 +312,7 @@ test("Empty-root markdown file drop creates a wrapper document for multiple file
     : undefined;
   const parsedWrapperLinks =
     parsedKnowledgeDBs && parsedWrapperRoot
-      ? getChildNodes(
-          parsedKnowledgeDBs,
-          parsedWrapperRoot,
-          plan.user.publicKey
-        ).toArray()
+      ? getChildNodes(parsedKnowledgeDBs, parsedWrapperRoot, LOCAL).toArray()
       : [];
 
   expect(pane.rootNodeId).toBeUndefined();
@@ -363,26 +360,19 @@ test("planCreateNodesFromMarkdownTrees creates only standalone nodes", () => {
   );
   const parentItemID = topItemIDs[0];
   const parentNodeID = topNodeIDs[0];
-  const parentNode = getNode(
-    plan.knowledgeDBs,
-    parentNodeID,
-    plan.user.publicKey
-  );
-  const childNodeID = nodeChildren(
-    plan.knowledgeDBs,
-    parentNode,
-    plan.user.publicKey
-  ).first()?.id as ID | undefined;
+  const parentNode = getNode(plan.knowledgeDBs, parentNodeID, LOCAL);
+  const childNodeID = nodeChildren(plan.knowledgeDBs, parentNode, LOCAL).first()
+    ?.id as ID | undefined;
   const childNode = childNodeID
-    ? getNode(plan.knowledgeDBs, childNodeID, plan.user.publicKey)
+    ? getNode(plan.knowledgeDBs, childNodeID, LOCAL)
     : undefined;
   const grandchildNodeID = nodeChildren(
     plan.knowledgeDBs,
     childNode,
-    plan.user.publicKey
+    LOCAL
   ).first()?.id as ID | undefined;
   const grandchildNode = grandchildNodeID
-    ? getNode(plan.knowledgeDBs, grandchildNodeID, plan.user.publicKey)
+    ? getNode(plan.knowledgeDBs, grandchildNodeID, LOCAL)
     : undefined;
 
   expect(parentNode).toBeDefined();
@@ -391,12 +381,12 @@ test("planCreateNodesFromMarkdownTrees creates only standalone nodes", () => {
 
   expect(parentItemID).toEqual(getSemanticID(plan.knowledgeDBs, parentNode!));
   expect(
-    nodeChildren(plan.knowledgeDBs, parentNode, plan.user.publicKey).first()?.id
+    nodeChildren(plan.knowledgeDBs, parentNode, LOCAL).first()?.id
   ).toEqual(childNode?.id);
   expect(childNode && nodeText(childNode)).toBe("Child");
-  expect(
-    nodeChildren(plan.knowledgeDBs, childNode, plan.user.publicKey).first()?.id
-  ).toEqual(grandchildNode?.id);
+  expect(nodeChildren(plan.knowledgeDBs, childNode, LOCAL).first()?.id).toEqual(
+    grandchildNode?.id
+  );
   expect(grandchildNode && nodeText(grandchildNode)).toBe("Grandchild");
 });
 
@@ -411,7 +401,7 @@ test("Planning multiple markdown files returns top nodes in import order", () =>
 
   const topTexts = topNodeIDs.map((semanticID) => {
     const found = plan.knowledgeDBs
-      .get(plan.user.publicKey)
+      .get(LOCAL)
       ?.nodes.valueSeq()
       .find(
         (node) =>
@@ -434,7 +424,7 @@ test("Planning one markdown file with multiple roots returns top nodes in source
 
   const topTexts = topNodeIDs.map((semanticID) => {
     const found = plan.knowledgeDBs
-      .get(plan.user.publicKey)
+      .get(LOCAL)
       ?.nodes.valueSeq()
       .find(
         (node) =>

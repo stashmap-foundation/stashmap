@@ -1,6 +1,7 @@
 import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react";
 import { List, Map, Set, OrderedSet } from "immutable";
 import { UNAUTHENTICATED_USER_PK } from "./NostrAuthContext";
+import { LOCAL } from "./core/nodeRef";
 import { generatePaneId } from "./SplitPanesContext";
 import {
   jsonToPanes,
@@ -13,13 +14,13 @@ import {
   parseDocumentRouteUrl,
   parseNodeRouteUrl,
   parseSourceFromSearch,
+  resolveAddress,
 } from "./navigationUrl";
 
-export const defaultPane = (author: PublicKey, rootItemID?: ID): Pane => ({
+export const defaultPane = (author: SourceId = LOCAL): Pane => ({
   id: generatePaneId(),
   author,
   sourceId: author,
-  ...(rootItemID ? { rootNodeId: rootItemID } : {}),
 });
 
 const DEFAULT_TEMPORARY_VIEW: TemporaryViewState = {
@@ -91,24 +92,25 @@ function saveViewsToStorage(publicKey: PublicKey, views: Views): void {
   }
 }
 
-function getUrlPanes(publicKey: PublicKey): Pane[] | undefined {
+function getUrlPanes(myPublicKey: PublicKey): Pane[] | undefined {
   const documentRoute = parseDocumentRouteUrl(window.location.pathname);
   if (documentRoute) {
+    const docSource = resolveAddress(documentRoute.author, myPublicKey);
     return [
       {
         id: generatePaneId(),
-        author: documentRoute.author,
-        sourceId: documentRoute.author,
+        author: docSource,
+        sourceId: docSource,
         documentId: documentRoute.docId,
       },
     ];
   }
   const nodeID = parseNodeRouteUrl(window.location.pathname);
   if (nodeID) {
-    const nodeSource =
-      (parseSourceFromSearch(window.location.search) as
-        | PublicKey
-        | undefined) || publicKey;
+    const nodeSource = resolveAddress(
+      parseSourceFromSearch(window.location.search),
+      myPublicKey
+    );
     return [
       {
         id: generatePaneId(),
@@ -136,7 +138,7 @@ function getInitialPanes(publicKey: PublicKey): Pane[] {
   if (stored) {
     return stored;
   }
-  return [defaultPane(publicKey)];
+  return [defaultPane()];
 }
 
 function replacePaneUser(pane: Pane, publicKey: PublicKey): Pane {

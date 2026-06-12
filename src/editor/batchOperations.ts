@@ -1,4 +1,5 @@
 import { List, OrderedSet } from "immutable";
+import { LOCAL } from "../core/nodeRef";
 import { addNodeToPathWithNodes, viewPathToString } from "../rowModel";
 import { Plan, planExpandNode, planUpdateNodeText } from "../planner";
 import {
@@ -197,7 +198,7 @@ function getPreviousSiblingFromRows(
 }
 
 function getCurrentPlanNode(plan: Plan, node: GraphNode): GraphNode {
-  return getNode(plan.knowledgeDBs, node.id, plan.user.publicKey) ?? node;
+  return getNode(plan.knowledgeDBs, node.id, LOCAL) ?? node;
 }
 
 export function planBatchIndent(

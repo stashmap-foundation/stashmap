@@ -8,7 +8,7 @@ import {
   findNewNodeEditor,
   BOB,
   forkReadonlyRoot,
-  openReadonlyRoute,
+  readonlyRoute,
   renderApp,
   renderTree,
   type,
@@ -217,10 +217,16 @@ My Notes
     Logic
     Scripting
   `);
-  const nodeUrl = await openReadonlyRoute("Programming Languages");
   cleanup();
 
-  renderApp({ ...alice(), initialRoute: nodeUrl });
+  renderApp({
+    ...alice(),
+    initialRoute: readonlyRoute(
+      bob().user.publicKey,
+      "My Notes",
+      "Programming Languages"
+    ),
+  });
   await screen.findByText("READONLY");
   await userEvent.click(await screen.findByLabelText("expand OOP"));
   await expectTree(`

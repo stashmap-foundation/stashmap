@@ -27,6 +27,7 @@ import userEvent from "@testing-library/user-event";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 import { sha256 } from "@noble/hashes/sha256";
 import { schnorr } from "@noble/curves/secp256k1";
+import { LOCAL } from "./core/nodeRef";
 import { createPlan, planUpdateNodeText } from "./planner";
 import { planCopyDescendantNodes } from "./core/plan";
 import { execute } from "./infra/nostr/executor";
@@ -223,7 +224,7 @@ const DEFAULT_DATA_CONTEXT_PROPS: TestDataProps = {
     defaultRelays: [{ url: "wss://default.relay", read: true, write: true }],
     userRelays: [{ url: "wss://user.relay", read: true, write: true }],
   },
-  panes: [{ id: "pane-0", author: ALICE.publicKey, sourceId: ALICE.publicKey }],
+  panes: [{ id: "pane-0", author: LOCAL, sourceId: LOCAL }],
 };
 
 export function applyDefaults(props?: Partial<TestAppState>): TestAppState {
@@ -276,17 +277,18 @@ function normalizeTestInitialRoute(
     return route;
   }
 
-  const querySource = new URLSearchParams(search).get(
-    "source"
-  ) as PublicKey | null;
-  const author: PublicKey =
-    querySource || options.user?.publicKey || ALICE.publicKey;
+  const querySource = new URLSearchParams(search).get("source");
+  const sourceId: SourceId = querySource || LOCAL;
+  const eventAuthor =
+    querySource && querySource !== LOCAL
+      ? (querySource as PublicKey)
+      : options.user?.publicKey || ALICE.publicKey;
   const eventKnowledgeDB = options.relayPool
-    ? processEvents(List(options.relayPool.getEvents())).get(author)
+    ? processEvents(List(options.relayPool.getEvents())).get(eventAuthor)
         ?.knowledgeDB
     : undefined;
   const nodes =
-    options.knowledgeDBs.get(author)?.nodes || eventKnowledgeDB?.nodes;
+    options.knowledgeDBs.get(sourceId)?.nodes || eventKnowledgeDB?.nodes;
   const targetNode = segments.reduce<GraphNode | undefined>(
     (parentNode, segment, index) => {
       if (index > 0 && !parentNode) {
@@ -304,7 +306,7 @@ function normalizeTestInitialRoute(
     },
     undefined
   );
-  return targetNode ? buildNodeRouteUrl(targetNode.id, author) : route;
+  return targetNode ? buildNodeRouteUrl(targetNode.id, sourceId) : route;
 }
 
 export function renderApis(
@@ -434,9 +436,15 @@ export async function forkOwnRoot(
 ): Promise<void> {
   const utils = cU();
   const author = utils.user.publicKey;
-  const knowledgeDB = processEvents(List(utils.relayPool.getEvents())).get(
+  const parsedDB = processEvents(List(utils.relayPool.getEvents())).get(
     author
   )?.knowledgeDB;
+  const knowledgeDB = parsedDB
+    ? {
+        ...parsedDB,
+        nodes: parsedDB.nodes.map((n) => ({ ...n, author: LOCAL })),
+      }
+    : undefined;
   const rootNode = knowledgeDB?.nodes
     .valueSeq()
     .find(
@@ -446,12 +454,12 @@ export async function forkOwnRoot(
   if (!knowledgeDB || !rootNode) {
     throw new Error(`forkOwnRoot: root not found: ${rootText}`);
   }
-  const knowledgeDBs = Map<PublicKey, KnowledgeData>([[author, knowledgeDB]]);
+  const knowledgeDBs = Map<SourceId, KnowledgeData>([[LOCAL, knowledgeDB]]);
   const plan = createPlan({ ...utils, knowledgeDBs });
   const [forkPlan, mapping] = planCopyDescendantNodes(plan, rootNode);
   const forkRootID = mapping.get(rootNode.id);
   const forkRoot = forkRootID
-    ? forkPlan.knowledgeDBs.get(author)?.nodes.get(forkRootID)
+    ? forkPlan.knowledgeDBs.get(LOCAL)?.nodes.get(forkRootID)
     : undefined;
   if (!forkRoot) {
     throw new Error(`forkOwnRoot: fork failed for: ${rootText}`);

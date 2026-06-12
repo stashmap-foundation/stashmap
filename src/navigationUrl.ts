@@ -1,3 +1,15 @@
+import { LOCAL } from "./core/nodeRef";
+
+export function resolveAddress(
+  address: SourceId | undefined,
+  myPublicKey: PublicKey
+): SourceId {
+  if (!address || address === LOCAL || address === myPublicKey) {
+    return LOCAL;
+  }
+  return address;
+}
+
 export function buildNodeRouteUrl(
   rootNode: ID,
   sourceId: SourceId,
@@ -10,7 +22,7 @@ export function buildNodeRouteUrl(
 }
 
 export function buildDocumentRouteUrl(
-  author: PublicKey,
+  author: SourceId,
   docId: string,
   scrollToId?: string
 ): string {

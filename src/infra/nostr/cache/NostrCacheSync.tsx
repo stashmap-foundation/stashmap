@@ -6,6 +6,7 @@ import { useData } from "../../../DataContext";
 import { useDocumentStore } from "../../../DocumentStore";
 import { useDefaultRelays } from "../../../NostrAuthContext";
 import { useUserRelayContext } from "../../../UserRelayContext";
+import { decodePublicKeyInputSync } from "../publicKeys";
 import {
   flattenRelays,
   getReadRelays,
@@ -117,15 +118,20 @@ export function NostrCacheSync({
   const { userRelays } = useUserRelayContext();
   const defaultRelays = useDefaultRelays();
 
-  const extraAuthors = useMemo(
-    () => [...new globalThis.Set(panes.map((pane) => pane.author))],
+  const paneAuthors = useMemo(
+    () =>
+      panes
+        .map((pane) => decodePublicKeyInputSync(pane.author))
+        .filter((author): author is PublicKey => author !== undefined),
     [panes]
   );
 
-  const authors = useMemo(
-    () => [...new globalThis.Set([user.publicKey, ...extraAuthors])].sort(),
-    [user.publicKey, extraAuthors]
-  );
+  const authors = useMemo(() => {
+    const own = decodePublicKeyInputSync(user.publicKey);
+    return [
+      ...new globalThis.Set([...(own ? [own] : []), ...paneAuthors]),
+    ].sort();
+  }, [user.publicKey, paneAuthors]);
 
   const relayUrls = useMemo(
     () =>

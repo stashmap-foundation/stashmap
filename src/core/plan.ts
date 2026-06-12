@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-use-before-define, functional/no-let, functional/immutable-data, no-continue, no-nested-ternary */
 import { List, Map, Set as ImmutableSet } from "immutable";
 import { v4 } from "uuid";
+import { LOCAL } from "./nodeRef";
 import { KIND_RELAY_METADATA_EVENT, newTimestamp, msTag } from "../nostr";
 import { ensureNodeNativeFields, getNode, isSearchId } from "./connections";
 import type {
@@ -52,23 +53,15 @@ function planEnsureSystemRoot<T extends GraphPlan>(
   plan: T,
   systemRole: RootSystemRole
 ): [T, GraphNode] {
-  const existing = getOwnSystemRoot(
-    plan.knowledgeDBs,
-    plan.user.publicKey,
-    systemRole
-  );
+  const existing = getOwnSystemRoot(plan.knowledgeDBs, LOCAL, systemRole);
   if (existing) {
     return [plan, existing];
   }
 
   const node = withDocumentRoot(
-    newGraphNode(
-      plan.user.publicKey,
-      plainSpans(getSystemRoleText(systemRole)),
-      {
-        systemRole,
-      }
-    )
+    newGraphNode(LOCAL, plainSpans(getSystemRoleText(systemRole)), {
+      systemRole,
+    })
   );
 
   return [upsertNodesCore(plan, node), node];
@@ -128,7 +121,7 @@ export function upsertNodesCore<T extends GraphPlan>(
   plan: T,
   nodes: GraphNode
 ): T {
-  const userDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
+  const userDB = plan.knowledgeDBs.get(LOCAL, newDB());
   const normalized = ensureNodeNativeFields(plan.knowledgeDBs, nodes);
   const node: GraphNode =
     !normalized.parent && !normalized.docId
@@ -140,7 +133,7 @@ export function upsertNodesCore<T extends GraphPlan>(
   };
   const planWithNode: T = {
     ...plan,
-    knowledgeDBs: plan.knowledgeDBs.set(plan.user.publicKey, updatedDB),
+    knowledgeDBs: plan.knowledgeDBs.set(LOCAL, updatedDB),
   };
   return planMarkDocumentAffected(
     planUpsertRootDocument(planWithNode, node),
@@ -150,7 +143,7 @@ export function upsertNodesCore<T extends GraphPlan>(
 
 function addCrefToLog<T extends GraphPlan>(plan: T, nodeID: ID): T {
   const [planWithLog, nodes] = planEnsureSystemRoot(plan, LOG_ROOT_ROLE);
-  const crefNode = newGraphNode(plan.user.publicKey, [linkSpan(nodeID, "")], {
+  const crefNode = newGraphNode(LOCAL, [linkSpan(nodeID, "")], {
     root: nodes.root as ID,
     parent: nodes.id as ID,
   });
@@ -165,7 +158,7 @@ export function planUpsertNodes<T extends GraphPlan>(
   plan: T,
   nodes: GraphNode
 ): T {
-  const userDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
+  const userDB = plan.knowledgeDBs.get(LOCAL, newDB());
   const isNewNode = !userDB.nodes.has(nodes.id);
   const basePlan = upsertNodesCore(plan, nodes);
 
@@ -267,7 +260,7 @@ export function planCopyDescendantNodes<T extends GraphPlan>(
 
   const { copiedNodes } = descendants.reduce(
     (acc, node) => {
-      const baseNode = newGraphNode(plan.user.publicKey, node.spans, {
+      const baseNode = newGraphNode(LOCAL, node.spans, {
         root: acc.copiedRoot,
       });
       const nextCopiedRoot = acc.copiedRoot ?? baseNode.root;
@@ -413,17 +406,14 @@ function planDeleteDocumentRoot<T extends GraphPlan>(
 }
 
 export function planDeleteNodes<T extends GraphPlan>(plan: T, nodeID: ID): T {
-  const userDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
+  const userDB = plan.knowledgeDBs.get(LOCAL, newDB());
   const node = userDB.nodes.get(nodeID);
   const updatedNodes = userDB.nodes.remove(nodeID);
   const updatedDB = {
     ...userDB,
     nodes: updatedNodes,
   };
-  const nextKnowledgeDBs = plan.knowledgeDBs.set(
-    plan.user.publicKey,
-    updatedDB
-  );
+  const nextKnowledgeDBs = plan.knowledgeDBs.set(LOCAL, updatedDB);
   if (!node) {
     return { ...plan, knowledgeDBs: nextKnowledgeDBs };
   }
@@ -442,13 +432,10 @@ export function planDeleteDescendantNodes<T extends GraphPlan>(
   plan: T,
   sourceNode: GraphNode
 ): T {
-  const userNodesByID = plan.knowledgeDBs.get(
-    plan.user.publicKey,
-    newDB()
-  ).nodes;
+  const userNodesByID = plan.knowledgeDBs.get(LOCAL, newDB()).nodes;
   const descendants = getNodeSubtree(plan, sourceNode)
     .filter((node) => node.id !== sourceNode.id)
-    .filter((node) => node.author === plan.user.publicKey)
+    .filter((node) => node.author === LOCAL)
     .sortBy((node) => -getNodeParentDepth(userNodesByID, node));
 
   return descendants.reduce(
@@ -481,7 +468,7 @@ export function planPublishRelayMetadata<T extends GraphPlan>(
   const tags = relayTags(relays);
   const publishRelayMetadataEvent: CoreOutboundEvent & EventAttachment = {
     kind: KIND_RELAY_METADATA_EVENT,
-    pubkey: plan.user.publicKey,
+    pubkey: LOCAL,
     created_at: newTimestamp(),
     tags: [...tags, msTag()],
     content: "",
@@ -549,7 +536,7 @@ export function planAddTargetsToNode<T extends GraphPlan>(
           : undefined;
       if (documentLinkTarget) {
         const childNode = newGraphNode(
-          accPlan.user.publicKey,
+          LOCAL,
           [
             fileLinkSpan(
               documentLinkTarget.filePath ?? documentLinkTarget.docId,
@@ -588,7 +575,7 @@ export function planAddTargetsToNode<T extends GraphPlan>(
       if (refTarget || isSearchId(objectID as ID)) {
         const childNode = refTarget
           ? newGraphNode(
-              accPlan.user.publicKey,
+              LOCAL,
               [linkSpan(refTarget.targetID, refTarget.linkText || "")],
               {
                 root: parentNode.root,
@@ -603,18 +590,14 @@ export function planAddTargetsToNode<T extends GraphPlan>(
               spans: plainSpans(""),
               parent: parentNode.id,
               updated: Date.now(),
-              author: accPlan.user.publicKey,
+              author: LOCAL,
               root: parentNode.root,
               relevance,
               argument,
             } as GraphNode);
         const planWithChild = planUpsertNodes(accPlan, childNode);
         const sourceNode = refTarget
-          ? getNode(
-              planWithChild.knowledgeDBs,
-              refTarget.targetID,
-              planWithChild.user.publicKey
-            )
+          ? getNode(planWithChild.knowledgeDBs, refTarget.targetID, LOCAL)
           : undefined;
         const planWithSourceRoot = sourceNode
           ? planMarkDocumentAffected(planWithChild, sourceNode)
@@ -630,11 +613,7 @@ export function planAddTargetsToNode<T extends GraphPlan>(
         ];
       }
 
-      const existingNode = getNode(
-        accPlan.knowledgeDBs,
-        objectID,
-        accPlan.user.publicKey
-      );
+      const existingNode = getNode(accPlan.knowledgeDBs, objectID, LOCAL);
       if (existingNode && existingNode.id === objectID) {
         const updatedChild = {
           ...existingNode,
@@ -655,14 +634,10 @@ export function planAddTargetsToNode<T extends GraphPlan>(
         ];
       }
 
-      const childNode = newGraphNode(
-        accPlan.user.publicKey,
-        plainSpans(objectText || ""),
-        {
-          root: parentNode.root,
-          parent: parentNode.id,
-        }
-      );
+      const childNode = newGraphNode(LOCAL, plainSpans(objectText || ""), {
+        root: parentNode.root,
+        parent: parentNode.id,
+      });
       const nodeWithMetadata = {
         ...childNode,
         relevance,
@@ -728,7 +703,7 @@ export function planAddTopTargetsToDocument<T extends GraphPlan>(
         return [accPlan, accIds];
       }
       const topNode = newGraphNode(
-        accPlan.user.publicKey,
+        LOCAL,
         [
           fileLinkSpan(
             documentLinkTarget.filePath ?? documentLinkTarget.docId,

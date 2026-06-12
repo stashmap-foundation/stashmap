@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useMediaQuery } from "react-responsive";
 import { List, OrderedSet } from "immutable";
+import { LOCAL } from "../core/nodeRef";
 import { TemporaryViewProvider, useTemporaryView } from "./temporaryViewState";
 
 import { getDisplayTextForRow, getIndependentRows } from "../rowModel";
@@ -130,7 +131,7 @@ function BreadcrumbItem({
 }
 
 type BreadcrumbTarget = {
-  author: PublicKey;
+  author: SourceId;
   sourceId: SourceId;
   documentId?: string;
   rootNodeId?: ID;
@@ -333,7 +334,7 @@ function ForkButton(): JSX.Element | null {
   const isMobile = useMediaQuery(IS_MOBILE);
   const data = useData();
   const currentPane = useCurrentPane();
-  const isViewingOtherUserContent = currentPane.author !== data.user.publicKey;
+  const isViewingOtherUserContent = currentPane.author !== LOCAL;
   const graph = graphLookupFromData(data);
   const currentNode = currentPane.rootNodeId
     ? lookupNode(graph, currentPane.rootNodeId, currentPane.sourceId)?.node
@@ -396,13 +397,13 @@ function ForkButton(): JSX.Element | null {
 }
 
 function HomeButton(): JSX.Element | null {
-  const { knowledgeDBs, user } = useData();
+  const { knowledgeDBs } = useData();
   const navigatePane = useNavigatePane();
-  const logNode = getOwnLogRoot(knowledgeDBs, user.publicKey);
+  const logNode = getOwnLogRoot(knowledgeDBs, LOCAL);
   if (!logNode) {
     return null;
   }
-  const href = buildNodeRouteUrl(logNode.id, user.publicKey);
+  const href = buildNodeRouteUrl(logNode.id, LOCAL);
 
   return (
     <a
@@ -441,17 +442,17 @@ function NewNoteButton(): JSX.Element {
 }
 
 function useHomeShortcut(): void {
-  const { knowledgeDBs, user } = useData();
+  const { knowledgeDBs } = useData();
   const navigatePane = useNavigatePane();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
       if ((e.metaKey || e.ctrlKey) && e.key === "h") {
-        const logNode = getOwnLogRoot(knowledgeDBs, user.publicKey);
+        const logNode = getOwnLogRoot(knowledgeDBs, LOCAL);
         if (!logNode) {
           return;
         }
-        const href = buildNodeRouteUrl(logNode.id, user.publicKey);
+        const href = buildNodeRouteUrl(logNode.id, LOCAL);
         e.preventDefault();
         navigatePane(href);
       }
@@ -459,7 +460,7 @@ function useHomeShortcut(): void {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [navigatePane, knowledgeDBs, user.publicKey]);
+  }, [navigatePane, knowledgeDBs]);
 }
 
 function BackButton(): JSX.Element | null {
@@ -561,9 +562,8 @@ function PaneStatusLine({
 }): JSX.Element {
   const paneIndex = usePaneIndex();
   const pane = useCurrentPane();
-  const { user } = useData();
   const isFirstPane = paneIndex === 0;
-  const isViewingOtherUserContent = pane.author !== user.publicKey;
+  const isViewingOtherUserContent = pane.author !== LOCAL;
 
   return (
     <footer className="pane-status-line">
@@ -1495,8 +1495,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
 function PaneViewInner(): JSX.Element {
   const pane = useCurrentPane();
   const paneIndex = usePaneIndex();
-  const { user } = useData();
-  const isOtherUser = pane.author !== user.publicKey;
+  const isOtherUser = pane.author !== LOCAL;
   const {
     wrapperRef,
     onKeyDownCapture,

@@ -82,14 +82,14 @@ export function findDocumentNodes(
 }
 
 export function buildKnowledgeDBFromDocumentNodes(
-  author: PublicKey,
+  author: SourceId,
   documentNodes: Map<string, GraphNode>
 ): KnowledgeData | undefined {
   if (documentNodes.size === 0) {
     return undefined;
   }
 
-  const baseKnowledgeDBs = Map<PublicKey, KnowledgeData>().set(author, {
+  const baseKnowledgeDBs = Map<SourceId, KnowledgeData>().set(author, {
     ...newDB(),
     nodes: documentNodes,
   });
@@ -98,7 +98,7 @@ export function buildKnowledgeDBFromDocumentNodes(
     .valueSeq()
     .sortBy((node) => getNodeDepth(baseKnowledgeDBs, node))
     .reduce((acc, node) => {
-      const knowledgeDBs = Map<PublicKey, KnowledgeData>().set(node.author, {
+      const knowledgeDBs = Map<SourceId, KnowledgeData>().set(node.author, {
         ...newDB(),
         nodes: acc,
       });
@@ -113,7 +113,7 @@ export function buildKnowledgeDBFromDocumentNodes(
 }
 
 export function buildKnowledgeDBFromDocumentEvents(
-  author: PublicKey,
+  author: SourceId,
   events: List<UnsignedEvent | Event>
 ): KnowledgeData | undefined {
   return buildKnowledgeDBFromDocumentNodes(author, findDocumentNodes(events));

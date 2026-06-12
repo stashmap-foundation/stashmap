@@ -2,9 +2,9 @@ import React, { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useMediaQuery } from "react-responsive";
 import { List } from "immutable";
+import { LOCAL } from "../core/nodeRef";
 import { TYPE_COLORS } from "../core/constants";
 import { IS_MOBILE } from "./responsive";
-import { useData } from "../DataContext";
 import { useCurrentPane } from "../SplitPanesContext";
 import { useTemporaryView } from "./temporaryViewState";
 import { usePaneTreeResult } from "./TreeView";
@@ -72,13 +72,12 @@ export function MobileActionBar({
 }: MobileActionBarProps): JSX.Element | null {
   const isMobile = useMediaQuery(IS_MOBILE);
   const [activeRow, setActiveRow] = useState<HTMLElement | null>(null);
-  const data = useData();
   const pane = useCurrentPane();
   const { selection } = useTemporaryView();
   const { createPlan, executePlan } = usePlanner();
   const treeResult = usePaneTreeResult();
   const rows = treeResult?.rows || List<Row>();
-  const isOtherUser = pane.author !== data.user.publicKey;
+  const isOtherUser = pane.author !== LOCAL;
   const isInSearch = pane.searchQuery !== undefined;
 
   const handleFocusIn = useCallback((e: FocusEvent) => {

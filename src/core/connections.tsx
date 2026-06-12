@@ -28,7 +28,7 @@ export type RefTargetSeed = {
 };
 
 export type DocumentLinkTargetSeed = {
-  author: PublicKey;
+  author: SourceId;
   docId: string;
   filePath?: string;
   linkText?: string;
@@ -42,7 +42,7 @@ export function createRefTarget(
 }
 
 export function createDocumentLinkTarget(
-  author: PublicKey,
+  author: SourceId,
   docId: string,
   filePath?: string,
   linkText?: string
@@ -229,7 +229,7 @@ export function buildTextNodesFromGraphNodes(
     return acc.set(node.author, {
       nodes: authorDB.nodes.set(node.id, node),
     });
-  }, Map<PublicKey, KnowledgeData>());
+  }, Map<SourceId, KnowledgeData>());
 
   const latestByHead = nodeList.reduce((acc, node) => {
     const semanticID = getNodeSemanticID(node);
@@ -254,7 +254,7 @@ export function buildTextNodesFromGraphNodes(
 export function getNode(
   knowledgeDBs: KnowledgeDBs,
   nodeID: ID | undefined,
-  sourceId: PublicKey
+  sourceId: SourceId
 ): GraphNode | undefined {
   if (!nodeID) {
     return undefined;
@@ -265,17 +265,17 @@ export function getNode(
 export function getChildNodes(
   knowledgeDBs: KnowledgeDBs,
   node: GraphNode,
-  myself: PublicKey
+  sourceId: SourceId
 ): List<GraphNode> {
   return node.children.reduce((acc, childID) => {
-    const childNode = getNode(knowledgeDBs, childID, myself);
+    const childNode = getNode(knowledgeDBs, childID, sourceId);
     return childNode ? acc.push(childNode) : acc;
   }, List<GraphNode>());
 }
 
 export type RefTargetInfo = {
   stack: ID[];
-  author: PublicKey;
+  author: SourceId;
   sourceId: SourceId;
   rootNodeId?: ID;
   scrollToId?: string;
@@ -284,7 +284,7 @@ export type RefTargetInfo = {
 export function getNodeRouteTargetInfo(
   nodeID: ID,
   knowledgeDBs: KnowledgeDBs,
-  effectiveAuthor: PublicKey
+  effectiveAuthor: SourceId
 ): RefTargetInfo | undefined {
   const node = getNode(knowledgeDBs, nodeID, effectiveAuthor);
   if (!node) {
@@ -301,7 +301,7 @@ export function getNodeRouteTargetInfo(
 export function getRefTargetInfo(
   refId: ID,
   knowledgeDBs: KnowledgeDBs,
-  effectiveAuthor: PublicKey
+  effectiveAuthor: SourceId
 ): RefTargetInfo | undefined {
   const node = resolveNode(
     knowledgeDBs,
@@ -401,7 +401,7 @@ function resolveFileLinkRootByDocs(
 export function getRefLinkTargetInfo(
   refId: ID,
   knowledgeDBs: KnowledgeDBs,
-  effectiveAuthor: PublicKey,
+  effectiveAuthor: SourceId,
   documents?: Map<string, Document>,
   documentByFilePath?: Map<string, Document>
 ): RefTargetInfo | undefined {
@@ -450,7 +450,7 @@ export function ensureNodeNativeFields(
 export function getSearchNodes(
   searchId: ID,
   foundNodeIDs: List<ID>,
-  myself: PublicKey,
+  myself: SourceId,
   asRefs: boolean = false
 ): { node: GraphNode; childNodes: List<GraphNode> } {
   const rel = {
@@ -573,7 +573,7 @@ export function computeEmptyNodeMetadata(
 export function injectEmptyNodesIntoKnowledgeDBs(
   knowledgeDBs: KnowledgeDBs,
   temporaryEvents: List<TemporaryEvent>,
-  myself: PublicKey
+  myself: SourceId
 ): KnowledgeDBs {
   // Compute current metadata from event stream
   const emptyNodeMetadata = computeEmptyNodeMetadata(temporaryEvents);

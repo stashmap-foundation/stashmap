@@ -82,7 +82,7 @@ declare global {
     publicKey: PublicKey;
   };
 
-  type KnowledgeDBs = Map<PublicKey, KnowledgeData>;
+  type KnowledgeDBs = Map<SourceId, KnowledgeData>;
 
   type SnapshotNodes = Map<string, Map<string, GraphNode>>;
 
@@ -123,7 +123,7 @@ declare global {
 
   type Pane = {
     id: string;
-    author: PublicKey;
+    author: SourceId;
     sourceId: SourceId;
     documentId?: string;
     rootNodeId?: ID;
@@ -212,7 +212,7 @@ declare global {
           targetContext: List<ID>;
           contextLabels: string[];
           targetLabel: string;
-          author: PublicKey;
+          author: SourceId;
           incomingRelevance?: Relevance;
           incomingArgument?: Argument;
           displayAs?: "bidirectional" | "incoming";
@@ -261,7 +261,7 @@ declare global {
     systemRole?: RootSystemRole;
     snapshotId?: string;
     updated: number;
-    author: PublicKey;
+    author: SourceId;
     basedOn?: ID;
     root: ID;
     relevance: Relevance;

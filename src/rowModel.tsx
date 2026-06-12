@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-use-before-define, functional/no-let, functional/immutable-data */
 import React from "react";
 import { Map } from "immutable";
+import { LOCAL } from "./core/nodeRef";
 import {
   isSearchId,
   parseSearchId,
@@ -261,7 +262,7 @@ export function useIsViewingOtherUserContent(): boolean {
   if (user.publicKey === UNAUTHENTICATED_USER_PK) {
     return true;
   }
-  return node.author !== user.publicKey;
+  return node.author !== LOCAL;
 }
 
 export function useNodeIndex(): number | undefined {

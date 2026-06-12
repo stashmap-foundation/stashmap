@@ -9,7 +9,7 @@ import {
   findNewNodeEditor,
   type,
   expectTree,
-  openReadonlyRoute,
+  readonlyRoute,
 } from "./utils.test";
 import { UNAUTHENTICATED_USER_PK } from "./NostrAuthContext";
 import { defaultPane } from "./userSessionState";
@@ -43,10 +43,12 @@ test("Fork works when navigating to a version entry", async () => {
   await type(
     "My Notes{Enter}{Tab}Cities{Enter}{Tab}Paris{Enter}London{Enter}Rome{Enter}Vienna{Escape}"
   );
-  const nodeUrl = await openReadonlyRoute("Cities");
   cleanup();
 
-  renderApp({ ...bob(), initialRoute: nodeUrl });
+  renderApp({
+    ...bob(),
+    initialRoute: readonlyRoute(alice().user.publicKey, "My Notes", "Cities"),
+  });
   await screen.findByText("READONLY");
   await userEvent.click(await screen.findByLabelText("copy root to edit"));
 
@@ -72,14 +74,7 @@ test("Bob can view Alice's node via /r/ URL without following her", async () => 
     "My Notes{Enter}{Tab}Cities{Enter}{Tab}Paris{Enter}London{Escape}"
   );
 
-  await userEvent.click(
-    await screen.findByLabelText("open Cities in fullscreen")
-  );
-
-  await waitFor(() => {
-    expect(window.location.pathname).toMatch(/^\/r\//);
-  });
-  const nodeUrl = `${window.location.pathname}${window.location.search}`;
+  const nodeUrl = readonlyRoute(alice().user.publicKey, "My Notes", "Cities");
   cleanup();
 
   renderApp({ ...bob(), initialRoute: nodeUrl });
@@ -99,14 +94,7 @@ test("Anonymous user can view node via /r/ URL", async () => {
     "My Notes{Enter}{Tab}Cities{Enter}{Tab}Paris{Enter}London{Escape}"
   );
 
-  await userEvent.click(
-    await screen.findByLabelText("open Cities in fullscreen")
-  );
-
-  await waitFor(() => {
-    expect(window.location.pathname).toMatch(/^\/r\//);
-  });
-  const nodeUrl = `${window.location.pathname}${window.location.search}`;
+  const nodeUrl = readonlyRoute(alice().user.publicKey, "My Notes", "Cities");
   cleanup();
 
   renderApp({ ...anon(), initialRoute: nodeUrl });
@@ -131,14 +119,7 @@ test("Anonymous user sees versioned node text via /r/ URL", async () => {
   await userEvent.clear(barcelonaEditor);
   await userEvent.type(barcelonaEditor, "BCN{Escape}");
 
-  await userEvent.click(
-    await screen.findByLabelText("open Cities in fullscreen")
-  );
-
-  await waitFor(() => {
-    expect(window.location.pathname).toMatch(/^\/r\//);
-  });
-  const nodeUrl = `${window.location.pathname}${window.location.search}`;
+  const nodeUrl = readonlyRoute(alice().user.publicKey, "My Notes", "Cities");
   cleanup();
 
   renderApp({ ...anon(), initialRoute: nodeUrl });
@@ -158,14 +139,7 @@ test("Clicking breadcrumb while viewing other user's content preserves READONLY"
     "My Notes{Enter}{Tab}Cities{Enter}{Tab}Paris{Enter}London{Escape}"
   );
 
-  await userEvent.click(
-    await screen.findByLabelText("open Cities in fullscreen")
-  );
-
-  await waitFor(() => {
-    expect(window.location.pathname).toMatch(/^\/r\//);
-  });
-  const nodeUrl = `${window.location.pathname}${window.location.search}`;
+  const nodeUrl = readonlyRoute(alice().user.publicKey, "My Notes", "Cities");
   cleanup();
 
   renderApp({ ...bob(), initialRoute: nodeUrl });
@@ -221,14 +195,7 @@ test("Breadcrumb navigation opens document URLs for document roots", async () =>
     "My Notes{Enter}{Tab}Cities{Enter}{Tab}Paris{Enter}London{Escape}"
   );
 
-  await userEvent.click(
-    await screen.findByLabelText("open Cities in fullscreen")
-  );
-
-  await waitFor(() => {
-    expect(window.location.pathname).toMatch(/^\/r\//);
-  });
-  const nodeUrl = `${window.location.pathname}${window.location.search}`;
+  const nodeUrl = readonlyRoute(alice().user.publicKey, "My Notes", "Cities");
   cleanup();
 
   renderApp({ ...bob(), initialRoute: nodeUrl });
@@ -251,14 +218,7 @@ test("Clicking fullscreen while viewing other user's content preserves READONLY"
     "My Notes{Enter}{Tab}Cities{Enter}{Tab}Paris{Enter}London{Escape}"
   );
 
-  await userEvent.click(
-    await screen.findByLabelText("open Cities in fullscreen")
-  );
-
-  await waitFor(() => {
-    expect(window.location.pathname).toMatch(/^\/r\//);
-  });
-  const nodeUrl = `${window.location.pathname}${window.location.search}`;
+  const nodeUrl = readonlyRoute(alice().user.publicKey, "My Notes", "Cities");
   cleanup();
 
   renderApp({ ...bob(), initialRoute: nodeUrl });
@@ -288,14 +248,7 @@ test("Relay filters never contain invalid pubkeys when anonymous user views /r/ 
     "My Notes{Enter}{Tab}Cities{Enter}{Tab}Paris{Enter}London{Escape}"
   );
 
-  await userEvent.click(
-    await screen.findByLabelText("open Cities in fullscreen")
-  );
-
-  await waitFor(() => {
-    expect(window.location.pathname).toMatch(/^\/r\//);
-  });
-  const nodeUrl = `${window.location.pathname}${window.location.search}`;
+  const nodeUrl = readonlyRoute(alice().user.publicKey, "My Notes", "Cities");
   cleanup();
 
   const { relayPool } = renderApp({ ...anon(), initialRoute: nodeUrl });
@@ -319,14 +272,7 @@ test("/r/ URL takes priority over stale history state", async () => {
     "My Notes{Enter}{Tab}Cities{Enter}{Tab}Paris{Enter}London{Escape}"
   );
 
-  await userEvent.click(
-    await screen.findByLabelText("open Cities in fullscreen")
-  );
-
-  await waitFor(() => {
-    expect(window.location.pathname).toMatch(/^\/r\//);
-  });
-  const nodeUrl = `${window.location.pathname}${window.location.search}`;
+  const nodeUrl = readonlyRoute(alice().user.publicKey, "My Notes", "Cities");
   cleanup();
 
   const stalePanes = [defaultPane(bob().user.publicKey)];

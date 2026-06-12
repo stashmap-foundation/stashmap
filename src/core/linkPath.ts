@@ -56,7 +56,7 @@ export function resolveLinkPath(
 }
 
 export function fileLinkIndexKey(
-  author: PublicKey,
+  author: SourceId,
   normalizedPath: string
 ): string {
   return `${author}:${normalizedPath}`;

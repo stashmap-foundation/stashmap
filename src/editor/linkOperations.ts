@@ -15,7 +15,7 @@ import { AddToParentTarget } from "../planner";
 export type LinkNavigationMode = "link" | "target";
 
 export type EditorNavigationTarget = {
-  author: PublicKey;
+  author: SourceId;
   sourceId: SourceId;
   documentId?: string;
   rootNodeId?: ID;

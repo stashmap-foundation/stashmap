@@ -1,6 +1,7 @@
 import React, { Dispatch, SetStateAction } from "react";
 import { Map as ImmutableMap } from "immutable";
 import { UnsignedEvent } from "nostr-tools";
+import { LOCAL } from "../../core/nodeRef";
 import { useBackend } from "../../BackendContext";
 import { useDocumentStore, useDocuments } from "../../DocumentStore";
 import { ExecutorProvider } from "../../ExecutorContext";
@@ -44,7 +45,7 @@ function collectTakenPaths(
 
 function lookupFilePath(
   documents: ImmutableMap<string, Document>,
-  author: PublicKey,
+  author: SourceId,
   docId: string
 ): string | undefined {
   return documents.get(documentKeyOf(author, docId))?.filePath;
@@ -61,8 +62,12 @@ function enrichWithFilePath(
   documents: ImmutableMap<string, Document>,
   taken: ReadonlySet<string>
 ): EnrichedWrite | undefined {
-  const parsed = eventToParsed(event);
-  if (!parsed) return undefined;
+  const rawParsed = eventToParsed(event);
+  if (!rawParsed) return undefined;
+  const parsed = {
+    document: { ...rawParsed.document, author: LOCAL },
+    nodes: rawParsed.nodes.map((node) => ({ ...node, author: LOCAL })),
+  };
   const { document } = parsed;
   const existing = lookupFilePath(documents, document.author, document.docId);
   const filePath =
@@ -81,8 +86,9 @@ function enrichDelete(
   event: UnsignedEvent,
   documents: ImmutableMap<string, Document>
 ): { del: DocumentDelete; filePath?: string } | undefined {
-  const del = eventToDocumentDelete(event);
-  if (!del) return undefined;
+  const rawDel = eventToDocumentDelete(event);
+  if (!rawDel) return undefined;
+  const del = { ...rawDel, author: LOCAL };
   return {
     del,
     filePath: lookupFilePath(documents, del.author, del.docId),

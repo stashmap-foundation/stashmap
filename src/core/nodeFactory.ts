@@ -16,7 +16,7 @@ function graphNodeId(uuid?: string): ID {
 }
 
 export function newGraphNode(
-  myself: PublicKey,
+  author: SourceId,
   spans: InlineSpan[],
   options: NewGraphNodeOptions = {}
 ): GraphNode {
@@ -33,7 +33,7 @@ export function newGraphNode(
       ? { systemRole: options.systemRole }
       : {}),
     updated: Date.now(),
-    author: myself,
+    author,
     root,
     relevance: options.relevance,
     ...(options.argument !== undefined ? { argument: options.argument } : {}),

@@ -1,5 +1,6 @@
 import React from "react";
 import { List } from "immutable";
+import { LOCAL } from "../core/nodeRef";
 import {
   ViewPath,
   useSearchDepth,
@@ -160,7 +161,7 @@ function logNodeNotFoundDebug({
         }))
     )
     .toArray();
-  const userNode = getNode(data.knowledgeDBs, rowID, data.user.publicKey);
+  const userNode = getNode(data.knowledgeDBs, rowID, LOCAL);
   const paneNode = getNode(data.knowledgeDBs, rowID, pane?.author);
   const rootNode = getNode(data.knowledgeDBs, pane?.rootNodeId, pane?.author);
   const nodeSummary = (node: typeof userNode): Record<string, unknown> | null =>
@@ -190,7 +191,7 @@ function logNodeNotFoundDebug({
     rowID,
     displayText,
     pane,
-    user: data.user.publicKey,
+    user: LOCAL,
     totalNodeCount,
     dbs,
     documents: data.documents.size,
@@ -205,13 +206,12 @@ function VersionContent({
   reference,
 }: {
   reference: {
-    author: PublicKey;
+    author: SourceId;
     versionMeta?: Row["versionMeta"];
   };
 }): JSX.Element {
-  const { user } = useData();
   const meta = reference.versionMeta;
-  const isOtherUser = reference.author !== user.publicKey;
+  const isOtherUser = reference.author !== LOCAL;
   const dateStr = meta ? new Date(meta.updated).toLocaleString() : "";
   return (
     <span className="break-word" data-testid="reference-row">
@@ -243,7 +243,7 @@ function ReferenceContent({
     text: string;
     targetLabel: string;
     contextLabels: string[];
-    author: PublicKey;
+    author: SourceId;
     displayAs?: "bidirectional" | "incoming";
     incomingRelevance?: Relevance;
     incomingArgument?: Argument;
@@ -825,15 +825,13 @@ export function Node({
     className !== undefined ? `${className} hover-light-bg` : "hover-light-bg";
   const clsBody = cardBodyClassName || "ps-0";
 
-  const { user } = useData();
   const data = useData();
   const isConcreteRef = isRefNode(row.node);
   const { virtualType } = row;
   const currentNode = useCurrentNode();
   const isViewingOtherUser = useIsViewingOtherUserContent();
   const node = getCurrentReferenceForRow(data, row);
-  const isOtherUser =
-    (node && node.author !== user.publicKey) || isViewingOtherUser;
+  const isOtherUser = (node && node.author !== LOCAL) || isViewingOtherUser;
 
   const isVersion = virtualType === "version" || !!node?.versionMeta;
   const isSuggestionWithChildren =

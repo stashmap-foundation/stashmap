@@ -8,7 +8,7 @@ export function isStandaloneRoot(node: GraphNode): boolean {
 
 export function getOwnSystemRoot(
   knowledgeDBs: KnowledgeDBs,
-  author: PublicKey,
+  author: SourceId,
   systemRole: RootSystemRole
 ): GraphNode | undefined {
   return knowledgeDBs
@@ -26,7 +26,7 @@ export function getOwnSystemRoot(
 
 export function getOwnLogRoot(
   knowledgeDBs: KnowledgeDBs,
-  author: PublicKey
+  author: SourceId
 ): GraphNode | undefined {
   return getOwnSystemRoot(knowledgeDBs, author, LOG_ROOT_ROLE);
 }

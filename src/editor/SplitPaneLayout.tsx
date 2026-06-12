@@ -3,6 +3,7 @@ import { useMediaQuery } from "react-responsive";
 import { Dropdown } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import { nip19 } from "nostr-tools";
+import { LOCAL } from "../core/nodeRef";
 import {
   useSplitPanes,
   PaneIndexProvider,
@@ -25,7 +26,7 @@ export function PaneSearchButton(): JSX.Element {
   const { setPane } = useSplitPanes();
   const pane = useCurrentPane();
   const paneIndex = usePaneIndex();
-  const { user, knowledgeDBs } = useData();
+  const { knowledgeDBs } = useData();
   const [showInput, setShowInput] = useState(false);
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -45,8 +46,8 @@ export function PaneSearchButton(): JSX.Element {
       ).toArray();
       setPane({
         ...pane,
-        author: user.publicKey,
-        sourceId: user.publicKey,
+        author: LOCAL,
+        sourceId: LOCAL,
         documentId: undefined,
         rootNodeId: undefined,
         scrollToId: undefined,
@@ -105,7 +106,6 @@ export function ClosePaneButton(): JSX.Element | null {
   const { panes } = useSplitPanes();
   const paneIndex = usePaneIndex();
   const { createPlan, executePlan } = usePlanner();
-  const { user } = useData();
 
   if (isMobile) {
     return null;
@@ -116,8 +116,8 @@ export function ClosePaneButton(): JSX.Element | null {
     if (panes.length <= 1) {
       const freshPane: Pane = {
         id: generatePaneId(),
-        author: user.publicKey,
-        sourceId: user.publicKey,
+        author: LOCAL,
+        sourceId: LOCAL,
       };
       executePlan(planUpdatePanes(plan, [freshPane]));
       return;
@@ -270,8 +270,7 @@ export function PaneRootViewProvider({
 function PaneContent(): JSX.Element {
   const pane = useCurrentPane();
   const paneIndex = usePaneIndex();
-  const { user } = useData();
-  const isOtherUserContent = pane.author !== user.publicKey;
+  const isOtherUserContent = pane.author !== LOCAL;
 
   const paneClassName = isOtherUserContent
     ? "split-pane other-user-pane"

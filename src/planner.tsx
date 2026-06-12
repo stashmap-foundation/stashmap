@@ -45,6 +45,7 @@ import {
   addNodeToPathWithNodes,
 } from "./rowModel";
 import { nodeText, plainSpans } from "./core/nodeSpans";
+import { LOCAL } from "./core/nodeRef";
 import { useRelaysToCreatePlan } from "./relays";
 import {
   MultiSelectionState,
@@ -80,7 +81,7 @@ export function planUpdateNodeText(
   currentNode: GraphNode,
   text: string
 ): Plan {
-  if (currentNode.author !== plan.user.publicKey) {
+  if (currentNode.author !== LOCAL) {
     return plan;
   }
   if (nodeText(currentNode) === text) {
@@ -96,10 +97,10 @@ export function planUpdateNodeText(
 
 function removeEmptyNodeFromKnowledgeDBs(
   knowledgeDBs: KnowledgeDBs,
-  publicKey: PublicKey,
+  sourceId: SourceId,
   nodeID: ID
 ): KnowledgeDBs {
-  const myDB = knowledgeDBs.get(publicKey);
+  const myDB = knowledgeDBs.get(sourceId);
   if (!myDB) {
     return knowledgeDBs;
   }
@@ -121,7 +122,7 @@ function removeEmptyNodeFromKnowledgeDBs(
     ...existingNodes,
     children: filteredItems,
   });
-  return knowledgeDBs.set(publicKey, {
+  return knowledgeDBs.set(sourceId, {
     ...myDB,
     nodes: updatedNodes,
   });
@@ -253,7 +254,7 @@ export function planRemoveEmptyNodePosition(plan: Plan, nodeID: ID): Plan {
     ...plan,
     knowledgeDBs: removeEmptyNodeFromKnowledgeDBs(
       plan.knowledgeDBs,
-      plan.user.publicKey,
+      LOCAL,
       nodeID
     ),
     temporaryEvents: plan.temporaryEvents.push({
@@ -339,8 +340,8 @@ export function planForkPane(
     i === paneIndex
       ? {
           ...p,
-          author: plan.user.publicKey,
-          sourceId: plan.user.publicKey,
+          author: LOCAL,
+          sourceId: LOCAL,
           rootNodeId: newRootNodeId,
         }
       : p
@@ -357,11 +358,8 @@ function copyDeepNodeViewState(
   insertAtIndex?: number
 ): Plan {
   const nodes =
-    getNode(
-      planWithCopy.knowledgeDBs,
-      targetParentNode.id,
-      planWithCopy.user.publicKey
-    ) ?? targetParentNode;
+    getNode(planWithCopy.knowledgeDBs, targetParentNode.id, LOCAL) ??
+    targetParentNode;
   if (nodes.children.size === 0) {
     return planWithCopy;
   }
@@ -473,7 +471,7 @@ function planCreateNoteAtRoot(
 ): SaveNodeResult {
   const [planWithSeed, createdSeed] = planCreateNode(plan, text);
   const createdNode = withDocumentRoot(
-    newGraphNode(plan.user.publicKey, plainSpans(createdSeed.text))
+    newGraphNode(LOCAL, plainSpans(createdSeed.text))
   );
   const planWithNode = planUpsertNodes(planWithSeed, createdNode);
 
@@ -481,8 +479,8 @@ function planCreateNoteAtRoot(
     i === paneIndex
       ? {
           ...p,
-          author: plan.user.publicKey,
-          sourceId: plan.user.publicKey,
+          author: LOCAL,
+          sourceId: LOCAL,
           documentId: undefined,
           rootNodeId: createdNode.id,
           searchQuery: undefined,
@@ -555,7 +553,7 @@ export function planSaveNodeAndEnsureNodes(
     return { plan: resultPlan, viewPath, node: currentNode };
   }
 
-  const currentItem = getNode(plan.knowledgeDBs, rowID, plan.user.publicKey);
+  const currentItem = getNode(plan.knowledgeDBs, rowID, LOCAL);
   if ((currentItem && isRefNode(currentItem)) || isSearchId(rowID)) {
     return { plan, viewPath, node: currentNode };
   }
@@ -617,7 +615,7 @@ const PlanningContext = React.createContext<PlanningContextValue | undefined>(
 function resolveBasedOnNode(
   knowledgeDBs: KnowledgeDBs,
   nodeID: ID,
-  myself: PublicKey
+  myself: SourceId
 ): GraphNode | undefined {
   const own = getNode(knowledgeDBs, nodeID, myself);
   if (own) {
@@ -633,7 +631,7 @@ function resolveBasedOnNode(
 function getSnapshotSourceRoot(
   knowledgeDBs: KnowledgeDBs,
   snapshotAnchorNode: GraphNode | undefined,
-  fallbackAuthor: PublicKey
+  fallbackAuthor: SourceId
 ): GraphNode | undefined {
   if (!snapshotAnchorNode?.basedOn) {
     return undefined;
@@ -651,15 +649,15 @@ function getSnapshotSourceRoot(
 export function buildDocumentEvents(
   plan: GraphPlan
 ): List<UnsignedEvent & EventAttachment> {
-  const author = plan.user.publicKey;
+  const pubkey = plan.user.publicKey;
   const withUpserts = plan.affectedDocuments.reduce((events, docId) => {
-    const document = plan.documents.get(documentKeyOf(author, docId));
+    const document = plan.documents.get(documentKeyOf(LOCAL, docId));
     if (!document) {
       return events;
     }
     const topNodes = document.topNodeShortIds
       .map((topNodeShortId) =>
-        plan.knowledgeDBs.get(author)?.nodes.get(topNodeShortId)
+        plan.knowledgeDBs.get(LOCAL)?.nodes.get(topNodeShortId)
       )
       .filter((node): node is GraphNode => node !== undefined);
     const snapshotAnchorNode = topNodes.find(
@@ -668,7 +666,7 @@ export function buildDocumentEvents(
     const snapshotSourceRoot = getSnapshotSourceRoot(
       plan.knowledgeDBs,
       snapshotAnchorNode,
-      author
+      LOCAL
     );
     const sourceDocument = snapshotSourceRoot?.docId
       ? plan.documents.get(
@@ -678,11 +676,11 @@ export function buildDocumentEvents(
     const snapshotEvent = sourceDocument
       ? (buildSnapshotEventFromNodes(
           plan.knowledgeDBs,
-          author,
+          pubkey,
           sourceDocument
         ) as UnsignedEvent & EventAttachment)
       : undefined;
-    const event = buildDocumentEvent(plan.knowledgeDBs, document, {
+    const event = buildDocumentEvent(plan.knowledgeDBs, document, pubkey, {
       snapshotId:
         topNodes.find((topNode) => topNode.snapshotId)?.snapshotId ??
         (snapshotEvent ? findTag(snapshotEvent, "d") : undefined),
@@ -696,10 +694,10 @@ export function buildDocumentEvents(
   return plan.deletedDocs.reduce((events, docId) => {
     const deleteEvent = {
       kind: KIND_DELETE,
-      pubkey: author,
+      pubkey,
       created_at: newTimestamp(),
       tags: [
-        ["a", `${KIND_KNOWLEDGE_DOCUMENT}:${author}:${docId}`],
+        ["a", `${KIND_KNOWLEDGE_DOCUMENT}:${pubkey}:${docId}`],
         ["k", `${KIND_KNOWLEDGE_DOCUMENT}`],
         msTag(),
       ],
@@ -793,7 +791,7 @@ export function planSetEmptyNodePosition(
   paneIndex: number,
   insertIndex: number
 ): Plan {
-  if (parentNode.author !== plan.user.publicKey) {
+  if (parentNode.author !== LOCAL) {
     return plan;
   }
   const planWithExpanded = planExpandNode(plan, parentView, parentViewPath);
@@ -810,7 +808,7 @@ export function planSetEmptyNodePosition(
         spans: plainSpans(""),
         parent: parentNode.id,
         updated: Date.now(),
-        author: plan.user.publicKey,
+        author: LOCAL,
         root: parentNode.root,
         relevance: undefined,
       },

@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { Map as ImmutableMap } from "immutable";
+import { LOCAL } from "../../core/nodeRef";
 import { useBackend } from "../../BackendContext";
 import { useDocumentStore, useDocuments } from "../../DocumentStore";
 import { Document, parseToDocument } from "../../core/Document";
@@ -62,7 +63,7 @@ export function FilesystemWatcher(): null {
         return;
       }
       const existing = findExistingByFilePath(documents, event.relativePath);
-      const parsed = parseToDocument(profile.pubkey, event.content, {
+      const parsed = parseToDocument(LOCAL, event.content, {
         filePath: event.relativePath,
         relativePath: event.relativePath,
         updatedMsOverride: Date.now(),

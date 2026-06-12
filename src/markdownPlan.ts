@@ -1,4 +1,5 @@
 import { v4 } from "uuid";
+import { LOCAL } from "./core/nodeRef";
 import { getNode } from "./core/connections";
 import {
   MarkdownImportFile,
@@ -25,7 +26,7 @@ export function planCreateNodesFromMarkdownTrees<T extends GraphPlan>(
   const createDocuments = options.createDocuments ?? true;
   const walkContext: WalkContext = {
     knowledgeDBs: plan.knowledgeDBs,
-    publicKey: plan.user.publicKey,
+    publicKey: LOCAL,
     affectedDocuments: plan.affectedDocuments,
   };
   const treesWithDocIds = createDocuments
@@ -34,7 +35,7 @@ export function planCreateNodesFromMarkdownTrees<T extends GraphPlan>(
         docId: tree.docId ?? v4(),
       }))
     : trees;
-  const result = materializeTree(treesWithDocIds, plan.user.publicKey, {
+  const result = materializeTree(treesWithDocIds, LOCAL, {
     context: walkContext,
   });
   const planWithNodes: T = {
@@ -45,7 +46,7 @@ export function planCreateNodesFromMarkdownTrees<T extends GraphPlan>(
   if (!createDocuments) {
     return [planWithNodes, result.topSemanticIds, result.topNodeIds];
   }
-  const userNodes = result.context.knowledgeDBs.get(plan.user.publicKey)?.nodes;
+  const userNodes = result.context.knowledgeDBs.get(LOCAL)?.nodes;
   const planWithDocs = result.topNodeIds.reduce<T>((acc, longId) => {
     const rootNode = userNodes?.get(longId);
     return rootNode ? planUpsertRootDocument(acc, rootNode) : acc;
@@ -76,7 +77,7 @@ export function planCreateNodesFromMarkdown<T extends GraphPlan>(
 
   const fallbackText = "Imported Markdown";
   const fallbackNode = withDocumentRoot(
-    newGraphNode(nextPlan.user.publicKey, plainSpans(fallbackText))
+    newGraphNode(LOCAL, plainSpans(fallbackText))
   );
   return [
     planUpsertNodes(nextPlan, fallbackNode),
@@ -91,7 +92,7 @@ function moveCreatedTreesToParent<T extends GraphPlan>(
 ): T {
   return sourceNodeIDs.reduce((accPlan, sourceNodeID) => {
     const sourceNode = sourceNodeID
-      ? getNode(accPlan.knowledgeDBs, sourceNodeID, accPlan.user.publicKey)
+      ? getNode(accPlan.knowledgeDBs, sourceNodeID, LOCAL)
       : undefined;
     if (!sourceNode) {
       return accPlan;
@@ -127,11 +128,7 @@ function planInsertMarkdownTreesByParentId<T extends GraphPlan>(
     };
   }
 
-  const parentNode = getNode(
-    plan.knowledgeDBs,
-    parentNodeId,
-    plan.user.publicKey
-  );
+  const parentNode = getNode(plan.knowledgeDBs, parentNodeId, LOCAL);
   if (!parentNode) {
     return {
       plan,

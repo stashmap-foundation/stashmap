@@ -1,3 +1,4 @@
+import { LOCAL } from "./core/nodeRef";
 import {
   createRefTarget,
   createDocumentLinkTarget,
@@ -37,7 +38,7 @@ import {
 export type { NodeItemMetadata } from "./nodeItemMetadata";
 
 function getCurrentPlanNode(plan: Plan, node: GraphNode): GraphNode {
-  return getNode(plan.knowledgeDBs, node.id, plan.user.publicKey) ?? node;
+  return getNode(plan.knowledgeDBs, node.id, LOCAL) ?? node;
 }
 
 function planUpdateExistingItemMetadata(
@@ -69,7 +70,7 @@ function planUpdateDocumentTopNodeMetadata(
     documentId === undefined ||
     node.parent ||
     !node.docId ||
-    node.author !== plan.user.publicKey
+    node.author !== LOCAL
   ) {
     return plan;
   }
@@ -88,11 +89,7 @@ function planUpdateDocumentTopNodeMetadata(
           paneIndex
         ).plan
       : plan;
-  const updatedNode = getNode(
-    basePlan.knowledgeDBs,
-    node.id,
-    plan.user.publicKey
-  );
+  const updatedNode = getNode(basePlan.knowledgeDBs, node.id, LOCAL);
 
   return updatedNode
     ? planUpsertNodes(basePlan, updateNodeItemMetadata(updatedNode, metadata))
@@ -145,7 +142,7 @@ function getIncomingFileLinkSource(
     return undefined;
   }
   const sourceID = getBlockLinkTarget(node) ?? node.id;
-  const sourceRow = getNode(plan.knowledgeDBs, sourceID, plan.user.publicKey);
+  const sourceRow = getNode(plan.knowledgeDBs, sourceID, LOCAL);
   return isBlockFileLink(sourceRow) ? sourceRow : undefined;
 }
 
@@ -154,7 +151,7 @@ function planAcceptDocumentTopIncoming(
   input: {
     node: GraphNode;
     virtualType: Row["virtualType"];
-    paneAuthor: PublicKey;
+    paneAuthor: SourceId;
     documentId: string | undefined;
     isDocumentTopLevel: boolean;
   },
@@ -173,7 +170,7 @@ function planAcceptDocumentTopIncoming(
   if (!isDocumentTopLevel || !document || virtualType !== "incoming") {
     return undefined;
   }
-  const sourceRow = getNode(plan.knowledgeDBs, node.id, plan.user.publicKey);
+  const sourceRow = getNode(plan.knowledgeDBs, node.id, LOCAL);
   if (!sourceRow || !isBlockFileLink(sourceRow)) {
     return undefined;
   }
@@ -222,7 +219,7 @@ export function planUpdateViewItemMetadata(
     childIndex: number | undefined;
     virtualType: Row["virtualType"];
     paneIndex: number;
-    paneAuthor: PublicKey;
+    paneAuthor: SourceId;
     documentId: string | undefined;
     isDocumentTopLevel: boolean;
   },
@@ -311,7 +308,7 @@ export function planUpdateViewItemMetadata(
       rowID;
     const targetID = getBlockLinkTarget(node);
     const inheritedSourceNode = targetID
-      ? getNode(plan.knowledgeDBs, targetID, plan.user.publicKey)
+      ? getNode(plan.knowledgeDBs, targetID, LOCAL)
       : undefined;
     return planAddToParent(
       plan,

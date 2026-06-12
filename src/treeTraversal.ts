@@ -1,4 +1,5 @@
 import { List, Map, Set as ImmutableSet } from "immutable";
+import { LOCAL } from "./core/nodeRef";
 import {
   ViewPath,
   addNodeToPathWithNodes,
@@ -58,7 +59,7 @@ function emptyTreeResult(rows: List<Row> = List<Row>()): TreeResult {
 }
 
 function sourceIdForPath(data: Data, path: ViewPath): SourceId {
-  return data.panes[path[0]]?.sourceId ?? data.user.publicKey;
+  return data.panes[path[0]]?.sourceId ?? LOCAL;
 }
 
 type VirtualFooterInput = {
@@ -66,7 +67,7 @@ type VirtualFooterInput = {
   parentRow?: Row;
   parentID?: ID;
   parentSourceId: SourceId;
-  parentAuthor: PublicKey;
+  parentAuthor: SourceId;
   parentRoot: ID;
   parentUpdated: number;
   incomingCrefs: List<NodeRef>;
@@ -209,13 +210,13 @@ function getNodeIndexForRowID(
   return index >= 0 ? index : undefined;
 }
 
-function emptyRootNode(data: Data): GraphNode {
+function emptyRootNode(): GraphNode {
   return {
     children: List<ID>(),
     id: EMPTY_SEMANTIC_ID,
     spans: plainSpans(""),
     updated: Date.now(),
-    author: data.user.publicKey,
+    author: LOCAL,
     root: EMPTY_SEMANTIC_ID,
     relevance: undefined,
   };
@@ -260,7 +261,7 @@ function resolveRowForPath(
   const node =
     edgeNode ??
     resolved?.node ??
-    (rowID === EMPTY_SEMANTIC_ID ? emptyRootNode(data) : undefined);
+    (rowID === EMPTY_SEMANTIC_ID ? emptyRootNode() : undefined);
   if (!node) {
     return undefined;
   }
@@ -508,7 +509,7 @@ function getChildrenForRegularNode(
   graph: GraphLookup,
   parentRow: Row,
   rootNode: ID | undefined,
-  author: PublicKey,
+  author: SourceId,
   typeFilters: Pane["typeFilters"],
   options?: TreeTraversalOptions
 ): TreeResult {
@@ -558,8 +559,8 @@ function getChildrenForRegularNode(
 
   const containingNodeID = parentRow.parentNode?.id;
   const effectiveAuthor = nodes.author;
-  const visibleAuthors = ImmutableSet<PublicKey>([
-    data.user.publicKey,
+  const visibleAuthors = ImmutableSet<SourceId>([
+    LOCAL,
     author,
     effectiveAuthor,
   ]);
@@ -580,7 +581,7 @@ function getChildrenForRegularNode(
     ? incomingCrefs
     : List<NodeRef>();
 
-  const isOwnContent = effectiveAuthor === data.user.publicKey;
+  const isOwnContent = effectiveAuthor === LOCAL;
   const { suggestions: diffItems, versionMetas } = getAlternativeFooterData(
     graph,
     visibleAuthors,
@@ -595,7 +596,7 @@ function getChildrenForRegularNode(
     parentRow,
     parentID: nodes.id,
     parentSourceId: nodeSourceId,
-    parentAuthor: nodes.author ?? data.user.publicKey,
+    parentAuthor: nodes.author ?? LOCAL,
     parentRoot: nodes.root ?? rootNode ?? nodes.id,
     parentUpdated: nodes.updated ?? Date.now(),
     incomingCrefs: visibleIncomingCrefs,
@@ -613,7 +614,7 @@ function getTreeChildrenForResolvedRow(
   graph: GraphLookup,
   parentRow: Row,
   rootNode: ID | undefined,
-  author: PublicKey,
+  author: SourceId,
   typeFilters: Pane["typeFilters"],
   options?: TreeTraversalOptions
 ): TreeResult {
@@ -636,7 +637,7 @@ export function getTreeChildren(
   data: Data,
   parentPath: ViewPath,
   rootNode: ID | undefined,
-  author: PublicKey,
+  author: SourceId,
   typeFilters: Pane["typeFilters"],
   options?: TreeTraversalOptions
 ): TreeResult {
@@ -666,7 +667,7 @@ function getNodesInRows(
   rootRows: List<Row>,
   ctx: List<Row>,
   rootNode: ID | undefined,
-  author: PublicKey,
+  author: SourceId,
   typeFilters: Pane["typeFilters"],
   options?: TreeTraversalOptions
 ): TreeResult {
@@ -709,7 +710,7 @@ export function getNodesInTree(
   rootPaths: List<ViewPath>,
   ctx: List<ViewPath>,
   rootNode: ID | undefined,
-  author: PublicKey,
+  author: SourceId,
   typeFilters: Pane["typeFilters"],
   options?: TreeTraversalOptions
 ): TreeResult {
@@ -774,10 +775,7 @@ export function getNodesInDocument(
     return treeResult;
   }
 
-  const visibleAuthors = ImmutableSet<PublicKey>([
-    data.user.publicKey,
-    document.author,
-  ]);
+  const visibleAuthors = ImmutableSet<SourceId>([LOCAL, document.author]);
   const incomingCrefs = getIncomingCrefsForNode(
     graph,
     visibleAuthors,

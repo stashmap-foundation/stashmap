@@ -1,5 +1,6 @@
 import React from "react";
 import { Map } from "immutable";
+import { LOCAL } from "./core/nodeRef";
 import { newDB } from "./core/knowledge";
 import { injectEmptyNodesIntoKnowledgeDBs } from "./core/connections";
 import {
@@ -48,7 +49,7 @@ function mergeDBNodesAndNodes(
 
 function mergeKnowledgeDBs(a: KnowledgeDBs, b: KnowledgeDBs): KnowledgeDBs {
   const allUsers = a.keySeq().toSet().union(b.keySeq().toSet());
-  return Map<PublicKey, KnowledgeData>(
+  return Map<SourceId, KnowledgeData>(
     allUsers.toArray().map((userPK) => {
       return [userPK, mergeDBNodesAndNodes(a.get(userPK), b.get(userPK))];
     })
@@ -64,7 +65,6 @@ export function MergeKnowledgeDB({
 }): JSX.Element {
   const data = useData();
   const { temporaryEvents } = data.publishEventsStatus;
-  const myself = data.user.publicKey;
 
   const documentDBs = useDocumentKnowledgeDBs();
   const graphIndex = useDocumentGraphIndex();
@@ -79,7 +79,7 @@ export function MergeKnowledgeDB({
   const injectedDBs = injectEmptyNodesIntoKnowledgeDBs(
     baseDBs,
     temporaryEvents,
-    myself
+    LOCAL
   );
 
   return (

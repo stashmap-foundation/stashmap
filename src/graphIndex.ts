@@ -1,8 +1,8 @@
 import { Map as ImmutableMap } from "immutable";
+import { LOCAL, nodeRefKey } from "./core/nodeRef";
 import { EMPTY_SEMANTIC_ID } from "./core/connections";
 import { getAllFileLinks, getAllLinks, nodeText } from "./core/nodeSpans";
 import { fileLinkIndexKey, resolveLinkPath } from "./core/linkPath";
-import { nodeRefKey } from "./core/nodeRef";
 
 export function createEmptyGraphIndex(): GraphIndex {
   return {
@@ -75,13 +75,6 @@ function removeFromNodeMap(
   if (existing.size === 0) {
     map.delete(targetNodeID);
   }
-}
-
-function sourceIdForNode(
-  explicitSourceId: SourceId | undefined,
-  node: GraphNode
-): SourceId {
-  return explicitSourceId ?? node.author;
 }
 
 function sameRef(left: NodeRef, right: NodeRef): boolean {
@@ -408,8 +401,8 @@ function cloneIndex(graphIndex: GraphIndex): GraphIndex {
 export function addNodesToGraphIndex(
   graphIndex: GraphIndex,
   nodes: ImmutableMap<string, GraphNode>,
-  sourceFilePath?: string,
-  sourceId?: SourceId
+  sourceFilePath: string | undefined,
+  sourceId: SourceId
 ): GraphIndex {
   if (nodes.size === 0) {
     return graphIndex;
@@ -418,16 +411,11 @@ export function addNodesToGraphIndex(
   const nextIndex = cloneIndex(graphIndex);
 
   nodes.valueSeq().forEach((node) => {
-    addNodeSourceEntries(nextIndex, node, sourceIdForNode(sourceId, node));
+    addNodeSourceEntries(nextIndex, node, sourceId);
   });
 
   nodes.valueSeq().forEach((node) => {
-    addNodeSemanticEntries(
-      nextIndex,
-      node,
-      sourceIdForNode(sourceId, node),
-      sourceFilePath
-    );
+    addNodeSemanticEntries(nextIndex, node, sourceId, sourceFilePath);
   });
   return nextIndex;
 }
@@ -435,8 +423,8 @@ export function addNodesToGraphIndex(
 export function removeNodesFromGraphIndex(
   graphIndex: GraphIndex,
   nodes: ImmutableMap<string, GraphNode>,
-  sourceFilePath?: string,
-  sourceId?: SourceId
+  sourceFilePath: string | undefined,
+  sourceId: SourceId
 ): GraphIndex {
   if (nodes.size === 0) {
     return graphIndex;
@@ -445,15 +433,10 @@ export function removeNodesFromGraphIndex(
   const nextIndex = cloneIndex(graphIndex);
 
   nodes.valueSeq().forEach((node) => {
-    removeNodeSemanticEntries(
-      nextIndex,
-      node,
-      sourceIdForNode(sourceId, node),
-      sourceFilePath
-    );
+    removeNodeSemanticEntries(nextIndex, node, sourceId, sourceFilePath);
   });
   nodes.valueSeq().forEach((node) => {
-    removeNodeSourceEntries(nextIndex, node, sourceIdForNode(sourceId, node));
+    removeNodeSourceEntries(nextIndex, node, sourceId);
   });
   return nextIndex;
 }
@@ -461,9 +444,9 @@ export function removeNodesFromGraphIndex(
 function sourceIdFromDocumentKey(
   documentKey: string,
   nodes: ImmutableMap<string, GraphNode>
-): SourceId | undefined {
+): SourceId {
   const [author] = documentKey.split(":");
-  return author || nodes.valueSeq().first()?.author;
+  return author || nodes.valueSeq().first()?.author || LOCAL;
 }
 
 export function buildGraphIndexFromDocuments(

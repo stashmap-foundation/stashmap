@@ -2,6 +2,7 @@ import React from "react";
 import { List } from "immutable";
 import { DndProvider, useDragLayer, XYCoord } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
+import { LOCAL } from "./core/nodeRef";
 import {
   moveNodes,
   createRefTarget,
@@ -56,7 +57,7 @@ function refsEqual(
 }
 
 function getCurrentPlanNode(plan: Plan, node: GraphNode): GraphNode {
-  return getNode(plan.knowledgeDBs, node.id, plan.user.publicKey) ?? node;
+  return getNode(plan.knowledgeDBs, node.id, LOCAL) ?? node;
 }
 
 function addFallbackLinkText(

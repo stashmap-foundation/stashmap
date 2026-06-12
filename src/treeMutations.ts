@@ -1,3 +1,4 @@
+import { LOCAL } from "./core/nodeRef";
 import { getNode, isSearchId } from "./core/connections";
 import { planRemoveNodeItemById } from "./dataPlanner";
 import {
@@ -40,7 +41,7 @@ export function planDisconnectFromParent(
   childID: ID,
   preserveDescendants?: boolean
 ): Plan {
-  if (parentNode.author !== plan.user.publicKey) {
+  if (parentNode.author !== LOCAL) {
     return plan;
   }
 
@@ -78,7 +79,7 @@ export function planDeleteNode(
     return plan;
   }
 
-  if (node.author !== plan.user.publicKey) {
+  if (node.author !== LOCAL) {
     return plan;
   }
 
@@ -105,11 +106,8 @@ export function planMoveNode(
   );
 
   const actualTargetParentNode =
-    getNode(
-      planWithAdd.knowledgeDBs,
-      targetParentNode.id,
-      plan.user.publicKey
-    ) ?? targetParentNode;
+    getNode(planWithAdd.knowledgeDBs, targetParentNode.id, LOCAL) ??
+    targetParentNode;
 
   if (actualTargetParentNode.children.size === 0) {
     return planDisconnectFromParent(

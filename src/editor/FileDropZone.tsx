@@ -1,3 +1,4 @@
+import { LOCAL } from "../core/nodeRef";
 import {
   Plan,
   ParsedLine,
@@ -87,13 +88,13 @@ function upsertParsedDocument(
   plan: Plan,
   file: MarkdownImportFile
 ): { plan: Plan; document: Document } {
-  const parsed = parseToDocument(plan.user.publicKey, file.markdown, {
+  const parsed = parseToDocument(LOCAL, file.markdown, {
     filePath: file.name,
     relativePath: file.name,
     fallbackTitle: titleFromFileName(file.name),
     context: {
       knowledgeDBs: plan.knowledgeDBs,
-      publicKey: plan.user.publicKey,
+      publicKey: LOCAL,
       affectedDocuments: plan.affectedDocuments,
     },
   });
@@ -134,7 +135,7 @@ function planCreateImportedFilesDocument(
   importedDocuments: ReadonlyArray<Document>
 ): { plan: Plan; document: Document } {
   const root = withDocumentRoot(
-    newGraphNode(plan.user.publicKey, plainSpans("Imported Files"))
+    newGraphNode(LOCAL, plainSpans("Imported Files"))
   );
   const planWithRoot = planUpsertNodes(plan, root);
   const rootDocId = root.docId;

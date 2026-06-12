@@ -1,4 +1,5 @@
 import { List } from "immutable";
+import { LOCAL } from "../core/nodeRef";
 import { newGraphNode } from "../rowModel";
 import { execute } from "../infra/nostr/executor";
 import { createPlan, planUpsertNodes } from "../planner";
@@ -27,7 +28,7 @@ async function uploadMarkdown(alice: UpdateState): Promise<KnowledgeData> {
   const wsID = "my-first-workspace" as ID;
   const workspaceText = "my-first-workspace";
   const workspaceNode: GraphNode = {
-    ...newGraphNode(alice().user.publicKey, plainSpans(workspaceText), {
+    ...newGraphNode(LOCAL, plainSpans(workspaceText), {
       root: wsID,
     }),
     id: wsID,

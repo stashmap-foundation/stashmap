@@ -1,5 +1,6 @@
 import React from "react";
 import { Map, List } from "immutable";
+import { LOCAL } from "./core/nodeRef";
 import { getNodeText, isSearchId, parseSearchId } from "./core/connections";
 import { MergeKnowledgeDB, useData } from "./DataContext";
 import { deduplicateRefsByContext, findRefsToNode } from "./semanticProjection";
@@ -21,7 +22,7 @@ function SearchCrefBuilder({
   foundSemanticIDs: List<ID>;
 }): JSX.Element {
   const data = useData();
-  const { documents, knowledgeDBs, user } = data;
+  const { documents, knowledgeDBs } = data;
   const graph = graphLookupFromData(data);
   const pane = useCurrentPane();
   const effectiveAuthor = pane.author;
@@ -41,7 +42,7 @@ function SearchCrefBuilder({
   });
 
   const searchNodeBase = {
-    ...newGraphNode(user.publicKey, plainSpans("")),
+    ...newGraphNode(LOCAL, plainSpans("")),
     id: searchId as ID,
     root: searchId as ID,
   };
@@ -49,20 +50,20 @@ function SearchCrefBuilder({
     .toSet()
     .toList()
     .map((nodeID): GraphNode => {
-      const targetNode = lookupNode(graph, nodeID as ID, user.publicKey)?.node;
+      const targetNode = lookupNode(graph, nodeID as ID, LOCAL)?.node;
       const targetDocument =
         targetNode?.docId && !targetNode.parent
           ? documents.get(documentKeyOf(targetNode.author, targetNode.docId))
           : undefined;
       const primaryTargetDocument =
         targetNode &&
-        targetNode.author === user.publicKey &&
+        targetNode.author === LOCAL &&
         targetDocument?.topNodeShortIds[0] === targetNode.id
           ? targetDocument
           : undefined;
       const node = primaryTargetDocument
         ? newGraphNode(
-            user.publicKey,
+            LOCAL,
             [
               fileLinkSpan(
                 documentLinkPath(primaryTargetDocument),
@@ -74,7 +75,7 @@ function SearchCrefBuilder({
               parent: searchId as ID,
             }
           )
-        : newGraphNode(user.publicKey, [linkSpan(nodeID as ID, "")], {
+        : newGraphNode(LOCAL, [linkSpan(nodeID as ID, "")], {
             root: searchId as ID,
             parent: searchId as ID,
           });
@@ -97,8 +98,8 @@ function SearchCrefBuilder({
     nodes: Map<ID, GraphNode>(syntheticEntries),
   };
 
-  const syntheticDBs: KnowledgeDBs = Map<PublicKey, KnowledgeData>([
-    [user.publicKey, syntheticDB],
+  const syntheticDBs: KnowledgeDBs = Map<SourceId, KnowledgeData>([
+    [LOCAL, syntheticDB],
   ]);
 
   return (

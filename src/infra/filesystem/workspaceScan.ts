@@ -2,6 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 import { Map as ImmutableMap } from "immutable";
 import ignore, { Ignore } from "ignore";
+import { LOCAL } from "../../core/nodeRef";
 import {
   Document,
   parseToDocumentPreservingExplicitIds,
@@ -122,16 +123,12 @@ async function readAndParseFile(
   const relativePath = path.relative(profile.workspaceDir, absolutePath);
   const currentContent = await fs.readFile(absolutePath, "utf8");
   const fallbackTitle = path.basename(relativePath, ".md") || undefined;
-  const parsed = parseToDocumentPreservingExplicitIds(
-    profile.pubkey,
-    currentContent,
-    {
-      filePath: relativePath,
-      relativePath,
-      ...(fallbackTitle !== undefined ? { fallbackTitle } : {}),
-      ...(context !== undefined ? { context } : {}),
-    }
-  );
+  const parsed = parseToDocumentPreservingExplicitIds(LOCAL, currentContent, {
+    filePath: relativePath,
+    relativePath,
+    ...(fallbackTitle !== undefined ? { fallbackTitle } : {}),
+    ...(context !== undefined ? { context } : {}),
+  });
   return {
     scanned: {
       ...parsed.document,

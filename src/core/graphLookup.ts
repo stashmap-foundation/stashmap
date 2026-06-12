@@ -1,3 +1,4 @@
+import { LOCAL } from "./nodeRef";
 import { getBlockLinkTarget, isBlockLink } from "./nodeSpans";
 
 export type ResolvedNode = {
@@ -27,7 +28,7 @@ type GraphLookupData = Pick<Data, "user" | "knowledgeDBs" | "graphIndex">;
 
 function sourceOrderFromData(data: GraphLookupData): SourceId[] {
   const preferred = [
-    data.user.publicKey,
+    LOCAL,
     ...data.knowledgeDBs.keySeq().toArray(),
     ...data.graphIndex.nodesBySource.keys(),
   ];
@@ -41,7 +42,7 @@ export function graphLookupFromData(data: GraphLookupData): GraphLookup {
   return {
     knowledgeDBs: data.knowledgeDBs,
     graphIndex: data.graphIndex,
-    localSourceId: data.user.publicKey,
+    localSourceId: LOCAL,
     sourceOrder: sourceOrderFromData(data),
   };
 }
@@ -54,7 +55,7 @@ function getNodeFromKnowledgeDBs(
   graph: GraphLookup,
   ref: NodeRef
 ): GraphNode | undefined {
-  const sourceNodes = graph.knowledgeDBs.get(ref.sourceId as PublicKey)?.nodes;
+  const sourceNodes = graph.knowledgeDBs.get(ref.sourceId as SourceId)?.nodes;
   return sourceNodes?.get(ref.id);
 }
 

@@ -1,4 +1,5 @@
 import { Set } from "immutable";
+import { LOCAL } from "./core/nodeRef";
 import { deleteNodes, getNode, isRefNode } from "./core/connections";
 import {
   GraphPlan,
@@ -10,8 +11,8 @@ import {
 import { NodeItemMetadata, updateNodeItemMetadata } from "./nodeItemMetadata";
 
 function getWritableNode(plan: GraphPlan, nodeId: ID): GraphNode | undefined {
-  const node = getNode(plan.knowledgeDBs, nodeId, plan.user.publicKey);
-  if (!node || node.author !== plan.user.publicKey) {
+  const node = getNode(plan.knowledgeDBs, nodeId, LOCAL);
+  if (!node || node.author !== LOCAL) {
     return undefined;
   }
   return node;
@@ -29,9 +30,7 @@ function requireNodeItem(
 ): GraphNode | undefined {
   const index = getNodeItemIndex(node, itemId);
   const childID = index === undefined ? undefined : node.children.get(index);
-  return childID
-    ? getNode(plan.knowledgeDBs, childID, plan.user.publicKey)
-    : undefined;
+  return childID ? getNode(plan.knowledgeDBs, childID, LOCAL) : undefined;
 }
 
 export function planUpdateNodeItemMetadataById<T extends GraphPlan>(
@@ -76,11 +75,7 @@ export function planRemoveNodeItemById<T extends GraphPlan>(
   if (!item || isRefNode(item)) {
     return withoutItem;
   }
-  const sourceNode = getNode(
-    withoutItem.knowledgeDBs,
-    item.id,
-    withoutItem.user.publicKey
-  );
+  const sourceNode = getNode(withoutItem.knowledgeDBs, item.id, LOCAL);
   if (!sourceNode) {
     return withoutItem;
   }

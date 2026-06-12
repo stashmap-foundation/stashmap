@@ -13,7 +13,7 @@ import { nodeText, spansText } from "./nodeSpans";
 import { LOG_ROOT_FILE, LOG_ROOT_ROLE } from "./systemRoots";
 
 export type Document = {
-  author: PublicKey;
+  author: SourceId;
   docId: string;
   topNodeShortIds: string[];
   updatedMs: number;
@@ -30,7 +30,7 @@ export type ParsedDocument = {
 };
 
 export type DocumentDelete = {
-  author: PublicKey;
+  author: SourceId;
   docId: string;
   deletedAt: number;
 };
@@ -55,14 +55,14 @@ export type ParseToDocumentResult = {
   context: WalkContext;
 };
 
-export function documentKeyOf(author: PublicKey, docId: string): string {
-  return `${author}:${docId}`;
+export function documentKeyOf(sourceId: SourceId, docId: string): string {
+  return `${sourceId}:${docId}`;
 }
 
 export function getDocumentByIdOrFilePath(
   documents: ImmutableMap<string, Document>,
   documentByFilePath: ImmutableMap<string, Document>,
-  author: PublicKey,
+  author: SourceId,
   idOrFilePath: string
 ): Document | undefined {
   const documentById = documents.get(documentKeyOf(author, idOrFilePath));
@@ -142,12 +142,12 @@ function firstTopLevelNodeText(
 
 type TreeMaterializer = (
   trees: MarkdownTreeNode[],
-  author: PublicKey,
+  author: SourceId,
   options: MaterializeOptions
 ) => MaterializeResult;
 
 function parseToDocumentWithMaterializer(
-  author: PublicKey,
+  author: SourceId,
   content: string,
   options: ParseToDocumentOptions,
   materialize: TreeMaterializer
@@ -213,7 +213,7 @@ function parseToDocumentWithMaterializer(
 }
 
 export function parseToDocument(
-  author: PublicKey,
+  author: SourceId,
   content: string,
   options: ParseToDocumentOptions = {}
 ): ParseToDocumentResult {
@@ -226,7 +226,7 @@ export function parseToDocument(
 }
 
 export function parseToDocumentPreservingExplicitIds(
-  author: PublicKey,
+  author: SourceId,
   content: string,
   options: ParseToDocumentOptions
 ): ParseToDocumentResult {

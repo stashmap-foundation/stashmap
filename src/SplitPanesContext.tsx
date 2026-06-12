@@ -1,10 +1,12 @@
 import React, { createContext, useContext } from "react";
+import { LOCAL } from "./core/nodeRef";
 import { planUpdatePanes, usePlanner } from "./planner";
 import { useData } from "./DataContext";
 import {
   parseDocumentRouteUrl,
   parseNodeRouteUrl,
   parseSourceFromSearch,
+  resolveAddress,
 } from "./navigationUrl";
 import { usePaneHistory } from "./PaneHistoryContext";
 
@@ -46,7 +48,7 @@ type PaneOperations = {
   panes: Pane[];
   addPaneAt: (
     index: number,
-    author: PublicKey,
+    author: SourceId,
     rootNodeId?: ID,
     scrollToId?: string,
     documentId?: string,
@@ -63,7 +65,7 @@ export function useSplitPanes(): PaneOperations {
 
   const addPaneAt = (
     index: number,
-    author: PublicKey,
+    author: SourceId,
     rootNodeId?: ID,
     scrollToId?: string,
     documentId?: string,
@@ -123,14 +125,18 @@ export function useNavigatePane(): (url: string) => void {
         : urlWithoutHash;
     const search =
       questionMarkIndex >= 0 ? urlWithoutHash.slice(questionMarkIndex) : "";
-    const sourceId = parseSourceFromSearch(search);
-    const author = (sourceId || user.publicKey) as PublicKey;
+    const sourceId = resolveAddress(
+      parseSourceFromSearch(search),
+      user.publicKey
+    );
+    const author = sourceId;
     const documentRoute = parseDocumentRouteUrl(pathname);
     if (documentRoute) {
+      const docSource = resolveAddress(documentRoute.author, user.publicKey);
       setPane({
         id: pane.id,
-        author: documentRoute.author,
-        sourceId: documentRoute.author,
+        author: docSource,
+        sourceId: docSource,
         documentId: documentRoute.docId,
         scrollToId,
       });
@@ -138,7 +144,7 @@ export function useNavigatePane(): (url: string) => void {
     }
     const nodeID = parseNodeRouteUrl(pathname);
     if (nodeID) {
-      const nodeSourceId = sourceId || user.publicKey;
+      const nodeSourceId = sourceId;
       setPane({
         id: pane.id,
         author: nodeSourceId as PublicKey,
@@ -150,7 +156,7 @@ export function useNavigatePane(): (url: string) => void {
       setPane({
         id: pane.id,
         author,
-        sourceId: sourceId || user.publicKey,
+        sourceId: sourceId || LOCAL,
       });
     }
   };

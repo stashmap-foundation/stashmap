@@ -58,7 +58,7 @@ function getFallbackSemanticText(semanticID?: ID): string {
 export function getTextForSemanticID(
   knowledgeDBs: KnowledgeDBs,
   semanticID: ID,
-  author: PublicKey
+  author: SourceId
 ): string | undefined {
   if (isSearchId(semanticID)) {
     return parseSearchId(semanticID) || "";
@@ -111,7 +111,7 @@ export function findRefsToNode(
   graph: GraphLookup,
   semanticID: ID,
   filterContext?: Context,
-  targetAuthor?: PublicKey,
+  targetAuthor?: SourceId,
   targetRoot?: ID
 ): List<ReferencedByRef> {
   const { knowledgeDBs } = graph;
@@ -165,7 +165,7 @@ function getRefContextKey(
 function contextKeyForCref(
   knowledgeDBs: KnowledgeDBs,
   crefID: ID,
-  effectiveAuthor: PublicKey
+  effectiveAuthor: SourceId
 ): string | undefined {
   const targetNode = resolveNode(
     knowledgeDBs,
@@ -180,7 +180,7 @@ function contextKeyForCref(
 function coveredContextKeys(
   knowledgeDBs: KnowledgeDBs,
   crefIDs: List<ID>,
-  effectiveAuthor: PublicKey
+  effectiveAuthor: SourceId
 ): ImmutableSet<string> {
   return crefIDs.reduce((acc, crefID) => {
     const key = contextKeyForCref(knowledgeDBs, crefID, effectiveAuthor);
@@ -206,7 +206,7 @@ function sourceDocumentKey(
 
 function documentLinkerRefs(
   graphIndex: GraphIndex,
-  effectiveAuthor: PublicKey,
+  effectiveAuthor: SourceId,
   candidateDocument: Document,
   currentNodeFilePath: string | undefined
 ): NodeRef[] {
@@ -230,7 +230,7 @@ function documentLinkerRefs(
 function isWithinSubtree(
   knowledgeDBs: KnowledgeDBs,
   nodeID: ID,
-  author: PublicKey,
+  author: SourceId,
   subtreeRootIDs: ImmutableSet<ID>,
   visited: ImmutableSet<ID>
 ): boolean {
@@ -259,7 +259,7 @@ function subtreeLinksToDocument(
   candidate: GraphNode,
   currentNodeID: ID | undefined,
   currentNodeFilePath: string | undefined,
-  effectiveAuthor: PublicKey,
+  effectiveAuthor: SourceId,
   subtreeRootIDs: ImmutableSet<ID>
 ): boolean {
   const { graphIndex, knowledgeDBs } = graph;
@@ -304,7 +304,7 @@ function isInSystemRoot(
 export function deduplicateRefsByContext(
   refs: List<ReferencedByRef>,
   knowledgeDBs: KnowledgeDBs,
-  preferAuthor?: PublicKey
+  preferAuthor?: SourceId
 ): List<ReferencedByRef> {
   return refs
     .groupBy((ref) => getRefContextKey(knowledgeDBs, ref))
@@ -328,7 +328,7 @@ export function deduplicateRefsByContext(
 function incomingFileLinkSourceRefs(
   graphIndex: GraphIndex,
   rootFilePath: string | undefined,
-  rootAuthor: PublicKey | undefined
+  rootAuthor: SourceId | undefined
 ): NodeRef[] {
   if (!rootFilePath || !rootAuthor) return [];
   const key = fileLinkIndexKey(rootAuthor, rootFilePath);
@@ -362,13 +362,13 @@ function uniqueNodes(nodes: ResolvedNode[]): ResolvedNode[] {
 
 export function getIncomingCrefsForNode(
   graph: GraphLookup,
-  visibleAuthors: ImmutableSet<PublicKey>,
+  visibleAuthors: ImmutableSet<SourceId>,
   parentNodeID: ID | undefined,
   currentNodeID: ID | undefined,
-  effectiveAuthor: PublicKey,
+  effectiveAuthor: SourceId,
   currentItems?: List<GraphNode>,
   currentNodeFilePath?: string,
-  currentNodeAuthor?: PublicKey,
+  currentNodeAuthor?: SourceId,
   documents?: Map<string, Document>
 ): List<NodeRef> {
   const { graphIndex, knowledgeDBs } = graph;
@@ -478,14 +478,14 @@ const EMPTY_ALTERNATIVE_FOOTER_RESULT: AlternativeFooterResult = {
 
 function isVisibleVersion(
   node: GraphNode,
-  visibleAuthors: ImmutableSet<PublicKey>
+  visibleAuthors: ImmutableSet<SourceId>
 ): boolean {
   return !isRefNode(node) && visibleAuthors.has(node.author);
 }
 
 function getPastVersions(
   graph: GraphLookup,
-  visibleAuthors: ImmutableSet<PublicKey>,
+  visibleAuthors: ImmutableSet<SourceId>,
   currentNode: GraphNode
 ): List<GraphNode> {
   if (!currentNode.basedOn) {
@@ -510,7 +510,7 @@ function getPastVersions(
 
 function getFutureVersions(
   graph: GraphLookup,
-  visibleAuthors: ImmutableSet<PublicKey>,
+  visibleAuthors: ImmutableSet<SourceId>,
   currentNode: GraphNode,
   excludedIDs: ImmutableSet<ID> = ImmutableSet<ID>(),
   visited: ImmutableSet<ID> = ImmutableSet<ID>([currentNode.id])
@@ -554,7 +554,7 @@ function getFutureVersions(
 
 function getVersions(
   graph: GraphLookup,
-  visibleAuthors: ImmutableSet<PublicKey>,
+  visibleAuthors: ImmutableSet<SourceId>,
   currentNode: GraphNode
 ): List<GraphNode> {
   const pastVersions = getPastVersions(graph, visibleAuthors, currentNode);
@@ -584,7 +584,7 @@ function getVersions(
 
 export function getAlternativeFooterData(
   graph: GraphLookup,
-  visibleAuthors: ImmutableSet<PublicKey>,
+  visibleAuthors: ImmutableSet<SourceId>,
   filterTypes: FooterTypeFilters,
   currentNode?: GraphNode,
   showSuggestions: boolean = true,

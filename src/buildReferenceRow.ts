@@ -16,7 +16,7 @@ import {
 } from "./core/nodeSpans";
 import { Document, documentKeyOf, getDocumentForNode } from "./core/Document";
 import { fileLinkIndexKey, resolveLinkPath } from "./core/linkPath";
-import { nodeRefKey } from "./core/nodeRef";
+import { LOCAL, nodeRefKey } from "./core/nodeRef";
 import { DEFAULT_TYPE_FILTERS } from "./core/constants";
 import { referenceToText } from "./editor/referenceText";
 import {
@@ -104,7 +104,7 @@ function getConcreteContextNodes(
 function parseRef(
   refId: ID,
   knowledgeDBs: KnowledgeDBs,
-  myself: PublicKey,
+  myself: SourceId,
   documents?: ImmutableMap<string, Document>,
   documentByFilePath?: ImmutableMap<string, Document>
 ): ParsedRef | undefined {
@@ -287,7 +287,7 @@ function buildReferenceFromParsed(
   targetContext: List<ID>;
   contextLabels: string[];
   targetLabel: string;
-  author: PublicKey;
+  author: SourceId;
   incomingRelevance?: Relevance;
   incomingArgument?: Argument;
   displayAs?: "bidirectional" | "incoming";
@@ -324,7 +324,7 @@ function nodesShareLineage(left: GraphNode, right: GraphNode): boolean {
 
 function buildDeletedReference(
   refId: ID,
-  author: PublicKey,
+  author: SourceId,
   sourceId: SourceId,
   linkText?: string
 ): ReturnType<typeof buildReferenceFromParsed> | undefined {
@@ -349,7 +349,7 @@ function buildDeletedReference(
 function buildSourceParentReference(
   ref: ParsedRef,
   knowledgeDBs: KnowledgeDBs,
-  myself: PublicKey
+  myself: SourceId
 ): ReturnType<typeof buildReferenceFromParsed> | undefined {
   const { sourceItem } = ref;
   if (!sourceItem?.parent) {
@@ -387,7 +387,7 @@ function buildSourceParentReference(
 export function buildOutgoingReference(
   refId: ID,
   knowledgeDBs: KnowledgeDBs,
-  myself: PublicKey,
+  myself: SourceId,
   documents?: ImmutableMap<string, Document>,
   documentByFilePath?: ImmutableMap<string, Document>
 ): ReturnType<typeof buildReferenceFromParsed> | undefined {
@@ -634,7 +634,7 @@ export function buildReferenceItem(
       : undefined;
     const deleted = buildDeletedReference(
       refId,
-      sourceId as PublicKey,
+      sourceId as SourceId,
       sourceId,
       getBlockLinkText(parentItem) ?? getBlockFileLinkText(parentItem)
     );
@@ -650,11 +650,8 @@ export function buildReferenceItem(
   if (virtualType === "incoming") {
     const outgoing =
       ref.sourceItem && isBlockFileLink(ref.sourceItem)
-        ? buildSourceParentReference(
-            ref,
-            data.knowledgeDBs,
-            data.user.publicKey
-          ) ?? resolvedOutgoing
+        ? buildSourceParentReference(ref, data.knowledgeDBs, LOCAL) ??
+          resolvedOutgoing
         : resolvedOutgoing;
     if (!outgoing) {
       return undefined;
@@ -686,7 +683,7 @@ export function buildReferenceItem(
     if (!outgoing) {
       return undefined;
     }
-    const isOtherUser = outgoing.author !== data.user.publicKey;
+    const isOtherUser = outgoing.author !== LOCAL;
     const dateStr = new Date(versionMeta.updated).toLocaleString();
     const parts = [
       dateStr,

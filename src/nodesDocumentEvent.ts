@@ -17,6 +17,7 @@ export function snapshotIdForContent(content: string): string {
 export function buildDocumentEvent(
   knowledgeDBs: KnowledgeDBs,
   document: Document,
+  pubkey: PublicKey,
   options?: {
     snapshotId?: string;
   }
@@ -26,7 +27,7 @@ export function buildDocumentEvent(
     : [];
   return {
     kind: KIND_KNOWLEDGE_DOCUMENT,
-    pubkey: document.author,
+    pubkey,
     created_at: newTimestamp(),
     tags: [["d", document.docId], ...systemRoleTags, msTag()],
     content: renderDocumentMarkdown(knowledgeDBs, document, options),

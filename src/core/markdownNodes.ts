@@ -9,7 +9,7 @@ import { fileLinkSpan, linkSpan, nodeText } from "./nodeSpans";
 
 export type WalkContext = {
   knowledgeDBs: KnowledgeDBs;
-  publicKey: PublicKey;
+  publicKey: SourceId;
   affectedDocuments: ImmutableSet<string>;
   updated?: number;
 };
@@ -197,12 +197,12 @@ export type MaterializeResult = {
 
 function materializeTreeWithMode(
   trees: MarkdownTreeNode[],
-  author: PublicKey,
+  author: SourceId,
   options: MaterializeOptions,
   mode: IdMaterializationMode
 ): MaterializeResult {
   const baseContext: WalkContext = options.context ?? {
-    knowledgeDBs: ImmutableMap<PublicKey, KnowledgeData>(),
+    knowledgeDBs: ImmutableMap<SourceId, KnowledgeData>(),
     publicKey: author,
     affectedDocuments: ImmutableSet<string>(),
   };
@@ -237,7 +237,7 @@ function materializeTreeWithMode(
 
 export function materializeTree(
   trees: MarkdownTreeNode[],
-  author: PublicKey,
+  author: SourceId,
   options: MaterializeOptions = {}
 ): MaterializeResult {
   return materializeTreeWithMode(trees, author, options, "default");
@@ -245,7 +245,7 @@ export function materializeTree(
 
 export function materializeTreePreservingExplicitIds(
   trees: MarkdownTreeNode[],
-  author: PublicKey,
+  author: SourceId,
   options: MaterializeOptions
 ): MaterializeResult {
   return materializeTreeWithMode(trees, author, options, "preserve-explicit");

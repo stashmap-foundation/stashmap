@@ -1,5 +1,6 @@
 import React from "react";
 import { useMediaQuery } from "react-responsive";
+import { LOCAL } from "../core/nodeRef";
 import {
   updateViewPathsAfterPaneInsert,
   buildPaneTarget,
@@ -59,7 +60,6 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
 export function NewPaneButton(): JSX.Element | null {
   const { addPaneAt } = useSplitPanes();
   const paneIndex = usePaneIndex();
-  const { user } = useData();
   const isMobile = useMediaQuery(IS_MOBILE);
   const { createPlan, executePlan } = usePlanner();
 
@@ -75,7 +75,7 @@ export function NewPaneButton(): JSX.Element | null {
       insertIndex
     );
     executePlan(planUpdateViews(plan, shiftedViews));
-    addPaneAt(insertIndex, user.publicKey);
+    addPaneAt(insertIndex, LOCAL);
   };
 
   return (

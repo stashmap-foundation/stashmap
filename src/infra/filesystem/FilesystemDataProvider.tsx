@@ -5,6 +5,7 @@ import { useUserSessionState } from "../../userSessionState";
 import { useBackend } from "../../BackendContext";
 import { DataContextProvider, MergeKnowledgeDB } from "../../DataContext";
 import { DocumentStoreProvider, ParsedDocument } from "../../DocumentStore";
+import { LOCAL } from "../../core/nodeRef";
 import { PlanningContextProvider } from "../../planner";
 import { FilesystemExecutorProvider } from "./FilesystemExecutorProvider";
 import { NavigationStateProvider } from "../../NavigationStateContext";
@@ -43,8 +44,7 @@ function assertUniqueDocIds(documents: ReadonlyArray<ParsedDocument>): void {
 }
 
 function parseWorkspaceFiles(
-  files: ReadonlyArray<WorkspaceMarkdownFile>,
-  author: PublicKey
+  files: ReadonlyArray<WorkspaceMarkdownFile>
 ): ReadonlyArray<ParsedDocument> {
   const result = files.reduce<{
     documents: ParsedDocument[];
@@ -52,7 +52,7 @@ function parseWorkspaceFiles(
   }>(
     (acc, file) => {
       const fallbackTitle = fallbackTitleFromRelativePath(file.relativePath);
-      const parsed = parseToDocument(author, file.currentContent, {
+      const parsed = parseToDocument(LOCAL, file.currentContent, {
         filePath: file.relativePath,
         relativePath: file.relativePath,
         ...(fallbackTitle !== "" ? { fallbackTitle } : {}),
@@ -82,8 +82,8 @@ export function FilesystemDataProvider({
   const { workspace } = useBackend();
   const workspaceKey = workspace?.profile?.workspaceDir ?? "no-workspace";
   const initialDocuments = React.useMemo(
-    () => parseWorkspaceFiles(workspace?.files ?? [], user.publicKey),
-    [workspace?.files, user.publicKey]
+    () => parseWorkspaceFiles(workspace?.files ?? []),
+    [workspace?.files]
   );
 
   return (
@@ -101,6 +101,7 @@ export function FilesystemDataProvider({
     >
       <DocumentStoreProvider
         key={workspaceKey}
+        localPubkey={user.publicKey}
         initialDocuments={initialDocuments}
         unpublishedEvents={session.publishStatus.unsignedEvents}
       >

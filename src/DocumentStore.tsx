@@ -1,6 +1,7 @@
 import React from "react";
 import { List, Map as ImmutableMap } from "immutable";
 import { Event, UnsignedEvent } from "nostr-tools";
+import { LOCAL } from "./core/nodeRef";
 import type { StoredSnapshotRecord } from "./infra/nostr/cache/indexedDB";
 import {
   toStoredSnapshotRecord,
@@ -81,7 +82,7 @@ function withoutDocumentNodes(
 
 function withDocNodes(
   knowledgeDBs: KnowledgeDBs,
-  author: PublicKey,
+  author: SourceId,
   nodes: ImmutableMap<string, GraphNode>
 ): KnowledgeDBs {
   if (nodes.size === 0) return knowledgeDBs;
@@ -132,12 +133,12 @@ function applyDocumentToSnapshot(
       ? snapshot.deletes.remove(key)
       : snapshot.deletes;
   const withoutExistingNodes =
-    existingNodes.size > 0
+    existingDocument && existingNodes.size > 0
       ? removeNodesFromGraphIndex(
           snapshot.graphIndex,
           existingNodes,
-          existingDocument?.filePath,
-          existingDocument?.author
+          existingDocument.filePath,
+          existingDocument.author
         )
       : snapshot.graphIndex;
   const documentByFilePathAfterRemove = withoutDocumentInFilePathIndex(
@@ -226,26 +227,49 @@ function applyRecordsToSnapshot(
   );
 }
 
-function eventsToParsed(events: ReadonlyArray<Event | UnsignedEvent>): {
+function parsedWithSource(
+  parsed: ParsedDocument,
+  sourceId: SourceId
+): ParsedDocument {
+  return {
+    document: { ...parsed.document, author: sourceId },
+    nodes: parsed.nodes.map((node) => ({ ...node, author: sourceId })),
+  };
+}
+
+function eventsToParsed(
+  events: ReadonlyArray<Event | UnsignedEvent>,
+  localPubkey: PublicKey
+): {
   readonly records: ReadonlyArray<ParsedDocument>;
   readonly deletes: ReadonlyArray<DocumentDelete>;
 } {
   return {
     records: events
       .map((event) => eventToParsed(event))
-      .filter((parsed): parsed is ParsedDocument => parsed !== undefined),
+      .filter((parsed): parsed is ParsedDocument => parsed !== undefined)
+      .map((parsed) =>
+        parsed.document.author === localPubkey
+          ? parsedWithSource(parsed, LOCAL)
+          : parsed
+      ),
     deletes: events
       .map((event) => eventToDocumentDelete(event))
-      .filter((del): del is DocumentDelete => del !== undefined),
+      .filter((del): del is DocumentDelete => del !== undefined)
+      .map((del) =>
+        del.author === localPubkey ? { ...del, author: LOCAL } : del
+      ),
   };
 }
 
 export function DocumentStoreProvider({
   children,
+  localPubkey,
   unpublishedEvents = List<UnsignedEvent>(),
   initialDocuments = [],
 }: {
   children: React.ReactNode;
+  localPubkey: PublicKey;
   unpublishedEvents?: List<UnsignedEvent>;
   initialDocuments?: ReadonlyArray<ParsedDocument>;
 }): JSX.Element {
@@ -267,7 +291,7 @@ export function DocumentStoreProvider({
   const addEvents = React.useCallback(
     (events: ImmutableMap<string, Event | UnsignedEvent>) => {
       const eventList = events.valueSeq().toArray();
-      const { records, deletes } = eventsToParsed(eventList);
+      const { records, deletes } = eventsToParsed(eventList, localPubkey);
 
       const snapshotRecords = eventList
         .map((event) => toStoredSnapshotRecord(event))
@@ -294,14 +318,14 @@ export function DocumentStoreProvider({
         applyRecordsToSnapshot(current, records, deletes)
       );
     },
-    []
+    [localPubkey]
   );
 
   const activeSnapshot = React.useMemo(() => {
     const eventList = unpublishedEvents.toArray();
-    const { records, deletes } = eventsToParsed(eventList);
+    const { records, deletes } = eventsToParsed(eventList, localPubkey);
     return applyRecordsToSnapshot(snapshot, records, deletes);
-  }, [snapshot, unpublishedEvents]);
+  }, [snapshot, unpublishedEvents, localPubkey]);
 
   React.useEffect(() => {
     setSnapshotNodes((prev) =>

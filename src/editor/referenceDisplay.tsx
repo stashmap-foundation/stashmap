@@ -1,6 +1,6 @@
 import React from "react";
+import { LOCAL } from "../core/nodeRef";
 import { TYPE_COLORS } from "../core/constants";
-import { useData } from "../DataContext";
 import {
   ReferencePart,
   argumentChar,
@@ -66,10 +66,9 @@ export function ReferenceDisplay({
     incomingRelevance?: Relevance;
     incomingArgument?: Argument;
     deleted?: boolean;
-    author: PublicKey;
+    author: SourceId;
   };
 }): JSX.Element {
-  const { user } = useData();
   const parts = buildReferenceParts({
     displayAs: reference.displayAs,
     contextLabels: reference.contextLabels,
@@ -78,7 +77,7 @@ export function ReferenceDisplay({
     incomingArgument: reference.incomingArgument,
     deleted: reference.deleted,
   });
-  const isOtherUser = reference.author !== user.publicKey;
+  const isOtherUser = reference.author !== LOCAL;
   const className = reference.deleted
     ? "break-word deleted-reference"
     : "break-word";

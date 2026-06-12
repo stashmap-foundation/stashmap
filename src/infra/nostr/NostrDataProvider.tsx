@@ -115,6 +115,7 @@ export function NostrDataProvider({
       panes={session.panes}
     >
       <DocumentStoreProvider
+        localPubkey={myPublicKey}
         unpublishedEvents={session.publishStatus.unsignedEvents}
       >
         <NostrCacheSync paneRelays={paneRelays} />

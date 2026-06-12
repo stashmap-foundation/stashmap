@@ -1,6 +1,6 @@
 import React from "react";
 import { List, Map } from "immutable";
-import { useUserOrAnon } from "../../NostrAuthContext";
+import { useUser } from "../../NostrAuthContext";
 import { useUserSessionState } from "../../userSessionState";
 import { useBackend } from "../../BackendContext";
 import { DataContextProvider, MergeKnowledgeDB } from "../../DataContext";
@@ -77,7 +77,7 @@ export function FilesystemDataProvider({
 }: {
   children: React.ReactNode;
 }): JSX.Element {
-  const user = useUserOrAnon();
+  const user = useUser();
   const session = useUserSessionState(user);
   const { workspace } = useBackend();
   const workspaceKey = workspace?.profile?.workspaceDir ?? "no-workspace";
@@ -101,7 +101,7 @@ export function FilesystemDataProvider({
     >
       <DocumentStoreProvider
         key={workspaceKey}
-        localPubkey={user.publicKey}
+        localPubkey={user?.publicKey}
         initialDocuments={initialDocuments}
         unpublishedEvents={session.publishStatus.unsignedEvents}
       >

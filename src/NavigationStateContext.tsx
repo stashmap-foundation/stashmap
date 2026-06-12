@@ -12,6 +12,7 @@ import {
   parseDocumentRouteUrl,
   parseNodeRouteUrl,
   parseSourceFromSearch,
+  resolveAddress,
 } from "./navigationUrl";
 import { usePlanner } from "./planner";
 import { generatePaneId } from "./SplitPanesContext";
@@ -44,7 +45,7 @@ type HistoryState = {
 function paneToUrl(activePane: Pane): string | undefined {
   if (activePane.documentId) {
     return buildDocumentRouteUrl(
-      activePane.author,
+      activePane.sourceId,
       activePane.documentId,
       activePane.scrollToId
     );
@@ -63,33 +64,28 @@ function paneToUrl(activePane: Pane): string | undefined {
 function urlToPane(
   pathname: string,
   search: string,
-  fallbackAuthor: PublicKey
+  myPublicKey: PublicKey | undefined
 ): Pane {
-  const sourceId = parseSourceFromSearch(search);
-  const author = (sourceId || fallbackAuthor) as PublicKey;
+  const sourceId = resolveAddress(parseSourceFromSearch(search), myPublicKey);
   const documentRoute = parseDocumentRouteUrl(pathname);
   if (documentRoute) {
     return {
       id: generatePaneId(),
-      author: documentRoute.author,
-      sourceId: documentRoute.author,
+      sourceId: resolveAddress(documentRoute.author, myPublicKey),
       documentId: documentRoute.docId,
     };
   }
   const nodeID = parseNodeRouteUrl(pathname);
   if (nodeID) {
-    const nodeSourceId = sourceId || fallbackAuthor;
     return {
       id: generatePaneId(),
-      author: nodeSourceId as PublicKey,
-      sourceId: nodeSourceId,
+      sourceId,
       rootNodeId: nodeID,
     };
   }
   return {
     id: generatePaneId(),
-    author,
-    sourceId: sourceId || fallbackAuthor,
+    sourceId,
   };
 }
 
@@ -166,7 +162,7 @@ export function NavigationStateProvider({
     }
     // eslint-disable-next-line functional/immutable-data
     prevUrlRef.current = fullUrl;
-  }, [panes, safeActivePaneIndex, user.publicKey]);
+  }, [panes, safeActivePaneIndex, user?.publicKey]);
 
   useEffect(() => {
     const onPopState = (e: PopStateEvent): void => {
@@ -181,7 +177,7 @@ export function NavigationStateProvider({
           urlToPane(
             window.location.pathname,
             window.location.search,
-            user.publicKey
+            user?.publicKey
           ),
         ]);
         setActivePaneIndexState(0);
@@ -189,7 +185,7 @@ export function NavigationStateProvider({
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
-  }, [user.publicKey, setPanes]);
+  }, [user?.publicKey, setPanes]);
 
   return (
     <NavigationStateContext.Provider

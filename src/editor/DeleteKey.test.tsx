@@ -11,6 +11,7 @@ import {
   renderTree,
   setup,
   type,
+  requireUser,
 } from "../utils.test";
 
 /* eslint-disable testing-library/no-node-access */
@@ -219,7 +220,7 @@ Child
 
     renderApp({
       ...alice(),
-      initialRoute: readonlyRoute(bob().user.publicKey, "Travel Ideas"),
+      initialRoute: readonlyRoute(requireUser(bob()).publicKey, "Travel Ideas"),
     });
     await screen.findByText("READONLY");
 

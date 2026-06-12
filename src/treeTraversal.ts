@@ -130,7 +130,7 @@ function createRow(
           ? getDocumentByIdOrFilePath(
               data.documents,
               data.documentByFilePath,
-              pane.author,
+              pane.sourceId,
               pane.documentId
             )
           : undefined;

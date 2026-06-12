@@ -301,7 +301,7 @@ export function dnd(
     ? getDocumentByIdOrFilePath(
         plan.documents,
         plan.documentByFilePath,
-        sourcePane.author,
+        sourcePane.sourceId,
         sourcePane.documentId
       )
     : undefined;

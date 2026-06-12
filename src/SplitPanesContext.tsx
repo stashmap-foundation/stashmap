@@ -48,11 +48,10 @@ type PaneOperations = {
   panes: Pane[];
   addPaneAt: (
     index: number,
-    author: SourceId,
+    sourceId: SourceId,
     rootNodeId?: ID,
     scrollToId?: string,
-    documentId?: string,
-    sourceId?: SourceId
+    documentId?: string
   ) => void;
   removePane: (paneId: string) => void;
   setPane: (pane: Pane) => void;
@@ -65,16 +64,14 @@ export function useSplitPanes(): PaneOperations {
 
   const addPaneAt = (
     index: number,
-    author: SourceId,
+    sourceId: SourceId,
     rootNodeId?: ID,
     scrollToId?: string,
-    documentId?: string,
-    sourceId?: SourceId
+    documentId?: string
   ): void => {
     const newPane: Pane = {
       id: generatePaneId(),
-      author,
-      sourceId: sourceId ?? author,
+      sourceId,
       documentId,
       rootNodeId,
       scrollToId,
@@ -127,15 +124,13 @@ export function useNavigatePane(): (url: string) => void {
       questionMarkIndex >= 0 ? urlWithoutHash.slice(questionMarkIndex) : "";
     const sourceId = resolveAddress(
       parseSourceFromSearch(search),
-      user.publicKey
+      user?.publicKey
     );
-    const author = sourceId;
     const documentRoute = parseDocumentRouteUrl(pathname);
     if (documentRoute) {
-      const docSource = resolveAddress(documentRoute.author, user.publicKey);
+      const docSource = resolveAddress(documentRoute.author, user?.publicKey);
       setPane({
         id: pane.id,
-        author: docSource,
         sourceId: docSource,
         documentId: documentRoute.docId,
         scrollToId,
@@ -144,18 +139,15 @@ export function useNavigatePane(): (url: string) => void {
     }
     const nodeID = parseNodeRouteUrl(pathname);
     if (nodeID) {
-      const nodeSourceId = sourceId;
       setPane({
         id: pane.id,
-        author: nodeSourceId as PublicKey,
-        sourceId: nodeSourceId,
+        sourceId,
         rootNodeId: nodeID,
         scrollToId,
       });
     } else {
       setPane({
         id: pane.id,
-        author,
         sourceId: sourceId || LOCAL,
       });
     }

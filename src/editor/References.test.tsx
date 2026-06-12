@@ -12,6 +12,7 @@ import {
   renderTree,
   setup,
   type,
+  requireUser,
 } from "../utils.test";
 
 describe("References", () => {
@@ -155,7 +156,7 @@ Notes
     );
     cleanup();
 
-    await forkReadonlyRoot(bob(), alice().user.publicKey, "Notes");
+    await forkReadonlyRoot(bob(), requireUser(alice()).publicKey, "Notes");
     await userEvent.click(
       await screen.findByLabelText("open Cities in fullscreen")
     );

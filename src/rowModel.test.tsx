@@ -12,6 +12,7 @@ import {
   renderApp,
   renderTree,
   type,
+  requireUser,
 } from "./utils.test";
 import {
   parseViewPath,
@@ -119,7 +120,7 @@ My Notes
   `);
   cleanup();
 
-  await forkReadonlyRoot(bob(), alice().user.publicKey, "My Notes");
+  await forkReadonlyRoot(bob(), requireUser(alice()).publicKey, "My Notes");
   await userEvent.click(await screen.findByLabelText("expand Cities"));
   await userEvent.click(await screen.findByLabelText("edit Cities"));
   await userEvent.keyboard("{Enter}");
@@ -222,7 +223,7 @@ My Notes
   renderApp({
     ...alice(),
     initialRoute: readonlyRoute(
-      bob().user.publicKey,
+      requireUser(bob()).publicKey,
       "My Notes",
       "Programming Languages"
     ),

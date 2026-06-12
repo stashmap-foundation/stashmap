@@ -239,7 +239,7 @@ function parsedWithSource(
 
 function eventsToParsed(
   events: ReadonlyArray<Event | UnsignedEvent>,
-  localPubkey: PublicKey
+  localPubkey: PublicKey | undefined
 ): {
   readonly records: ReadonlyArray<ParsedDocument>;
   readonly deletes: ReadonlyArray<DocumentDelete>;
@@ -269,7 +269,7 @@ export function DocumentStoreProvider({
   initialDocuments = [],
 }: {
   children: React.ReactNode;
-  localPubkey: PublicKey;
+  localPubkey: PublicKey | undefined;
   unpublishedEvents?: List<UnsignedEvent>;
   initialDocuments?: ReadonlyArray<ParsedDocument>;
 }): JSX.Element {

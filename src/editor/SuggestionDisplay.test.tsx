@@ -13,6 +13,7 @@ import {
   expectTree,
   type,
   navigateToNodeViaSearch,
+  requireUser,
 } from "../utils.test";
 
 describe("Suggestion Display", () => {
@@ -332,7 +333,7 @@ Recipes
     await type("Alice Root{Escape}");
     cleanup();
 
-    await forkReadonlyRoot(bob(), alice().user.publicKey, "Alice Root");
+    await forkReadonlyRoot(bob(), requireUser(alice()).publicKey, "Alice Root");
     await userEvent.click(await screen.findByLabelText("edit Alice Root"));
     await userEvent.keyboard("{Enter}");
     await type("Bob Child{Escape}");
@@ -483,7 +484,7 @@ Topic
     window.history.pushState({}, "", "/");
     renderApp({
       ...bob(),
-      initialRoute: readonlyRoute(alice().user.publicKey, "Topic"),
+      initialRoute: readonlyRoute(requireUser(alice()).publicKey, "Topic"),
     });
     await screen.findByText("READONLY");
 
@@ -660,7 +661,7 @@ Cooking
     await type(
       "Recipes{Enter}{Tab}Pasta{Enter}Salad{Enter}Soup{Enter}Stew{Escape}"
     );
-    await forkReadonlyRoot(bob(), alice().user.publicKey, "Recipes");
+    await forkReadonlyRoot(bob(), requireUser(alice()).publicKey, "Recipes");
     await userEvent.click(await screen.findByLabelText("edit Recipes"));
     await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Curry{Escape}");

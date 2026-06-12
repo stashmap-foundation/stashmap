@@ -2,9 +2,12 @@ import { LOCAL } from "./core/nodeRef";
 
 export function resolveAddress(
   address: SourceId | undefined,
-  myPublicKey: PublicKey
+  myPublicKey: PublicKey | undefined
 ): SourceId {
-  if (!address || address === LOCAL || address === myPublicKey) {
+  if (!address || address === LOCAL) {
+    return LOCAL;
+  }
+  if (myPublicKey !== undefined && address === myPublicKey) {
     return LOCAL;
   }
   return address;

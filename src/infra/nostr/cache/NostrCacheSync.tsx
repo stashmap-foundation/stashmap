@@ -121,17 +121,17 @@ export function NostrCacheSync({
   const paneAuthors = useMemo(
     () =>
       panes
-        .map((pane) => decodePublicKeyInputSync(pane.author))
+        .map((pane) => decodePublicKeyInputSync(pane.sourceId))
         .filter((author): author is PublicKey => author !== undefined),
     [panes]
   );
 
   const authors = useMemo(() => {
-    const own = decodePublicKeyInputSync(user.publicKey);
+    const own = user ? decodePublicKeyInputSync(user.publicKey) : undefined;
     return [
       ...new globalThis.Set([...(own ? [own] : []), ...paneAuthors]),
     ].sort();
-  }, [user.publicKey, paneAuthors]);
+  }, [user, paneAuthors]);
 
   const relayUrls = useMemo(
     () =>

@@ -131,7 +131,6 @@ function BreadcrumbItem({
 }
 
 type BreadcrumbTarget = {
-  author: SourceId;
   sourceId: SourceId;
   documentId?: string;
   rootNodeId?: ID;
@@ -161,7 +160,6 @@ function createDocumentBreadcrumbEntry(document: Document): BreadcrumbEntry {
     key: `document:${document.author}:${document.docId}`,
     label: documentDisplayName(document),
     target: {
-      author: document.author,
       sourceId: document.author,
       documentId: document.docId,
     },
@@ -193,7 +191,6 @@ function createNodeBreadcrumbEntry(
     key: `node:${sourceId}:${node.id}`,
     label: getBreadcrumbLabel(knowledgeDBs, node, sourceId),
     target: {
-      author: sourceId,
       sourceId,
       rootNodeId: node.id,
     },
@@ -249,7 +246,7 @@ function Breadcrumbs(): JSX.Element {
     ? getDocumentByIdOrFilePath(
         data.documents,
         data.documentByFilePath,
-        pane.author,
+        pane.sourceId,
         pane.documentId
       )
     : undefined;
@@ -275,7 +272,7 @@ function Breadcrumbs(): JSX.Element {
         const targetUrl = (() => {
           if (target?.documentId) {
             return buildDocumentRouteUrl(
-              target.author,
+              target.sourceId,
               target.documentId,
               target.scrollToId
             );
@@ -296,7 +293,6 @@ function Breadcrumbs(): JSX.Element {
               if (target.documentId) {
                 setPane({
                   ...pane,
-                  author: target.author,
                   sourceId: target.sourceId,
                   documentId: target.documentId,
                   rootNodeId: undefined,
@@ -309,7 +305,6 @@ function Breadcrumbs(): JSX.Element {
               if (target.rootNodeId) {
                 setPane({
                   ...pane,
-                  author: target.author,
                   sourceId: target.sourceId,
                   documentId: undefined,
                   rootNodeId: target.rootNodeId,
@@ -342,7 +337,7 @@ function ForkButton(): JSX.Element | null {
   const isMobile = useMediaQuery(IS_MOBILE);
   const data = useData();
   const currentPane = useCurrentPane();
-  const isViewingOtherUserContent = currentPane.author !== LOCAL;
+  const isViewingOtherUserContent = currentPane.sourceId !== LOCAL;
   const graph = graphLookupFromData(data);
   const currentNode = currentPane.rootNodeId
     ? lookupNode(graph, currentPane.rootNodeId, currentPane.sourceId)?.node
@@ -535,7 +530,7 @@ function CurrentNodeName(): JSX.Element {
     ? getDocumentByIdOrFilePath(
         data.documents,
         data.documentByFilePath,
-        pane.author,
+        pane.sourceId,
         pane.documentId
       )
     : undefined;
@@ -571,7 +566,7 @@ function PaneStatusLine({
   const paneIndex = usePaneIndex();
   const pane = useCurrentPane();
   const isFirstPane = paneIndex === 0;
-  const isViewingOtherUserContent = pane.author !== LOCAL;
+  const isViewingOtherUserContent = pane.sourceId !== LOCAL;
 
   return (
     <footer className="pane-status-line">
@@ -1502,7 +1497,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
 function PaneViewInner(): JSX.Element {
   const pane = useCurrentPane();
   const paneIndex = usePaneIndex();
-  const isOtherUser = pane.author !== LOCAL;
+  const isOtherUser = pane.sourceId !== LOCAL;
   const {
     wrapperRef,
     onKeyDownCapture,

@@ -64,7 +64,7 @@ export function PaneTreeResultProvider({
     ? getDocumentByIdOrFilePath(
         data.documents,
         data.documentByFilePath,
-        pane.author,
+        pane.sourceId,
         pane.documentId
       )
     : undefined;
@@ -77,13 +77,13 @@ export function PaneTreeResultProvider({
       List<ViewPath>([viewPath]),
       List<ViewPath>(),
       pane.rootNodeId,
-      pane.author,
+      pane.sourceId,
       pane.typeFilters
     );
   }, [
     data,
     document,
-    pane.author,
+    pane.sourceId,
     pane.rootNodeId,
     pane.typeFilters,
     viewPath,

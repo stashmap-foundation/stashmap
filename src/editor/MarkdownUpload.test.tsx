@@ -3,7 +3,7 @@ import { newGraphNode } from "../rowModel";
 import { execute } from "../infra/nostr/executor";
 import { createPlan, planUpsertNodes } from "../planner";
 import { processEvents } from "../eventProcessing";
-import { ALICE, setup, UpdateState } from "../utils.test";
+import { ALICE, setup, UpdateState, requireUser } from "../utils.test";
 import { planPasteMarkdownTrees } from "./FileDropZone";
 import { parseMarkdown } from "../core/markdownTree";
 
@@ -46,7 +46,9 @@ async function uploadMarkdown(alice: UpdateState): Promise<KnowledgeData> {
   });
 
   const processed = processEvents(List(alice().relayPool.getEvents()));
-  const knowledgeDB = processed.get(alice().user.publicKey)?.knowledgeDB;
+  const knowledgeDB = processed.get(
+    requireUser(alice()).publicKey
+  )?.knowledgeDB;
   if (!knowledgeDB) {
     throw new Error("Missing uploaded knowledge DB");
   }

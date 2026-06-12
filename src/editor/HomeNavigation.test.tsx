@@ -12,6 +12,7 @@ import {
   setup,
   type,
   navigateToNodeViaSearch,
+  requireUser,
 } from "../utils.test";
 
 describe("Home Navigation", () => {
@@ -59,7 +60,7 @@ describe("Home Navigation", () => {
 
       renderApp({
         ...alice(),
-        initialRoute: readonlyRoute(bob().user.publicKey, "Rust"),
+        initialRoute: readonlyRoute(requireUser(bob()).publicKey, "Rust"),
       });
       await screen.findByText("READONLY");
 
@@ -222,7 +223,7 @@ My Notes
 
       await findEvent(relayPool, {
         kinds: [KIND_KNOWLEDGE_DOCUMENT],
-        authors: [alice().user.publicKey],
+        authors: [requireUser(alice()).publicKey],
         "#s": ["log"],
       });
 

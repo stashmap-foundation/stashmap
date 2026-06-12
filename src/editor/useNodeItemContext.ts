@@ -106,7 +106,7 @@ export function useNodeItemContext(): NodeItemContext {
           childIndex: row.childIndex,
           virtualType: row.virtualType,
           paneIndex,
-          paneAuthor: pane.author,
+          paneAuthor: pane.sourceId,
           documentId: pane.documentId,
           isDocumentTopLevel,
         },

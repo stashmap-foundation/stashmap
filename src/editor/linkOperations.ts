@@ -15,7 +15,6 @@ import { AddToParentTarget } from "../planner";
 export type LinkNavigationMode = "link" | "target";
 
 export type EditorNavigationTarget = {
-  author: SourceId;
   sourceId: SourceId;
   documentId?: string;
   rootNodeId?: ID;
@@ -78,7 +77,6 @@ function nodeTarget(
     : undefined;
   const targetRoot = mode === "target" ? target : parent ?? target;
   return {
-    author: targetRoot.ref.sourceId,
     sourceId: targetRoot.ref.sourceId,
     rootNodeId: targetRoot.node.id,
     scrollToId:
@@ -95,7 +93,6 @@ export function linkToNavigationTarget(
     const document = documentTarget(data, link);
     return document
       ? {
-          author: document.author,
           sourceId: document.author,
           documentId: document.docId,
         }
@@ -116,7 +113,7 @@ export function linkToHref(
   }
   if (target.documentId) {
     return buildDocumentRouteUrl(
-      target.author,
+      target.sourceId,
       target.documentId,
       target.scrollToId
     );
@@ -131,7 +128,7 @@ export function navigationTargetToHref(
 ): string | undefined {
   if (target.documentId) {
     return buildDocumentRouteUrl(
-      target.author,
+      target.sourceId,
       target.documentId,
       target.scrollToId
     );

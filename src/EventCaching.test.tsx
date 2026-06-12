@@ -9,6 +9,7 @@ import {
   setup,
   type,
   expectTree,
+  requireUser,
 } from "./utils.test";
 import { MockRelayPool, mockRelayPool } from "./nostrMock.test";
 import {
@@ -146,7 +147,7 @@ test("status bar shows pending when outbox has events on reload", async () => {
     key: "node:abc",
     event: {
       kind: 30023,
-      pubkey: alice().user.publicKey,
+      pubkey: requireUser(alice()).publicKey,
       created_at: 1,
       tags: [["d", "abc"]],
       content: "hello",
@@ -158,7 +159,7 @@ test("status bar shows pending when outbox has events on reload", async () => {
     key: "node:def",
     event: {
       kind: 30023,
-      pubkey: alice().user.publicKey,
+      pubkey: requireUser(alice()).publicKey,
       created_at: 2,
       tags: [["d", "def"]],
       content: "world",
@@ -187,7 +188,7 @@ test("relay results appear after queue flushes pending outbox events on reload",
     key: "node:abc",
     event: {
       kind: 30023,
-      pubkey: alice().user.publicKey,
+      pubkey: requireUser(alice()).publicKey,
       created_at: 1,
       tags: [["d", "abc"]],
       content: "hello",
@@ -199,7 +200,7 @@ test("relay results appear after queue flushes pending outbox events on reload",
     key: "node:def",
     event: {
       kind: 30023,
-      pubkey: alice().user.publicKey,
+      pubkey: requireUser(alice()).publicKey,
       created_at: 2,
       tags: [["d", "def"]],
       content: "world",
@@ -235,7 +236,7 @@ test("partial relay failure shows correct per-relay counts", async () => {
     key: "node:aaa",
     event: {
       kind: 30023,
-      pubkey: alice().user.publicKey,
+      pubkey: requireUser(alice()).publicKey,
       created_at: 1,
       tags: [["d", "aaa"]],
       content: "one",
@@ -247,7 +248,7 @@ test("partial relay failure shows correct per-relay counts", async () => {
     key: "node:bbb",
     event: {
       kind: 30023,
-      pubkey: alice().user.publicKey,
+      pubkey: requireUser(alice()).publicKey,
       created_at: 2,
       tags: [["d", "bbb"]],
       content: "two",

@@ -1,5 +1,6 @@
 import { act, cleanup, fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { LOCAL } from "../core/nodeRef";
 import {
   ALICE,
   setup,
@@ -30,9 +31,7 @@ describe("Tree Editor - Comprehensive Tests", () => {
   describe("Root Empty Node Flow", () => {
     test("Create node from empty pane and press Enter to chain", async () => {
       const [alice] = setup([ALICE], {
-        panes: [
-          { id: "pane-0", author: ALICE.publicKey, sourceId: ALICE.publicKey },
-        ],
+        panes: [{ id: "pane-0", sourceId: LOCAL }],
       });
       renderTree(alice);
 
@@ -50,9 +49,7 @@ My First Note
 
     test("Empty Enter on root empty node keeps editor visible", async () => {
       const [alice] = setup([ALICE], {
-        panes: [
-          { id: "pane-0", author: ALICE.publicKey, sourceId: ALICE.publicKey },
-        ],
+        panes: [{ id: "pane-0", sourceId: LOCAL }],
       });
       renderTree(alice);
 
@@ -64,9 +61,7 @@ My First Note
 
     test("Escape on root empty node with text saves and closes", async () => {
       const [alice] = setup([ALICE], {
-        panes: [
-          { id: "pane-0", author: ALICE.publicKey, sourceId: ALICE.publicKey },
-        ],
+        panes: [{ id: "pane-0", sourceId: LOCAL }],
       });
       renderTree(alice);
 

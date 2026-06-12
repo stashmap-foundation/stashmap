@@ -17,6 +17,7 @@ import {
   textContent,
   type,
   type UpdateState,
+  requireUser,
 } from "../utils.test";
 import {
   KIND_KNOWLEDGE_DOCUMENT,
@@ -1670,7 +1671,7 @@ My Notes
     await type("My Notes{Enter}{Tab}Topic{Enter}{Tab}Child{Escape}");
     cleanup();
 
-    await forkReadonlyRoot(bob(), alice().user.publicKey, "My Notes");
+    await forkReadonlyRoot(bob(), requireUser(alice()).publicKey, "My Notes");
 
     const bobEvents = bob().relayPool.getEvents();
     const snapshotEvents = bobEvents.filter(
@@ -1696,7 +1697,7 @@ My Notes
     await type("My Notes{Enter}{Tab}Topic{Enter}{Tab}Child{Escape}");
     cleanup();
 
-    await forkReadonlyRoot(bob(), alice().user.publicKey, "My Notes");
+    await forkReadonlyRoot(bob(), requireUser(alice()).publicKey, "My Notes");
 
     const bobEvents = bob().relayPool.getEvents();
     const snapshotEvent = bobEvents.find(
@@ -1743,7 +1744,7 @@ My Notes
     await type("My Notes{Enter}{Tab}Topic{Enter}{Tab}Child{Escape}");
     cleanup();
 
-    await forkReadonlyRoot(bob(), alice().user.publicKey, "My Notes");
+    await forkReadonlyRoot(bob(), requireUser(alice()).publicKey, "My Notes");
 
     const bobEvents = bob().relayPool.getEvents();
     const snapshotEvent = bobEvents.find(

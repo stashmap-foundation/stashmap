@@ -25,7 +25,7 @@ function SearchCrefBuilder({
   const { documents, knowledgeDBs } = data;
   const graph = graphLookupFromData(data);
   const pane = useCurrentPane();
-  const effectiveAuthor = pane.author;
+  const effectiveAuthor = pane.sourceId;
 
   const uniqueSemanticIDs = foundSemanticIDs.toSet().toList();
   const crefItems = uniqueSemanticIDs.flatMap((semanticID) => {

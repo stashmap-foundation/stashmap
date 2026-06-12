@@ -1,6 +1,5 @@
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { UNAUTHENTICATED_USER_PK } from "./NostrAuthContext";
 import { renderApp, findNewNodeEditor } from "./utils.test";
 import * as runtimeEnvironment from "./runtimeEnvironment";
 
@@ -148,9 +147,7 @@ test("Logout clears history state and does not save panes for unauthenticated us
   await waitFor(() => {
     expect(window.history.state?.panes).toBeUndefined();
   });
-  expect(
-    localStorage.getItem(`stashmap-panes-${UNAUTHENTICATED_USER_PK}`)
-  ).toBeNull();
+  expect(localStorage.getItem("stashmap-panes-undefined")).toBeNull();
 });
 
 test("Split panes don't persist after logout", async () => {

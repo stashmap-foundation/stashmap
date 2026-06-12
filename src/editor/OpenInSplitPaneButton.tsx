@@ -35,11 +35,10 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
     const target = buildPaneTarget(data, row);
     addPaneAt(
       insertIndex,
-      target.author,
+      target.sourceId,
       target.rootNodeId,
       target.scrollToId,
-      target.documentId,
-      target.sourceId
+      target.documentId
     );
   };
 

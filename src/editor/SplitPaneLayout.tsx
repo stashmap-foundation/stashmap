@@ -46,7 +46,6 @@ export function PaneSearchButton(): JSX.Element {
       ).toArray();
       setPane({
         ...pane,
-        author: LOCAL,
         sourceId: LOCAL,
         documentId: undefined,
         rootNodeId: undefined,
@@ -116,7 +115,6 @@ export function ClosePaneButton(): JSX.Element | null {
     if (panes.length <= 1) {
       const freshPane: Pane = {
         id: generatePaneId(),
-        author: LOCAL,
         sourceId: LOCAL,
       };
       executePlan(planUpdatePanes(plan, [freshPane]));
@@ -270,7 +268,7 @@ export function PaneRootViewProvider({
 function PaneContent(): JSX.Element {
   const pane = useCurrentPane();
   const paneIndex = usePaneIndex();
-  const isOtherUserContent = pane.author !== LOCAL;
+  const isOtherUserContent = pane.sourceId !== LOCAL;
 
   const paneClassName = isOtherUserContent
     ? "split-pane other-user-pane"

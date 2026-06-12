@@ -22,7 +22,7 @@ export function FullscreenButton(): JSX.Element | null {
   const href = (() => {
     if (target.documentId) {
       return buildDocumentRouteUrl(
-        target.author,
+        target.sourceId,
         target.documentId,
         target.scrollToId
       );

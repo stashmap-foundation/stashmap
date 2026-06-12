@@ -508,7 +508,6 @@ function useEmptyPaneDrop({
         if (idx !== paneIndex) return p;
         return {
           id: p.id,
-          author: paneTarget.author,
           sourceId: paneTarget.sourceId,
           documentId: paneTarget.documentId,
           rootNodeId: paneTarget.rootNodeId,

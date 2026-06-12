@@ -31,7 +31,7 @@ type RelayBackoffState = {
 };
 
 export type FlushDeps = {
-  readonly user: User;
+  readonly user: User | undefined;
   readonly relays: AllRelays;
   readonly backend: Pick<Backend, "publish">;
   readonly finalizeEvent: FinalizeEvent;

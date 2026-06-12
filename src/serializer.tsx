@@ -137,7 +137,6 @@ export function jsonToViews(s: Serializable): Map<string, View> {
 export function paneToJSON(pane: Pane): Serializable {
   return {
     i: pane.id,
-    a: pane.author,
     s: pane.sourceId,
     d: pane.documentId,
     r: pane.rootNodeId,
@@ -152,11 +151,9 @@ function jsonToPane(s: Serializable): Pane | undefined {
     return undefined;
   }
   const obj = asObject(s);
-  const author = asString(obj.a) as PublicKey;
   return {
     id: asString(obj.i),
-    author,
-    sourceId: obj.s !== undefined ? asString(obj.s) : author,
+    sourceId: asString(obj.s),
     documentId: obj.d !== undefined ? asString(obj.d) : undefined,
     rootNodeId: obj.r !== undefined ? (asString(obj.r) as ID) : undefined,
     searchQuery: obj.h !== undefined ? asString(obj.h) : undefined,

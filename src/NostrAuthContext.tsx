@@ -1,7 +1,5 @@
 import React from "react";
 
-export const UNAUTHENTICATED_USER_PK = "UNAUTHENTICATEDUSERPK" as PublicKey;
-
 type IdentityContextValue = {
   user: User | undefined;
   login?: (privateKey: string) => User;
@@ -14,21 +12,20 @@ export const NostrAuthContext = React.createContext<
   IdentityContextValue | undefined
 >(undefined);
 
-export function isUserLoggedInWithSeed(user: User): user is KeyPair {
-  return (user as KeyPair).privateKey !== undefined;
+export function isUserLoggedInWithSeed(
+  user: User | undefined
+): user is KeyPair {
+  return user !== undefined && (user as KeyPair).privateKey !== undefined;
 }
 
 export function isUserLoggedInWithExtension(
-  user: User
+  user: User | undefined
 ): user is { publicKey: PublicKey } {
-  if (isUserLoggedInWithSeed(user)) {
-    return false;
-  }
-  return user.publicKey !== UNAUTHENTICATED_USER_PK;
+  return user !== undefined && !isUserLoggedInWithSeed(user);
 }
 
-export function isUserLoggedIn(user: User): boolean {
-  return isUserLoggedInWithSeed(user) || isUserLoggedInWithExtension(user);
+export function isUserLoggedIn(user: User | undefined): user is User {
+  return user !== undefined;
 }
 
 export function useUser(): User | undefined {
@@ -37,10 +34,6 @@ export function useUser(): User | undefined {
     throw new Error("NostrAuthContext missing");
   }
   return context.user;
-}
-
-export function useUserOrAnon(): User {
-  return useUser() || { publicKey: UNAUTHENTICATED_USER_PK };
 }
 
 export function useDefaultRelays(): Relays {

@@ -77,7 +77,7 @@ export function MobileActionBar({
   const { createPlan, executePlan } = usePlanner();
   const treeResult = usePaneTreeResult();
   const rows = treeResult?.rows || List<Row>();
-  const isOtherUser = pane.author !== LOCAL;
+  const isOtherUser = pane.sourceId !== LOCAL;
   const isInSearch = pane.searchQuery !== undefined;
 
   const handleFocusIn = useCallback((e: FocusEvent) => {

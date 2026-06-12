@@ -13,7 +13,7 @@ import { PlanningContextProvider } from "../../planner";
 import { NostrExecutorProvider } from "./NostrExecutorProvider";
 import { useUserRelayContext } from "../../UserRelayContext";
 import { usePreloadRelays } from "../../relays";
-import { useDefaultRelays, useUserOrAnon } from "../../NostrAuthContext";
+import { useDefaultRelays, useUser } from "../../NostrAuthContext";
 import { useEventQuery } from "../../commons/useNostrQuery";
 import { getOutboxEvents } from "./cache/indexedDB";
 import { useCacheDB } from "./cache/CacheDBContext";
@@ -33,8 +33,8 @@ export function NostrDataProvider({
 }: {
   children: React.ReactNode;
 }): JSX.Element {
-  const user = useUserOrAnon();
-  const myPublicKey = user.publicKey;
+  const user = useUser();
+  const myPublicKey = user?.publicKey;
   const session = useUserSessionState(user);
   const { userRelays } = useUserRelayContext();
   const defaultRelays = useDefaultRelays();
@@ -65,7 +65,13 @@ export function NostrDataProvider({
 
   const { eose: metaEventsEose } = useEventQuery(
     backend,
-    [{ authors: [myPublicKey], kinds: [KIND_SETTINGS], limit: 1 }],
+    [
+      {
+        authors: myPublicKey ? [myPublicKey] : [],
+        kinds: [KIND_SETTINGS],
+        limit: 1,
+      },
+    ],
     {
       readFromRelays: usePreloadRelays({
         user: true,
@@ -73,7 +79,7 @@ export function NostrDataProvider({
     }
   );
   const extraAuthors = useMemo(
-    () => [...new globalThis.Set(session.panes.map((pane) => pane.author))],
+    () => [...new globalThis.Set(session.panes.map((pane) => pane.sourceId))],
     [session.panes]
   );
 

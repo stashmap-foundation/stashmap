@@ -19,7 +19,7 @@ type SignedEventWithConf = {
 
 export async function signEvents(
   events: List<EventTemplate & EventAttachment>,
-  user: User,
+  user: User | undefined,
   finalizeEvent: FinalizeEvent
 ): Promise<List<SignedEventWithConf>> {
   if (!isUserLoggedIn(user)) {

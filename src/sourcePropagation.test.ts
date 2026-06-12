@@ -76,7 +76,6 @@ function indexedData(entries: ReadonlyArray<[PublicKey, GraphNode[]]>): Data {
     panes: [
       {
         id: "pane-0",
-        author: SOURCE_B,
         sourceId: SOURCE_B,
         rootNodeId: "root",
       },

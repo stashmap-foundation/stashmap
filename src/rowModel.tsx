@@ -12,7 +12,6 @@ import {
   isRefNode,
 } from "./core/connections";
 import { useData } from "./DataContext";
-import { UNAUTHENTICATED_USER_PK } from "./NostrAuthContext";
 import { nodeText } from "./core/nodeSpans";
 import { getBlockLink } from "./core/blockLink";
 import {
@@ -191,7 +190,6 @@ export function buildPaneTarget(data: Data, row: Row): EditorNavigationTarget {
   })();
   if (refInfo) {
     return {
-      author: refInfo.sourceId,
       sourceId: refInfo.sourceId,
       rootNodeId: refInfo.rootNodeId,
       scrollToId: refInfo.scrollToId,
@@ -199,7 +197,6 @@ export function buildPaneTarget(data: Data, row: Row): EditorNavigationTarget {
   }
 
   return {
-    author: effectiveAuthor,
     sourceId: row.sourceId,
     rootNodeId: row.node.id,
   };
@@ -261,7 +258,7 @@ export function useCurrentNode(): GraphNode {
 export function useIsViewingOtherUserContent(): boolean {
   const { user } = useData();
   const row = useRow();
-  if (user.publicKey === UNAUTHENTICATED_USER_PK) {
+  if (!user) {
     return true;
   }
   return row.sourceId !== LOCAL;

@@ -1,6 +1,5 @@
 import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react";
 import { List, Map, Set, OrderedSet } from "immutable";
-import { UNAUTHENTICATED_USER_PK } from "./NostrAuthContext";
 import { LOCAL } from "./core/nodeRef";
 import { generatePaneId } from "./SplitPanesContext";
 import {
@@ -17,10 +16,9 @@ import {
   resolveAddress,
 } from "./navigationUrl";
 
-export const defaultPane = (author: SourceId = LOCAL): Pane => ({
+export const defaultPane = (): Pane => ({
   id: generatePaneId(),
-  author,
-  sourceId: author,
+  sourceId: LOCAL,
 });
 
 const DEFAULT_TEMPORARY_VIEW: TemporaryViewState = {
@@ -37,7 +35,12 @@ function panesStorageKey(publicKey: PublicKey): string {
   return `stashmap-panes-${publicKey}`;
 }
 
-function loadPanesFromStorage(publicKey: PublicKey): Pane[] | undefined {
+function loadPanesFromStorage(
+  publicKey: PublicKey | undefined
+): Pane[] | undefined {
+  if (publicKey === undefined) {
+    return undefined;
+  }
   try {
     const raw = localStorage.getItem(panesStorageKey(publicKey));
     if (!raw) {
@@ -50,8 +53,11 @@ function loadPanesFromStorage(publicKey: PublicKey): Pane[] | undefined {
   }
 }
 
-function savePanesToStorage(publicKey: PublicKey, panes: Pane[]): void {
-  if (publicKey === UNAUTHENTICATED_USER_PK) {
+function savePanesToStorage(
+  publicKey: PublicKey | undefined,
+  panes: Pane[]
+): void {
+  if (publicKey === undefined) {
     return;
   }
   try {
@@ -69,7 +75,12 @@ function viewsStorageKey(publicKey: PublicKey): string {
   return `stashmap-views-${publicKey}`;
 }
 
-function loadViewsFromStorage(publicKey: PublicKey): Views | undefined {
+function loadViewsFromStorage(
+  publicKey: PublicKey | undefined
+): Views | undefined {
+  if (publicKey === undefined) {
+    return undefined;
+  }
   try {
     const raw = localStorage.getItem(viewsStorageKey(publicKey));
     if (!raw) {
@@ -81,7 +92,13 @@ function loadViewsFromStorage(publicKey: PublicKey): Views | undefined {
   }
 }
 
-function saveViewsToStorage(publicKey: PublicKey, views: Views): void {
+function saveViewsToStorage(
+  publicKey: PublicKey | undefined,
+  views: Views
+): void {
+  if (publicKey === undefined) {
+    return;
+  }
   try {
     localStorage.setItem(
       viewsStorageKey(publicKey),
@@ -92,14 +109,13 @@ function saveViewsToStorage(publicKey: PublicKey, views: Views): void {
   }
 }
 
-function getUrlPanes(myPublicKey: PublicKey): Pane[] | undefined {
+function getUrlPanes(myPublicKey: PublicKey | undefined): Pane[] | undefined {
   const documentRoute = parseDocumentRouteUrl(window.location.pathname);
   if (documentRoute) {
     const docSource = resolveAddress(documentRoute.author, myPublicKey);
     return [
       {
         id: generatePaneId(),
-        author: docSource,
         sourceId: docSource,
         documentId: documentRoute.docId,
       },
@@ -114,7 +130,6 @@ function getUrlPanes(myPublicKey: PublicKey): Pane[] | undefined {
     return [
       {
         id: generatePaneId(),
-        author: nodeSource,
         sourceId: nodeSource,
         rootNodeId: nodeID,
       },
@@ -123,7 +138,7 @@ function getUrlPanes(myPublicKey: PublicKey): Pane[] | undefined {
   return undefined;
 }
 
-function getInitialPanes(publicKey: PublicKey): Pane[] {
+function getInitialPanes(publicKey: PublicKey | undefined): Pane[] {
   const urlPanes = getUrlPanes(publicKey);
   if (urlPanes) {
     return urlPanes;
@@ -141,15 +156,6 @@ function getInitialPanes(publicKey: PublicKey): Pane[] {
   return [defaultPane()];
 }
 
-function replacePaneUser(pane: Pane, publicKey: PublicKey): Pane {
-  return {
-    ...pane,
-    author: pane.author === UNAUTHENTICATED_USER_PK ? publicKey : pane.author,
-    sourceId:
-      pane.sourceId === UNAUTHENTICATED_USER_PK ? publicKey : pane.sourceId,
-  };
-}
-
 export type UserSessionState = {
   panes: Pane[];
   setPanes: Dispatch<SetStateAction<Pane[]>>;
@@ -159,8 +165,8 @@ export type UserSessionState = {
   setPublishStatus: Dispatch<SetStateAction<EventState>>;
 };
 
-export function useUserSessionState(user: User): UserSessionState {
-  const myPublicKey = user.publicKey;
+export function useUserSessionState(user: User | undefined): UserSessionState {
+  const myPublicKey = user?.publicKey;
   const isMountedRef = useRef(false);
   const [panes, setPanes] = useState<Pane[]>(() =>
     getInitialPanes(myPublicKey)
@@ -201,10 +207,6 @@ export function useUserSessionState(user: User): UserSessionState {
     const nextPanes = urlPanes ?? savedPanes;
     if (nextPanes) {
       setPanes(nextPanes);
-    } else {
-      setPanes((current) =>
-        current.map((p) => replacePaneUser(p, myPublicKey))
-      );
     }
     if (savedViews) {
       setViews(savedViews);

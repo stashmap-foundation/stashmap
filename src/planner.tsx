@@ -653,6 +653,9 @@ function getSnapshotSourceRoot(
 export function buildDocumentEvents(
   plan: GraphPlan
 ): List<UnsignedEvent & EventAttachment> {
+  if (!plan.user) {
+    return plan.publishEvents;
+  }
   const pubkey = plan.user.publicKey;
   const withUpserts = plan.affectedDocuments.reduce((events, docId) => {
     const document = plan.documents.get(documentKeyOf(LOCAL, docId));

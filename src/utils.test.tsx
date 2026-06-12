@@ -38,10 +38,7 @@ import { NostrDataProvider } from "./infra/nostr/NostrDataProvider";
 import { App } from "./App";
 import { DataContextProps } from "./DataContext";
 import { MockRelayPool, mockRelayPool } from "./nostrMock.test";
-import {
-  isUserLoggedInWithSeed,
-  UNAUTHENTICATED_USER_PK,
-} from "./NostrAuthContext";
+import { isUserLoggedInWithSeed } from "./NostrAuthContext";
 import { AuthProvider } from "./AuthProvider";
 import { nodeText } from "./core/nodeSpans";
 import { TemporaryViewProvider } from "./editor/temporaryViewState";
@@ -82,9 +79,7 @@ const CAROL_PRIVATE_KEY =
 export const CAROL_PUBLIC_KEY =
   "074eb94a7a3d34102b563b540ac505e4fa8f71e3091f1e39a77d32e813c707d2" as PublicKey;
 
-export const ANON: User = {
-  publicKey: UNAUTHENTICATED_USER_PK,
-};
+export const ANON: User | undefined = undefined;
 
 const ALICE: User = {
   publicKey:
@@ -224,7 +219,7 @@ const DEFAULT_DATA_CONTEXT_PROPS: TestDataProps = {
     defaultRelays: [{ url: "wss://default.relay", read: true, write: true }],
     userRelays: [{ url: "wss://user.relay", read: true, write: true }],
   },
-  panes: [{ id: "pane-0", author: LOCAL, sourceId: LOCAL }],
+  panes: [{ id: "pane-0", sourceId: LOCAL }],
 };
 
 export function applyDefaults(props?: Partial<TestAppState>): TestAppState {
@@ -235,8 +230,15 @@ export function applyDefaults(props?: Partial<TestAppState>): TestAppState {
   };
 }
 
+export function requireUser(state: TestAppState): User {
+  if (!state.user) {
+    throw new Error("Test requires a logged-in user");
+  }
+  return state.user;
+}
+
 export function setup(
-  users: User[],
+  users: (User | undefined)[],
   options?: Partial<TestAppState>
 ): UpdateState[] {
   const appState = applyDefaults(options);
@@ -435,7 +437,10 @@ export async function forkOwnRoot(
   forkText: string
 ): Promise<void> {
   const utils = cU();
-  const author = utils.user.publicKey;
+  const author = utils.user?.publicKey;
+  if (!author) {
+    throw new Error("forkOwnRoot requires a logged-in user");
+  }
   const parsedDB = processEvents(List(utils.relayPool.getEvents())).get(
     author
   )?.knowledgeDB;

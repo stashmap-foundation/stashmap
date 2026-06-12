@@ -12,6 +12,7 @@ import {
   renderApp,
   renderTree,
   setup,
+  requireUser,
 } from "../utils.test";
 import { execute } from "../infra/nostr/executor";
 import { processEvents } from "../eventProcessing";
@@ -129,7 +130,9 @@ tags:
 
   const events = buildDocumentEvents(plan);
   const processed = processEvents(events);
-  const knowledgeDB = processed.get(alice().user.publicKey)?.knowledgeDB;
+  const knowledgeDB = processed.get(
+    requireUser(alice()).publicKey
+  )?.knowledgeDB;
   const texts = knowledgeDB?.nodes
     .valueSeq()
     .map((node) => nodeText(node))

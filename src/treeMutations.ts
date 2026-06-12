@@ -26,7 +26,7 @@ function resetInvalidPanes(plan: Plan, paneIndexToReset?: number): Plan {
     if (!p.rootNodeId) {
       return false;
     }
-    return getNode(plan.knowledgeDBs, p.rootNodeId, p.author) === undefined;
+    return getNode(plan.knowledgeDBs, p.rootNodeId, p.sourceId) === undefined;
   };
 
   const newPanes = plan.panes.map((p, i) =>

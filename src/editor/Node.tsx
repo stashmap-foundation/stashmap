@@ -162,8 +162,8 @@ function logNodeNotFoundDebug({
     )
     .toArray();
   const userNode = getNode(data.knowledgeDBs, rowID, LOCAL);
-  const paneNode = getNode(data.knowledgeDBs, rowID, pane?.author);
-  const rootNode = getNode(data.knowledgeDBs, pane?.rootNodeId, pane?.author);
+  const paneNode = getNode(data.knowledgeDBs, rowID, pane?.sourceId);
+  const rootNode = getNode(data.knowledgeDBs, pane?.rootNodeId, pane?.sourceId);
   const nodeSummary = (
     node: typeof userNode,
     sourceId: SourceId
@@ -198,8 +198,8 @@ function logNodeNotFoundDebug({
     dbs,
     documents: data.documents.size,
     userNode: nodeSummary(userNode, LOCAL),
-    paneNode: nodeSummary(paneNode, pane?.author),
-    rootNode: nodeSummary(rootNode, pane?.author),
+    paneNode: nodeSummary(paneNode, pane?.sourceId),
+    rootNode: nodeSummary(rootNode, pane?.sourceId),
     matchingNodes,
   });
 }

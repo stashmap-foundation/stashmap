@@ -4,7 +4,7 @@ import { UnsignedEvent } from "nostr-tools";
 import { getMostRecentReplacableEvent } from "./nostrEvents";
 import { useEventQuery } from "./commons/useNostrQuery";
 import { createRelaysQuery, findAllRelays, sanitizeRelays } from "./relayUtils";
-import { useDefaultRelays, useUserOrAnon } from "./NostrAuthContext";
+import { useDefaultRelays, useUser } from "./NostrAuthContext";
 import { useBackend } from "./BackendContext";
 
 type UserRelayInfo = {
@@ -28,12 +28,12 @@ export function UserRelayContextProvider({
 }: {
   children: React.ReactNode;
 }): JSX.Element {
-  const user = useUserOrAnon();
+  const user = useUser();
   const defaultRelays = useDefaultRelays();
   const backend = useBackend();
   const { events: relaysEvents, eose: relaysEose } = useEventQuery(
     backend,
-    [createRelaysQuery([user.publicKey])],
+    [createRelaysQuery(user ? [user.publicKey] : [])],
     { readFromRelays: defaultRelays }
   );
   const userRelays = processRelayEvents(

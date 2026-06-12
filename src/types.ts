@@ -123,7 +123,6 @@ declare global {
 
   type Pane = {
     id: string;
-    author: SourceId;
     sourceId: SourceId;
     documentId?: string;
     rootNodeId?: ID;
@@ -140,7 +139,7 @@ declare global {
   };
 
   type Data = {
-    user: User;
+    user: User | undefined;
     knowledgeDBs: KnowledgeDBs;
     snapshotNodes: SnapshotNodes;
     graphIndex: GraphIndex;

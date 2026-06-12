@@ -132,9 +132,9 @@ export function systemRoleFromFilePath(
 }
 
 function firstTopLevelNodeText(
-  tree: ReadonlyArray<{ spans: InlineSpan[]; hidden?: boolean }>
+  tree: ReadonlyArray<{ spans: InlineSpan[] }>
 ): string | undefined {
-  const root = tree.find((node) => !node.hidden);
+  const root = tree[0];
   if (!root) return undefined;
   const text = spansText(root.spans);
   return text || undefined;
@@ -169,7 +169,7 @@ function parseToDocumentWithMaterializer(
     firstTopLevelNodeText(parsed.tree) ??
     "Untitled";
 
-  const visibleRoots = parsed.tree.filter((tree) => !tree.hidden);
+  const visibleRoots = parsed.tree;
   const trees = visibleRoots.map((tree, index) => ({
     ...tree,
     docId: ensured.docId,

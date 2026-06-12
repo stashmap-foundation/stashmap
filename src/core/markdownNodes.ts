@@ -112,8 +112,7 @@ function materializeTreeNode(
     ...(treeNode.listStart !== undefined && { listStart: treeNode.listStart }),
   };
 
-  const visibleChildren = treeNode.children.filter((child) => !child.hidden);
-  const [withVisible, childIDs] = visibleChildren.reduce(
+  const [withVisible, childIDs] = treeNode.children.reduce(
     ([accCtx, accChildren], childNode) => {
       const blockLink = singleBlockLinkSpan(childNode.spans);
       if (blockLink && blockLink.kind === "link") {
@@ -212,31 +211,29 @@ function materializeTreeWithMode(
     options.updatedMs !== undefined
       ? { ...baseContext, updated: options.updatedMs }
       : baseContext;
-  return trees
-    .filter((treeNode) => !treeNode.hidden)
-    .reduce<MaterializeResult>(
-      (acc, treeNode) => {
-        const hasExplicitRootId = usesExactTreeNodeId(mode, treeNode);
-        const rootUuid = treeNode.uuid ?? v4();
-        const rootNodeID = rootUuid as ID;
-        const treeWithUuid = hasExplicitRootId
-          ? treeNode
-          : { ...treeNode, uuid: rootUuid };
-        const [nextCtx, topSemanticID, topNodeID] = materializeTreeNode(
-          acc.context,
-          treeWithUuid,
-          rootNodeID,
-          undefined,
-          mode
-        );
-        return {
-          context: nextCtx,
-          topSemanticIds: [...acc.topSemanticIds, topSemanticID],
-          topNodeIds: [...acc.topNodeIds, topNodeID.id as ID],
-        };
-      },
-      { context: ctx, topSemanticIds: [], topNodeIds: [] }
-    );
+  return trees.reduce<MaterializeResult>(
+    (acc, treeNode) => {
+      const hasExplicitRootId = usesExactTreeNodeId(mode, treeNode);
+      const rootUuid = treeNode.uuid ?? v4();
+      const rootNodeID = rootUuid as ID;
+      const treeWithUuid = hasExplicitRootId
+        ? treeNode
+        : { ...treeNode, uuid: rootUuid };
+      const [nextCtx, topSemanticID, topNodeID] = materializeTreeNode(
+        acc.context,
+        treeWithUuid,
+        rootNodeID,
+        undefined,
+        mode
+      );
+      return {
+        context: nextCtx,
+        topSemanticIds: [...acc.topSemanticIds, topSemanticID],
+        topNodeIds: [...acc.topNodeIds, topNodeID.id as ID],
+      };
+    },
+    { context: ctx, topSemanticIds: [], topNodeIds: [] }
+  );
 }
 
 export function materializeTree(

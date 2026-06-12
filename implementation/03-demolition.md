@@ -30,7 +30,7 @@ Run the full gate after every checkpoint: `npm run typescript && npm run lint &&
 `RootAnchor` is two unrelated jobs on root nodes: a frozen breadcrumb (`snapshotContext`/`snapshotLabels` — stale text captured at copy time, serialized as `anchorContext=`/`anchorLabels=`, a third file vocabulary that `idea.md` forbids) and a source pointer (`sourceAuthor`/`sourceRootID`/`sourceNodeID`/`sourceParentNodeID`) that duplicates `basedOn` — `core/plan.ts:456-467` writes both from the same source node in one statement. The whole concept goes; the breadcrumb display is lost (re-derivable live from `basedOn` later if ever missed).
 
 1. **Fold first**: `getSnapshotSourceRoot` (`src/planner.tsx:711-723`) and the source resolution in `src/editor/Workspace.tsx:187-196` re-derive the snapshot source from the root's `basedOn` + node-centric snapshots instead of anchor fields. `DeepCopy.test.tsx` stays green.
-2. **Then delete the concept**: the `RootAnchor` type and `GraphNode.anchor` (`src/types.ts:267-274,289`); `src/core/rootAnchor.ts` (`createRootAnchor`, `getRootAnchorContext`, `rootAnchorsEqual`); anchor creation in `src/core/nodeFactory.ts:35`, `src/core/plan.ts:456-465,506-509`, `src/core/markdownNodes.ts:107,238`; markdown parsing (`src/core/markdownTree.ts:66-97`); the file format (`src/documentFormat.ts` root attrs incl. `anchorContext`/`anchorLabels`); serialization (`src/documentRenderer.ts:78`); breadcrumb rendering (`src/editor/Workspace.tsx:221-230`); `sourceAuthor` metadata in `src/infra/snapshotStore.ts:30-43`.
+2. **Then delete the concept**: the `RootAnchor` type and `GraphNode.anchor` (`src/types.ts:267-274,289`); `src/core/rootAnchor.ts` (`createRootAnchor`, `getRootAnchorContext`, `rootAnchorsEqual`); anchor creation in `src/core/nodeFactory.ts:35`, `src/core/plan.ts:456-465,506-509`, `src/core/markdownNodes.ts:107,238`; markdown parsing (`src/core/markdownTree.ts:66-97`); the file format (`src/documentFormat.ts` root attrs incl. `anchorContext`/`anchorLabels`); serialization (`src/documentRenderer.ts:78`); breadcrumb rendering (`src/editor/Workspace.tsx:221-230`). (The `sourceAuthor` in `src/infra/snapshotStore.ts:30-43` is snapshot-*event* metadata, not `RootAnchor` — it moves to checkpoint 6 with the rest of the cross-author fetch path.)
 3. Update tests pinning anchor round-trips (`Document.test.ts`, `MultiTopNodeDocuments.test.tsx` and friends).
 
 **Unrelated "anchor" naming — leave alone**: `useTemporaryView().anchor` (multiselect anchor, `TreeView.tsx`, `DroppableContainer.tsx`), `globalDragIndent.anchorX` (drag state), and the `anchor` field in `userSessionState.ts:30`. Do not grep-delete these.
@@ -38,7 +38,6 @@ Run the full gate after every checkpoint: `npm run typescript && npm run lint &&
 ### Checkpoint 2 — Dead vocabulary
 
 - Delete the `hidden` attribute end to end: parse (`src/core/markdownTree.ts:61,320`), materialization filters (`src/core/markdownNodes.ts:124,228`), root selection (`src/core/Document.ts:135-137,172`), format option (`src/documentFormat.ts`). It has no production writer and silently deletes user rows on save.
-- Delete the orphaned `nodesMatchForVersion` (`src/buildReferenceRow.ts:318-329`).
 
 ### Checkpoint 3 — Suggestion/version producer: cut text equality and cross-author inputs, keep the lineage feature
 
@@ -46,6 +45,7 @@ The `[V]` version rows ("+x/−y") and `(?)` suggestion rows are **not** inheren
 
 Delete only what violates the model:
 
+- **Text-equality version detection**: `nodesMatchForVersion` (`src/buildReferenceRow.ts:318-329` — *not* orphaned: called at ~714 to present same-text-same-context reference rows as versions of the parent). Version relations come from `basedOn` lineage only; the text-match branch goes.
 - **Text-equality suppression** inside `getAlternativeFooterData` (`src/semanticProjection.ts`: the `currentSemanticIDs` set at ~615-617 and its uses in suggestion dedupe ~649-651 and `addCount`/`uncoveredAddCount` filtering ~678-690): every `getNodeSemanticID` check goes; suppression is `originKey` (`basedOn ?? id`) only. Deliberate behavior change: same text with different origin is no longer suppressed — model-correct.
 - **Cross-author inputs**: `visibleAuthors` built from `data.contacts` (`src/treeTraversal.ts:559-564`) shrinks to the user's own graph; `isVisibleVersion` author filtering simplifies accordingly (fully vacuous after checkpoint 4 deletes contacts).
 - **Multi-user test fixtures**: the "Bob forks…" scenarios in `src/editor/SuggestionDisplay.test.tsx` — replace with self-fork coverage built on the DeepCopy flow, pinning: a fork shows as `[V]` with correct counts on its original; the fork's new children appear as `(?)` suggestions; suppression is `originKey`-based; the existing `not_relevant`-ref decline suppression (`declinedTargetIDs` — already lineage-honest) keeps working.

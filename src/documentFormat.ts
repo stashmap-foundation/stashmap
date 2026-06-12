@@ -3,7 +3,6 @@ import { serializeFrontMatter } from "./core/knowstrFrontmatter";
 export function formatNodeAttrs(
   uuid: string,
   options?: {
-    hidden?: boolean;
     basedOn?: ID;
     snapshotId?: string;
     userPublicKey?: PublicKey;
@@ -14,7 +13,6 @@ export function formatNodeAttrs(
     ...(options?.userPublicKey
       ? [`userPublicKey="${options.userPublicKey}"`]
       : []),
-    ...(options?.hidden ? ["hidden"] : []),
     ...(options?.basedOn ? [`basedOn="${options.basedOn}"`] : []),
     ...(options?.snapshotId ? [`snapshot="${options.snapshotId}"`] : []),
   ];

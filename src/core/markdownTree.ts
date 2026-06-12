@@ -33,7 +33,6 @@ const PREFIX_RE = /^(\([!?~x+-]{1,2}\)\s*)+/;
 
 type ParsedComment = {
   uuid: string;
-  hidden: boolean;
   basedOn: string | undefined;
   snapshotId: string | undefined;
   systemRole: RootSystemRole | undefined;
@@ -56,7 +55,6 @@ function parseIdComment(content: string): ParsedComment | undefined {
     attrsMap[key] = value;
   });
 
-  const hidden = rest.includes(" hidden");
   const basedOn = attrsMap.basedOn || undefined;
   const snapshotId = attrsMap.snapshot || undefined;
   const userPublicKey = (attrsMap.userPublicKey || undefined) as
@@ -65,7 +63,6 @@ function parseIdComment(content: string): ParsedComment | undefined {
 
   return {
     uuid,
-    hidden,
     basedOn,
     snapshotId,
     systemRole: undefined,
@@ -242,7 +239,6 @@ export type MarkdownTreeNode = {
   headingLevel?: number;
   listOrdered?: boolean;
   listStart?: number;
-  hidden?: boolean;
   basedOn?: string;
   snapshotId?: string;
   systemRole?: RootSystemRole;
@@ -280,7 +276,6 @@ function commentNodeAttrs(
 ): Partial<MarkdownTreeNode> {
   return {
     ...(commentAttrs?.uuid !== undefined && { uuid: commentAttrs.uuid }),
-    ...(commentAttrs?.hidden && { hidden: true }),
     ...(commentAttrs?.basedOn !== undefined && {
       basedOn: commentAttrs.basedOn,
     }),

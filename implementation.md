@@ -10,9 +10,9 @@ Conventions: **Done** means committed and verified with `npm run typescript && n
 
 A codebase audit (2026-06-11) found the surfaces below contradicting the model. Eliminating these discrepancies comes before any new feature: the multi-user machinery is built on two retired primitives — author-as-boundary and text-equality-as-identity — and is **deleted, not migrated**. The app becomes a clean single-user editor on all three runtimes (CLI, Electron, web), then collaboration is rebuilt on the source boundary.
 
-### Phase A1 — Demolition: remove multi-user machinery on retired primitives
+### Phase A1 — Demolition: remove multi-user machinery on retired primitives — Done
 
-The detailed execution prompt with checkpoints, dependency map, prohibited compatibility moves, and hard-grep gates lives in **`implementation/03-demolition.md`**. Summary:
+Completed 2026-06-12 (commits `1d268ab`..`94d5240`, +684/−2723). The detailed execution prompt with checkpoints, dependency map, prohibited compatibility moves, and hard-grep gates lives in **`implementation/03-demolition.md`**. Summary:
 
 Remove, in checkpoint order:
 

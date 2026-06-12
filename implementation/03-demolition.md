@@ -1,6 +1,6 @@
 # Phase A1 — Demolition execution prompt
 
-Status: **Not started**.
+Status: **Done** (2026-06-12, commits `1d268ab`..`94d5240`). All hard greps clean, keep-list suites green, net diff +684/−2723 across 81 files. Multi-user engine tests were converted to self-fork fixtures (`forkOwnRoot`); source-dependent behaviors are recorded in the re-coverage manifest in `implementation.md` Phase B3. Production fixes that fell out: suggestion subtrees inherit `virtualType` (row-based read-only/drag semantics), and snapshot source resolution follows `basedOn`.
 
 We are removing all multi-user machinery before introducing the source boundary (Phase A2). Read `AGENTS.md` and `idea.md` first — especially the suggestion lifecycle (materialization is the only engine transition; "accept" is not an operation) and the invariants. Treat the keep-list and the hard greps below as mandatory.
 

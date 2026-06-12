@@ -264,15 +264,6 @@ declare global {
   // Argument types (evidence) for node children
   type Argument = "confirms" | "contra" | undefined;
 
-  type RootAnchor = {
-    snapshotContext: Context;
-    snapshotLabels?: string[];
-    sourceAuthor?: PublicKey;
-    sourceRootID?: ID;
-    sourceNodeID?: ID;
-    sourceParentNodeID?: ID;
-  };
-
   type RootSystemRole = "log";
 
   type InlineSpan =
@@ -286,7 +277,6 @@ declare global {
     spans: InlineSpan[];
     docId?: string;
     parent?: ID;
-    anchor?: RootAnchor;
     systemRole?: RootSystemRole;
     userPublicKey?: PublicKey;
     snapshotId?: string;

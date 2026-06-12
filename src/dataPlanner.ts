@@ -1,10 +1,5 @@
 import { Set } from "immutable";
-import {
-  deleteNodes,
-  getNodeContext,
-  getNode,
-  isRefNode,
-} from "./core/connections";
+import { deleteNodes, getNode, isRefNode } from "./core/connections";
 import {
   GraphPlan,
   planDeleteDescendantNodes,
@@ -93,8 +88,6 @@ export function planRemoveNodeItemById<T extends GraphPlan>(
     return planMoveDescendantNodes(
       withoutItem,
       sourceNode,
-      getNodeContext(withoutItem.knowledgeDBs, sourceNode),
-      undefined,
       undefined,
       sourceNode.id
     );

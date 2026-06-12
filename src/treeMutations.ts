@@ -1,9 +1,4 @@
-import {
-  getNode,
-  getNodeContext,
-  getSemanticID,
-  isSearchId,
-} from "./core/connections";
+import { getNode, isSearchId } from "./core/connections";
 import { planRemoveNodeItemById } from "./dataPlanner";
 import {
   ViewPath,
@@ -95,7 +90,6 @@ export function planDeleteNode(
 export function planMoveNode(
   plan: Plan,
   sourceNode: GraphNode,
-  sourceRowID: ID,
   sourceChildID: ID,
   sourceParentNode: GraphNode,
   sourceViewPath: ViewPath,
@@ -103,24 +97,19 @@ export function planMoveNode(
   targetParentViewPath: ViewPath,
   insertAtIndex?: number
 ): Plan {
-  const [planWithAdd, [actualItemID]] = planAddToParent(
+  const [planWithAdd] = planAddToParent(
     plan,
     sourceNode.id,
     targetParentNode,
     insertAtIndex
   );
 
-  const moveItemID = actualItemID ?? sourceRowID;
   const actualTargetParentNode =
     getNode(
       planWithAdd.knowledgeDBs,
       targetParentNode.id,
       plan.user.publicKey
     ) ?? targetParentNode;
-  const targetContext = getNodeContext(
-    planWithAdd.knowledgeDBs,
-    actualTargetParentNode
-  ).push(getSemanticID(planWithAdd.knowledgeDBs, actualTargetParentNode));
 
   if (actualTargetParentNode.children.size === 0) {
     return planDisconnectFromParent(
@@ -170,9 +159,7 @@ export function planMoveNode(
   return planMoveDescendantNodes(
     planWithDisconnect,
     sourceNode,
-    targetContext,
     actualTargetParentNode.id,
-    moveItemID !== sourceRowID ? moveItemID : undefined,
     actualTargetParentNode.root
   );
 }

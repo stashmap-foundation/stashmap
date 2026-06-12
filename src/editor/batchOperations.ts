@@ -236,7 +236,6 @@ export function planBatchIndent(
       const moved = planMoveNode(
         state.plan,
         row.node,
-        row.rowID,
         row.node.id,
         row.parentNode,
         viewPath,
@@ -319,7 +318,6 @@ export function planBatchOutdent(
       const moved = planMoveNode(
         state.plan,
         row.node,
-        row.rowID,
         row.node.id,
         row.parentNode,
         viewPath,

@@ -289,8 +289,6 @@ export function planUpdateViewItemMetadata(
       const source = resolveDeepCopySource(plan, rowID, node);
       return planDeepCopyNode(
         plan,
-        source.itemID,
-        source.semanticContext,
         source.node,
         currentParentNode,
         viewPath,

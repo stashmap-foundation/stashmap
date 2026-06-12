@@ -3,7 +3,6 @@ import { List, Map as ImmutableMap, Set as ImmutableSet } from "immutable";
 import { v4 } from "uuid";
 import { ensureNodeNativeFields } from "./connections";
 import { newDB } from "./knowledge";
-import { createRootAnchor } from "./rootAnchor";
 import { MarkdownTreeNode } from "./markdownTree";
 import { newGraphNode } from "./nodeFactory";
 import { fileLinkSpan, linkSpan, nodeText } from "./nodeSpans";
@@ -80,7 +79,6 @@ function newMarkdownGraphNode(
 function materializeTreeNode(
   ctx: WalkContext,
   treeNode: MarkdownTreeNode,
-  semanticContext: List<ID>,
   root: ID,
   parent: ID | undefined,
   mode: IdMaterializationMode
@@ -93,7 +91,6 @@ function materializeTreeNode(
       root,
       relevance: treeNode.relevance,
       argument: treeNode.argument,
-      semanticContext,
     },
     mode
   );
@@ -102,9 +99,6 @@ function materializeTreeNode(
     spans: treeNode.spans,
     parent,
     docId: parent ? undefined : treeNode.docId,
-    anchor: parent
-      ? undefined
-      : treeNode.anchor ?? createRootAnchor(semanticContext),
     systemRole: parent ? undefined : treeNode.systemRole,
     userPublicKey: treeNode.userPublicKey,
     snapshotId: treeNode.snapshotId,
@@ -118,9 +112,6 @@ function materializeTreeNode(
     ...(treeNode.listStart !== undefined && { listStart: treeNode.listStart }),
   };
 
-  const childSemanticContext = semanticContext.push(
-    nodeText(nodeBaseWithFields) as ID
-  );
   const visibleChildren = treeNode.children.filter((child) => !child.hidden);
   const [withVisible, childIDs] = visibleChildren.reduce(
     ([accCtx, accChildren], childNode) => {
@@ -166,7 +157,6 @@ function materializeTreeNode(
       const [afterChild, , materializedChild] = materializeTreeNode(
         accCtx,
         childNode,
-        childSemanticContext,
         root,
         nodeBaseWithFields.id,
         mode
@@ -199,7 +189,6 @@ function materializeTreeNode(
 export type MaterializeOptions = {
   context?: WalkContext;
   updatedMs?: number;
-  semanticContext?: List<ID>;
 };
 
 export type MaterializeResult = {
@@ -223,7 +212,6 @@ function materializeTreeWithMode(
     options.updatedMs !== undefined
       ? { ...baseContext, updated: options.updatedMs }
       : baseContext;
-  const semanticContext = options.semanticContext ?? List<ID>();
   return trees
     .filter((treeNode) => !treeNode.hidden)
     .reduce<MaterializeResult>(
@@ -234,12 +222,9 @@ function materializeTreeWithMode(
         const treeWithUuid = hasExplicitRootId
           ? treeNode
           : { ...treeNode, uuid: rootUuid };
-        const treeSemanticContext =
-          treeNode.anchor?.snapshotContext ?? semanticContext;
         const [nextCtx, topSemanticID, topNodeID] = materializeTreeNode(
           acc.context,
           treeWithUuid,
-          treeSemanticContext,
           rootNodeID,
           undefined,
           mode

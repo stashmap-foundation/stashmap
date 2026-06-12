@@ -1,5 +1,4 @@
 /* eslint-disable functional/immutable-data, functional/no-let, no-continue */
-import { List } from "immutable";
 import MarkdownIt from "markdown-it";
 import markdownItFrontMatter from "markdown-it-front-matter";
 // eslint-disable-next-line import/no-unresolved
@@ -37,7 +36,6 @@ type ParsedComment = {
   hidden: boolean;
   basedOn: string | undefined;
   snapshotId: string | undefined;
-  anchor: RootAnchor | undefined;
   systemRole: RootSystemRole | undefined;
   userPublicKey: PublicKey | undefined;
 };
@@ -61,49 +59,15 @@ function parseIdComment(content: string): ParsedComment | undefined {
   const hidden = rest.includes(" hidden");
   const basedOn = attrsMap.basedOn || undefined;
   const snapshotId = attrsMap.snapshot || undefined;
-  const anchorContext = attrsMap.anchorContext || undefined;
-  const anchorLabelsAttr = attrsMap.anchorLabels || undefined;
-  const sourceAuthor = attrsMap.sourceAuthor || undefined;
-  const sourceRootID = (attrsMap.sourceRoot || undefined) as ID | undefined;
-  const sourceNodeID = (attrsMap.sourceNode || undefined) as ID | undefined;
-  const sourceParentNodeID = (attrsMap.sourceParent || undefined) as
-    | ID
-    | undefined;
   const userPublicKey = (attrsMap.userPublicKey || undefined) as
     | PublicKey
     | undefined;
-
-  const anchor =
-    anchorContext ||
-    anchorLabelsAttr ||
-    sourceAuthor ||
-    sourceRootID ||
-    sourceNodeID ||
-    sourceParentNodeID
-      ? {
-          snapshotContext: anchorContext
-            ? List(anchorContext.split(":") as ID[])
-            : List<ID>(),
-          ...(anchorLabelsAttr
-            ? {
-                snapshotLabels: anchorLabelsAttr
-                  .split("|")
-                  .map((label) => decodeURIComponent(label)),
-              }
-            : {}),
-          ...(sourceAuthor ? { sourceAuthor: sourceAuthor as PublicKey } : {}),
-          ...(sourceRootID ? { sourceRootID } : {}),
-          ...(sourceNodeID ? { sourceNodeID } : {}),
-          ...(sourceParentNodeID ? { sourceParentNodeID } : {}),
-        }
-      : undefined;
 
   return {
     uuid,
     hidden,
     basedOn,
     snapshotId,
-    anchor,
     systemRole: undefined,
     userPublicKey,
   };
@@ -281,7 +245,6 @@ export type MarkdownTreeNode = {
   hidden?: boolean;
   basedOn?: string;
   snapshotId?: string;
-  anchor?: RootAnchor;
   systemRole?: RootSystemRole;
   userPublicKey?: PublicKey;
 };
@@ -323,9 +286,6 @@ function commentNodeAttrs(
     }),
     ...(commentAttrs?.snapshotId !== undefined && {
       snapshotId: commentAttrs.snapshotId,
-    }),
-    ...(commentAttrs?.anchor !== undefined && {
-      anchor: commentAttrs.anchor,
     }),
     ...(commentAttrs?.systemRole !== undefined && {
       systemRole: commentAttrs.systemRole,

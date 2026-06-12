@@ -29,7 +29,6 @@ async function uploadMarkdown(alice: UpdateState): Promise<KnowledgeData> {
   const workspaceNode: GraphNode = {
     ...newGraphNode(alice().user.publicKey, plainSpans(workspaceText), {
       root: wsID,
-      semanticContext: List(),
     }),
     id: wsID,
     root: wsID,

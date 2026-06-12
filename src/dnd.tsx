@@ -386,7 +386,6 @@ export function dnd(
       return planMoveNode(
         accPlan,
         sourceRow.node,
-        sourceRow.rowID,
         sourceRow.node.id,
         getCurrentPlanNode(accPlan, sourceRow.parentNode),
         sourceRow.viewPath,
@@ -511,8 +510,6 @@ export function dnd(
     const deepCopySource = resolveDeepCopySource(accPlan, sourceRow);
     return planDeepCopyNode(
       accPlan,
-      deepCopySource.itemID,
-      deepCopySource.semanticContext,
       deepCopySource.node,
       targetNode,
       sourceRow.viewPath,

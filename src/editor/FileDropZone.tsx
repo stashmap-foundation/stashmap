@@ -22,11 +22,6 @@ import type { MarkdownImportFile } from "../core/markdownImport";
 
 export type { MarkdownImportFile } from "../core/markdownImport";
 export { parseMarkdownImportFiles } from "../core/markdownImport";
-export {
-  planCreateNodesFromMarkdown,
-  planCreateNodesFromMarkdownFiles,
-  planCreateNodesFromMarkdownTrees,
-} from "../markdownPlan";
 
 /* eslint-disable functional/immutable-data */
 export function parsedLinesToTrees(children: ParsedLine[]): MarkdownTreeNode[] {

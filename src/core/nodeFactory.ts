@@ -1,6 +1,5 @@
 import { List } from "immutable";
 import { v4 } from "uuid";
-import { createRootAnchor } from "./rootAnchor";
 
 export type NewGraphNodeOptions = {
   root?: ID;
@@ -8,7 +7,6 @@ export type NewGraphNodeOptions = {
   docId?: string;
   relevance?: Relevance;
   argument?: Argument;
-  semanticContext?: Context;
   systemRole?: RootSystemRole;
   uuid?: string;
 };
@@ -31,9 +29,6 @@ export function newGraphNode(
     spans,
     parent,
     ...(options.docId !== undefined ? { docId: options.docId } : {}),
-    ...(options.semanticContext !== undefined && !parent
-      ? { anchor: createRootAnchor(options.semanticContext) }
-      : {}),
     ...(options.systemRole !== undefined && !parent
       ? { systemRole: options.systemRole }
       : {}),

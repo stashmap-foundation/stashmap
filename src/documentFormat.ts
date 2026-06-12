@@ -1,43 +1,11 @@
 import { serializeFrontMatter } from "./core/knowstrFrontmatter";
 
-export function formatRootHeading(
-  rootText: string,
-  rootUuid: string,
-  basedOn?: ID,
-  snapshotId?: string,
-  anchor?: RootAnchor
-): string {
-  const parts = [
-    `id:${rootUuid}`,
-    ...(basedOn ? [`basedOn="${basedOn}"`] : []),
-    ...(snapshotId ? [`snapshot="${snapshotId}"`] : []),
-    ...(anchor?.snapshotContext.size
-      ? [`anchorContext="${anchor.snapshotContext.join(":")}"`]
-      : []),
-    ...(anchor?.snapshotLabels?.length
-      ? [
-          `anchorLabels="${anchor.snapshotLabels
-            .map((label) => encodeURIComponent(label))
-            .join("|")}"`,
-        ]
-      : []),
-    ...(anchor?.sourceAuthor ? [`sourceAuthor="${anchor.sourceAuthor}"`] : []),
-    ...(anchor?.sourceRootID ? [`sourceRoot="${anchor.sourceRootID}"`] : []),
-    ...(anchor?.sourceNodeID ? [`sourceNode="${anchor.sourceNodeID}"`] : []),
-    ...(anchor?.sourceParentNodeID
-      ? [`sourceParent="${anchor.sourceParentNodeID}"`]
-      : []),
-  ];
-  return `# ${rootText} <!-- ${parts.join(" ")} -->`;
-}
-
 export function formatNodeAttrs(
   uuid: string,
   options?: {
     hidden?: boolean;
     basedOn?: ID;
     snapshotId?: string;
-    anchor?: RootAnchor;
     userPublicKey?: PublicKey;
   }
 ): string {
@@ -49,28 +17,6 @@ export function formatNodeAttrs(
     ...(options?.hidden ? ["hidden"] : []),
     ...(options?.basedOn ? [`basedOn="${options.basedOn}"`] : []),
     ...(options?.snapshotId ? [`snapshot="${options.snapshotId}"`] : []),
-    ...(options?.anchor?.snapshotContext.size
-      ? [`anchorContext="${options.anchor.snapshotContext.join(":")}"`]
-      : []),
-    ...(options?.anchor?.snapshotLabels?.length
-      ? [
-          `anchorLabels="${options.anchor.snapshotLabels
-            .map((label) => encodeURIComponent(label))
-            .join("|")}"`,
-        ]
-      : []),
-    ...(options?.anchor?.sourceAuthor
-      ? [`sourceAuthor="${options.anchor.sourceAuthor}"`]
-      : []),
-    ...(options?.anchor?.sourceRootID
-      ? [`sourceRoot="${options.anchor.sourceRootID}"`]
-      : []),
-    ...(options?.anchor?.sourceNodeID
-      ? [`sourceNode="${options.anchor.sourceNodeID}"`]
-      : []),
-    ...(options?.anchor?.sourceParentNodeID
-      ? [`sourceParent="${options.anchor.sourceParentNodeID}"`]
-      : []),
   ];
   if (parts.length === 0) {
     return "";

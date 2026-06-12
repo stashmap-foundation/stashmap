@@ -75,7 +75,6 @@ function getSerializableNodeAttrs(
     ...(node.basedOn ? { basedOn: node.basedOn } : {}),
     ...(node.userPublicKey ? { userPublicKey: node.userPublicKey } : {}),
     ...(snapshotId ? { snapshotId } : {}),
-    ...(node.anchor ? { anchor: node.anchor } : {}),
   });
 }
 

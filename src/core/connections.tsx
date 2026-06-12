@@ -2,7 +2,6 @@
 import { List, Set, Map } from "immutable";
 import { newGraphNode } from "./nodeFactory";
 import { SEARCH_PREFIX } from "./constants";
-import { getRootAnchorContext, rootAnchorsEqual } from "./rootAnchor";
 import {
   getBlockFileLinkPath,
   getBlockLinkTarget,
@@ -150,7 +149,7 @@ export function getNodeContext(
     }
   }
 
-  const fallbackContext = getRootAnchorContext(node);
+  const fallbackContext = List<ID>();
   if (!node.parent) {
     if (db) {
       getNodeContextIndex(db).set(nodeKey, fallbackContext);
@@ -438,16 +437,14 @@ export function ensureNodeNativeFields(
 ): GraphNode {
   const existingNode = knowledgeDBs.get(node.author)?.nodes.get(node.id);
   const parent = node.parent || existingNode?.parent;
-  const anchor = parent ? undefined : node.anchor ?? existingNode?.anchor;
 
-  if (node.parent === parent && rootAnchorsEqual(node.anchor, anchor)) {
+  if (node.parent === parent) {
     return node;
   }
 
   return {
     ...node,
     parent,
-    anchor,
   };
 }
 
@@ -458,7 +455,7 @@ export function getSearchNodes(
   asRefs: boolean = false
 ): { node: GraphNode; childNodes: List<GraphNode> } {
   const rel = {
-    ...newGraphNode(myself, plainSpans(""), { semanticContext: List<ID>() }),
+    ...newGraphNode(myself, plainSpans("")),
     id: searchId as ID,
     root: searchId as ID,
   };

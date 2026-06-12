@@ -17,11 +17,13 @@ import { processEvents } from "../eventProcessing";
 import {
   parseMarkdownImportFiles,
   parseTextToTrees,
+  planImportMarkdownFilesAtEmptyRoot,
+} from "./FileDropZone";
+import {
   planCreateNodesFromMarkdown,
   planCreateNodesFromMarkdownFiles,
   planCreateNodesFromMarkdownTrees,
-  planImportMarkdownFilesAtEmptyRoot,
-} from "./FileDropZone";
+} from "../markdownPlan";
 import { MarkdownTreeNode, parseMarkdown } from "../core/markdownTree";
 import {
   getBlockFileLinkPath,

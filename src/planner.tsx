@@ -22,8 +22,6 @@ import {
   getNode,
   computeEmptyNodeMetadata,
   isSearchId,
-  getNodeContext,
-  getSemanticID,
   isRefNode,
 } from "./core/connections";
 import type { TextSeed } from "./core/connections";
@@ -349,7 +347,6 @@ export function planForkPane(
   const [planWithNodes, nodesIdMapping] = planCopyDescendantNodes(
     plan,
     sourceNode,
-    (node) => getNodeContext(plan.knowledgeDBs, node),
     (node) => node.author === pane.author
   );
   const updatedViews = updateViewsWithNodesMapping(
@@ -413,8 +410,6 @@ function copyDeepNodeViewState(
 
 export function planDeepCopyNode(
   plan: Plan,
-  resolvedItemID: ID,
-  resolvedSemanticContext: Context,
   resolvedNode: GraphNode,
   targetParentNode: GraphNode,
   sourceViewPath: ViewPath,
@@ -423,25 +418,9 @@ export function planDeepCopyNode(
   relevance?: Relevance,
   argument?: Argument
 ): Plan {
-  const targetRootContext = getNodeContext(
-    plan.knowledgeDBs,
-    targetParentNode
-  ).push(getSemanticID(plan.knowledgeDBs, targetParentNode));
-  const sourceRootChildContext = resolvedSemanticContext.push(resolvedItemID);
-  const targetRootChildContext = targetRootContext.push(resolvedItemID);
-
   const [planWithCopiedNodes, mapping] = planCopyDescendantNodes(
     plan,
     resolvedNode,
-    (node) => {
-      const isRootNode = node.id === resolvedNode.id;
-      const sourceNodeContext = getNodeContext(plan.knowledgeDBs, node);
-      return isRootNode
-        ? targetRootContext
-        : targetRootChildContext.concat(
-            sourceNodeContext.skip(sourceRootChildContext.size)
-          );
-    },
     undefined,
     targetParentNode.id,
     targetParentNode.root
@@ -519,9 +498,7 @@ function planCreateNoteAtRoot(
   const [planWithSeed, createdSeed] = planCreateNode(plan, text);
   const createdNode = withDocumentRoot(
     withUsersEntryPublicKey(
-      newGraphNode(plan.user.publicKey, plainSpans(createdSeed.text), {
-        semanticContext: List<ID>(),
-      }),
+      newGraphNode(plan.user.publicKey, plainSpans(createdSeed.text)),
       createdSeed.text
     )
   );
@@ -700,6 +677,22 @@ const PlanningContext = React.createContext<PlanningContextValue | undefined>(
 // Filter out empty placeholder nodes from events before publishing
 // Empty nodes are injected at read time via injectEmptyNodesIntoKnowledgeDBs,
 // so any nodes modification will include them - we need to filter before publishing
+function resolveBasedOnNode(
+  knowledgeDBs: KnowledgeDBs,
+  nodeID: ID,
+  myself: PublicKey
+): GraphNode | undefined {
+  const own = getNode(knowledgeDBs, nodeID, myself);
+  if (own) {
+    return own;
+  }
+  return knowledgeDBs
+    .keySeq()
+    .sort()
+    .map((author) => getNode(knowledgeDBs, nodeID, author))
+    .find((node) => node !== undefined);
+}
+
 function getSnapshotSourceRoot(
   knowledgeDBs: KnowledgeDBs,
   snapshotAnchorNode: GraphNode | undefined,
@@ -708,19 +701,13 @@ function getSnapshotSourceRoot(
   if (!snapshotAnchorNode?.basedOn) {
     return undefined;
   }
-  const sourceAuthor =
-    snapshotAnchorNode.anchor?.sourceAuthor ?? fallbackAuthor;
-  const sourceNode = getNode(
+  const sourceNode = resolveBasedOnNode(
     knowledgeDBs,
     snapshotAnchorNode.basedOn,
-    sourceAuthor
+    fallbackAuthor
   );
-  if (sourceNode?.root) {
-    return getNode(knowledgeDBs, sourceNode.root, sourceNode.author);
-  }
-  const sourceRootID = snapshotAnchorNode.anchor?.sourceRootID;
-  return sourceRootID
-    ? getNode(knowledgeDBs, sourceRootID, sourceAuthor)
+  return sourceNode
+    ? getNode(knowledgeDBs, sourceNode.root, sourceNode.author)
     : undefined;
 }
 

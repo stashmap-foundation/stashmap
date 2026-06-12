@@ -42,7 +42,7 @@ import {
   planToggleTemporarySelection,
 } from "../planner";
 import { parseTextToTrees, planPasteMarkdownTrees } from "./FileDropZone";
-import { getNodeText, getSemanticID, getNode } from "../core/connections";
+import { getNodeText, getSemanticID } from "../core/connections";
 import { getOwnLogRoot } from "../core/systemRoots";
 import { buildDocumentRouteUrl, buildNodeRouteUrl } from "../navigationUrl";
 import {
@@ -180,27 +180,6 @@ function breadcrumbEntriesWithDocument(
   return [documentEntry, ...visibleNodeEntries];
 }
 
-function getLiveAnchorSourceNode(
-  knowledgeDBs: KnowledgeDBs,
-  node: GraphNode
-): GraphNode | undefined {
-  const sourceAuthor = node.anchor?.sourceAuthor || node.author;
-  if (node.anchor?.sourceNodeID) {
-    return getNode(knowledgeDBs, node.anchor.sourceNodeID, sourceAuthor);
-  }
-  if (!node.anchor?.sourceRootID) {
-    return undefined;
-  }
-  const sourceRoot = getNode(
-    knowledgeDBs,
-    node.anchor.sourceRootID,
-    sourceAuthor
-  );
-  return sourceRoot && !sourceRoot.parent && sourceRoot.root === sourceRoot.id
-    ? sourceRoot
-    : undefined;
-}
-
 function createNodeBreadcrumbEntry(
   knowledgeDBs: KnowledgeDBs,
   node: GraphNode,
@@ -215,22 +194,6 @@ function createNodeBreadcrumbEntry(
       rootNodeId: node.id,
     },
   };
-}
-
-function createSnapshotBreadcrumbEntries(
-  anchor: RootAnchor | undefined,
-  fallbackAuthor: PublicKey
-): BreadcrumbEntry[] {
-  if (!anchor?.snapshotContext.size) {
-    return [];
-  }
-  const author = anchor.sourceAuthor || fallbackAuthor;
-  return anchor.snapshotContext.toArray().map((semanticID, index) => ({
-    key: `snapshot:${author}:${semanticID}:${index}`,
-    label: anchor.snapshotLabels?.[index] || semanticID,
-    disabled: true,
-    isSource: true,
-  }));
 }
 
 function buildAnchoredLineageEntries(
@@ -265,69 +228,7 @@ function buildAnchoredLineageEntries(
     }
   }
 
-  const sourceNode = getLiveAnchorSourceNode(data.knowledgeDBs, node);
-  if (sourceNode) {
-    return [
-      ...buildAnchoredLineageEntries(
-        data,
-        graph,
-        sourceNode,
-        sourceNode.author,
-        nextSeen
-      ).slice(0, -1),
-      createNodeBreadcrumbEntry(data.knowledgeDBs, node, sourceId),
-    ];
-  }
-
-  return [
-    ...createSnapshotBreadcrumbEntries(node.anchor, node.author),
-    createNodeBreadcrumbEntry(data.knowledgeDBs, node, sourceId),
-  ];
-}
-
-function SourceButton(): JSX.Element | null {
-  const data = useData();
-  const { knowledgeDBs } = data;
-  const pane = useCurrentPane();
-  const { setPane } = useSplitPanes();
-  const paneHistory = usePaneHistory();
-  const graph = graphLookupFromData(data);
-  const rootNode = pane.rootNodeId
-    ? lookupNode(graph, pane.rootNodeId, pane.sourceId)?.node
-    : undefined;
-
-  if (!rootNode?.anchor) {
-    return null;
-  }
-
-  const sourceNode = getLiveAnchorSourceNode(knowledgeDBs, rootNode);
-  if (!sourceNode) {
-    return null;
-  }
-
-  const target: Pane = {
-    ...pane,
-    author: sourceNode.author,
-    sourceId: sourceNode.author,
-    rootNodeId: sourceNode.id,
-    scrollToId: undefined,
-  };
-
-  return (
-    <button
-      type="button"
-      className="header-action-btn"
-      onClick={() => {
-        paneHistory?.push(pane.id, pane);
-        setPane(target);
-      }}
-      aria-label="Open source tree"
-      title="Source"
-      data-pane-action="source"
-    >
-      source
-    </button>
-  );
+  return [createNodeBreadcrumbEntry(data.knowledgeDBs, node, sourceId)];
 }
 
 function Breadcrumbs(): JSX.Element {
@@ -603,7 +504,6 @@ function PaneHeader(): JSX.Element {
       <div className="pane-header-left">
         <BackButton />
         <Breadcrumbs />
-        <SourceButton />
         <ForkButton />
         {isFirstPane && <SignInMenuBtn />}
       </div>

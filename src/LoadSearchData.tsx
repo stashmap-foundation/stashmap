@@ -41,9 +41,7 @@ function SearchCrefBuilder({
   });
 
   const searchNodeBase = {
-    ...newGraphNode(user.publicKey, plainSpans(""), {
-      semanticContext: List<ID>(),
-    }),
+    ...newGraphNode(user.publicKey, plainSpans("")),
     id: searchId as ID,
     root: searchId as ID,
   };

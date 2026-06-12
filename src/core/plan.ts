@@ -7,14 +7,7 @@ import {
   newTimestamp,
   msTag,
 } from "../nostr";
-import {
-  ensureNodeNativeFields,
-  getNode,
-  getNodeContext,
-  getNodeText,
-  getSemanticID,
-  isSearchId,
-} from "./connections";
+import { ensureNodeNativeFields, getNode, isSearchId } from "./connections";
 import type {
   DocumentLinkTargetSeed,
   RefTargetSeed,
@@ -28,7 +21,6 @@ import {
 import { newDB } from "./knowledge";
 import { newGraphNode } from "./nodeFactory";
 import { fileLinkSpan, linkSpan, plainSpans } from "./nodeSpans";
-import { createRootAnchor } from "./rootAnchor";
 import {
   LOG_ROOT_ROLE,
   getOwnSystemRoot,
@@ -146,7 +138,6 @@ function planEnsureSystemRoot<T extends GraphPlan>(
       plan.user.publicKey,
       plainSpans(getSystemRoleText(systemRole)),
       {
-        semanticContext: List<ID>(),
         systemRole,
       }
     )
@@ -295,25 +286,6 @@ export function planUpsertNodes<T extends GraphPlan>(
   return addCrefToLog(basePlan, nodes.id);
 }
 
-function getAnchorSnapshotLabels(
-  knowledgeDBs: KnowledgeDBs,
-  node: GraphNode
-): string[] {
-  const labels: string[] = [];
-  let parentNodeID = node.parent;
-  while (parentNodeID) {
-    const parentNode = getNode(knowledgeDBs, parentNodeID, node.author);
-    if (!parentNode) {
-      break;
-    }
-    labels.unshift(
-      getNodeText(parentNode) || getSemanticID(knowledgeDBs, parentNode)
-    );
-    parentNodeID = parentNode.parent;
-  }
-  return labels;
-}
-
 type NodesIdMapping = Map<ID, ID>;
 
 function getEffectiveParentNodeID(node: GraphNode): ID | undefined {
@@ -392,7 +364,6 @@ function getNodeSubtree(
 export function planCopyDescendantNodes<T extends GraphPlan>(
   plan: T,
   sourceNode: GraphNode,
-  getSemanticContext: (node: GraphNode) => Context,
   filterNode?: (node: GraphNode) => boolean,
   targetParentNodeID?: ID,
   root?: ID
@@ -405,17 +376,14 @@ export function planCopyDescendantNodes<T extends GraphPlan>(
 
   const { copiedNodes } = descendants.reduce(
     (acc, node) => {
-      const newSemanticContext = getSemanticContext(node);
       const baseNode = newGraphNode(plan.user.publicKey, node.spans, {
         root: acc.copiedRoot,
-        semanticContext: newSemanticContext,
       });
       const nextCopiedRoot = acc.copiedRoot ?? baseNode.root;
       return {
         copiedRoot: nextCopiedRoot,
         copiedNodes: acc.copiedNodes.push({
           source: node,
-          newSemanticContext,
           sourceParentID: getEffectiveParentNodeID(node),
           copy: baseNode,
         }),
@@ -425,7 +393,6 @@ export function planCopyDescendantNodes<T extends GraphPlan>(
       copiedRoot: root,
       copiedNodes: List<{
         source: GraphNode;
-        newSemanticContext: Context;
         sourceParentID?: ID;
         copy: GraphNode;
       }>(),
@@ -438,7 +405,7 @@ export function planCopyDescendantNodes<T extends GraphPlan>(
   );
 
   const resultPlan = copiedNodes.reduce(
-    (accPlan, { source, newSemanticContext, sourceParentID, copy }) => {
+    (accPlan, { source, sourceParentID, copy }) => {
       const isRootNode = source.id === sourceNode.id;
       const children = source.children.map((childID) => {
         const mappedID = resultMapping.get(childID as ID);
@@ -453,16 +420,6 @@ export function planCopyDescendantNodes<T extends GraphPlan>(
         ...copy,
         children,
         parent: copiedParentID,
-        anchor: (() => {
-          if (!isRootNode || targetParentNodeID) {
-            return undefined;
-          }
-          return createRootAnchor(
-            newSemanticContext,
-            source,
-            getAnchorSnapshotLabels(accPlan.knowledgeDBs, source)
-          );
-        })(),
         spans: source.spans,
         basedOn: source.id,
         relevance: source.relevance,
@@ -478,35 +435,15 @@ export function planCopyDescendantNodes<T extends GraphPlan>(
 export function planMoveDescendantNodes<T extends GraphPlan>(
   plan: T,
   sourceNode: GraphNode,
-  targetSemanticContext: Context,
   targetParentNodeID?: ID,
-  targetSemanticID?: ID,
   root?: ID
 ): T {
   const descendants = getNodeSubtree(plan, sourceNode);
-  const sourceSemanticID = getSemanticID(plan.knowledgeDBs, sourceNode);
-  const sourceSemanticContext = getNodeContext(plan.knowledgeDBs, sourceNode);
-  const effectiveTargetSemanticID = targetSemanticID ?? sourceSemanticID;
-  const sourceChildContext = sourceSemanticContext.push(sourceSemanticID);
-  const targetChildContext = targetSemanticContext.push(
-    effectiveTargetSemanticID
-  );
-
   return descendants.reduce((accPlan, node) => {
     const isRootNode = node.id === sourceNode.id;
-    const nodeSemanticContext = getNodeContext(accPlan.knowledgeDBs, node);
-    const newSemanticContext = isRootNode
-      ? targetSemanticContext
-      : targetChildContext.concat(
-          nodeSemanticContext.skip(sourceChildContext.size)
-        );
     return planUpsertNodes(accPlan, {
       ...node,
       parent: isRootNode ? targetParentNodeID : getEffectiveParentNodeID(node),
-      anchor:
-        isRootNode && !targetParentNodeID
-          ? createRootAnchor(newSemanticContext)
-          : undefined,
       root: root ?? node.root,
     });
   }, plan);
@@ -707,11 +644,6 @@ export function planAddTargetsToNode<T extends GraphPlan>(
     return [plan, []];
   }
 
-  const parentContext = getNodeContext(plan.knowledgeDBs, parentNode);
-  const childContext = parentContext.push(
-    getSemanticID(plan.knowledgeDBs, parentNode)
-  );
-
   const [planWithChildren, nodeItemPayload] = targetsArray.reduce<
     [T, ChildPayload[]]
   >(
@@ -842,7 +774,6 @@ export function planAddTargetsToNode<T extends GraphPlan>(
         {
           root: parentNode.root,
           parent: parentNode.id,
-          semanticContext: childContext,
         }
       );
       const nodeWithUserPublicKey = objectUserPublicKey

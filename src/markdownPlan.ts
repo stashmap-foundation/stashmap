@@ -1,6 +1,5 @@
-import { List } from "immutable";
 import { v4 } from "uuid";
-import { getNodeContext, getSemanticID, getNode } from "./core/connections";
+import { getNode } from "./core/connections";
 import {
   MarkdownImportFile,
   parseMarkdownImportFiles,
@@ -21,7 +20,6 @@ import { nodeText, plainSpans } from "./core/nodeSpans";
 export function planCreateNodesFromMarkdownTrees<T extends GraphPlan>(
   plan: T,
   trees: MarkdownTreeNode[],
-  context: List<ID> = List<ID>(),
   options: { createDocuments?: boolean } = {}
 ): [T, topItemIDs: ID[], topNodeIDs: ID[]] {
   const createDocuments = options.createDocuments ?? true;
@@ -38,7 +36,6 @@ export function planCreateNodesFromMarkdownTrees<T extends GraphPlan>(
     : trees;
   const result = materializeTree(treesWithDocIds, plan.user.publicKey, {
     context: walkContext,
-    semanticContext: context,
   });
   const planWithNodes: T = {
     ...plan,
@@ -58,28 +55,20 @@ export function planCreateNodesFromMarkdownTrees<T extends GraphPlan>(
 
 export function planCreateNodesFromMarkdownFiles<T extends GraphPlan>(
   plan: T,
-  files: MarkdownImportFile[],
-  context: List<ID> = List<ID>()
+  files: MarkdownImportFile[]
 ): [T, topItemIDs: ID[]] {
   const trees = parseMarkdownImportFiles(files);
-  const [nextPlan, topItemIDs] = planCreateNodesFromMarkdownTrees(
-    plan,
-    trees,
-    context
-  );
+  const [nextPlan, topItemIDs] = planCreateNodesFromMarkdownTrees(plan, trees);
   return [nextPlan, topItemIDs];
 }
 
 export function planCreateNodesFromMarkdown<T extends GraphPlan>(
   plan: T,
-  markdownText: string,
-  context: List<ID> = List<ID>()
+  markdownText: string
 ): [T, topItemID: ID] {
-  const [nextPlan, topItemIDs] = planCreateNodesFromMarkdownFiles(
-    plan,
-    [{ name: "Imported Markdown", markdown: markdownText }],
-    context
-  );
+  const [nextPlan, topItemIDs] = planCreateNodesFromMarkdownFiles(plan, [
+    { name: "Imported Markdown", markdown: markdownText },
+  ]);
 
   if (topItemIDs.length > 0) {
     return [nextPlan, topItemIDs[0] as ID];
@@ -87,9 +76,7 @@ export function planCreateNodesFromMarkdown<T extends GraphPlan>(
 
   const fallbackText = "Imported Markdown";
   const fallbackNode = withDocumentRoot(
-    newGraphNode(nextPlan.user.publicKey, plainSpans(fallbackText), {
-      semanticContext: List<ID>(),
-    })
+    newGraphNode(nextPlan.user.publicKey, plainSpans(fallbackText))
   );
   return [
     planUpsertNodes(nextPlan, fallbackNode),
@@ -97,17 +84,12 @@ export function planCreateNodesFromMarkdown<T extends GraphPlan>(
   ];
 }
 
-function moveCreatedTreesToParentContext<T extends GraphPlan>(
+function moveCreatedTreesToParent<T extends GraphPlan>(
   plan: T,
-  originalTopNodeIDs: ID[],
   sourceNodeIDs: ID[],
-  actualNodeIDs: ID[],
-  targetSemanticContext: Context,
   parentNode: GraphNode
 ): T {
-  return originalTopNodeIDs.reduce((accPlan, originalID, index) => {
-    const actualID = actualNodeIDs[index];
-    const sourceNodeID = sourceNodeIDs[index];
+  return sourceNodeIDs.reduce((accPlan, sourceNodeID) => {
     const sourceNode = sourceNodeID
       ? getNode(accPlan.knowledgeDBs, sourceNodeID, accPlan.user.publicKey)
       : undefined;
@@ -117,9 +99,7 @@ function moveCreatedTreesToParentContext<T extends GraphPlan>(
     return planMoveDescendantNodes(
       accPlan,
       sourceNode,
-      targetSemanticContext,
       parentNode.id,
-      actualID !== originalID ? actualID : undefined,
       parentNode.root
     );
   }, plan);
@@ -162,19 +142,12 @@ function planInsertMarkdownTreesByParentId<T extends GraphPlan>(
   }
 
   const [planWithNodes, topItemIDs, topNodeIDs] =
-    planCreateNodesFromMarkdownTrees(plan, trees, List<ID>(), {
+    planCreateNodesFromMarkdownTrees(plan, trees, {
       createDocuments: false,
     });
-  const targetSemanticContext = getNodeContext(
-    planWithNodes.knowledgeDBs,
-    parentNode
-  ).push(getSemanticID(planWithNodes.knowledgeDBs, parentNode));
-  const movedPlan = moveCreatedTreesToParentContext(
+  const movedPlan = moveCreatedTreesToParent(
     planWithNodes,
-    topItemIDs,
     topNodeIDs,
-    topNodeIDs,
-    targetSemanticContext,
     parentNode
   );
   const [planWithAdded, actualItemIDs] = planAddTargetsToNode(

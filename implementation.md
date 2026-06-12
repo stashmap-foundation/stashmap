@@ -49,6 +49,8 @@ Acceptance (hard criteria in the prompt): same-URL-three-viewers test (owner edi
 
 ### Phase A3 — Phase 1B closeout (remaining items)
 
+Status: **Done** (commits 0078a5c..feda75d + vote-id coverage).
+
 - Malformed snapshot-ID validation in filesystem save paths: node-level snapshots accepted only with `snap_sha256_<64 lowercase hex>` IDs; clear errors for workspace markdown, no crashes on malformed foreign documents.
 - `knowstr_vote_id` round-trip regression coverage.
 - Duplicate node-ID rejection reports file paths and guidance per `idea.md` (currently a bare single-ID throw at `src/core/markdownNodes.ts:44`), and collects all duplicates instead of aborting on the first.

@@ -78,6 +78,34 @@ custom: yes
   );
 });
 
+test("save round-trips knowstr_vote_id frontmatter unchanged", async () => {
+  const { path: workspaceDir } = knowstrInit();
+  write(
+    workspaceDir,
+    "doc.md",
+    `---
+title: "Doc"
+knowstr_vote_id: vote-abc-123
+---
+
+# Doc
+
+- one
+`
+  );
+
+  await knowstrSave(workspaceDir);
+
+  const raw = fs.readFileSync(path.join(workspaceDir, "doc.md"), "utf8");
+  expect(raw).toContain("knowstr_vote_id: vote-abc-123");
+
+  const second = await knowstrSave(workspaceDir);
+  expect(second.changed_paths).toEqual([]);
+  expect(fs.readFileSync(path.join(workspaceDir, "doc.md"), "utf8")).toContain(
+    "knowstr_vote_id: vote-abc-123"
+  );
+});
+
 test("save inserts blank line after frontmatter and is idempotent", async () => {
   const { path: workspaceDir } = knowstrInit();
   write(

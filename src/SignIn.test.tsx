@@ -187,44 +187,8 @@ test("Split panes don't persist after logout", async () => {
   expect(screen.queryAllByLabelText("collapse Root").length).toBe(0);
 });
 
-test("Sign in persists created Notes", async () => {
-  const view = renderApp({
-    user: undefined,
-    timeToStorePreLoginEvents: 0,
-  });
-  await userEvent.type(await findNewNodeEditor(), "Hello World!{Escape}");
-  await userEvent.click(
-    await screen.findByLabelText("sign in to save changes")
-  );
-  await userEvent.type(
-    await screen.findByPlaceholderText(
-      "nsec, private key or mnemonic (12 words)"
-    ),
-    "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a{enter}"
-  );
-
-  await screen.findByLabelText("edit Hello World!", undefined, {
-    timeout: 5000,
-  });
-  fireEvent.click(await screen.findByLabelText("open menu"));
-  fireEvent.click(await screen.findByLabelText("logout"));
-  cleanup();
-
-  renderApp({
-    relayPool: view.relayPool,
-    fileStore: view.fileStore,
-    user: undefined,
-  });
-  expect(screen.queryAllByLabelText("edit Hello World!").length).toBe(0);
-
-  await userEvent.click(await screen.findByLabelText("sign in"));
-  await userEvent.type(
-    await screen.findByPlaceholderText(
-      "nsec, private key or mnemonic (12 words)"
-    ),
-    "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a{enter}"
-  );
-  await screen.findByLabelText("edit Hello World!", undefined, {
-    timeout: 5000,
-  });
+test("Logged out is a read-only viewer without an editor", async () => {
+  renderApp({ user: undefined });
+  await screen.findByLabelText("sign in");
+  expect(screen.queryByLabelText("new node editor")).toBeNull();
 });

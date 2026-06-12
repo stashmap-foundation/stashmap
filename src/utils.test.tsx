@@ -43,7 +43,6 @@ import {
 } from "./NostrAuthContext";
 import { AuthProvider } from "./AuthProvider";
 import { nodeText } from "./core/nodeSpans";
-import { StorePreLoginContext } from "./StorePreLoginContext";
 import { TemporaryViewProvider } from "./editor/temporaryViewState";
 import { PaneView } from "./editor/Workspace";
 import { PaneRootViewProvider } from "./editor/SplitPaneLayout";
@@ -172,7 +171,6 @@ function applyApis(props?: Partial<TestApis>): TestApis {
   };
   return {
     eventLoadingTimeout: 0,
-    timeToStorePreLoginEvents: 0,
     fileStore: props?.fileStore || mockFileStore(),
     relayPool,
     backend,
@@ -208,7 +206,6 @@ const DEFAULT_DATA_CONTEXT_PROPS: TestDataProps = {
     isLoading: false,
     unsignedEvents: List<UnsignedEvent>(),
     results: Map<string, PublishResultsOfEvent>(),
-    preLoginEvents: List<UnsignedEvent>(),
     temporaryView: {
       rowFocusIntents: Map<number, RowFocusIntent>(),
       baseSelection: OrderedSet<string>(),
@@ -362,7 +359,6 @@ export function renderApis(
           finalizeEvent,
           nip11,
           eventLoadingTimeout: 0,
-          timeToStorePreLoginEvents: 0,
         }}
       >
         <BackendProviderComponent>
@@ -390,7 +386,6 @@ export function renderApis(
     finalizeEvent,
     nip11,
     eventLoadingTimeout: 0,
-    timeToStorePreLoginEvents: 0,
     ...utils,
   };
 }
@@ -554,11 +549,7 @@ function RootViewOrPaneIsLoadingInner({
 }: {
   children: React.ReactNode;
 }): JSX.Element {
-  return (
-    <PaneRootViewProvider>
-      <StorePreLoginContext>{children}</StorePreLoginContext>
-    </PaneRootViewProvider>
-  );
+  return <PaneRootViewProvider>{children}</PaneRootViewProvider>;
 }
 
 export function RootViewOrPaneIsLoading({

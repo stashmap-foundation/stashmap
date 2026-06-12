@@ -26,11 +26,6 @@ export function toStoredSnapshotRecord(
   if (!replaceableKey || !dTag) {
     return undefined;
   }
-  const sourceRootShortID = findTag(event, "source");
-  const sourceAuthor = findTag(event, "source_author") as PublicKey | undefined;
-  if (!sourceAuthor) {
-    return undefined;
-  }
   return {
     replaceableKey,
     author: event.pubkey as PublicKey,
@@ -40,8 +35,6 @@ export function toStoredSnapshotRecord(
     updatedMs: getEventMs(event),
     content: event.content,
     tags: event.tags,
-    sourceAuthor,
-    ...(sourceRootShortID !== undefined ? { sourceRootShortID } : {}),
   };
 }
 
@@ -113,8 +106,7 @@ export async function fetchSnapshots(
 export function materializeSnapshot(
   record: StoredSnapshotRecord
 ): Map<string, GraphNode> {
-  const event = storedDocumentToEvent(record);
-  const parsed = eventToParsed({ ...event, pubkey: record.sourceAuthor });
+  const parsed = eventToParsed(storedDocumentToEvent(record));
   const nodes = parsed?.nodes ?? Map<string, GraphNode>();
   return nodes;
 }

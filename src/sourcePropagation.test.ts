@@ -62,7 +62,6 @@ function indexedData(entries: ReadonlyArray<[PublicKey, GraphNode[]]>): Data {
       isLoading: false,
       unsignedEvents: List(),
       results: Map(),
-      preLoginEvents: List(),
       temporaryView: {
         rowFocusIntents: Map<number, RowFocusIntent>(),
         baseSelection: OrderedSet<string>(),

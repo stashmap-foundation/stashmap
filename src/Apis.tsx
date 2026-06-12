@@ -17,7 +17,6 @@ export type Apis = {
     searchDebounce: number;
   };
   eventLoadingTimeout: number;
-  timeToStorePreLoginEvents: number;
 };
 
 const ApiContext = React.createContext<Apis | undefined>(undefined);

@@ -28,7 +28,6 @@ const eventQueryModule = jest.requireMock("../eventQuery") as {
 };
 
 const FAKE_AUTHOR = "alice" as PublicKey;
-const SOURCE_AUTHOR = "source_alice" as PublicKey;
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -43,8 +42,6 @@ test("toStoredSnapshotRecord converts a valid snapshot event", () => {
     tags: [
       ["d", "root-1"],
       ["ms", "5000"],
-      ["source", "src-root-short"],
-      ["source_author", SOURCE_AUTHOR],
     ],
     content: "# Snapshot",
   } as unknown as Event;
@@ -58,8 +55,6 @@ test("toStoredSnapshotRecord converts a valid snapshot event", () => {
     updatedMs: 5000,
     content: "# Snapshot",
     tags: event.tags,
-    sourceAuthor: SOURCE_AUTHOR,
-    sourceRootShortID: "src-root-short",
   });
 });
 
@@ -92,43 +87,11 @@ test("toStoredSnapshotRecord returns undefined for missing d-tag", () => {
   expect(toStoredSnapshotRecord(event)).toBeUndefined();
 });
 
-test("toStoredSnapshotRecord extracts sourceRootShortID from source tag", () => {
-  const event = {
-    id: "snap-3",
-    pubkey: FAKE_AUTHOR,
-    created_at: 10,
-    kind: KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
-    tags: [
-      ["d", "root-1"],
-      ["source", "my-source-root"],
-      ["source_author", SOURCE_AUTHOR],
-    ],
-    content: "# Snapshot",
-  } as unknown as Event;
-
-  const record = toStoredSnapshotRecord(event);
-  expect(record?.sourceRootShortID).toBe("my-source-root");
-});
-
-test("toStoredSnapshotRecord returns undefined without source_author tag", () => {
-  const event = {
-    id: "snap-4",
-    pubkey: FAKE_AUTHOR,
-    created_at: 10,
-    kind: KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
-    tags: [["d", "root-1"]],
-    content: "# Snapshot",
-  } as unknown as Event;
-
-  expect(toStoredSnapshotRecord(event)).toBeUndefined();
-});
-
 test("fetchSnapshots returns cached snapshot without relay query", async () => {
   const db = {} as StashmapDB;
   const cachedRecord = {
     replaceableKey: `${KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT}:alice:root-1`,
     author: FAKE_AUTHOR,
-    sourceAuthor: SOURCE_AUTHOR,
     eventId: "snap-1",
     dTag: "root-1",
     createdAt: 10,
@@ -161,7 +124,6 @@ test("fetchSnapshots queries relays for uncached snapshots and stores them", asy
     tags: [
       ["d", "root-1"],
       ["ms", "5000"],
-      ["source_author", SOURCE_AUTHOR],
     ],
     content: "# Snapshot",
   } as unknown as Event;
@@ -185,7 +147,6 @@ test("fetchSnapshots handles mixed cached and uncached", async () => {
   const cachedRecord = {
     replaceableKey: `${KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT}:alice:root-1`,
     author: FAKE_AUTHOR,
-    sourceAuthor: SOURCE_AUTHOR,
     eventId: "snap-1",
     dTag: "root-1",
     createdAt: 10,
@@ -209,7 +170,6 @@ test("fetchSnapshots handles mixed cached and uncached", async () => {
     tags: [
       ["d", "root-2"],
       ["ms", "6000"],
-      ["source_author", SOURCE_AUTHOR],
     ],
     content: "# Uncached",
   } as unknown as Event;

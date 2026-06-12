@@ -120,7 +120,6 @@ export function NostrExecutorProvider({
         unsignedEvents: prevStatus.unsignedEvents.concat(filteredEvents),
         results: prevStatus.results,
         isLoading: !queueRef.current,
-        preLoginEvents: prevStatus.preLoginEvents,
         temporaryView: plan.temporaryView,
         temporaryEvents: newTemporaryEvents,
       };

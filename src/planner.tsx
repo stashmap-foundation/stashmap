@@ -45,7 +45,6 @@ import {
   addNodeToPathWithNodes,
 } from "./rowModel";
 import { nodeText, plainSpans } from "./core/nodeSpans";
-import { UNAUTHENTICATED_USER_PK } from "./NostrAuthContext";
 import { useRelaysToCreatePlan } from "./relays";
 import {
   MultiSelectionState,
@@ -589,42 +588,6 @@ export function getNextInsertPosition(
   if (!parentPath) return null;
 
   return { parentPath, insertAt: (nodeIndex ?? 0) + 1 };
-}
-
-export function replaceUnauthenticatedUser<T extends string>(
-  from: T,
-  publicKey: string
-): T {
-  // TODO: This feels quite dangerous
-  return from.replaceAll(UNAUTHENTICATED_USER_PK, publicKey) as T;
-}
-
-function rewriteIDs(event: UnsignedEvent): UnsignedEvent {
-  const replacedTags = event.tags.map((tag) =>
-    tag.map((t) => replaceUnauthenticatedUser(t, event.pubkey))
-  );
-  return {
-    ...event,
-    content: replaceUnauthenticatedUser(event.content, event.pubkey),
-    tags: replacedTags,
-  };
-}
-
-export function planRewriteUnpublishedEvents(
-  plan: Plan,
-  events: List<UnsignedEvent>
-): Plan {
-  const allEvents = plan.publishEvents.concat(events);
-  const rewrittenEvents = allEvents.map((event) =>
-    rewriteIDs({
-      ...event,
-      pubkey: plan.user.publicKey,
-    })
-  );
-  return {
-    ...plan,
-    publishEvents: rewrittenEvents,
-  };
 }
 
 type ExecutePlan = (plan: Plan) => Promise<void>;

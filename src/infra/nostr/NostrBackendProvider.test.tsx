@@ -37,7 +37,6 @@ test("NostrBackendProvider exposes subscribe and publish that delegate to relayP
             .mockReturnValue(Promise.resolve({ suppported_nips: [] })),
         },
         eventLoadingTimeout: 0,
-        timeToStorePreLoginEvents: 0,
       }}
     >
       <NostrBackendProvider db={null}>

@@ -111,7 +111,6 @@ declare global {
     | { type: "REMOVE_EMPTY_NODE"; nodeID: ID };
 
   type EventState = PublishEvents<EventAttachment> & {
-    preLoginEvents: List<UnsignedEvent & EventAttachment>;
     temporaryView: TemporaryViewState;
     temporaryEvents: List<TemporaryEvent>;
     queueStatus?: QueueStatus;

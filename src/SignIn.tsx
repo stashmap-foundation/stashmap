@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from "react";
-import { List } from "immutable";
 import { Form, Modal } from "react-bootstrap";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ErrorMessage } from "./commons/ErrorMessage";
@@ -11,10 +10,6 @@ import {
   useLoginWithExtension,
 } from "./NostrAuthContext";
 import { useData } from "./DataContext";
-import { Plan, planRewriteUnpublishedEvents, usePlanner } from "./planner";
-import { useExecutor } from "./ExecutorContext";
-import { KINDS_META } from "./infra/nostr/NostrDataProvider";
-import { useStorePreLoginEvents } from "./StorePreLoginContext";
 import { convertInputToPrivateKey } from "./nostrKey";
 import { supportsExtensionLogin } from "./runtimeEnvironment";
 
@@ -174,26 +169,17 @@ function SignInWithExtension({
   );
 }
 
-function useIsUnsavedChanges(): boolean {
-  const { publishEventsStatus } = useData();
-  return publishEventsStatus.unsignedEvents.size > 0;
-}
-
 export function SignInModal(): JSX.Element {
   const login = useLogin();
   const loginWithExtension = useLoginWithExtension();
   const allowExtensionLogin = supportsExtensionLogin();
   const navigate = useNavigate();
   const location = useLocation();
-  const { publishEventsStatus } = useData();
-  const executor = useExecutor();
-  const { createPlan, setPublishEvents } = usePlanner();
   const referrer = (location.state as LocationState | undefined)?.referrer;
   const signInReferrer = `${location.pathname}${location.search}${location.hash}`;
   const onHide = (): void => {
     navigate(referrer || "/");
   };
-  const storeMergeEvents = useStorePreLoginEvents();
 
   const signIn = ({
     withExtension,
@@ -205,48 +191,11 @@ export function SignInModal(): JSX.Element {
     if (!login || !loginWithExtension) {
       return;
     }
-    const preLoginPlan = createPlan();
-
-    const user = withExtension
-      ? loginWithExtension(key as PublicKey)
-      : login(key as string);
-    const plan = planRewriteUnpublishedEvents(
-      { ...preLoginPlan, user },
-      publishEventsStatus.unsignedEvents
-    );
-    if (plan.publishEvents.size === 0) {
-      navigate(referrer || "/");
-      return;
-    }
-    const mergeEvents = plan.publishEvents.filter((e) =>
-      KINDS_META.includes(e.kind)
-    );
-    const nonMergeEvents = plan.publishEvents.filter(
-      (e) => !KINDS_META.includes(e.kind)
-    );
-
-    if (nonMergeEvents.size > 0) {
-      setPublishEvents((current) => {
-        return {
-          ...current,
-          unsignedEvents: List(),
-          preLoginEvents: mergeEvents,
-        };
-      });
-      executor.executePlan({ ...plan, publishEvents: nonMergeEvents } as Plan);
+    if (withExtension) {
+      loginWithExtension(key as PublicKey);
     } else {
-      setPublishEvents((current) => {
-        return {
-          unsignedEvents: current.unsignedEvents,
-          results: current.results,
-          isLoading: false,
-          preLoginEvents: mergeEvents,
-          temporaryView: current.temporaryView,
-          temporaryEvents: current.temporaryEvents,
-        };
-      });
+      login(key as string);
     }
-    storeMergeEvents(mergeEvents.map((e) => e.kind));
     setTimeout(() => navigate(referrer || "/"), 0);
   };
   return (
@@ -283,7 +232,6 @@ export function SignInModal(): JSX.Element {
 export function SignInMenuBtn(): JSX.Element | null {
   const { user } = useData();
   const navigate = useNavigate();
-  const unsavedChanges = useIsUnsavedChanges();
   const isLoggedIn = isUserLoggedIn(user);
   if (isLoggedIn) {
     return null;
@@ -291,11 +239,9 @@ export function SignInMenuBtn(): JSX.Element | null {
   return (
     <button
       type="button"
-      className={`header-action-btn${
-        unsavedChanges ? " header-action-btn-danger" : ""
-      }`}
+      className="header-action-btn"
       onClick={() => navigate("/signin")}
-      aria-label={unsavedChanges ? "sign in to save changes" : "sign in"}
+      aria-label="sign in"
     >
       sign in
     </button>

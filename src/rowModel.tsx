@@ -11,6 +11,7 @@ import {
   isRefNode,
 } from "./core/connections";
 import { useData } from "./DataContext";
+import { UNAUTHENTICATED_USER_PK } from "./NostrAuthContext";
 import { nodeText } from "./core/nodeSpans";
 import { getBlockLink } from "./core/blockLink";
 import {
@@ -256,7 +257,11 @@ export function useCurrentNode(): GraphNode {
 
 export function useIsViewingOtherUserContent(): boolean {
   const { user } = useData();
-  return useRow().node.author !== user.publicKey;
+  const { node } = useRow();
+  if (user.publicKey === UNAUTHENTICATED_USER_PK) {
+    return true;
+  }
+  return node.author !== user.publicKey;
 }
 
 export function useNodeIndex(): number | undefined {

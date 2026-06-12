@@ -42,10 +42,7 @@ export type StoredDeleteRecord = {
   readonly deletedAt: number;
 };
 
-export type StoredSnapshotRecord = StoredDocumentRecord & {
-  readonly sourceRootShortID?: string;
-  readonly sourceAuthor: PublicKey;
-};
+export type StoredSnapshotRecord = StoredDocumentRecord;
 
 export type SyncCheckpointRecord = {
   readonly author: PublicKey;

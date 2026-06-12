@@ -42,12 +42,7 @@ function snapshotEventForContent(
     kind: KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
     pubkey: snapshotAuthor,
     created_at: newTimestamp(),
-    tags: [
-      ["d", snapshotIdForContent(content)],
-      ["source", sourceDocument.docId],
-      ["source_author", sourceDocument.author],
-      msTag(),
-    ],
+    tags: [["d", snapshotIdForContent(content)], msTag()],
     content,
   };
 }

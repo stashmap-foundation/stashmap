@@ -14,7 +14,6 @@ import {
   parseNodeRouteUrl,
   parseSourceFromSearch,
 } from "./navigationUrl";
-import { replaceUnauthenticatedUser } from "./planner";
 
 export const defaultPane = (author: PublicKey, rootItemID?: ID): Pane => ({
   id: generatePaneId(),
@@ -143,14 +142,9 @@ function getInitialPanes(publicKey: PublicKey): Pane[] {
 function replacePaneUser(pane: Pane, publicKey: PublicKey): Pane {
   return {
     ...pane,
-    author: replaceUnauthenticatedUser(pane.author, publicKey),
-    sourceId: replaceUnauthenticatedUser(pane.sourceId, publicKey),
-    ...(pane.rootNodeId !== undefined && {
-      rootNodeId: replaceUnauthenticatedUser(pane.rootNodeId, publicKey),
-    }),
-    ...(pane.scrollToId !== undefined && {
-      scrollToId: replaceUnauthenticatedUser(pane.scrollToId, publicKey),
-    }),
+    author: pane.author === UNAUTHENTICATED_USER_PK ? publicKey : pane.author,
+    sourceId:
+      pane.sourceId === UNAUTHENTICATED_USER_PK ? publicKey : pane.sourceId,
   };
 }
 
@@ -176,7 +170,6 @@ export function useUserSessionState(user: User): UserSessionState {
     unsignedEvents: List(),
     results: Map(),
     isLoading: false,
-    preLoginEvents: List(),
     temporaryView: DEFAULT_TEMPORARY_VIEW,
     temporaryEvents: List(),
   });

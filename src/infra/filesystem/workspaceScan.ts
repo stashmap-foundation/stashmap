@@ -171,6 +171,6 @@ export async function scanWorkspaceDocuments(
   checkDuplicateDocIds(final.documents);
 
   const knowledgeDBs =
-    final.context?.knowledgeDBs ?? ImmutableMap<PublicKey, KnowledgeData>();
+    final.context?.knowledgeDBs ?? ImmutableMap<SourceId, KnowledgeData>();
   return { documents: final.documents, knowledgeDBs };
 }

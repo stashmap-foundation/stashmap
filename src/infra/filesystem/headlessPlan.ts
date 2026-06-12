@@ -9,7 +9,7 @@ const EMPTY_RELAYS: AllRelays = {
 
 export function createHeadlessPlan(
   viewer: PublicKey,
-  knowledgeDBs: KnowledgeDBs = Map<PublicKey, KnowledgeData>()
+  knowledgeDBs: KnowledgeDBs = Map<SourceId, KnowledgeData>()
 ): GraphPlan {
   return createGraphPlan({
     user: { publicKey: viewer },

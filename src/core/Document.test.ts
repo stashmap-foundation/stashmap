@@ -74,9 +74,7 @@ test("node-level basedOn and snapshot survive parse and render", () => {
   expect(nodes.get("u2")?.basedOn).toBe("a2");
   expect(nodes.get("u2")?.snapshotId).toBe(childSnapshot);
 
-  const knowledgeDBs = Map<PublicKey, KnowledgeData>([
-    [TEST_PUBKEY, { nodes }],
-  ]);
+  const knowledgeDBs = Map<SourceId, KnowledgeData>([[TEST_PUBKEY, { nodes }]]);
   expect(renderDocumentMarkdown(knowledgeDBs, document)).toContain(
     `snapshot="${rootSnapshot}"`
   );

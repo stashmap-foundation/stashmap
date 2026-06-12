@@ -1,6 +1,6 @@
 # Phase A2 — Source boundary execution prompt
 
-Status: **Not started**. Prerequisite: Phase A1 (`03-demolition.md`) is done — contacts, user entries, `RootAnchor`, pre-login editing, and cross-author sync are gone; `GraphNode.author` is single-valued everywhere.
+Status: **Done** (commits 5dd5596..b1d1945; CP1 LOCAL re-keying, CP2 GraphNode.author deleted, CP3 workspace-only mutations, CP4 Pane.author + sentinel deleted, CP5 address boundary, CP6 Electron writes files only). Prerequisite: Phase A1 (`03-demolition.md`) is done — contacts, user entries, `RootAnchor`, pre-login editing, and cross-author sync are gone; `GraphNode.author` is single-valued everywhere.
 
 Read `idea.md` first. Treat the model below and the acceptance criteria as mandatory.
 

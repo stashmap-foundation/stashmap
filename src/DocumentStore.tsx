@@ -51,7 +51,7 @@ function createEmptySnapshot(): DocumentSnapshot {
     documents: ImmutableMap<string, Document>(),
     documentByFilePath: ImmutableMap<string, Document>(),
     deletes: ImmutableMap<string, DocumentDelete>(),
-    knowledgeDBs: ImmutableMap<PublicKey, KnowledgeData>(),
+    knowledgeDBs: ImmutableMap<SourceId, KnowledgeData>(),
     graphIndex: createEmptyGraphIndex(),
   };
 }

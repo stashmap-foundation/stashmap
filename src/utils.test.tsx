@@ -194,7 +194,7 @@ type TestDataProps = DataContextProps & {
 
 const DEFAULT_DATA_CONTEXT_PROPS: TestDataProps = {
   user: ALICE,
-  knowledgeDBs: Map<PublicKey, KnowledgeData>(),
+  knowledgeDBs: Map<SourceId, KnowledgeData>(),
   graphIndex: createEmptyGraphIndex(),
   documents: Map(),
   documentByFilePath: Map(),

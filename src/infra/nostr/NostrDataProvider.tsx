@@ -110,7 +110,7 @@ export function NostrDataProvider({
   return (
     <DataContextProvider
       user={user}
-      knowledgeDBs={Map<PublicKey, KnowledgeData>()}
+      knowledgeDBs={Map<SourceId, KnowledgeData>()}
       graphIndex={createEmptyGraphIndex()}
       documents={Map()}
       documentByFilePath={Map()}

@@ -33,7 +33,7 @@ function testNode(
 }
 
 function indexedData(entries: ReadonlyArray<[PublicKey, GraphNode[]]>): Data {
-  const knowledgeDBs = Map<PublicKey, KnowledgeData>(
+  const knowledgeDBs = Map<SourceId, KnowledgeData>(
     entries.map(([sourceId, nodes]) => [
       sourceId,
       { nodes: Map<ID, GraphNode>(nodes.map((node) => [node.id, node])) },

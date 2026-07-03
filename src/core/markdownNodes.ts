@@ -74,6 +74,22 @@ function newMarkdownGraphNode(
     : node;
 }
 
+function withTreeNodeAttrs(
+  node: GraphNode,
+  treeNode: MarkdownTreeNode
+): GraphNode {
+  return {
+    ...node,
+    ...(treeNode.basedOn ? { basedOn: treeNode.basedOn as ID } : {}),
+    ...(treeNode.snapshotId !== undefined && {
+      snapshotId: treeNode.snapshotId,
+    }),
+    ...(treeNode.extraAttrs !== undefined && {
+      extraAttrs: treeNode.extraAttrs,
+    }),
+  };
+}
+
 function materializeTreeNode(
   ctx: WalkContext,
   treeNode: MarkdownTreeNode,
@@ -117,17 +133,20 @@ function materializeTreeNode(
       const blockLink = singleBlockLinkSpan(childNode.spans);
       if (blockLink && blockLink.kind === "link") {
         assertUnusedTreeNodeId(accCtx, childNode);
-        const refNode = newMarkdownGraphNode(
-          ctx,
-          childNode,
-          [linkSpan(blockLink.targetID, blockLink.text)],
-          {
-            root,
-            parent: nodeBaseWithFields.id,
-            relevance: childNode.relevance,
-            argument: childNode.argument,
-          },
-          mode
+        const refNode = withTreeNodeAttrs(
+          newMarkdownGraphNode(
+            ctx,
+            childNode,
+            [linkSpan(blockLink.targetID, blockLink.text)],
+            {
+              root,
+              parent: nodeBaseWithFields.id,
+              relevance: childNode.relevance,
+              argument: childNode.argument,
+            },
+            mode
+          ),
+          childNode
         );
         return [
           walkUpsertNode(accCtx, refNode),
@@ -136,17 +155,20 @@ function materializeTreeNode(
       }
       if (blockLink && blockLink.kind === "fileLink") {
         assertUnusedTreeNodeId(accCtx, childNode);
-        const fileNode = newMarkdownGraphNode(
-          ctx,
-          childNode,
-          [fileLinkSpan(blockLink.path, blockLink.text)],
-          {
-            root,
-            parent: nodeBaseWithFields.id,
-            relevance: childNode.relevance,
-            argument: childNode.argument,
-          },
-          mode
+        const fileNode = withTreeNodeAttrs(
+          newMarkdownGraphNode(
+            ctx,
+            childNode,
+            [fileLinkSpan(blockLink.path, blockLink.text)],
+            {
+              root,
+              parent: nodeBaseWithFields.id,
+              relevance: childNode.relevance,
+              argument: childNode.argument,
+            },
+            mode
+          ),
+          childNode
         );
         return [
           walkUpsertNode(accCtx, fileNode),

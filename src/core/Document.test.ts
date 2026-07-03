@@ -127,3 +127,28 @@ test("unknown comment attributes survive parse and render", () => {
     '<!-- id:u2 knowstr_vote_id="v2" custom="x" -->'
   );
 });
+
+test("block-link rows keep basedOn, snapshot, and unknown attributes", () => {
+  const snapshot = `snap_sha256_${"3".repeat(64)}`;
+  const markdown = [
+    "# Reading <!-- id:u1 -->",
+    "",
+    `- [Chapter](#t1) <!-- id:u2 basedOn="a5" snapshot="${snapshot}" knowstr_vote_id="v1" -->`,
+    "",
+  ].join("\n");
+
+  const { document, nodes } = parseToDocumentPreservingExplicitIds(
+    TEST_PUBKEY,
+    markdown,
+    { docIdFallback: "doc-1" }
+  );
+
+  expect(nodes.get("u2")?.basedOn).toBe("a5");
+  expect(nodes.get("u2")?.snapshotId).toBe(snapshot);
+  expect(nodes.get("u2")?.extraAttrs).toEqual({ knowstr_vote_id: "v1" });
+
+  const knowledgeDBs = Map<SourceId, KnowledgeData>([[TEST_PUBKEY, { nodes }]]);
+  expect(renderDocumentMarkdown(knowledgeDBs, document)).toContain(
+    `- [Chapter](#t1) <!-- id:u2 basedOn="a5" snapshot="${snapshot}" knowstr_vote_id="v1" -->`
+  );
+});

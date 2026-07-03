@@ -5,12 +5,16 @@ export function formatNodeAttrs(
   options?: {
     basedOn?: ID;
     snapshotId?: string;
+    extraAttrs?: Record<string, string>;
   }
 ): string {
   const parts: string[] = [
     ...(uuid ? [`id:${uuid}`] : []),
     ...(options?.basedOn ? [`basedOn="${options.basedOn}"`] : []),
     ...(options?.snapshotId ? [`snapshot="${options.snapshotId}"`] : []),
+    ...Object.entries(options?.extraAttrs ?? {}).map(
+      ([key, value]) => `${key}="${value}"`
+    ),
   ];
   if (parts.length === 0) {
     return "";

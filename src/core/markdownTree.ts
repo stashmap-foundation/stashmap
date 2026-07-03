@@ -35,6 +35,7 @@ type ParsedComment = {
   uuid: string;
   basedOn: string | undefined;
   snapshotId: string | undefined;
+  extraAttrs: Record<string, string> | undefined;
   systemRole: RootSystemRole | undefined;
 };
 
@@ -50,8 +51,12 @@ function parseIdComment(content: string): ParsedComment | undefined {
   const rest = match[2];
 
   const attrsMap: Record<string, string> = {};
+  const extraAttrs: Record<string, string> = {};
   [...rest.matchAll(ATTR_RE)].forEach(([, key, value]) => {
     attrsMap[key] = value;
+    if (key !== "basedOn" && key !== "snapshot") {
+      extraAttrs[key] = value;
+    }
   });
 
   const basedOn = attrsMap.basedOn || undefined;
@@ -60,6 +65,7 @@ function parseIdComment(content: string): ParsedComment | undefined {
     uuid,
     basedOn,
     snapshotId,
+    extraAttrs: Object.keys(extraAttrs).length > 0 ? extraAttrs : undefined,
     systemRole: undefined,
   };
 }
@@ -235,6 +241,7 @@ export type MarkdownTreeNode = {
   listStart?: number;
   basedOn?: string;
   snapshotId?: string;
+  extraAttrs?: Record<string, string>;
   systemRole?: RootSystemRole;
 };
 
@@ -274,6 +281,9 @@ function commentNodeAttrs(
     }),
     ...(commentAttrs?.snapshotId !== undefined && {
       snapshotId: commentAttrs.snapshotId,
+    }),
+    ...(commentAttrs?.extraAttrs !== undefined && {
+      extraAttrs: commentAttrs.extraAttrs,
     }),
     ...(commentAttrs?.systemRole !== undefined && {
       systemRole: commentAttrs.systemRole,

@@ -99,3 +99,31 @@ test("parseToDocument tolerates malformed snapshot ids in foreign documents", ()
 
   expect(nodes.get("u1")?.snapshotId).toBe("garbage");
 });
+
+test("unknown comment attributes survive parse and render", () => {
+  const markdown = [
+    '# Votes <!-- id:u1 knowstr_vote_id="v1" -->',
+    "",
+    '- Option A <!-- id:u2 knowstr_vote_id="v2" custom="x" -->',
+    "",
+  ].join("\n");
+
+  const { document, nodes } = parseToDocumentPreservingExplicitIds(
+    TEST_PUBKEY,
+    markdown,
+    { docIdFallback: "doc-1" }
+  );
+
+  expect(nodes.get("u1")?.extraAttrs).toEqual({ knowstr_vote_id: "v1" });
+  expect(nodes.get("u2")?.extraAttrs).toEqual({
+    knowstr_vote_id: "v2",
+    custom: "x",
+  });
+
+  const knowledgeDBs = Map<SourceId, KnowledgeData>([[TEST_PUBKEY, { nodes }]]);
+  const rendered = renderDocumentMarkdown(knowledgeDBs, document);
+  expect(rendered).toContain('<!-- id:u1 knowstr_vote_id="v1" -->');
+  expect(rendered).toContain(
+    '<!-- id:u2 knowstr_vote_id="v2" custom="x" -->'
+  );
+});

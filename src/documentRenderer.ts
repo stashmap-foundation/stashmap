@@ -75,6 +75,7 @@ function getSerializableNodeAttrs(
   return formatNodeAttrs(node.id, {
     ...(node.basedOn ? { basedOn: node.basedOn } : {}),
     ...(snapshotId ? { snapshotId } : {}),
+    ...(node.extraAttrs ? { extraAttrs: node.extraAttrs } : {}),
   });
 }
 

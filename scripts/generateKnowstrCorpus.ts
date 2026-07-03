@@ -54,6 +54,7 @@ function dumpNode(
     ...(node.listStart !== undefined && { listStart: node.listStart }),
     ...(node.basedOn !== undefined && { basedOn: node.basedOn }),
     ...(node.snapshotId !== undefined && { snapshotId: node.snapshotId }),
+    ...(node.extraAttrs !== undefined && { extraAttrs: node.extraAttrs }),
     children: node.children
       .toArray()
       .map((childId: string) => dumpNode(nodes, childId)),

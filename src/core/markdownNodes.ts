@@ -107,6 +107,9 @@ function materializeTreeNode(
       listOrdered: treeNode.listOrdered,
     }),
     ...(treeNode.listStart !== undefined && { listStart: treeNode.listStart }),
+    ...(treeNode.extraAttrs !== undefined && {
+      extraAttrs: treeNode.extraAttrs,
+    }),
   };
 
   const [withVisible, childIDs] = treeNode.children.reduce(

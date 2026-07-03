@@ -267,6 +267,7 @@ declare global {
     headingLevel?: number;
     listOrdered?: boolean;
     listStart?: number;
+    extraAttrs?: Record<string, string>;
   };
 
   type Views = Map<string, View>;

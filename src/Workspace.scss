@@ -143,6 +143,24 @@ body {
   }
 }
 
+// The reach chip: a link row's target isn't shared with this document's
+// readers. Quiet dashed outline; violet on hover like other affordances.
+.publish-reach-chip {
+  background: transparent;
+  border: 1px dashed var(--base01);
+  border-radius: 3px;
+  color: var(--base01);
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0 6px;
+  white-space: nowrap;
+
+  &:hover {
+    border-color: var(--violet);
+    color: var(--violet);
+  }
+}
+
 // Breadcrumbs take only their natural width — the publish button sits
 // snug after them and the spare space follows. When space runs out they
 // shrink with an ellipsis down to a readable floor, never to nothing.

@@ -1,5 +1,8 @@
 import { LOCAL } from "./core/nodeRef";
-import { plainSpans } from "./core/nodeSpans";
+import { linkSpan, plainSpans } from "./core/nodeSpans";
+import { newGraphNode } from "./core/nodeFactory";
+import type { Document } from "./core/Document";
+import { unpublishedLinkTarget } from "./editor/publishReach";
 import { createPlan, buildDocumentEvents, Plan } from "./planner";
 import { planCreateNodesFromMarkdown } from "./markdownPlan";
 import {
@@ -119,6 +122,84 @@ test("unpublished documents emit no deposit", () => {
   expect(
     buildDocumentEvents(plan).some((e) => e.kind === KIND_KNOWLEDGE_DEPOSIT)
   ).toBe(false);
+});
+
+test("the reach chip resolves unpublished link targets in published documents", () => {
+  const { plan, docId, rootId } = planWithEssay();
+  const [planWithTarget] = planCreateNodesFromMarkdown(plan, "# Target\n");
+  const targetDoc = planWithTarget.documents
+    .valueSeq()
+    .find((doc) => doc.docId !== docId);
+  if (!targetDoc) {
+    throw new Error("target document missing");
+  }
+  const linkRow = newGraphNode([linkSpan(targetDoc.topNodeShortIds[0], "T")], {
+    parent: rootId,
+    root: rootId,
+  });
+  const essayDoc = (published: Plan): Document => {
+    const doc = published.documents.valueSeq().find((d) => d.docId === docId);
+    if (!doc) {
+      throw new Error("essay document missing");
+    }
+    return doc;
+  };
+
+  // Essay unpublished: no chip.
+  expect(
+    unpublishedLinkTarget(
+      planWithTarget.knowledgeDBs,
+      planWithTarget.documents,
+      planWithTarget.documentByFilePath,
+      essayDoc(planWithTarget),
+      linkRow
+    )
+  ).toBeUndefined();
+
+  // Essay published, target unpublished: the chip resolves the target.
+  const published = planSetDocumentPublishState(planWithTarget, docId, {
+    entities: [],
+    paused: false,
+  });
+  expect(
+    unpublishedLinkTarget(
+      published.knowledgeDBs,
+      published.documents,
+      published.documentByFilePath,
+      essayDoc(published),
+      linkRow
+    )?.docId
+  ).toBe(targetDoc.docId);
+
+  // Non-link rows never chip.
+  expect(
+    unpublishedLinkTarget(
+      published.knowledgeDBs,
+      published.documents,
+      published.documentByFilePath,
+      essayDoc(published),
+      newGraphNode(plainSpans("plain row"), { parent: rootId, root: rootId })
+    )
+  ).toBeUndefined();
+
+  // Target published too: chip gone.
+  const bothPublished = planSetDocumentPublishState(
+    published,
+    targetDoc.docId,
+    {
+      entities: [],
+      paused: false,
+    }
+  );
+  expect(
+    unpublishedLinkTarget(
+      bothPublished.knowledgeDBs,
+      bothPublished.documents,
+      bothPublished.documentByFilePath,
+      essayDoc(bothPublished),
+      linkRow
+    )
+  ).toBeUndefined();
 });
 
 const CONTRACT_ID = "rgb:cdtFZh2Q-YTY1rYW-yBdMlZb-GbkThw~-ArYpJ72-eXiti5Y";

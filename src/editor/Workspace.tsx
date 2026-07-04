@@ -1,7 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useMediaQuery } from "react-responsive";
+import { Dropdown } from "react-bootstrap";
 import { List, OrderedSet } from "immutable";
 import { LOCAL } from "../core/nodeRef";
+import { isUserLoggedIn } from "../NostrAuthContext";
+import { publishStateOf, type PublishState } from "../core/knowstrFrontmatter";
+import { getNodeDocumentId, planSetDocumentPublishState } from "../core/plan";
 import { TemporaryViewProvider, useTemporaryView } from "./temporaryViewState";
 
 import { getDisplayTextForRow, getIndependentRows } from "../rowModel";
@@ -498,6 +502,198 @@ function BackButton(): JSX.Element | null {
   );
 }
 
+const ENTITY_SCHEME_RE = /^(asset:|wd:|isbn:|doi:)/u;
+
+// Contained canonical entities: nodes of this document whose ids carry an
+// entity scheme. Pasting an entity's marker into a document is one of the
+// three gestures that put it into a context.
+function documentEntityCandidates(
+  knowledgeDBs: KnowledgeDBs,
+  document: Document
+): string[] {
+  const nodes = knowledgeDBs.get(LOCAL)?.nodes;
+  if (!nodes) {
+    return [];
+  }
+  return nodes
+    .valueSeq()
+    .toArray()
+    .filter(
+      (node) =>
+        ENTITY_SCHEME_RE.test(node.id) &&
+        (document.topNodeShortIds.includes(node.id) ||
+          document.topNodeShortIds.includes(node.root))
+    )
+    .map((node) => node.id);
+}
+
+// The header button is the publication state: Publish (one click) /
+// published / paused. The popover edits the state; there are no dialogs.
+// Shown only on own documents — foreign panes get the fork button instead.
+function PublishButton(): JSX.Element | null {
+  const data = useData();
+  const currentPane = useCurrentPane();
+  const { createPlan, executePlan } = usePlanner();
+  const [justPublished, setJustPublished] = useState(false);
+  const [relayDraft, setRelayDraft] = useState("");
+
+  const isOwnContent = currentPane.sourceId === LOCAL;
+  const graph = graphLookupFromData(data);
+  const rootNode = currentPane.rootNodeId
+    ? lookupNode(graph, currentPane.rootNodeId, currentPane.sourceId)?.node
+    : undefined;
+  const docId =
+    currentPane.documentId ??
+    (rootNode
+      ? getNodeDocumentId({ knowledgeDBs: data.knowledgeDBs }, rootNode)
+      : undefined);
+  const document = docId
+    ? getDocumentByIdOrFilePath(
+        data.documents,
+        data.documentByFilePath,
+        LOCAL,
+        docId
+      )
+    : undefined;
+
+  if (!isOwnContent || !isUserLoggedIn(data.user) || !document) {
+    return null;
+  }
+
+  const state = publishStateOf(document.frontMatter);
+
+  const applyState = (next: PublishState): void => {
+    setJustPublished(false);
+    executePlan(
+      planSetDocumentPublishState(createPlan(), document.docId, next)
+    );
+  };
+
+  const handlePublish = (): void => {
+    applyState({
+      entities: [
+        ...new Set([
+          ...(state?.entities ?? []),
+          ...documentEntityCandidates(data.knowledgeDBs, document),
+        ]),
+      ],
+      relays: state?.relays,
+      paused: false,
+    });
+    setJustPublished(true);
+    setTimeout(() => setJustPublished(false), 2500);
+  };
+
+  if (!state) {
+    return (
+      <button
+        type="button"
+        className="header-action-btn"
+        onClick={handlePublish}
+        aria-label="publish document"
+        title="Publish this document"
+      >
+        publish
+      </button>
+    );
+  }
+
+  const glyph = state.paused ? "◌ paused" : "⦿ published";
+  return (
+    <Dropdown className="options-dropdown">
+      <Dropdown.Toggle
+        as="button"
+        className="header-action-btn"
+        aria-label="publishing options"
+        tabIndex={0}
+      >
+        {justPublished ? "⦿ now publishing" : glyph}
+      </Dropdown.Toggle>
+      <Dropdown.Menu>
+        <Dropdown.Header>
+          {state.paused
+            ? "Paused — the last published version stays visible"
+            : "Published — republishes on every save"}
+        </Dropdown.Header>
+        {state.entities.map((entity) => (
+          <Dropdown.Item
+            key={entity}
+            className="d-flex menu-item"
+            onClick={() =>
+              applyState({
+                ...state,
+                entities: state.entities.filter((e) => e !== entity),
+              })
+            }
+            aria-label={`stop publishing under ${entity}`}
+            tabIndex={0}
+          >
+            <span className="d-block dropdown-item-icon" aria-hidden="true">
+              ×
+            </span>
+            <div className="menu-item-text">{entity}</div>
+          </Dropdown.Item>
+        ))}
+        {(state.relays ?? []).map((url) => (
+          <Dropdown.Item
+            key={url}
+            className="d-flex menu-item"
+            onClick={() =>
+              applyState({
+                ...state,
+                relays: (state.relays ?? []).filter((r) => r !== url),
+              })
+            }
+            aria-label={`remove relay ${url}`}
+            tabIndex={0}
+          >
+            <span className="d-block dropdown-item-icon" aria-hidden="true">
+              ~
+            </span>
+            <div className="menu-item-text">{url}</div>
+          </Dropdown.Item>
+        ))}
+        <form
+          className="d-flex menu-item px-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (relayDraft.trim() !== "") {
+              applyState({
+                ...state,
+                relays: [...(state.relays ?? []), relayDraft.trim()],
+              });
+              setRelayDraft("");
+            }
+          }}
+        >
+          <input
+            type="text"
+            value={relayDraft}
+            placeholder="add relay wss://…"
+            aria-label="add relay"
+            onChange={(event) => setRelayDraft(event.target.value)}
+            onClick={(event) => event.stopPropagation()}
+          />
+        </form>
+        <Dropdown.Divider />
+        <Dropdown.Item
+          className="d-flex menu-item"
+          onClick={() => applyState({ ...state, paused: !state.paused })}
+          aria-label={state.paused ? "resume publishing" : "pause publishing"}
+          tabIndex={0}
+        >
+          <span className="d-block dropdown-item-icon" aria-hidden="true">
+            {state.paused ? "▶" : "⏸"}
+          </span>
+          <div className="menu-item-text">
+            {state.paused ? "Resume publishing" : "Pause publishing"}
+          </div>
+        </Dropdown.Item>
+      </Dropdown.Menu>
+    </Dropdown>
+  );
+}
+
 function PaneHeader(): JSX.Element {
   const paneIndex = usePaneIndex();
   const isFirstPane = paneIndex === 0;
@@ -509,6 +705,7 @@ function PaneHeader(): JSX.Element {
         <BackButton />
         <Breadcrumbs />
         <ForkButton />
+        <PublishButton />
         {isFirstPane && <SignInMenuBtn />}
       </div>
       <div className="pane-header-right">

@@ -15,6 +15,7 @@ import {
   workspaceDocumentKey,
 } from "./Document";
 import { getWorkspaceNode, withWorkspace, workspaceOf } from "./knowledge";
+import { PublishState, withPublishState } from "./knowstrFrontmatter";
 import { newGraphNode } from "./nodeFactory";
 import { fileLinkSpan, linkSpan, plainSpans } from "./nodeSpans";
 import {
@@ -113,6 +114,31 @@ export function planMarkDocumentAffected<T extends GraphPlan>(
   return docId
     ? { ...plan, affectedDocuments: plan.affectedDocuments.add(docId) }
     : plan;
+}
+
+// Publish state lives in the document's frontmatter and nowhere else.
+// Setting it marks the document affected so the next save (re)publishes;
+// paused state stops deposit emission (planner) while riding the file.
+export function planSetDocumentPublishState<T extends GraphPlan>(
+  plan: T,
+  docId: string,
+  state: PublishState
+): T {
+  const key = workspaceDocumentKey(docId);
+  const document = plan.documents.get(key);
+  if (!document) {
+    return plan;
+  }
+  const nextDocument: Document = {
+    ...document,
+    frontMatter: withPublishState(document.frontMatter, state),
+    updatedMs: Date.now(),
+  };
+  return {
+    ...plan,
+    documents: plan.documents.set(key, nextDocument),
+    affectedDocuments: plan.affectedDocuments.add(docId),
+  };
 }
 
 export function upsertNodesCore<T extends GraphPlan>(

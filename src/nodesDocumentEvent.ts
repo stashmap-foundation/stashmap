@@ -66,6 +66,30 @@ export function buildDepositEvent(
   };
 }
 
+// Deposits route to the user's configured write relays plus the document's
+// declared relays (knowstr_publish.relays — intent, travels with the
+// deposit) plus scheme defaults: asset: entities bring their pinned relay
+// from app config (the deedsats demo relay).
+export function depositWriteRelayConf(
+  document: Document,
+  assetRelay: string | undefined = process.env.REACT_APP_ASSET_RELAY
+): WriteRelayConf {
+  const declared = publishStateOf(document.frontMatter)?.relays ?? [];
+  const scheme =
+    assetRelay &&
+    depositEntityTags(document).some((tag) => tag.startsWith("asset:"))
+      ? [assetRelay]
+      : [];
+  return {
+    user: true,
+    extraRelays: [...new Set([...declared, ...scheme])].map((url) => ({
+      url,
+      read: false,
+      write: true,
+    })),
+  };
+}
+
 export function buildSnapshotEvent(
   snapshotAuthor: PublicKey,
   content: string

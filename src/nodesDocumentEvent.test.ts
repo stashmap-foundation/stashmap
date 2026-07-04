@@ -7,7 +7,11 @@ import {
   withPublishState,
   withoutPublishState,
 } from "./core/knowstrFrontmatter";
-import { buildDepositEvent, depositEntityTags } from "./nodesDocumentEvent";
+import {
+  buildDepositEvent,
+  depositEntityTags,
+  depositWriteRelayConf,
+} from "./nodesDocumentEvent";
 import { KIND_KNOWLEDGE_DEPOSIT } from "./nostr";
 
 const TEST_PUBKEY = "a".repeat(64) as PublicKey;
@@ -127,4 +131,53 @@ test("buildDepositEvent carries kind 34774, d, S tags, and ms", () => {
 test("an unpublished document's deposit tags are its roots alone", () => {
   const document = parseDoc("# Essay <!-- id:u77 -->\n");
   expect(depositEntityTags(document)).toEqual(["u77"]);
+});
+
+const PUBLISHED_UNDER_ASSET = [
+  "---",
+  "knowstr_doc_id: doc-1",
+  "knowstr_publish:",
+  "  entities:",
+  "    - asset:rgb:test-contract",
+  "  relays:",
+  "    - wss://salon.example",
+  "---",
+  "# Essay <!-- id:u77 -->",
+  "",
+].join("\n");
+
+test("deposits route to declared relays plus the asset scheme default", () => {
+  const document = parseDoc(PUBLISHED_UNDER_ASSET);
+  expect(depositWriteRelayConf(document, "wss://deedsats.example")).toEqual({
+    user: true,
+    extraRelays: [
+      { url: "wss://salon.example", read: false, write: true },
+      { url: "wss://deedsats.example", read: false, write: true },
+    ],
+  });
+});
+
+test("no asset entity, no scheme relay; no config, declared only", () => {
+  const noAsset = parseDoc(
+    [
+      "---",
+      "knowstr_doc_id: doc-1",
+      "knowstr_publish:",
+      "  relays:",
+      "    - wss://salon.example",
+      "---",
+      "# Essay <!-- id:u77 -->",
+      "",
+    ].join("\n")
+  );
+  expect(depositWriteRelayConf(noAsset, "wss://deedsats.example")).toEqual({
+    user: true,
+    extraRelays: [{ url: "wss://salon.example", read: false, write: true }],
+  });
+  expect(
+    depositWriteRelayConf(parseDoc(PUBLISHED_UNDER_ASSET), undefined)
+  ).toEqual({
+    user: true,
+    extraRelays: [{ url: "wss://salon.example", read: false, write: true }],
+  });
 });

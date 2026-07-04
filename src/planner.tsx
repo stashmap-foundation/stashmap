@@ -13,10 +13,13 @@ import { useExecutor } from "./ExecutorContext";
 import { Document as KnowstrDocument, documentKeyOf } from "./core/Document";
 import { renderDocumentMarkdown } from "./documentRenderer";
 import {
+  buildDepositEvent,
   buildDocumentEvent,
   buildSnapshotEvent,
+  depositWriteRelayConf,
   snapshotIdForContent,
 } from "./nodesDocumentEvent";
+import { publishStateOf } from "./core/knowstrFrontmatter";
 import {
   EMPTY_SEMANTIC_ID,
   isEmptySemanticID,
@@ -713,11 +716,24 @@ export function buildDocumentEvents(
           EventAttachment)
       : undefined;
     const event = buildDocumentEvent(write.document, pubkey, write.content);
-    return snapshotEvent
-      ? events
-          .push(snapshotEvent)
-          .push(event as UnsignedEvent & EventAttachment)
-      : events.push(event as UnsignedEvent & EventAttachment);
+    // Published, unpaused documents also emit a deposit beside their
+    // storage event: same content, kind 34774, entity-tagged, routed to
+    // the configured write relays plus the document's declared relays.
+    // Paused documents emit none, so the paused flag never reaches a
+    // deposit.
+    const publishState = publishStateOf(write.document.frontMatter);
+    const depositEvent =
+      publishState && !publishState.paused
+        ? ({
+            ...buildDepositEvent(write.document, pubkey, write.content),
+            writeRelayConf: depositWriteRelayConf(write.document),
+          } as UnsignedEvent & EventAttachment)
+        : undefined;
+    const withSnapshot = snapshotEvent ? events.push(snapshotEvent) : events;
+    const withDocument = withSnapshot.push(
+      event as UnsignedEvent & EventAttachment
+    );
+    return depositEvent ? withDocument.push(depositEvent) : withDocument;
   }, plan.publishEvents);
   return plan.deletedDocs.reduce((events, docId) => {
     const deleteEvent = {

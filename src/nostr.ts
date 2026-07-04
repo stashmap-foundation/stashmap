@@ -7,6 +7,11 @@ export const KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT = 34773;
 // be both stored and published without the replaceable events colliding.
 export const KIND_KNOWLEDGE_DEPOSIT = 34774;
 
+// v0 cheat: every document published under an asset: entity goes to the
+// deedsats relay only (per-document override in the publish popover wins).
+export const ASSET_ENTITY_RELAY =
+  process.env.REACT_APP_ASSET_RELAY ?? "wss://nostr.nodesmap.com/";
+
 export const KIND_DELETE = 5;
 
 export const KIND_RELAY_METADATA_EVENT = 10002;

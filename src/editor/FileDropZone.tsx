@@ -56,6 +56,27 @@ export function parseTextToTrees(text: string): MarkdownTreeNode[] {
   return parsedLinesToTrees(parseClipboardText(text));
 }
 
+// The first entity-discovery gesture: pasting an RGB contract id creates a
+// node identified as asset:<contract id> — literally the asset's entity id
+// and its tag, so publishing a document that contains it reaches the
+// asset's relay. Real ids look like rgb:cdtFZh2Q-YTY1rYW-….
+export const RGB_CONTRACT_ID_RE = /^rgb:[A-Za-z0-9_~-]{20,}$/u;
+
+export function pasteTextToTrees(text: string): MarkdownTreeNode[] {
+  const marker = text.trim();
+  if (RGB_CONTRACT_ID_RE.test(marker)) {
+    return [
+      {
+        spans: plainSpans(marker),
+        children: [],
+        blockKind: "list_item",
+        uuid: `asset:${marker}`,
+      },
+    ];
+  }
+  return parseTextToTrees(text);
+}
+
 function titleFromFileName(fileName: string): string {
   const baseName = fileName.replace(/\.[^/.]+$/u, "").trim();
   return baseName || "Imported Markdown";

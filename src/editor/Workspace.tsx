@@ -6,7 +6,8 @@ import { LOCAL } from "../core/nodeRef";
 import { isUserLoggedIn } from "../NostrAuthContext";
 import { useUserRelayContext } from "../UserRelayContext";
 import { getWriteRelays } from "../relayUtils";
-import { DEFAULT_RELAYS } from "../nostr";
+import { ASSET_ENTITY_RELAY, DEFAULT_RELAYS } from "../nostr";
+import { depositEntityTags } from "../nodesDocumentEvent";
 import { publishStateOf, type PublishState } from "../core/knowstrFrontmatter";
 import { getNodeDocumentId, planSetDocumentPublishState } from "../core/plan";
 import { TemporaryViewProvider, useTemporaryView } from "./temporaryViewState";
@@ -49,7 +50,7 @@ import {
   planShiftTemporarySelection,
   planToggleTemporarySelection,
 } from "../planner";
-import { parseTextToTrees, planPasteMarkdownTrees } from "./FileDropZone";
+import { pasteTextToTrees, planPasteMarkdownTrees } from "./FileDropZone";
 import { getNodeText, getSemanticID } from "../core/connections";
 import { getOwnLogRoot } from "../core/systemRoots";
 import { buildDocumentRouteUrl, buildNodeRouteUrl } from "../navigationUrl";
@@ -580,11 +581,17 @@ function PublishButton(): JSX.Element | null {
   const state = publishStateOf(document.frontMatter);
   const configured = getWriteRelays(userRelays).map((relay) => relay.url);
   // A user should never have to know what a relay is: with nothing
-  // configured, the predefined set is offered and used.
-  const baseline =
+  // configured, the predefined set is offered and used. Documents
+  // published under an asset: entity default to the asset relay only
+  // (the v0 cheat), matching depositWriteRelayConf.
+  const configuredOrDefault =
     configured.length > 0
       ? configured
       : getWriteRelays(DEFAULT_RELAYS).map((relay) => relay.url);
+  const hasAssetEntity = depositEntityTags(document).some((tag) =>
+    tag.startsWith("asset:")
+  );
+  const baseline = hasAssetEntity ? [ASSET_ENTITY_RELAY] : configuredOrDefault;
   const declared = state?.relays;
   const effective = declared !== undefined ? declared : baseline;
 
@@ -634,7 +641,9 @@ function PublishButton(): JSX.Element | null {
     );
   }
 
-  const relayRows = [...new Set([...baseline, ...(declared ?? [])])];
+  const relayRows = [
+    ...new Set([...baseline, ...configuredOrDefault, ...(declared ?? [])]),
+  ];
   return (
     // autoClose="outside": toggling destinations and entities is an
     // editing session — the menu closes on outside click, not per click.
@@ -1431,7 +1440,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
         return;
       }
       navigator.clipboard.readText().then((text) => {
-        const trees = parseTextToTrees(text);
+        const trees = pasteTextToTrees(text);
         if (trees.length === 0) {
           return;
         }

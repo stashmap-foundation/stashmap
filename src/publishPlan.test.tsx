@@ -1,11 +1,17 @@
-import { createPlan, buildDocumentEvents } from "./planner";
+import { LOCAL } from "./core/nodeRef";
+import { plainSpans } from "./core/nodeSpans";
+import { createPlan, buildDocumentEvents, Plan } from "./planner";
 import { planCreateNodesFromMarkdown } from "./markdownPlan";
-import { planSetDocumentPublishState, GraphPlan } from "./core/plan";
+import {
+  pasteTextToTrees,
+  planPasteMarkdownTrees,
+} from "./editor/FileDropZone";
+import { planSetDocumentPublishState } from "./core/plan";
 import { KIND_KNOWLEDGE_DEPOSIT, KIND_KNOWLEDGE_DOCUMENT } from "./nostr";
 import { parseFrontMatter, publishStateOf } from "./core/knowstrFrontmatter";
 import { ALICE, setup } from "./utils.test";
 
-function planWithEssay(): { plan: GraphPlan; docId: string; rootId: string } {
+function planWithEssay(): { plan: Plan; docId: string; rootId: string } {
   const [alice] = setup([ALICE]);
   const [plan] = planCreateNodesFromMarkdown(
     createPlan(alice()),
@@ -48,7 +54,10 @@ test("publishing a document emits a deposit beside its storage event", () => {
   ]);
   expect(storage?.tags.some(([name]) => name === "S")).toBe(false);
   expect(deposit?.writeRelayConf).toEqual({
-    extraRelays: [{ url: "wss://salon.example", read: false, write: true }],
+    extraRelays: [
+      { url: "wss://salon.example", read: false, write: true },
+      { url: "wss://nostr.nodesmap.com/", read: false, write: true },
+    ],
   });
 });
 
@@ -110,4 +119,35 @@ test("unpublished documents emit no deposit", () => {
   expect(
     buildDocumentEvents(plan).some((e) => e.kind === KIND_KNOWLEDGE_DEPOSIT)
   ).toBe(false);
+});
+
+const CONTRACT_ID = "rgb:cdtFZh2Q-YTY1rYW-yBdMlZb-GbkThw~-ArYpJ72-eXiti5Y";
+
+test("pasting an RGB contract id creates the identified asset node", () => {
+  expect(pasteTextToTrees(`  ${CONTRACT_ID}\n`)).toEqual([
+    {
+      spans: plainSpans(CONTRACT_ID),
+      children: [],
+      blockKind: "list_item",
+      uuid: `asset:${CONTRACT_ID}`,
+    },
+  ]);
+  expect(pasteTextToTrees("just some text").some((tree) => tree.uuid)).toBe(
+    false
+  );
+
+  const { plan, rootId } = planWithEssay();
+  const parent = plan.knowledgeDBs.get(LOCAL)?.nodes.get(rootId);
+  if (!parent) {
+    throw new Error("parent missing");
+  }
+  const pasted = planPasteMarkdownTrees(
+    plan,
+    pasteTextToTrees(CONTRACT_ID),
+    parent,
+    0
+  );
+  expect(
+    pasted.knowledgeDBs.get(LOCAL)?.nodes.get(`asset:${CONTRACT_ID}`)
+  ).toBeDefined();
 });

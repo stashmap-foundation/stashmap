@@ -201,14 +201,29 @@ test("without declared relays: the configured set, else the defaults", () => {
       "",
     ].join("\n")
   );
-  expect(depositWriteRelayConf(noDeclared, USER_RELAYS, undefined)).toEqual({
+  expect(depositWriteRelayConf(noDeclared, USER_RELAYS, "")).toEqual({
     user: true,
     extraRelays: [],
   });
+  // The v0 cheat: without a declared choice, asset documents go to the
+  // asset relay ONLY — not the configured set.
   expect(
-    depositWriteRelayConf(noDeclared, [], "wss://deedsats.example")
+    depositWriteRelayConf(noDeclared, USER_RELAYS, "wss://deedsats.example")
   ).toEqual({
-    defaultRelays: true,
     extraRelays: [{ url: "wss://deedsats.example", read: false, write: true }],
+  });
+  expect(depositWriteRelayConf(noDeclared, USER_RELAYS)).toEqual({
+    extraRelays: [
+      { url: "wss://nostr.nodesmap.com/", read: false, write: true },
+    ],
+  });
+  const noAsset = parseDoc(
+    ["---", "knowstr_doc_id: doc-1", "knowstr_publish:", "---"]
+      .concat(["# Essay <!-- id:u77 -->", ""])
+      .join("\n")
+  );
+  expect(depositWriteRelayConf(noAsset, [], undefined)).toEqual({
+    defaultRelays: true,
+    extraRelays: [],
   });
 });

@@ -5,6 +5,7 @@ import type { Document } from "./core/Document";
 import { publishStateOf } from "./core/knowstrFrontmatter";
 import { getWriteRelays } from "./relayUtils";
 import {
+  ASSET_ENTITY_RELAY,
   KIND_KNOWLEDGE_DOCUMENT,
   KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
   KIND_KNOWLEDGE_DEPOSIT,
@@ -69,30 +70,33 @@ export function buildDepositEvent(
 
 // Deposits route to the document's declared relays (knowstr_publish.relays
 // — a per-document choice that REPLACES the configured set and travels with
-// the deposit as intent), or else the user's configured write relays, or
-// else the defaults. Scheme defaults always join: asset: entities bring
-// their pinned relay from app config (the deedsats demo relay).
+// the deposit as intent). Without a declared choice, asset documents go to
+// the asset relay ONLY (the v0 cheat: rgb contract documents live on the
+// deedsats relay), everything else to the user's configured write relays,
+// or else the defaults.
 export function depositWriteRelayConf(
   document: Document,
   userRelays: Relays,
-  assetRelay: string | undefined = process.env.REACT_APP_ASSET_RELAY
+  assetRelay: string | undefined = ASSET_ENTITY_RELAY
 ): WriteRelayConf {
   const declared = publishStateOf(document.frontMatter)?.relays;
-  const scheme =
-    assetRelay &&
-    depositEntityTags(document).some((tag) => tag.startsWith("asset:"))
-      ? [assetRelay]
-      : [];
+  const hasAssetEntity = depositEntityTags(document).some((tag) =>
+    tag.startsWith("asset:")
+  );
+  const scheme = assetRelay && hasAssetEntity ? [assetRelay] : [];
   const toRelay = (url: string): Relay => ({ url, read: false, write: true });
   if (declared !== undefined) {
     return {
       extraRelays: [...new Set([...declared, ...scheme])].map(toRelay),
     };
   }
+  if (scheme.length > 0) {
+    return { extraRelays: scheme.map(toRelay) };
+  }
   const hasConfigured = getWriteRelays(userRelays).length > 0;
   return {
     ...(hasConfigured ? { user: true } : { defaultRelays: true }),
-    extraRelays: scheme.map(toRelay),
+    extraRelays: [],
   };
 }
 

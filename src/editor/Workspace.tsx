@@ -5,6 +5,7 @@ import { List, OrderedSet } from "immutable";
 import { LOCAL } from "../core/nodeRef";
 import { isUserLoggedIn } from "../NostrAuthContext";
 import { useUserRelayContext } from "../UserRelayContext";
+import { useBackend } from "../BackendContext";
 import { getWriteRelays } from "../relayUtils";
 import { ASSET_ENTITY_RELAY, DEFAULT_RELAYS } from "../nostr";
 import { depositEntityTags } from "../nodesDocumentEvent";
@@ -828,6 +829,7 @@ function PaneStatusLine({
 }): JSX.Element {
   const paneIndex = usePaneIndex();
   const pane = useCurrentPane();
+  const { workspace } = useBackend();
   const isFirstPane = paneIndex === 0;
   const isViewingOtherUserContent = pane.sourceId !== LOCAL;
 
@@ -843,7 +845,9 @@ function PaneStatusLine({
       >
         {isViewingOtherUserContent && "READONLY"}
       </div>
-      {isFirstPane && <PublishingStatusWrapper />}
+      {/* The relays/synced status tracks the web storage channel. The
+          desktop workspace is the disk — there is nothing to sync. */}
+      {isFirstPane && !workspace && <PublishingStatusWrapper />}
       {isFirstPane && (
         <div className="status-segment">
           <PaneSettingsMenu onShowShortcuts={onShowShortcuts} />

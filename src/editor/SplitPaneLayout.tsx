@@ -17,6 +17,7 @@ import { PaneView } from "./Workspace";
 import { createSearchId } from "../core/connections";
 import { planUpdateViews, planUpdatePanes, usePlanner } from "../planner";
 import { useData } from "../DataContext";
+import { useBackend } from "../BackendContext";
 import { isUserLoggedIn, useLogout } from "../NostrAuthContext";
 import { useDragAutoScroll } from "../useDragAutoScroll";
 import { IS_MOBILE } from "./responsive";
@@ -150,6 +151,7 @@ export function PaneSettingsMenu({
   const navigate = useNavigate();
   const logout = useLogout();
   const { user } = useData();
+  const { workspace } = useBackend();
   const isLoggedIn = isUserLoggedIn(user);
   const [copied, setCopied] = useState<CopiedField>("none");
 
@@ -206,17 +208,21 @@ export function PaneSettingsMenu({
             <Dropdown.Divider />
           </>
         )}
-        <Dropdown.Item
-          className="d-flex menu-item"
-          onClick={() => navigate("/relays")}
-          aria-label="edit relays"
-          tabIndex={0}
-        >
-          <span className="d-block dropdown-item-icon" aria-hidden="true">
-            ~
-          </span>
-          <div className="menu-item-text">Relays</div>
-        </Dropdown.Item>
+        {/* Relay management belongs to the web storage channel; the desktop
+            workspace configures relays in .knowstr/profile.json. */}
+        {!workspace && (
+          <Dropdown.Item
+            className="d-flex menu-item"
+            onClick={() => navigate("/relays")}
+            aria-label="edit relays"
+            tabIndex={0}
+          >
+            <span className="d-block dropdown-item-icon" aria-hidden="true">
+              ~
+            </span>
+            <div className="menu-item-text">Relays</div>
+          </Dropdown.Item>
+        )}
         {onShowShortcuts && (
           <Dropdown.Item
             className="d-flex menu-item"

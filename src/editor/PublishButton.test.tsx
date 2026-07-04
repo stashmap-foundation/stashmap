@@ -30,7 +30,7 @@ test("the header button publishes, pauses, and resumes a document", async () => 
     )
   );
 
-  await userEvent.click(screen.getByLabelText("publishing options"));
+  // autoClose="outside": the menu stays open across state edits.
   await userEvent.click(await screen.findByLabelText("resume publishing"));
   await waitFor(() =>
     expect(screen.getByLabelText("publishing options").textContent).toContain(

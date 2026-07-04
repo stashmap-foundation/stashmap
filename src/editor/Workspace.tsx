@@ -636,7 +636,9 @@ function PublishButton(): JSX.Element | null {
 
   const relayRows = [...new Set([...baseline, ...(declared ?? [])])];
   return (
-    <Dropdown className="options-dropdown publish-dropdown">
+    // autoClose="outside": toggling destinations and entities is an
+    // editing session — the menu closes on outside click, not per click.
+    <Dropdown className="options-dropdown publish-dropdown" autoClose="outside">
       <Dropdown.Toggle
         as="button"
         className="header-action-btn"

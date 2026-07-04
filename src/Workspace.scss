@@ -143,10 +143,11 @@ body {
   }
 }
 
-// Breadcrumbs claim the header's spare space and never vanish entirely:
-// they shrink with an ellipsis down to a readable floor instead.
+// Breadcrumbs take only their natural width — the publish button sits
+// snug after them and the spare space follows. When space runs out they
+// shrink with an ellipsis down to a readable floor, never to nothing.
 .pane-header-left .breadcrumbs {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 4ch;
 }
 

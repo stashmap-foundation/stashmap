@@ -20,7 +20,7 @@ test("the header button publishes, pauses, and resumes a document", async () => 
   await userEvent.click(await screen.findByLabelText("publish document"));
 
   const toggle = await screen.findByLabelText("publishing options");
-  expect(toggle.textContent).toContain("now publishing");
+  expect(toggle.textContent).toContain("published");
 
   await userEvent.click(toggle);
   await userEvent.click(await screen.findByLabelText("pause publishing"));

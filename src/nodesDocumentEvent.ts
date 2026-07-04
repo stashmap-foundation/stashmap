@@ -3,6 +3,7 @@ import { sha256 } from "@noble/hashes/sha256";
 import { bytesToHex } from "@noble/hashes/utils";
 import type { Document } from "./core/Document";
 import { publishStateOf } from "./core/knowstrFrontmatter";
+import { getWriteRelays } from "./relayUtils";
 import {
   KIND_KNOWLEDGE_DOCUMENT,
   KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
@@ -66,12 +67,14 @@ export function buildDepositEvent(
   };
 }
 
-// Deposits route to the user's configured write relays plus the document's
-// declared relays (knowstr_publish.relays — intent, travels with the
-// deposit) plus scheme defaults: asset: entities bring their pinned relay
-// from app config (the deedsats demo relay).
+// Deposits route to the document's declared relays (knowstr_publish.relays
+// — a per-document choice that REPLACES the configured set and travels with
+// the deposit as intent), or else the user's configured write relays, or
+// else the defaults. Scheme defaults always join: asset: entities bring
+// their pinned relay from app config (the deedsats demo relay).
 export function depositWriteRelayConf(
   document: Document,
+  userRelays: Relays,
   assetRelay: string | undefined = process.env.REACT_APP_ASSET_RELAY
 ): WriteRelayConf {
   const declared = publishStateOf(document.frontMatter)?.relays ?? [];
@@ -80,13 +83,16 @@ export function depositWriteRelayConf(
     depositEntityTags(document).some((tag) => tag.startsWith("asset:"))
       ? [assetRelay]
       : [];
+  const toRelay = (url: string): Relay => ({ url, read: false, write: true });
+  if (declared.length > 0) {
+    return {
+      extraRelays: [...new Set([...declared, ...scheme])].map(toRelay),
+    };
+  }
+  const hasConfigured = getWriteRelays(userRelays).length > 0;
   return {
-    user: true,
-    extraRelays: [...new Set([...declared, ...scheme])].map((url) => ({
-      url,
-      read: false,
-      write: true,
-    })),
+    ...(hasConfigured ? { user: true } : { defaultRelays: true }),
+    extraRelays: scheme.map(toRelay),
   };
 }
 

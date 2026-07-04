@@ -48,7 +48,6 @@ test("publishing a document emits a deposit beside its storage event", () => {
   ]);
   expect(storage?.tags.some(([name]) => name === "S")).toBe(false);
   expect(deposit?.writeRelayConf).toEqual({
-    user: true,
     extraRelays: [{ url: "wss://salon.example", read: false, write: true }],
   });
 });

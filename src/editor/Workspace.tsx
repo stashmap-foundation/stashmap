@@ -4,6 +4,9 @@ import { Dropdown } from "react-bootstrap";
 import { List, OrderedSet } from "immutable";
 import { LOCAL } from "../core/nodeRef";
 import { isUserLoggedIn } from "../NostrAuthContext";
+import { useUserRelayContext } from "../UserRelayContext";
+import { getWriteRelays } from "../relayUtils";
+import { DEFAULT_RELAYS } from "../nostr";
 import { publishStateOf, type PublishState } from "../core/knowstrFrontmatter";
 import { getNodeDocumentId, planSetDocumentPublishState } from "../core/plan";
 import { TemporaryViewProvider, useTemporaryView } from "./temporaryViewState";
@@ -504,6 +507,16 @@ function BackButton(): JSX.Element | null {
 
 const ENTITY_SCHEME_RE = /^(asset:|wd:|isbn:|doi:)/u;
 
+// Destinations render as plain hostnames: a user shouldn't need to know
+// what a relay or a wss:// URL is. The full URL stays in the tooltip.
+function hostLabel(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
+}
+
 // Contained canonical entities: nodes of this document whose ids carry an
 // entity scheme. Pasting an entity's marker into a document is one of the
 // three gestures that put it into a context.
@@ -527,15 +540,18 @@ function documentEntityCandidates(
     .map((node) => node.id);
 }
 
-// The header button is the publication state: Publish (one click) /
-// published / paused. The popover edits the state; there are no dialogs.
-// Shown only on own documents — foreign panes get the fork button instead.
+// The header button is the publication state: publish (one click) / a
+// compact glyph with the relay count / paused. The popover edits the
+// state; there are no dialogs. The relay list shows the EFFECTIVE set —
+// the per-document choice when one exists, else the user's configured
+// write relays (which fall back to the defaults) — and toggling a relay
+// materializes the per-document override in knowstr_publish.relays.
+// Shown only on own documents; foreign panes get the fork button instead.
 function PublishButton(): JSX.Element | null {
   const data = useData();
   const currentPane = useCurrentPane();
   const { createPlan, executePlan } = usePlanner();
-  const [justPublished, setJustPublished] = useState(false);
-  const [relayDraft, setRelayDraft] = useState("");
+  const { userRelays } = useUserRelayContext();
 
   const isOwnContent = currentPane.sourceId === LOCAL;
   const graph = graphLookupFromData(data);
@@ -561,12 +577,33 @@ function PublishButton(): JSX.Element | null {
   }
 
   const state = publishStateOf(document.frontMatter);
+  const configured = getWriteRelays(userRelays).map((relay) => relay.url);
+  // A user should never have to know what a relay is: with nothing
+  // configured, the predefined set is offered and used.
+  const baseline =
+    configured.length > 0
+      ? configured
+      : getWriteRelays(DEFAULT_RELAYS).map((relay) => relay.url);
+  const declared = state?.relays ?? [];
+  const effective = declared.length > 0 ? declared : baseline;
 
   const applyState = (next: PublishState): void => {
-    setJustPublished(false);
     executePlan(
       planSetDocumentPublishState(createPlan(), document.docId, next)
     );
+  };
+
+  const applyRelays = (nextEffective: string[]): void => {
+    if (!state) {
+      return;
+    }
+    const sameAsBaseline =
+      nextEffective.length === baseline.length &&
+      baseline.every((url) => nextEffective.includes(url));
+    applyState({
+      ...state,
+      relays: sameAsBaseline ? undefined : nextEffective,
+    });
   };
 
   const handlePublish = (): void => {
@@ -580,8 +617,6 @@ function PublishButton(): JSX.Element | null {
       relays: state?.relays,
       paused: false,
     });
-    setJustPublished(true);
-    setTimeout(() => setJustPublished(false), 2500);
   };
 
   if (!state) {
@@ -591,30 +626,30 @@ function PublishButton(): JSX.Element | null {
         className="header-action-btn"
         onClick={handlePublish}
         aria-label="publish document"
-        title="Publish this document"
+        title={`Publish this document to ${effective.length} relays`}
       >
         publish
       </button>
     );
   }
 
-  const glyph = state.paused ? "◌ paused" : "⦿ published";
+  const relayRows = [...new Set([...baseline, ...declared])];
   return (
-    <Dropdown className="options-dropdown">
+    <Dropdown className="options-dropdown publish-dropdown">
       <Dropdown.Toggle
         as="button"
         className="header-action-btn"
         aria-label="publishing options"
+        title={
+          state.paused
+            ? "Paused — the last published version stays visible"
+            : "Published — republishes on every save"
+        }
         tabIndex={0}
       >
-        {justPublished ? "⦿ now publishing" : glyph}
+        {state.paused ? "◌ paused" : "⦿ published"}
       </Dropdown.Toggle>
       <Dropdown.Menu>
-        <Dropdown.Header>
-          {state.paused
-            ? "Paused — the last published version stays visible"
-            : "Published — republishes on every save"}
-        </Dropdown.Header>
         {state.entities.map((entity) => (
           <Dropdown.Item
             key={entity}
@@ -626,6 +661,7 @@ function PublishButton(): JSX.Element | null {
               })
             }
             aria-label={`stop publishing under ${entity}`}
+            title={`Stop publishing under ${entity}`}
             tabIndex={0}
           >
             <span className="d-block dropdown-item-icon" aria-hidden="true">
@@ -634,52 +670,43 @@ function PublishButton(): JSX.Element | null {
             <div className="menu-item-text">{entity}</div>
           </Dropdown.Item>
         ))}
-        {(state.relays ?? []).map((url) => (
-          <Dropdown.Item
-            key={url}
-            className="d-flex menu-item"
-            onClick={() =>
-              applyState({
-                ...state,
-                relays: (state.relays ?? []).filter((r) => r !== url),
-              })
-            }
-            aria-label={`remove relay ${url}`}
-            tabIndex={0}
-          >
-            <span className="d-block dropdown-item-icon" aria-hidden="true">
-              ~
-            </span>
-            <div className="menu-item-text">{url}</div>
-          </Dropdown.Item>
-        ))}
-        <form
-          className="d-flex menu-item px-3"
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (relayDraft.trim() !== "") {
-              applyState({
-                ...state,
-                relays: [...(state.relays ?? []), relayDraft.trim()],
-              });
-              setRelayDraft("");
-            }
-          }}
-        >
-          <input
-            type="text"
-            value={relayDraft}
-            placeholder="add relay wss://…"
-            aria-label="add relay"
-            onChange={(event) => setRelayDraft(event.target.value)}
-            onClick={(event) => event.stopPropagation()}
-          />
-        </form>
+        {state.entities.length > 0 && <Dropdown.Divider />}
+        {relayRows.map((url) => {
+          const active = effective.includes(url);
+          return (
+            <Dropdown.Item
+              key={url}
+              className={`d-flex menu-item${
+                active ? "" : " publish-destination-off"
+              }`}
+              onClick={() =>
+                applyRelays(
+                  active
+                    ? effective.filter((u) => u !== url)
+                    : [...effective, url]
+                )
+              }
+              aria-label={`${active ? "deselect" : "select"} relay ${url}`}
+              title={url}
+              tabIndex={0}
+            >
+              <span className="d-block dropdown-item-icon" aria-hidden="true">
+                {active ? "✓" : "○"}
+              </span>
+              <div className="menu-item-text">{hostLabel(url)}</div>
+            </Dropdown.Item>
+          );
+        })}
         <Dropdown.Divider />
         <Dropdown.Item
           className="d-flex menu-item"
           onClick={() => applyState({ ...state, paused: !state.paused })}
           aria-label={state.paused ? "resume publishing" : "pause publishing"}
+          title={
+            state.paused
+              ? "Resume — republishes on every save"
+              : "Pause — the last published version stays visible"
+          }
           tabIndex={0}
         >
           <span className="d-block dropdown-item-icon" aria-hidden="true">

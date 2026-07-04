@@ -146,10 +146,15 @@ const PUBLISHED_UNDER_ASSET = [
   "",
 ].join("\n");
 
-test("deposits route to declared relays plus the asset scheme default", () => {
+const USER_RELAYS: Relays = [
+  { url: "wss://mine.example", read: true, write: true },
+];
+
+test("declared relays replace the configured set; the asset scheme joins", () => {
   const document = parseDoc(PUBLISHED_UNDER_ASSET);
-  expect(depositWriteRelayConf(document, "wss://deedsats.example")).toEqual({
-    user: true,
+  expect(
+    depositWriteRelayConf(document, USER_RELAYS, "wss://deedsats.example")
+  ).toEqual({
     extraRelays: [
       { url: "wss://salon.example", read: false, write: true },
       { url: "wss://deedsats.example", read: false, write: true },
@@ -157,27 +162,27 @@ test("deposits route to declared relays plus the asset scheme default", () => {
   });
 });
 
-test("no asset entity, no scheme relay; no config, declared only", () => {
-  const noAsset = parseDoc(
+test("without declared relays: the configured set, else the defaults", () => {
+  const noDeclared = parseDoc(
     [
       "---",
       "knowstr_doc_id: doc-1",
       "knowstr_publish:",
-      "  relays:",
-      "    - wss://salon.example",
+      "  entities:",
+      "    - asset:rgb:test-contract",
       "---",
       "# Essay <!-- id:u77 -->",
       "",
     ].join("\n")
   );
-  expect(depositWriteRelayConf(noAsset, "wss://deedsats.example")).toEqual({
+  expect(depositWriteRelayConf(noDeclared, USER_RELAYS, undefined)).toEqual({
     user: true,
-    extraRelays: [{ url: "wss://salon.example", read: false, write: true }],
+    extraRelays: [],
   });
   expect(
-    depositWriteRelayConf(parseDoc(PUBLISHED_UNDER_ASSET), undefined)
+    depositWriteRelayConf(noDeclared, [], "wss://deedsats.example")
   ).toEqual({
-    user: true,
-    extraRelays: [{ url: "wss://salon.example", read: false, write: true }],
+    defaultRelays: true,
+    extraRelays: [{ url: "wss://deedsats.example", read: false, write: true }],
   });
 });

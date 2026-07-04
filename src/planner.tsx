@@ -726,7 +726,10 @@ export function buildDocumentEvents(
       publishState && !publishState.paused
         ? ({
             ...buildDepositEvent(write.document, pubkey, write.content),
-            writeRelayConf: depositWriteRelayConf(write.document),
+            writeRelayConf: depositWriteRelayConf(
+              write.document,
+              plan.relays.userRelays
+            ),
           } as UnsignedEvent & EventAttachment)
         : undefined;
     const withSnapshot = snapshotEvent ? events.push(snapshotEvent) : events;

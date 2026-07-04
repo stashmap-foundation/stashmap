@@ -91,6 +91,38 @@ body {
   flex: 1;
 }
 
+// The publish control never squeezes the breadcrumbs: it keeps its
+// natural (compact) width and the crumbs keep the remaining space.
+// One font throughout; state accents use the solarized palette.
+.publish-dropdown {
+  flex-shrink: 0;
+
+  .dropdown-toggle {
+    white-space: nowrap;
+  }
+
+  .dropdown-toggle::after {
+    display: none;
+  }
+
+  .dropdown-menu {
+    min-width: 240px;
+    font-size: inherit;
+    font-family: inherit;
+  }
+
+  .menu-item .dropdown-item-icon {
+    color: var(--violet);
+  }
+
+  .publish-destination-off {
+    .dropdown-item-icon,
+    .menu-item-text {
+      opacity: 0.55;
+    }
+  }
+}
+
 .pane-header-right {
   display: flex;
   align-items: center;

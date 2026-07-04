@@ -8,6 +8,7 @@ import {
   MockWorkspaceIpc,
   mockWorkspaceIpc,
 } from "./testFixtures/mockWorkspaceIpc";
+import { MockRelayPool, mockRelayPool } from "./nostrMock.test";
 import { loadCliProfile } from "./cli/config";
 import { knowstrInit } from "./testFixtures/workspace";
 import { navigateToNodeViaSearch, renderWithTestData } from "./utils.test";
@@ -50,6 +51,7 @@ type AppRenderOptions = {
 
 type AppRenderResult = RenderResult & {
   ipc: MockWorkspaceIpc;
+  relayPool: MockRelayPool;
   path?: string;
   pubkey?: PublicKey;
   npub?: string;
@@ -62,6 +64,7 @@ export async function renderAppTree(
   const ipc = mockWorkspaceIpc(path ?? null);
   // eslint-disable-next-line functional/immutable-data
   PENDING_IPCS.push(ipc);
+  const relayPool = mockRelayPool();
 
   const utils = renderWithTestData(
     <FilesystemAppRoot>
@@ -73,7 +76,14 @@ export async function renderAppTree(
     </FilesystemAppRoot>,
     {
       BackendProvider: ({ children }) => (
-        <FilesystemBackendProvider ipc={ipc}>
+        <FilesystemBackendProvider
+          ipc={ipc}
+          pool={{
+            subscribe: (relays, filters, params) =>
+              relayPool.subscribeMany(relays, filters, params),
+            publish: (relays, event) => relayPool.publish(relays, event),
+          }}
+        >
           {children}
         </FilesystemBackendProvider>
       ),
@@ -84,7 +94,7 @@ export async function renderAppTree(
 
   if (path === undefined) {
     await screen.findByLabelText("Open Folder as Workspace");
-    return { ...utils, ipc };
+    return { ...utils, ipc, relayPool };
   }
 
   const profile = loadCliProfile({ cwd: path });
@@ -97,6 +107,7 @@ export async function renderAppTree(
   return {
     ...utils,
     ipc,
+    relayPool,
     path,
     pubkey: profile.pubkey,
     npub: nip19.npubEncode(profile.pubkey),

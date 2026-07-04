@@ -1,10 +1,12 @@
 import React, { Dispatch, SetStateAction } from "react";
 import { Map as ImmutableMap } from "immutable";
 import { LOCAL } from "../../core/nodeRef";
+import { useApis } from "../../Apis";
 import { useBackend } from "../../BackendContext";
 import { useDocumentStore, useDocuments } from "../../DocumentStore";
 import { ExecutorProvider } from "../../ExecutorContext";
-import { buildDocumentWrites, Plan } from "../../planner";
+import { buildDepositEvents, buildDocumentWrites, Plan } from "../../planner";
+import { publishEventsWithConf, signEvents } from "../nostr/executor";
 import {
   Document,
   DocumentDelete,
@@ -105,7 +107,29 @@ export function FilesystemExecutorProvider({
 }): JSX.Element {
   const store = useDocumentStore();
   const documents = useDocuments();
-  const { workspace } = useBackend();
+  const backend = useBackend();
+  const { workspace } = backend;
+  const { finalizeEvent } = useApis();
+
+  // Publication is storage-independent: the workspace lives on disk, but
+  // deposits of published documents go to relays here exactly as on the
+  // web. Only deposits — the desktop has no storage channel.
+  const publishDeposits = async (plan: Plan): Promise<void> => {
+    const deposits = buildDepositEvents(plan);
+    if (deposits.size === 0) {
+      return;
+    }
+    const finalized = await signEvents(deposits, plan.user, finalizeEvent);
+    if (finalized.size === 0) {
+      return;
+    }
+    try {
+      await publishEventsWithConf(backend, plan.relays, finalized);
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.warn("Publishing deposits failed", error);
+    }
+  };
 
   const executePlan = async (plan: Plan): Promise<void> => {
     if (plan.paneUpdate) {
@@ -160,6 +184,8 @@ export function FilesystemExecutorProvider({
         deletedPaths
       );
     }
+
+    await publishDeposits(plan);
   };
 
   const republishEventsOnRelay = (): Promise<void> => Promise.resolve();

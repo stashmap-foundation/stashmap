@@ -78,11 +78,30 @@ function envCliProfileArgs() {
 
 const recentWorkspaces = createRecentWorkspacesStore();
 
+// Publishing needs the key in the renderer: deposits are signed there and
+// sent straight to relays. Storage stays on disk — the desktop has no
+// storage channel, but publication is storage-independent.
+function readProfilePrivateKey(profile) {
+  if (!profile.nsecFile || !fs.existsSync(profile.nsecFile)) {
+    return undefined;
+  }
+  try {
+    const raw = fs.readFileSync(profile.nsecFile, "utf8");
+    return convertInputToPrivateKey(raw) || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 async function loadProfileAndEvents(profile) {
   const runtime = await getWorkspaceRuntime(profile.workspaceDir);
   const loaded = await runtime.load();
   await runtime.ready();
-  return { profile: loaded.profile, files: loaded.files };
+  return {
+    profile: loaded.profile,
+    files: loaded.files,
+    privateKey: readProfilePrivateKey(loaded.profile),
+  };
 }
 
 function isInitialisedFolder(folder) {

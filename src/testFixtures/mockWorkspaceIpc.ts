@@ -12,6 +12,22 @@ import {
   WorkspaceRuntime,
 } from "../infra/filesystem/workspaceRuntime";
 
+// Same behavior as electron/main.js: the load payload carries the profile's
+// private key so the renderer can sign deposits.
+function readProfilePrivateKey(profile: {
+  nsecFile?: string;
+}): string | undefined {
+  if (!profile.nsecFile || !fs.existsSync(profile.nsecFile)) {
+    return undefined;
+  }
+  try {
+    const raw = fs.readFileSync(profile.nsecFile, "utf8");
+    return convertInputToPrivateKey(raw) || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function logMockWorkspaceDebug(
   label: string,
   details: Record<string, unknown>
@@ -70,6 +86,7 @@ export function mockWorkspaceIpc(
           (loaded): WorkspaceLoaded => ({
             profile: loaded.profile,
             files: [...loaded.files],
+            privateKey: readProfilePrivateKey(loaded.profile),
           })
         ) ?? Promise.resolve(null),
     ready: async () => {

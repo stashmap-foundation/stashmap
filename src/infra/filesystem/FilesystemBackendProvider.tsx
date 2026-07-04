@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { AbstractSimplePool, verifyEvent } from "nostr-tools";
+import { hexToBytes } from "@noble/hashes/utils";
 import { Backend, BackendProvider, WorkspaceState } from "../../BackendContext";
 import { LoadedCliProfile } from "../../cli/config";
 import type {
@@ -10,6 +12,9 @@ import type { FsEventHandler } from "./workspaceWatcher";
 export type WorkspaceLoaded = {
   profile: LoadedCliProfile;
   files: WorkspaceMarkdownFile[];
+  // Hex private key from the profile's nsec file, when present. Publishing
+  // signs deposits in the renderer; local work needs no key.
+  privateKey?: string;
 };
 
 export type WorkspaceIpc = {
@@ -30,11 +35,27 @@ type LoadState =
   | { status: "loading" }
   | { status: "loaded"; data: WorkspaceLoaded | null };
 
+export type RelayPoolLike = {
+  subscribe: Backend["subscribe"];
+  publish: Backend["publish"];
+};
+
+function realRelayPool(): RelayPoolLike {
+  const pool = new AbstractSimplePool({ verifyEvent });
+  return {
+    subscribe: (relayList, filters, params) =>
+      pool.subscribeMany(relayList, filters, params),
+    publish: (relayList, event) => pool.publish(relayList, event),
+  };
+}
+
 export function FilesystemBackendProvider({
   ipc,
+  pool,
   children,
 }: {
   ipc: WorkspaceIpc;
+  pool?: RelayPoolLike;
   children: React.ReactNode;
 }): JSX.Element | null {
   const [state, setState] = useState<LoadState>({ status: "loading" });
@@ -58,11 +79,20 @@ export function FilesystemBackendProvider({
     setVersion((v) => v + 1);
   }, []);
 
+  const relayPool = useMemo(() => pool ?? realRelayPool(), [pool]);
+
   const backend: Backend = useMemo(() => {
     const data = state.status === "loaded" ? state.data : null;
     const profile = data?.profile ?? null;
     const files = data?.files ?? [];
-    const user = profile ? { publicKey: profile.pubkey } : undefined;
+    const user = profile
+      ? {
+          publicKey: profile.pubkey,
+          ...(data?.privateKey
+            ? { privateKey: hexToBytes(data.privateKey) }
+            : {}),
+        }
+      : undefined;
     const defaultRelays = profile?.relays ?? [];
     const workspace: WorkspaceState = {
       profile,
@@ -81,23 +111,13 @@ export function FilesystemBackendProvider({
       subscribeFsEvents: (handler) => ipc.subscribeFsEvents(handler),
     };
     return {
-      subscribe: (_relays, _filters, params) => {
-        params.oneose?.();
-        return { close: () => undefined };
-      },
-      publish: (relayList, event) => {
-        // eslint-disable-next-line no-console
-        console.warn(
-          "Filesystem publish not yet implemented; dropping event",
-          event.kind
-        );
-        return relayList.map(() => Promise.resolve(""));
-      },
+      subscribe: relayPool.subscribe,
+      publish: relayPool.publish,
       user,
       defaultRelays,
       workspace,
     };
-  }, [state, ipc, refresh]);
+  }, [state, ipc, refresh, relayPool]);
 
   if (state.status === "loading") {
     return null;

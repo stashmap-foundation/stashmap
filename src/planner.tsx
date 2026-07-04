@@ -703,6 +703,42 @@ export function buildDocumentWrites(plan: GraphPlan): {
   });
 }
 
+// Published, unpaused documents emit a deposit: same content as storage,
+// kind 34774, entity-tagged, with per-event relay routing. Paused documents
+// emit none, so the paused flag never reaches a deposit.
+function depositEventFor(
+  plan: GraphPlan,
+  pubkey: PublicKey,
+  write: { document: KnowstrDocument; content: string }
+): (UnsignedEvent & EventAttachment) | undefined {
+  const publishState = publishStateOf(write.document.frontMatter);
+  return publishState && !publishState.paused
+    ? ({
+        ...buildDepositEvent(write.document, pubkey, write.content),
+        writeRelayConf: depositWriteRelayConf(
+          write.document,
+          plan.relays.userRelays
+        ),
+      } as UnsignedEvent & EventAttachment)
+    : undefined;
+}
+
+// Deposits alone — publication is storage-independent, so executors whose
+// storage isn't relay-backed (the desktop's filesystem) publish exactly
+// these and nothing else.
+export function buildDepositEvents(
+  plan: GraphPlan
+): List<UnsignedEvent & EventAttachment> {
+  if (!plan.user) {
+    return List();
+  }
+  const pubkey = plan.user.publicKey;
+  return buildDocumentWrites(plan).reduce((events, write) => {
+    const deposit = depositEventFor(plan, pubkey, write);
+    return deposit ? events.push(deposit) : events;
+  }, List<UnsignedEvent & EventAttachment>());
+}
+
 export function buildDocumentEvents(
   plan: GraphPlan
 ): List<UnsignedEvent & EventAttachment> {
@@ -716,22 +752,7 @@ export function buildDocumentEvents(
           EventAttachment)
       : undefined;
     const event = buildDocumentEvent(write.document, pubkey, write.content);
-    // Published, unpaused documents also emit a deposit beside their
-    // storage event: same content, kind 34774, entity-tagged, routed to
-    // the configured write relays plus the document's declared relays.
-    // Paused documents emit none, so the paused flag never reaches a
-    // deposit.
-    const publishState = publishStateOf(write.document.frontMatter);
-    const depositEvent =
-      publishState && !publishState.paused
-        ? ({
-            ...buildDepositEvent(write.document, pubkey, write.content),
-            writeRelayConf: depositWriteRelayConf(
-              write.document,
-              plan.relays.userRelays
-            ),
-          } as UnsignedEvent & EventAttachment)
-        : undefined;
+    const depositEvent = depositEventFor(plan, pubkey, write);
     const withSnapshot = snapshotEvent ? events.push(snapshotEvent) : events;
     const withDocument = withSnapshot.push(
       event as UnsignedEvent & EventAttachment

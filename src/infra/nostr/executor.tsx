@@ -60,6 +60,35 @@ export async function signEvents(
       });
 }
 
+// Signed events out to relays, each routed by its writeRelayConf. Shared by
+// every executor that publishes — publication is storage-independent, so
+// the filesystem executor uses this for deposits too.
+export async function publishEventsWithConf(
+  backend: Pick<Backend, "publish">,
+  relays: AllRelays,
+  finalizedEvents: List<SignedEventWithConf>
+): Promise<PublishResultsEventMap> {
+  const results = await Promise.all(
+    finalizedEvents.toArray().map(({ event, writeRelayConf }) => {
+      const writeRelayUrls = applyWriteRelayConfig(
+        relays.defaultRelays,
+        relays.userRelays,
+        writeRelayConf
+      );
+      return publishEventToRelays(
+        backend,
+        event,
+        Array.from(new Set(writeRelayUrls.map((r: Relay) => r.url)))
+      );
+    })
+  );
+
+  return results.reduce((rdx, result, index) => {
+    const eventId = finalizedEvents.get(index)?.event.id;
+    return eventId ? rdx.set(eventId, result) : rdx;
+  }, Map<string, PublishResultsOfEvent>());
+}
+
 export async function execute({
   plan,
   backend,
@@ -87,25 +116,7 @@ export async function execute({
     return Map();
   }
 
-  const results = await Promise.all(
-    finalizedEvents.toArray().map(({ event, writeRelayConf }) => {
-      const writeRelayUrls = applyWriteRelayConfig(
-        plan.relays.defaultRelays,
-        plan.relays.userRelays,
-        writeRelayConf
-      );
-      return publishEventToRelays(
-        backend,
-        event,
-        Array.from(new Set(writeRelayUrls.map((r: Relay) => r.url)))
-      );
-    })
-  );
-
-  return results.reduce((rdx, result, index) => {
-    const eventId = finalizedEvents.get(index)?.event.id;
-    return eventId ? rdx.set(eventId, result) : rdx;
-  }, Map<string, PublishResultsOfEvent>());
+  return publishEventsWithConf(backend, plan.relays, finalizedEvents);
 }
 
 export async function republishEvents({

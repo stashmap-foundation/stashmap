@@ -121,9 +121,10 @@ test("unknown comment attributes survive parse and render", () => {
   });
 
   const knowledgeDBs = Map<SourceId, KnowledgeData>([[TEST_PUBKEY, { nodes }]]);
-  const rendered = renderDocumentMarkdown(knowledgeDBs, document);
-  expect(rendered).toContain('<!-- id:u1 knowstr_vote_id="v1" -->');
-  expect(rendered).toContain(
+  expect(renderDocumentMarkdown(knowledgeDBs, document)).toContain(
+    '<!-- id:u1 knowstr_vote_id="v1" -->'
+  );
+  expect(renderDocumentMarkdown(knowledgeDBs, document)).toContain(
     '<!-- id:u2 knowstr_vote_id="v2" custom="x" -->'
   );
 });

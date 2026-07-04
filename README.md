@@ -1,3 +1,5 @@
+Planning docs (idea.md, implementation.md, spaces-protocol.md) live in the shared planning repo: `../deedsats-docs/knowstr/`.
+
 ## Prerequisites
 
 - node v16.14.2

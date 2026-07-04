@@ -2,8 +2,9 @@
 
 ## How we work
 
-- An idea.md file describes what we are currently implementing and what the goal of the current sprint is. It's descriptive from a UX perspective
-- The implementation.md file describes how we implement it
+- Planning documents live in the shared planning repo `../deedsats-docs/knowstr/` (knowstr and deedsats are developed in tandem; all idea/implementation docs are consolidated there).
+- Its idea.md describes what we are currently implementing and what the goal of the current sprint is. It's descriptive from a UX perspective
+- Its implementation.md describes how we implement it; spaces-protocol.md is the wire contract shared with deedsats
 
 ## Rules for implementation
 

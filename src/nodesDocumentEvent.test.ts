@@ -162,6 +162,32 @@ test("declared relays replace the configured set; the asset scheme joins", () =>
   });
 });
 
+test("an explicitly empty destination set persists and publishes nowhere", () => {
+  const fm = withPublishState(undefined, {
+    entities: [],
+    relays: [],
+    paused: false,
+  });
+  const serialized = serializeFrontMatter(fm);
+  const inner = serialized.replace(/^---\n/u, "").replace(/---\n$/u, "");
+  expect(publishStateOf(parseFrontMatter(inner))?.relays).toEqual([]);
+
+  const document = parseDoc(
+    [
+      "---",
+      "knowstr_doc_id: doc-1",
+      "knowstr_publish:",
+      "  relays: []",
+      "---",
+      "# Essay <!-- id:u77 -->",
+      "",
+    ].join("\n")
+  );
+  expect(depositWriteRelayConf(document, USER_RELAYS, undefined)).toEqual({
+    extraRelays: [],
+  });
+});
+
 test("without declared relays: the configured set, else the defaults", () => {
   const noDeclared = parseDoc(
     [

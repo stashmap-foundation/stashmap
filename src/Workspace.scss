@@ -121,6 +121,39 @@ body {
       opacity: 0.55;
     }
   }
+
+  // "add your own…" is a menu row, not a browser input: same font, no
+  // chrome, a quiet dashed underline in the palette.
+  .publish-add-destination {
+    padding: 0.25rem 1rem;
+
+    .publish-add-input {
+      background: transparent;
+      border: none;
+      border-bottom: 1px dashed var(--base01);
+      color: inherit;
+      font: inherit;
+      outline: none;
+      width: 100%;
+
+      &::placeholder {
+        color: var(--base01);
+      }
+    }
+  }
+}
+
+// Breadcrumbs claim the header's spare space and never vanish entirely:
+// they shrink with an ellipsis down to a readable floor instead.
+.pane-header-left .breadcrumbs {
+  flex: 1 1 auto;
+  min-width: 4ch;
+}
+
+.breadcrumb-current {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .pane-header-right {

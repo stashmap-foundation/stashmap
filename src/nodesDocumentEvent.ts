@@ -77,14 +77,14 @@ export function depositWriteRelayConf(
   userRelays: Relays,
   assetRelay: string | undefined = process.env.REACT_APP_ASSET_RELAY
 ): WriteRelayConf {
-  const declared = publishStateOf(document.frontMatter)?.relays ?? [];
+  const declared = publishStateOf(document.frontMatter)?.relays;
   const scheme =
     assetRelay &&
     depositEntityTags(document).some((tag) => tag.startsWith("asset:"))
       ? [assetRelay]
       : [];
   const toRelay = (url: string): Relay => ({ url, read: false, write: true });
-  if (declared.length > 0) {
+  if (declared !== undefined) {
     return {
       extraRelays: [...new Set([...declared, ...scheme])].map(toRelay),
     };

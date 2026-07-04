@@ -52,15 +52,16 @@ export function publishStateOf(
   };
 }
 
+// relays semantics: undefined = the user's configured set; a present list
+// REPLACES it — including the explicitly empty list, which means "nowhere"
+// and must survive the round-trip rather than snapping back to defaults.
 export function withPublishState(
   fm: FrontMatter | undefined,
   state: PublishState
 ): FrontMatter {
   const value = {
     ...(state.entities.length > 0 ? { entities: state.entities } : {}),
-    ...(state.relays && state.relays.length > 0
-      ? { relays: state.relays }
-      : {}),
+    ...(state.relays !== undefined ? { relays: state.relays } : {}),
     ...(state.paused ? { paused: true } : {}),
   };
   return {

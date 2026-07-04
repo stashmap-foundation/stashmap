@@ -552,6 +552,7 @@ function PublishButton(): JSX.Element | null {
   const currentPane = useCurrentPane();
   const { createPlan, executePlan } = usePlanner();
   const { userRelays } = useUserRelayContext();
+  const [destinationDraft, setDestinationDraft] = useState("");
 
   const isOwnContent = currentPane.sourceId === LOCAL;
   const graph = graphLookupFromData(data);
@@ -584,8 +585,8 @@ function PublishButton(): JSX.Element | null {
     configured.length > 0
       ? configured
       : getWriteRelays(DEFAULT_RELAYS).map((relay) => relay.url);
-  const declared = state?.relays ?? [];
-  const effective = declared.length > 0 ? declared : baseline;
+  const declared = state?.relays;
+  const effective = declared !== undefined ? declared : baseline;
 
   const applyState = (next: PublishState): void => {
     executePlan(
@@ -633,7 +634,7 @@ function PublishButton(): JSX.Element | null {
     );
   }
 
-  const relayRows = [...new Set([...baseline, ...declared])];
+  const relayRows = [...new Set([...baseline, ...(declared ?? [])])];
   return (
     <Dropdown className="options-dropdown publish-dropdown">
       <Dropdown.Toggle
@@ -643,7 +644,9 @@ function PublishButton(): JSX.Element | null {
         title={
           state.paused
             ? "Paused — the last published version stays visible"
-            : "Published — republishes on every save"
+            : `Published — republishes on every save${
+                effective.length === 0 ? " (no destinations selected)" : ""
+              }`
         }
         tabIndex={0}
       >
@@ -697,6 +700,31 @@ function PublishButton(): JSX.Element | null {
             </Dropdown.Item>
           );
         })}
+        <form
+          className="d-flex menu-item publish-add-destination"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const draft = destinationDraft.trim();
+            if (draft !== "") {
+              const url = draft.includes("://") ? draft : `wss://${draft}`;
+              applyRelays([...new Set([...effective, url])]);
+              setDestinationDraft("");
+            }
+          }}
+        >
+          <span className="d-block dropdown-item-icon" aria-hidden="true">
+            +
+          </span>
+          <input
+            className="publish-add-input"
+            type="text"
+            value={destinationDraft}
+            placeholder="add your own…"
+            aria-label="add destination"
+            onChange={(event) => setDestinationDraft(event.target.value)}
+            onClick={(event) => event.stopPropagation()}
+          />
+        </form>
         <Dropdown.Divider />
         <Dropdown.Item
           className="d-flex menu-item"

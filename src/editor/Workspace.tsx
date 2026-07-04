@@ -760,9 +760,9 @@ function PaneHeader(): JSX.Element {
     <header className="pane-header">
       <div className="pane-header-left">
         <BackButton />
+        <PublishButton />
         <Breadcrumbs />
         <ForkButton />
-        <PublishButton />
         {isFirstPane && <SignInMenuBtn />}
       </div>
       <div className="pane-header-right">

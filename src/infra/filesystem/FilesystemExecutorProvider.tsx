@@ -68,9 +68,16 @@ function enrichWithFilePath(
           slugify(write.document.title || write.document.docId),
           taken
         );
+  // Same title rule as the initial load (workspaceScan): on a file
+  // workspace the filename is the identity, so it beats content-derived
+  // titles. Without this, the first save silently renamed the document.
+  const filePathParts = filePath.split("/");
+  const fallbackTitle =
+    filePathParts[filePathParts.length - 1]?.replace(/\.md$/u, "") || undefined;
   const parsed = parseToDocument(LOCAL, write.content, {
     updatedMsOverride: Date.now(),
     docIdFallback: write.document.docId,
+    ...(fallbackTitle !== undefined ? { fallbackTitle } : {}),
     ...(write.document.systemRole !== undefined
       ? { systemRoleOverride: write.document.systemRole }
       : {}),

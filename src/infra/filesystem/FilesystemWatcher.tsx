@@ -63,10 +63,15 @@ export function FilesystemWatcher(): null {
         return;
       }
       const existing = findExistingByFilePath(documents, event.relativePath);
+      // Filename beats content-derived titles, same as the initial scan.
+      const pathParts = event.relativePath.split("/");
+      const fallbackTitle =
+        pathParts[pathParts.length - 1]?.replace(/\.md$/u, "") || undefined;
       const parsed = parseToDocument(LOCAL, event.content, {
         filePath: event.relativePath,
         relativePath: event.relativePath,
         updatedMsOverride: Date.now(),
+        ...(fallbackTitle !== undefined ? { fallbackTitle } : {}),
         ...(existing && { docIdFallback: existing.docId }),
       });
       logFilesystemWatcherDebug("upsert", {

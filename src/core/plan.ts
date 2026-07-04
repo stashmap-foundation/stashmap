@@ -134,11 +134,14 @@ export function planSetDocumentPublishState<T extends GraphPlan>(
     frontMatter: withPublishState(document.frontMatter, state),
     updatedMs: Date.now(),
   };
-  return {
-    ...plan,
-    documents: plan.documents.set(key, nextDocument),
-    affectedDocuments: plan.affectedDocuments.add(docId),
-  };
+  return withDocumentInFilePathIndex(
+    {
+      ...plan,
+      documents: plan.documents.set(key, nextDocument),
+      affectedDocuments: plan.affectedDocuments.add(docId),
+    },
+    nextDocument
+  );
 }
 
 export function upsertNodesCore<T extends GraphPlan>(

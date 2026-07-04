@@ -18,6 +18,63 @@ export function serializeFrontMatter(fm: FrontMatter): string {
   return `---\n${body}---\n`;
 }
 
+export type PublishState = {
+  entities: string[];
+  relays?: string[];
+  paused: boolean;
+};
+
+function stringList(value: unknown): string[] | undefined {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === "string")
+    : undefined;
+}
+
+// knowstr_publish present = published; the bare key is the minimal form
+// (own-root tag only, default relays). `paused` stops republish-on-save,
+// so it never reaches the wire: paused documents emit no deposits, and
+// unpausing removes the flag before the next one.
+export function publishStateOf(
+  fm: FrontMatter | undefined
+): PublishState | undefined {
+  if (!fm || !("knowstr_publish" in fm)) {
+    return undefined;
+  }
+  const raw = fm.knowstr_publish;
+  if (raw === null || raw === undefined || typeof raw !== "object") {
+    return { entities: [], paused: false };
+  }
+  const record = raw as Record<string, unknown>;
+  return {
+    entities: stringList(record.entities) ?? [],
+    relays: stringList(record.relays),
+    paused: record.paused === true,
+  };
+}
+
+export function withPublishState(
+  fm: FrontMatter | undefined,
+  state: PublishState
+): FrontMatter {
+  const value = {
+    ...(state.entities.length > 0 ? { entities: state.entities } : {}),
+    ...(state.relays && state.relays.length > 0
+      ? { relays: state.relays }
+      : {}),
+    ...(state.paused ? { paused: true } : {}),
+  };
+  return {
+    ...(fm ?? {}),
+    knowstr_publish: Object.keys(value).length > 0 ? value : null,
+  };
+}
+
+export function withoutPublishState(fm: FrontMatter | undefined): FrontMatter {
+  return Object.fromEntries(
+    Object.entries(fm ?? {}).filter(([key]) => key !== "knowstr_publish")
+  );
+}
+
 export function ensureKnowstrDocId(
   fm: FrontMatter | undefined,
   fallback?: string

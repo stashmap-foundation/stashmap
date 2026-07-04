@@ -2,6 +2,10 @@ export const KIND_SETTINGS = 11071;
 
 export const KIND_KNOWLEDGE_DOCUMENT = 34772;
 export const KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT = 34773;
+// Deposits: published documents, tagged with the entities they are
+// published under. Distinct from storage (34772) so the same document can
+// be both stored and published without the replaceable events colliding.
+export const KIND_KNOWLEDGE_DEPOSIT = 34774;
 
 export const KIND_DELETE = 5;
 

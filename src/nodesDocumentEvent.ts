@@ -2,9 +2,11 @@ import { UnsignedEvent } from "nostr-tools";
 import { sha256 } from "@noble/hashes/sha256";
 import { bytesToHex } from "@noble/hashes/utils";
 import type { Document } from "./core/Document";
+import { publishStateOf } from "./core/knowstrFrontmatter";
 import {
   KIND_KNOWLEDGE_DOCUMENT,
   KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
+  KIND_KNOWLEDGE_DEPOSIT,
   msTag,
   newTimestamp,
 } from "./nostr";
@@ -30,6 +32,36 @@ export function buildDocumentEvent(
     pubkey,
     created_at: newTimestamp(),
     tags: [["d", document.docId], ...systemRoleTags, msTag()],
+    content,
+  };
+}
+
+// The S set is {own roots} ∪ knowstr_publish.entities (interop rule: tags
+// and content sit inside one signature and MUST agree). Roots stay implicit
+// in the frontmatter; entities is the carried record of granted audiences.
+export function depositEntityTags(document: Document): string[] {
+  const entities = publishStateOf(document.frontMatter)?.entities ?? [];
+  return [...new Set([...document.topNodeShortIds, ...entities])];
+}
+
+export function buildDepositEvent(
+  document: Document,
+  pubkey: PublicKey,
+  content: string
+): UnsignedEvent {
+  const systemRoleTags = document.systemRole
+    ? ([["s", document.systemRole]] as string[][])
+    : [];
+  return {
+    kind: KIND_KNOWLEDGE_DEPOSIT,
+    pubkey,
+    created_at: newTimestamp(),
+    tags: [
+      ["d", document.docId],
+      ...depositEntityTags(document).map((id) => ["S", id]),
+      ...systemRoleTags,
+      msTag(),
+    ],
     content,
   };
 }

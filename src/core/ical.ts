@@ -1,21 +1,28 @@
 /* eslint-disable functional/no-let, functional/immutable-data */
 import { icalEntryId } from "./icalId";
 
-const ICAL_URL_RE = /(webcal:\/\/\S+|https?:\/\/\S+\.ics(\?\S*)?)/iu;
+// URL charset excludes ] and parentheses so a URL inside the link form
+// stops at its own closing delimiter.
+const ICAL_URL_RE =
+  /(webcal:\/\/[^\s\]()]+|https?:\/\/[^\s\]()]+\.ics(\?[^\s\]()]*)?)/iu;
 
 // The calendar-feed recognizer: a node whose text carries an iCal URL
 // (`.ics` or `webcal://`) is a calendar-feed node — recognized like
 // entities, no node-type UI. Returns the feed URL, or undefined.
 export function icalFeedUrlOf(text: string): string | undefined {
+  const linkForm = icalFeedLinkPartsOf(text);
+  if (linkForm) {
+    return linkForm.url;
+  }
   const match = ICAL_URL_RE.exec(text);
   if (!match) {
     return undefined;
   }
-  return match[0].replace(/[)\]}>,.]+$/u, "") || undefined;
+  return match[0].replace(/[}>,.]+$/u, "") || undefined;
 }
 
 const ICAL_FEED_LINK_RE =
-  /^\[([^\]]*)\]\((webcal:\/\/\S+|https?:\/\/\S+\.ics(\?\S*)?)\)$/iu;
+  /^\[([^\]]*)\]\((webcal:\/\/[^\s()]+|https?:\/\/[^\s()]+\.ics(\?[^\s()]*)?)\)$/iu;
 
 // The feed-as-link form: `[any name](https://…/feed.ics)` — text is yours,
 // identity lives in the parentheses, mirroring entity links. Returns the
@@ -37,8 +44,8 @@ export function isBareIcalFeedUrl(text: string): boolean {
   return url !== undefined && text.trim() === url;
 }
 
-export function icalFeedLinkText(url: string): string {
-  return `[${url}](${url})`;
+export function icalFeedLinkText(url: string, label?: string): string {
+  return `[${label ?? url}](${url})`;
 }
 
 // A projected calendar entry: the literal-VEVENT subset of the machine-feeds

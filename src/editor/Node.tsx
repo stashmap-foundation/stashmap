@@ -36,7 +36,12 @@ import {
 import { isBlockLinkAny } from "../core/nodeSpans";
 import { getBlockLink } from "../core/blockLink";
 import { ENTITY_SCHEME_RE } from "../core/entityRecognition";
-import { icalFeedLinkPartsOf } from "../core/ical";
+import {
+  icalFeedLinkPartsOf,
+  icalFeedLinkText,
+  icalFeedUrlOf,
+  isBareIcalFeedUrl,
+} from "../core/ical";
 import { inlineTargetToHref, linkStyle, linkToHref } from "./linkOperations";
 import { ReferenceDisplay } from "./referenceDisplay";
 import { MiniEditor, preventEditorBlur } from "./AddNode";
@@ -421,6 +426,20 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       viewKey: viewPathToString(targetViewPath),
     });
 
+  // Feed-as-link rows edit their label; the URL is structural, like an
+  // entity link's target. Saving re-wraps the new label around the known
+  // URL; typing a bare feed URL (re)wraps into the link form.
+  const feedLink = icalFeedLinkPartsOf(displayText);
+  const withFeedUrl = (text: string): string => {
+    if (isBareIcalFeedUrl(text)) {
+      return icalFeedLinkText(text.trim());
+    }
+    if (feedLink && text.trim() !== "" && !icalFeedUrlOf(text)) {
+      return icalFeedLinkText(feedLink.url, text.trim());
+    }
+    return text;
+  };
+
   const handleSave = (text: string, submitted?: boolean): void => {
     const {
       plan: basePlan,
@@ -428,7 +447,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       node: savedNode,
     } = planSaveNodeAndEnsureNodes(
       createPlan(),
-      text,
+      withFeedUrl(text),
       rowID,
       currentNode,
       viewPath,
@@ -675,14 +694,18 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
   return (
     <MiniEditor
       key={`${viewPathToString(viewPath)}:${nodeIndex}`}
-      initialText={displayText}
+      initialText={feedLink ? feedLink.label : displayText}
       style={textStyle}
       onSave={handleSave}
       onTab={handleTab}
       onShiftTab={handleShiftTab}
       onClose={isEmptyNode ? handleClose : undefined}
       autoFocus={shouldAutoFocus}
-      ariaLabel={isEmptyNode ? "new node editor" : `edit ${displayText}`}
+      ariaLabel={
+        isEmptyNode
+          ? "new node editor"
+          : `edit ${feedLink ? feedLink.label : displayText}`
+      }
       onEscape={handleEscapeRequest}
       onRequestRowFocus={handleRequestRowFocus}
       onDelete={isEmptyNode ? undefined : handleDelete}

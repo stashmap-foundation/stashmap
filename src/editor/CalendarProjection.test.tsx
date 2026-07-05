@@ -66,30 +66,42 @@ Salon
   );
 });
 
-test("bare feed urls wrap into the renameable link form", async () => {
+test("bare feed urls wrap; the label renames without losing the feed", async () => {
   const [alice] = setup([ALICE]);
+  const fetchedUrls: string[] = [];
   renderApp({
     ...alice(),
-    fetchCalendarFeed: async () => FEED,
+    fetchCalendarFeed: async (url: string) => {
+      fetchedUrls.push(url);
+      return FEED;
+    },
   });
 
   await type("Salon{Enter}{Tab}https://scholarium.at/salon.ics{Escape}");
 
-  // The row displays the label (initially the URL); the raw text carries
-  // the link form — visible in the expand label — so renaming later never
-  // loses the feed.
-  await userEvent.click(
-    await screen.findByLabelText("expand https://scholarium.at/salon.ics")
+  // The editor shows and edits the label only; the URL is structural.
+  const editor = await screen.findByLabelText(
+    "edit https://scholarium.at/salon.ics"
   );
+  await userEvent.click(editor);
+  await userEvent.keyboard("{Control>}a{/Control}Salon Termine{Escape}");
+
+  await userEvent.click(await screen.findByLabelText("expand Salon Termine"));
 
   await expectTree(
     `
 Salon
-  https://scholarium.at/salon.ics
+  Salon Termine
     {~} 01.01.2020 Founding seminar
     14.07.2030 Sommerfest
     ${dunbarText()}
   `,
     { showGutter: true }
+  );
+
+  // The fetch always used the clean URL — never a garbage span across
+  // the link form's halves.
+  expect(new Set(fetchedUrls)).toEqual(
+    new Set(["https://scholarium.at/salon.ics"])
   );
 });

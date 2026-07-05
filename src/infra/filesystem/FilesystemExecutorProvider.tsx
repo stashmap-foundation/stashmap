@@ -2,6 +2,7 @@ import React, { Dispatch, SetStateAction } from "react";
 import { Map as ImmutableMap } from "immutable";
 import { LOCAL } from "../../core/nodeRef";
 import { useApis } from "../../Apis";
+import { isUserLoggedInWithSeed } from "../../NostrAuthContext";
 import { useBackend } from "../../BackendContext";
 import { useDocumentStore, useDocuments } from "../../DocumentStore";
 import { ExecutorProvider } from "../../ExecutorContext";
@@ -114,20 +115,54 @@ export function FilesystemExecutorProvider({
   // Publication is storage-independent: the workspace lives on disk, but
   // deposits of published documents go to relays here exactly as on the
   // web. Only deposits — the desktop has no storage channel.
+  const describeSigningKey = (user: Plan["user"]): string => {
+    if (!user) {
+      return "no user";
+    }
+    return isUserLoggedInWithSeed(user)
+      ? "seed loaded"
+      : "pubkey only — no nsec loaded, cannot sign";
+  };
+
   const publishDeposits = async (plan: Plan): Promise<void> => {
     const deposits = buildDepositEvents(plan);
+    // eslint-disable-next-line no-console
+    console.log(
+      "[publish] deposits built:",
+      deposits.size,
+      "| key:",
+      describeSigningKey(plan.user)
+    );
     if (deposits.size === 0) {
       return;
     }
-    const finalized = await signEvents(deposits, plan.user, finalizeEvent);
-    if (finalized.size === 0) {
-      return;
-    }
     try {
-      await publishEventsWithConf(backend, plan.relays, finalized);
+      const finalized = await signEvents(deposits, plan.user, finalizeEvent);
+      // eslint-disable-next-line no-console
+      console.log("[publish] signed:", finalized.size);
+      if (finalized.size === 0) {
+        return;
+      }
+      const results = await publishEventsWithConf(
+        backend,
+        plan.relays,
+        finalized
+      );
+      results.forEach((res, id) =>
+        res.results.forEach((status, url) =>
+          // eslint-disable-next-line no-console
+          console.log(
+            "[publish]",
+            id.slice(0, 8),
+            url,
+            status.status,
+            status.reason ?? ""
+          )
+        )
+      );
     } catch (error) {
       // eslint-disable-next-line no-console
-      console.warn("Publishing deposits failed", error);
+      console.warn("[publish] Publishing deposits failed", error);
     }
   };
 

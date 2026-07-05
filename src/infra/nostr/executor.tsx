@@ -75,11 +75,16 @@ export async function publishEventsWithConf(
         relays.userRelays,
         writeRelayConf
       );
-      return publishEventToRelays(
-        backend,
-        event,
-        Array.from(new Set(writeRelayUrls.map((r: Relay) => r.url)))
+      const urls = Array.from(new Set(writeRelayUrls.map((r: Relay) => r.url)));
+      // eslint-disable-next-line no-console
+      console.log(
+        "[publish] event kind",
+        event.kind,
+        event.id.slice(0, 8),
+        "→",
+        urls.length > 0 ? urls.join(", ") : "(no relays!)"
       );
+      return publishEventToRelays(backend, event, urls);
     })
   );
 

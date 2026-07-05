@@ -175,3 +175,45 @@ export function parseIcalFeed(content: string): IcalEntry[] {
     })
     .map(({ entry }) => entry);
 }
+
+export type CalendarMergeItem =
+  | { kind: "child"; childId: string }
+  | { kind: "projection"; entry: IcalEntry };
+
+// Interleaves untouched projections with the calendar node's actual
+// children: your arrangement wins where you arranged (children keep
+// document order), the feed owns what you left alone (each untouched
+// projection rides after its nearest materialized feed predecessor;
+// projections before any materialized entry lead the list). With nothing
+// materialized this is pure feed order.
+export function mergeProjectedEntries(
+  childIds: readonly string[],
+  entries: readonly IcalEntry[]
+): CalendarMergeItem[] {
+  const childIdSet = new Set(childIds);
+  const leading: IcalEntry[] = [];
+  const anchored = new Map<string, IcalEntry[]>();
+  let anchor: string | undefined;
+  entries.forEach((entry) => {
+    if (childIdSet.has(entry.id)) {
+      anchor = entry.id;
+      return;
+    }
+    if (anchor === undefined) {
+      leading.push(entry);
+    } else {
+      anchored.set(anchor, [...(anchored.get(anchor) ?? []), entry]);
+    }
+  });
+  const items: CalendarMergeItem[] = leading.map((entry) => ({
+    kind: "projection",
+    entry,
+  }));
+  childIds.forEach((childId) => {
+    items.push({ kind: "child", childId });
+    (anchored.get(childId) ?? []).forEach((entry) =>
+      items.push({ kind: "projection", entry })
+    );
+  });
+  return items;
+}

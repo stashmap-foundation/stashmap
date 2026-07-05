@@ -4,6 +4,7 @@ import Dashboard from "./editor/Dashboard";
 import { RelaysWrapper } from "./editor/Relays";
 import { SignUp } from "./SignUp";
 import { SignInModal } from "./SignIn";
+import { CalendarFeedProvider } from "./CalendarFeedContext";
 
 export function App(): JSX.Element {
   useEffect(() => {
@@ -37,15 +38,17 @@ export function App(): JSX.Element {
   }, []);
 
   return (
-    <Routes>
-      <Route path="/" element={<Dashboard />}>
-        <Route path="follow" element={<Navigate replace to="/" />} />
-        <Route path="relays" element={<RelaysWrapper />} />
-        <Route path="signin" element={<SignInModal />} />
-        <Route path="signup" element={<SignUp />} />
-      </Route>
-      <Route path="/d/:author/:docId" element={<Dashboard />} />
-      <Route path="/r/:nodeId" element={<Dashboard />} />
-    </Routes>
+    <CalendarFeedProvider>
+      <Routes>
+        <Route path="/" element={<Dashboard />}>
+          <Route path="follow" element={<Navigate replace to="/" />} />
+          <Route path="relays" element={<RelaysWrapper />} />
+          <Route path="signin" element={<SignInModal />} />
+          <Route path="signup" element={<SignUp />} />
+        </Route>
+        <Route path="/d/:author/:docId" element={<Dashboard />} />
+        <Route path="/r/:nodeId" element={<Dashboard />} />
+      </Routes>
+    </CalendarFeedProvider>
   );
 }

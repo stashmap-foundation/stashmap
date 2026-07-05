@@ -11,6 +11,9 @@ import {
   viewPathToString,
 } from "../rowModel";
 import { useData } from "../DataContext";
+import { useCalendarFeeds } from "../CalendarFeedContext";
+import { icalFeedUrlOf } from "../core/ical";
+import { nodeText } from "../core/nodeSpans";
 import { useCurrentPane, usePaneIndex } from "../SplitPanesContext";
 import { useApis } from "../Apis";
 import {
@@ -53,7 +56,12 @@ export function PaneTreeResultProvider({
 }: {
   children: React.ReactNode;
 }): JSX.Element {
-  const data = useData();
+  const baseData = useData();
+  const { feeds: calendarFeeds, requestFeed } = useCalendarFeeds();
+  const data = useMemo(
+    () => ({ ...baseData, calendarFeeds }),
+    [baseData, calendarFeeds]
+  );
   const pane = useCurrentPane();
   const paneIndex = usePaneIndex();
   const viewPath = useMemo(
@@ -88,6 +96,17 @@ export function PaneTreeResultProvider({
     pane.typeFilters,
     viewPath,
   ]);
+
+  // Fetch-on-render: any visible calendar-feed node requests its feed;
+  // the projection rows appear when the fetch resolves.
+  useEffect(() => {
+    treeResult.rows.forEach((row) => {
+      const feedUrl = icalFeedUrlOf(nodeText(row.node));
+      if (feedUrl) {
+        requestFeed(feedUrl);
+      }
+    });
+  }, [treeResult, requestFeed]);
 
   return (
     <PaneTreeResultContext.Provider value={treeResult}>

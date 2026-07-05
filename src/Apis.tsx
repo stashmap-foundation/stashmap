@@ -17,6 +17,7 @@ export type Apis = {
     searchDebounce: number;
   };
   eventLoadingTimeout: number;
+  fetchCalendarFeed?: (url: string) => Promise<string>;
 };
 
 const ApiContext = React.createContext<Apis | undefined>(undefined);

@@ -4,6 +4,7 @@ import { Event, EventTemplate, UnsignedEvent } from "nostr-tools";
 import { RelayInformation } from "nostr-tools/lib/types/nip11";
 import { QueueStatus } from "./infra/nostr/cache/PublishQueue";
 import { Document as DocumentType } from "./core/Document";
+import { IcalEntry } from "./core/ical";
 
 declare global {
   type Children = {
@@ -148,6 +149,10 @@ declare global {
     documentByFilePath: Map<string, DocumentType>;
     relaysInfos: Map<string, RelayInformation | undefined>;
     publishEventsStatus: EventState;
+    // Fetched calendar feeds, keyed by feed URL — the read path of the
+    // machine-feeds law. Projections derive from these at row-build time
+    // and never enter knowledgeDBs.
+    calendarFeeds?: Map<string, IcalEntry[]>;
 
     views: Views;
     panes: Pane[];

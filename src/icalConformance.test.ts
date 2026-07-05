@@ -7,7 +7,12 @@
 import * as fs from "fs";
 import * as path from "path";
 import { icalEntryId } from "./core/icalId";
-import { icalFeedUrlOf, parseIcalFeed } from "./core/ical";
+import {
+  IcalEntry,
+  icalFeedUrlOf,
+  mergeProjectedEntries,
+  parseIcalFeed,
+} from "./core/ical";
 
 type IdCase = {
   name: string;
@@ -102,5 +107,48 @@ describe("icalFeedUrlOf", () => {
     expect(icalFeedUrlOf("webcal://x.org/feed")).toEqual("webcal://x.org/feed");
     expect(icalFeedUrlOf("just text")).toBeUndefined();
     expect(icalFeedUrlOf("https://x.org/page.html")).toBeUndefined();
+  });
+});
+
+describe("mergeProjectedEntries", () => {
+  const entry = (id: string): IcalEntry => ({
+    id,
+    uid: id,
+    summary: id,
+    allDay: false,
+  });
+
+  test("nothing materialized: pure feed order", () => {
+    expect(mergeProjectedEntries([], [entry("a"), entry("b")])).toEqual([
+      { kind: "projection", entry: entry("a") },
+      { kind: "projection", entry: entry("b") },
+    ]);
+  });
+
+  test("materialized rows keep document order, projections ride anchors", () => {
+    // Feed order a,b,c — the user materialized b and moved a plain note in.
+    const items = mergeProjectedEntries(
+      ["note", "b"],
+      [entry("a"), entry("b"), entry("c")]
+    );
+    expect(items).toEqual([
+      { kind: "projection", entry: entry("a") },
+      { kind: "child", childId: "note" },
+      { kind: "child", childId: "b" },
+      { kind: "projection", entry: entry("c") },
+    ]);
+  });
+
+  test("reordered materialized entries win over feed order", () => {
+    // Feed a,b — user materialized both and swapped them.
+    const items = mergeProjectedEntries(
+      ["b", "a"],
+      [entry("a"), entry("b"), entry("c")]
+    );
+    expect(items).toEqual([
+      { kind: "child", childId: "b" },
+      { kind: "projection", entry: entry("c") },
+      { kind: "child", childId: "a" },
+    ]);
   });
 });

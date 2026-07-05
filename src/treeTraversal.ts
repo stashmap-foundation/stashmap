@@ -26,8 +26,10 @@ import {
   isBlockLink,
   isBlockLinkAny,
   linkSpan,
+  nodeText,
   plainSpans,
 } from "./core/nodeSpans";
+import { IcalEntry, icalFeedUrlOf, mergeProjectedEntries } from "./core/ical";
 import { getDocumentByIdOrFilePath, type Document } from "./core/Document";
 import { DEFAULT_TYPE_FILTERS } from "./core/constants";
 import {
@@ -441,6 +443,82 @@ function createVirtualRow(
   );
 }
 
+// A projected calendar entry as a behaviorally first-class row (idea.md,
+// Computed rows are first-class in behavior): synthetic node, no
+// virtualType, never stored — write gestures materialize it (M8.4).
+function createProjectionRow(
+  data: Data,
+  graph: GraphLookup,
+  parentRow: Row,
+  parentNode: GraphNode,
+  parentSourceId: SourceId,
+  entry: IcalEntry
+): Row {
+  const node: GraphNode = {
+    children: List<ID>(),
+    id: entry.id as ID,
+    spans: plainSpans(entry.summary),
+    parent: parentNode.id,
+    updated: parentNode.updated ?? Date.now(),
+    root: parentNode.root ?? parentNode.id,
+    relevance: undefined,
+  };
+  const parentPath = addNodesToLastElement(parentRow.viewPath, parentNode.id);
+  const viewPath = appendNodeToPath(parentPath, node.id);
+  return createRow(
+    data,
+    graph,
+    viewPath,
+    node,
+    graph.localSourceId,
+    parentRow,
+    parentNode,
+    { sourceId: parentSourceId, id: parentNode.id },
+    undefined,
+    false,
+    undefined,
+    undefined
+  );
+}
+
+// The machine-feeds merge at row level: children keep document order,
+// untouched projections slot in per mergeProjectedEntries. Projections
+// derive from data.calendarFeeds and never touch knowledgeDBs.
+function interleaveProjectionRows(
+  data: Data,
+  graph: GraphLookup,
+  parentRow: Row,
+  parentNode: GraphNode,
+  parentSourceId: SourceId,
+  rowsByChildId: Map<ID, Row>,
+  childRows: List<Row>
+): List<Row> {
+  const feedUrl = icalFeedUrlOf(nodeText(parentNode));
+  const entries = feedUrl ? data.calendarFeeds?.get(feedUrl) : undefined;
+  if (!entries || entries.length === 0) {
+    return childRows;
+  }
+  const merged = mergeProjectedEntries(parentNode.children.toArray(), entries);
+  return List(
+    merged.flatMap((item) => {
+      if (item.kind === "projection") {
+        return [
+          createProjectionRow(
+            data,
+            graph,
+            parentRow,
+            parentNode,
+            parentSourceId,
+            item.entry
+          ),
+        ];
+      }
+      const row = rowsByChildId.get(item.childId as ID);
+      return row ? [row] : [];
+    })
+  );
+}
+
 function appendVirtualFooterRows(
   data: Data,
   graph: GraphLookup,
@@ -542,7 +620,7 @@ function getChildrenForRegularNode(
     .filter((node): node is GraphNode => node !== undefined)
     .toList();
 
-  const childRows = nodes.children
+  const childRowPairs = nodes.children
     .map((childID, index) => ({
       childID,
       row: createChildRow(
@@ -561,13 +639,26 @@ function getChildrenForRegularNode(
         : childID === EMPTY_SEMANTIC_ID ||
           (row !== undefined && itemPassesFilters(row.node, activeFilters))
     )
-    .map(({ row }) => row)
-    .filter((row): row is Row => row !== undefined)
+    .filter((pair): pair is { childID: ID; row: Row } => pair.row !== undefined)
     .toList();
+  const childRows = childRowPairs.map(({ row }) => row);
 
   if (options?.isMarkdownExport) {
     return { rows: childRows };
   }
+
+  const rowsByChildId = Map<ID, Row>(
+    childRowPairs.map(({ childID, row }) => [childID, row])
+  );
+  const rowsWithProjections = interleaveProjectionRows(
+    data,
+    graph,
+    parentRow,
+    nodes,
+    nodeSourceId,
+    rowsByChildId,
+    childRows
+  );
 
   const containingNodeID = parentRow.parentNode?.id;
   const visibleAuthors = ImmutableSet<SourceId>([LOCAL, author, nodeSourceId]);
@@ -611,7 +702,7 @@ function getChildrenForRegularNode(
   });
 
   return {
-    rows: childRows.concat(footerResult.rows),
+    rows: rowsWithProjections.concat(footerResult.rows),
   };
 }
 

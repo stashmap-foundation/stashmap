@@ -367,6 +367,9 @@ export function renderApis(
           finalizeEvent,
           nip11,
           eventLoadingTimeout: 0,
+          ...(options?.fetchCalendarFeed
+            ? { fetchCalendarFeed: options.fetchCalendarFeed }
+            : {}),
         }}
       >
         <BackendProviderComponent>

@@ -1,0 +1,62 @@
+{
+  "comment": "Conformance fixtures for calendar-entry id normalization (idea.md, The wire). ical:<UID>[@<RECURRENCE-ID>]; UID verbatim when free of unsafe characters ([\\s\"'<>%]), else those characters percent-encoded as UTF-8 bytes, uppercase hex. Ids are opaque; nobody parses them back. Implementations projecting the same feed MUST derive byte-identical ids.",
+  "cases": [
+    {
+      "name": "plain rfc5545 uid",
+      "uid": "20260707T120000Z-1234@scholarium.at",
+      "expected": "ical:20260707T120000Z-1234@scholarium.at"
+    },
+    {
+      "name": "uuid uid",
+      "uid": "8a4fdc22-6d1e-4a0b-9d2e-c1b2aa9f0001",
+      "expected": "ical:8a4fdc22-6d1e-4a0b-9d2e-c1b2aa9f0001"
+    },
+    {
+      "name": "spaces encode",
+      "uid": "my event 42",
+      "expected": "ical:my%20event%2042"
+    },
+    {
+      "name": "quotes and angle brackets encode",
+      "uid": "a\"b'c<d>e",
+      "expected": "ical:a%22b%27c%3Cd%3Ee"
+    },
+    {
+      "name": "percent encodes itself",
+      "uid": "50%off",
+      "expected": "ical:50%25off"
+    },
+    {
+      "name": "tab and newline encode",
+      "uid": "a\tb\nc",
+      "expected": "ical:a%09b%0Ac"
+    },
+    {
+      "name": "non-ascii stays verbatim",
+      "uid": "seminar-münchen-🎓",
+      "expected": "ical:seminar-münchen-🎓"
+    },
+    {
+      "name": "non-ascii whitespace encodes as utf-8 bytes",
+      "uid": "a b",
+      "expected": "ical:a%C2%A0b"
+    },
+    {
+      "name": "arrow sequence encodes via its angle bracket",
+      "uid": "a-->b",
+      "expected": "ical:a--%3Eb"
+    },
+    {
+      "name": "recurrence instant appends",
+      "uid": "weekly-seminar@scholarium.at",
+      "recurrenceId": "20260714T180000Z",
+      "expected": "ical:weekly-seminar@scholarium.at@20260714T180000Z"
+    },
+    {
+      "name": "recurrence with unsafe uid",
+      "uid": "my event",
+      "recurrenceId": "20260714T180000Z",
+      "expected": "ical:my%20event@20260714T180000Z"
+    }
+  ]
+}

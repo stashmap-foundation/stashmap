@@ -1,0 +1,34 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//scholarium//salon//EN
+BEGIN:VEVENT
+UID:20260921T180000Z-77@scholarium.at
+DTSTART:20260921T180000Z
+SUMMARY:Seminar Robin Dunbar\, part two
+BEGIN:VALARM
+TRIGGER:-PT15M
+ACTION:DISPLAY
+DESCRIPTION:Reminder
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:allday-1@scholarium.at
+DTSTART;VALUE=DATE:20260714
+SUMMARY:Sommerfest with a very long title that certainly needs to be fo
+ lded across two lines to stay under the octet limit
+END:VEVENT
+BEGIN:VEVENT
+UID:weekly@scholarium.at
+DTSTART;TZID=Europe/Vienna:20260901T190000
+RRULE:FREQ=WEEKLY;COUNT=10
+SUMMARY:Recurring seminar (skipped in v1)
+END:VEVENT
+BEGIN:VEVENT
+UID:no start uid
+SUMMARY:Undated entry sorts last
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20260801T100000Z
+SUMMARY:No UID - never projected
+END:VEVENT
+END:VCALENDAR

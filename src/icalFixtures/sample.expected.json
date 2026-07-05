@@ -1,0 +1,26 @@
+{
+  "comment": "Expected projection of sample.ics: literal VEVENTs only (RRULE/RDATE skipped), calendar order, undated entries last, UID required. Ids per ical-ids.json normalization.",
+  "entries": [
+    {
+      "id": "ical:allday-1@scholarium.at",
+      "uid": "allday-1@scholarium.at",
+      "summary": "Sommerfest with a very long title that certainly needs to be folded across two lines to stay under the octet limit",
+      "start": "2026-07-14",
+      "allDay": true
+    },
+    {
+      "id": "ical:20260921T180000Z-77@scholarium.at",
+      "uid": "20260921T180000Z-77@scholarium.at",
+      "summary": "Seminar Robin Dunbar, part two",
+      "start": "2026-09-21T18:00:00Z",
+      "allDay": false
+    },
+    {
+      "id": "ical:no%20start%20uid",
+      "uid": "no start uid",
+      "summary": "Undated entry sorts last",
+      "start": null,
+      "allDay": false
+    }
+  ]
+}

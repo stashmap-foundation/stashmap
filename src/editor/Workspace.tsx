@@ -632,12 +632,12 @@ function PublishButton(): JSX.Element | null {
     return (
       <button
         type="button"
-        className="header-action-btn"
+        className="header-action-btn publish-cta"
         onClick={handlePublish}
         aria-label="publish document"
         title={`Publish this document to ${effective.length} relays`}
       >
-        publish
+        ◌ publish
       </button>
     );
   }

@@ -12,7 +12,8 @@ import { useCurrentPane } from "../SplitPanesContext";
 import { useData } from "../DataContext";
 import { usePlanner } from "../planner";
 import { LOCAL } from "../core/nodeRef";
-import { getDocumentByIdOrFilePath } from "../core/Document";
+import { Document, getDocumentByIdOrFilePath } from "../core/Document";
+import { graphLookupFromData, lookupNode } from "../core/graphLookup";
 import { publishStateOf } from "../core/knowstrFrontmatter";
 import { getNodeDocumentId, planSetDocumentPublishState } from "../core/plan";
 import { unpublishedLinkTarget } from "./publishReach";
@@ -21,24 +22,24 @@ import { EvidenceSelector } from "./EvidenceSelector";
 import { FullscreenButton } from "./FullscreenButton";
 import { OpenInSplitPaneButton } from "./OpenInSplitPaneButton";
 
-// A link row inside a published document whose target isn't shared: a
-// truthful description (readers see this title but can't open it) and a
-// one-tap grant of this document's effective set and relays. No dialogs.
-function PublishReachChip(): JSX.Element | null {
+// The pane's document, but only when it is published — the condition for
+// the publish-reach slot to exist on its rows.
+function usePublishedPaneDocument(): Document | undefined {
   const data = useData();
   const pane = useCurrentPane();
-  const node = useCurrentNode();
-  const { createPlan, executePlan } = usePlanner();
-
   if (pane.sourceId !== LOCAL) {
-    return null;
+    return undefined;
   }
+  const graph = graphLookupFromData(data);
+  const rootNode = pane.rootNodeId
+    ? lookupNode(graph, pane.rootNodeId, pane.sourceId)?.node
+    : undefined;
   const docId =
     pane.documentId ??
-    (node
-      ? getNodeDocumentId({ knowledgeDBs: data.knowledgeDBs }, node)
+    (rootNode
+      ? getNodeDocumentId({ knowledgeDBs: data.knowledgeDBs }, rootNode)
       : undefined);
-  const paneDocument = docId
+  const document = docId
     ? getDocumentByIdOrFilePath(
         data.documents,
         data.documentByFilePath,
@@ -46,6 +47,24 @@ function PublishReachChip(): JSX.Element | null {
         docId
       )
     : undefined;
+  return document && publishStateOf(document.frontMatter)
+    ? document
+    : undefined;
+}
+
+// A link row inside a published document whose target isn't shared: the
+// hollow publish glyph in a dashed frame — same visual language as the
+// header's publish button (hollow = not published, click to publish).
+// Always visible: this is state, not a hover control.
+function PublishReachChip({
+  paneDocument,
+}: {
+  paneDocument: Document;
+}): JSX.Element | null {
+  const data = useData();
+  const node = useCurrentNode();
+  const { createPlan, executePlan } = usePlanner();
+
   const target = unpublishedLinkTarget(
     data.knowledgeDBs,
     data.documents,
@@ -53,7 +72,7 @@ function PublishReachChip(): JSX.Element | null {
     paneDocument,
     node
   );
-  if (!paneDocument || !target) {
+  if (!target) {
     return null;
   }
 
@@ -79,9 +98,9 @@ function PublishReachChip(): JSX.Element | null {
       className="publish-reach-chip"
       onClick={grant}
       aria-label={`publish linked document ${target.title || target.docId}`}
-      title="Readers of this document can see this link but can't open it — click to publish the target to the same audience"
+      title="Not shared — readers of this document can see this link but can't open it. Click to publish."
     >
-      not shared
+      ◌
     </button>
   );
 }
@@ -95,6 +114,7 @@ export function RightMenu(): JSX.Element {
   const isRoot = useIsRoot();
   const pane = useCurrentPane();
   const currentNode = useCurrentNode();
+  const publishedDocument = usePublishedPaneDocument();
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
   const isInSearchView = useIsInSearchView();
   const [rowID] = useCurrentRowID();
@@ -108,13 +128,19 @@ export function RightMenu(): JSX.Element {
 
   return (
     <div className="right-menu">
+      {publishedDocument && (
+        <div className="publish-reach-slot">
+          {!isVirtualItem && (
+            <PublishReachChip paneDocument={publishedDocument} />
+          )}
+        </div>
+      )}
       <div className="relevance-slot">
         {!isReadonly && <RelevanceSelector virtualType={virtualType} />}
       </div>
       <div className="evidence-slot">
         {!isReadonly && virtualType !== "suggestion" && <EvidenceSelector />}
       </div>
-      {!isVirtualItem && <PublishReachChip />}
       {!isEmptySemanticID(rowID) && (
         <div className="action-slot">
           <FullscreenButton />

@@ -6,7 +6,9 @@ import {
   itemPassesFilters,
   getSemanticID,
 } from "./core/connections";
+import { ENTITY_SCHEME_RE } from "./core/entityRecognition";
 import {
+  getBlockLinkTarget,
   getBlockLinkText,
   getBlockFileLinkPath,
   getBlockFileLinkText,
@@ -658,6 +660,22 @@ export function buildReferenceItem(
     const parentItem = parentNode
       ? lookupNode(graph, refId, sourceId)?.node
       : undefined;
+    const entityTarget = getBlockLinkTarget(parentItem);
+    if (entityTarget && ENTITY_SCHEME_RE.test(entityTarget)) {
+      // A dangling entity link: the entity has no home page, which is its
+      // ordinary state — never deletion (idea.md: "dangling allowed, no
+      // page"). Renders as plain link text until E6 gives it a surface.
+      const linkText = getBlockLinkText(parentItem) ?? entityTarget;
+      return {
+        id: refId,
+        type: "reference",
+        text: linkText,
+        targetContext: List<ID>(),
+        contextLabels: [],
+        targetLabel: linkText,
+        sourceId,
+      };
+    }
     const deleted = buildDeletedReference(
       refId,
       sourceId,

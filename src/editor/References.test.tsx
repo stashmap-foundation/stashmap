@@ -213,6 +213,23 @@ Other
     expect(screen.queryByText(/Loading/)).toBeNull();
   });
 
+  test("Dangling entity link renders plainly, never as (deleted)", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type(
+      "Places{Enter}{Tab}https://www.wikidata.org/wiki/Q131723{Escape}"
+    );
+
+    // The pasted marker became a link row targeting wd:Q131723 with no
+    // home page — the ordinary dangling state, not a deletion.
+    await expectTree(`
+Places
+  [R] https://www.wikidata.org/wiki/Q131723
+    `);
+    expect(screen.queryByText(/deleted/)).toBeNull();
+  });
+
   test("Deleted node shows (deleted) indicator in ~Log", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());

@@ -24,6 +24,7 @@ import {
   removeStoredDelete,
   removeStoredDocument,
 } from "./infra/nostr/cache/indexedDB";
+import { decryptStorageEvent } from "./storageEncryption";
 import { collectEventsUntilIdle } from "./eventQuery";
 
 const PERMANENT_SYNC_BACKFILL_PAGE_LIMIT = 200;
@@ -325,12 +326,16 @@ export function startPermanentDocumentSync({
   relayPool,
   relayUrls,
   authors,
+  user,
+  capabilityKeys,
   addLiveEvents,
 }: {
   db: StashmapDB | null;
   relayPool: SimplePool;
   relayUrls: string[];
   authors: PublicKey[];
+  user: User | undefined;
+  capabilityKeys: ReadonlyArray<string>;
   addLiveEvents?: (events: ImmutableMap<string, Event | UnsignedEvent>) => void;
 }): () => void {
   if (
@@ -347,11 +352,25 @@ export function startPermanentDocumentSync({
     checkpoints: new Map<PublicKey, SyncCheckpointRecord>(),
   };
 
-  const applyIncomingEvent = async (event: Event): Promise<void> => {
-    if (!state.active || !event.id || state.seenEventIds.has(event.id)) {
+  const applyIncomingEvent = async (wireEvent: Event): Promise<void> => {
+    if (
+      !state.active ||
+      !wireEvent.id ||
+      state.seenEventIds.has(wireEvent.id)
+    ) {
       return;
     }
-    state.seenEventIds.add(event.id);
+    state.seenEventIds.add(wireEvent.id);
+
+    const decrypted = await decryptStorageEvent(
+      wireEvent,
+      user,
+      capabilityKeys
+    );
+    if (!decrypted) {
+      return;
+    }
+    const event = { ...decrypted, id: wireEvent.id, sig: wireEvent.sig };
 
     if (!db) {
       addLiveEvents?.(ImmutableMap([[event.id, event]]));

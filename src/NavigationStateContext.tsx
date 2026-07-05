@@ -12,6 +12,7 @@ import {
   parseDocumentRouteUrl,
   parseNodeRouteUrl,
   parseSourceFromSearch,
+  parseStorageKeyFromHash,
   addressForSource,
   resolveAddress,
 } from "./navigationUrl";
@@ -69,15 +70,18 @@ function paneToUrl(
 function urlToPane(
   pathname: string,
   search: string,
+  hash: string,
   myPublicKey: PublicKey | undefined
 ): Pane {
   const sourceId = resolveAddress(parseSourceFromSearch(search), myPublicKey);
+  const storageKey = parseStorageKeyFromHash(hash);
   const documentRoute = parseDocumentRouteUrl(pathname);
   if (documentRoute) {
     return {
       id: generatePaneId(),
       sourceId: resolveAddress(documentRoute.address, myPublicKey),
       documentId: documentRoute.docId,
+      ...(storageKey !== undefined && { storageKey }),
     };
   }
   const nodeID = parseNodeRouteUrl(pathname);
@@ -86,6 +90,7 @@ function urlToPane(
       id: generatePaneId(),
       sourceId,
       rootNodeId: nodeID,
+      ...(storageKey !== undefined && { storageKey }),
     };
   }
   return {
@@ -182,6 +187,7 @@ export function NavigationStateProvider({
           urlToPane(
             window.location.pathname,
             window.location.search,
+            window.location.hash,
             user?.publicKey
           ),
         ]);

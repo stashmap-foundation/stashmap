@@ -1554,7 +1554,7 @@ My Fork
     cleanup();
 
     const forkNodeEvents = alice()
-      .relayPool.getEvents()
+      .relayPool.getDecryptedEvents()
       .filter(
         (e) =>
           e.kind === KIND_KNOWLEDGE_DOCUMENT && e.pubkey === ALICE.publicKey
@@ -1592,7 +1592,7 @@ Target
     `);
 
     const aliceCopyEvents = utils.relayPool
-      .getEvents()
+      .getDecryptedEvents()
       .filter(
         (e) =>
           e.kind === KIND_KNOWLEDGE_DOCUMENT &&
@@ -1641,7 +1641,7 @@ My Notes
   [S] BobFolder
     `);
 
-    const eventsBeforeAccept = utils.relayPool.getEvents().length;
+    const eventsBeforeAccept = utils.relayPool.getDecryptedEvents().length;
 
     const acceptBtn = screen.getByLabelText("accept BobFolder as relevant");
     fireEvent.click(acceptBtn);
@@ -1652,7 +1652,7 @@ My Notes
     `);
 
     const newEvents = utils.relayPool
-      .getEvents()
+      .getDecryptedEvents()
       .slice(eventsBeforeAccept)
       .filter(
         (e) =>
@@ -1671,7 +1671,7 @@ My Notes
 
     await forkReadonlyRoot(bob(), requireUser(alice()).publicKey, "My Notes");
 
-    const bobEvents = bob().relayPool.getEvents();
+    const bobEvents = bob().relayPool.getDecryptedEvents();
     const snapshotEvents = bobEvents.filter(
       (event) =>
         event.kind === KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT &&
@@ -1697,7 +1697,7 @@ My Notes
 
     await forkReadonlyRoot(bob(), requireUser(alice()).publicKey, "My Notes");
 
-    const bobEvents = bob().relayPool.getEvents();
+    const bobEvents = bob().relayPool.getDecryptedEvents();
     const snapshotEvent = bobEvents.find(
       (event) =>
         event.kind === KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT &&
@@ -1744,7 +1744,7 @@ My Notes
 
     await forkReadonlyRoot(bob(), requireUser(alice()).publicKey, "My Notes");
 
-    const bobEvents = bob().relayPool.getEvents();
+    const bobEvents = bob().relayPool.getDecryptedEvents();
     const snapshotEvent = bobEvents.find(
       (event) =>
         event.kind === KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT &&

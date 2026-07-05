@@ -8,6 +8,8 @@ import {
   isUserLoggedInWithExtension,
 } from "../../NostrAuthContext";
 import { applyWriteRelayConfig } from "../../relays";
+import { KIND_KNOWLEDGE_DOCUMENT } from "../../nostr";
+import { buildStorageEnvelope } from "../../storageEncryption";
 import { publishEventToRelays, PUBLISH_TIMEOUT } from "./nostrPublish";
 
 export { PUBLISH_TIMEOUT };
@@ -37,11 +39,37 @@ export async function signEvents(
     }
   };
 
+  // Storage events go on the wire encrypted: content becomes the age
+  // envelope under the event's per-document key, the key attachment never
+  // leaves the app.
+  const toWireTemplate = async (
+    e: EventTemplate & EventAttachment
+  ): Promise<{
+    template: EventTemplate;
+    writeRelayConf?: WriteRelayConf;
+  }> => {
+    const { writeRelayConf, storageKey, ...template } = e;
+    if (template.kind !== KIND_KNOWLEDGE_DOCUMENT) {
+      return { template, writeRelayConf };
+    }
+    if (!storageKey) {
+      throw new Error("Storage event without a storage key");
+    }
+    return {
+      template: {
+        ...template,
+        content: await buildStorageEnvelope(user, storageKey, template.content),
+      },
+      writeRelayConf,
+    };
+  };
+
+  const wireEvents = await Promise.all(events.toArray().map(toWireTemplate));
+
   return isUserLoggedInWithExtension(user)
     ? List<SignedEventWithConf>(
         await Promise.all(
-          events.map(async (e) => {
-            const { writeRelayConf, storageKey, ...template } = e;
+          wireEvents.map(async ({ template, writeRelayConf }) => {
             const signedEvent = await signEventWithExtension(template);
             return {
               event: signedEvent as VerifiedEvent,
@@ -50,14 +78,15 @@ export async function signEvents(
           })
         )
       )
-    : events.map((e) => {
-        const { writeRelayConf, storageKey, ...template } = e;
-        const event = finalizeEvent(
-          template,
-          (user as KeyPair).privateKey
-        ) as VerifiedEvent;
-        return { event, writeRelayConf };
-      });
+    : List<SignedEventWithConf>(
+        wireEvents.map(({ template, writeRelayConf }) => {
+          const event = finalizeEvent(
+            template,
+            (user as KeyPair).privateKey
+          ) as VerifiedEvent;
+          return { event, writeRelayConf };
+        })
+      );
 }
 
 // Signed events out to relays, each routed by its writeRelayConf. Shared by

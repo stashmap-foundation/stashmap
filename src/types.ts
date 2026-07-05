@@ -57,6 +57,12 @@ declare global {
   export type Nostr = {
     getPublicKey: () => Promise<PublicKey>;
     signEvent: (event: EventTemplate) => Promise<Event>;
+    // NIP-07 optional capability, required by knowstr: storage encryption
+    // wraps per-document keys via nip44 self-encryption.
+    nip44: {
+      encrypt: (pubkey: string, plaintext: string) => Promise<string>;
+      decrypt: (pubkey: string, ciphertext: string) => Promise<string>;
+    };
   };
 
   type DesktopShellBridge = {
@@ -133,6 +139,9 @@ declare global {
     sourceId: SourceId;
     documentId?: string;
     rootNodeId?: ID;
+    // Capability from a share link (#key= fragment): the storage key that
+    // opens the pane's encrypted foreign document.
+    storageKey?: string;
     searchQuery?: string;
     searchResultIDs?: ID[];
     typeFilters?: (

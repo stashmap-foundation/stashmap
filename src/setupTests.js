@@ -1,6 +1,8 @@
 import { Buffer } from "buffer";
 import crypto from "crypto";
 import { TextEncoder, TextDecoder } from "util";
+import { ReadableStream, TransformStream, WritableStream } from "stream/web";
+import consumers from "stream/consumers";
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { cleanup } from "@testing-library/react";
 import { suggestionSettings } from "./core/constants";
@@ -20,6 +22,22 @@ if (!global.crypto) {
 global.TextEncoder = TextEncoder;
 global.TextDecoder = TextDecoder;
 global.Buffer = Buffer;
+// age-encryption drives its cipher through Web Streams and collects the
+// output via Response, both absent in jsdom.
+if (!global.TransformStream) {
+  global.TransformStream = TransformStream;
+  global.ReadableStream = ReadableStream;
+  global.WritableStream = WritableStream;
+}
+if (!global.Response) {
+  global.Response = function Response(body) {
+    return {
+      body,
+      arrayBuffer: () => consumers.arrayBuffer(body),
+      text: () => consumers.text(body),
+    };
+  };
+}
 global.ResizeObserver = function ResizeObserver() {};
 global.ResizeObserver.prototype.observe = () => {};
 global.ResizeObserver.prototype.unobserve = () => {};

@@ -74,3 +74,21 @@ export function parseSourceFromSearch(search: string): SourceId | undefined {
   const sourceId = params.get("source");
   return sourceId || undefined;
 }
+
+// Capability links carry the document's storage key in the fragment so it
+// never leaves the browser: `/d/<author>/<docId>#key=<storage key>`. A
+// fragment not starting with `key=` remains a scroll target.
+export function parseStorageKeyFromHash(hash: string): string | undefined {
+  const match = hash.match(/^#key=(.+)$/);
+  return match ? decodeURIComponent(match[1]) : undefined;
+}
+
+export function buildShareRouteUrl(
+  author: SourceId,
+  docId: string,
+  storageKey: string
+): string {
+  return `${buildDocumentRouteUrl(author, docId)}#key=${encodeURIComponent(
+    storageKey
+  )}`;
+}

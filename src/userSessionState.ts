@@ -13,6 +13,7 @@ import {
   parseDocumentRouteUrl,
   parseNodeRouteUrl,
   parseSourceFromSearch,
+  parseStorageKeyFromHash,
   resolveAddress,
 } from "./navigationUrl";
 
@@ -113,11 +114,13 @@ function getUrlPanes(myPublicKey: PublicKey | undefined): Pane[] | undefined {
   const documentRoute = parseDocumentRouteUrl(window.location.pathname);
   if (documentRoute) {
     const docSource = resolveAddress(documentRoute.address, myPublicKey);
+    const storageKey = parseStorageKeyFromHash(window.location.hash);
     return [
       {
         id: generatePaneId(),
         sourceId: docSource,
         documentId: documentRoute.docId,
+        ...(storageKey !== undefined && { storageKey }),
       },
     ];
   }
@@ -127,11 +130,13 @@ function getUrlPanes(myPublicKey: PublicKey | undefined): Pane[] | undefined {
       parseSourceFromSearch(window.location.search),
       myPublicKey
     );
+    const storageKey = parseStorageKeyFromHash(window.location.hash);
     return [
       {
         id: generatePaneId(),
         sourceId: nodeSource,
         rootNodeId: nodeID,
+        ...(storageKey !== undefined && { storageKey }),
       },
     ];
   }

@@ -126,6 +126,19 @@ export function NostrCacheSync({
     [panes]
   );
 
+  // Storage keys handed to this client through capability links — the only
+  // way a foreign storage event can be opened.
+  const capabilityKeys = useMemo(
+    () => [
+      ...new globalThis.Set(
+        panes
+          .map((pane) => pane.storageKey)
+          .filter((key): key is string => key !== undefined)
+      ),
+    ],
+    [panes]
+  );
+
   const authors = useMemo(() => {
     const own = user ? decodePublicKeyInputSync(user.publicKey) : undefined;
     return [
@@ -196,9 +209,11 @@ export function NostrCacheSync({
       relayPool,
       relayUrls,
       authors,
+      user,
+      capabilityKeys,
       addLiveEvents: addEvents,
     });
-  }, [addEvents, authors, db, relayPool, relayUrls]);
+  }, [addEvents, authors, db, relayPool, relayUrls, user, capabilityKeys]);
 
   // Persist locally-added events to IndexedDB
   const persistEvents = useMemo(() => {

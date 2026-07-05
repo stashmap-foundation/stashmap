@@ -4,6 +4,7 @@ import { Event, UnsignedEvent } from "nostr-tools";
 import { KIND_KNOWLEDGE_DOCUMENT } from "../../../nostr";
 import { mockRelayPool, MockRelayPool } from "../../../nostrMock.test";
 import { createPublishQueue, FlushDeps } from "./PublishQueue";
+import { newStorageKey } from "../../../storageEncryption";
 import { mockFinalizeEvent, ALICE_PRIVATE_KEY } from "../../../utils.test";
 
 jest.mock("./indexedDB");
@@ -25,6 +26,7 @@ const makeEvent = (dTag: string): UnsignedEvent & EventAttachment => ({
   created_at: Math.floor(Date.now() / 1000),
   tags: [["d", dTag]],
   content: `content-${dTag}`,
+  storageKey: newStorageKey(),
 });
 
 const waitForResults = (

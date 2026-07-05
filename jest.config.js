@@ -17,7 +17,7 @@ module.exports = {
   },
   transformIgnorePatterns: [
     "^.+\\.module\\.(css|sass|scss)$",
-    "<rootDir>[/\\\\]node_modules[/\\\\](?!react-dnd|dnd-core|@react-dnd|react-dnd-scrolling|react-dnd-html5-backend)",
+    "<rootDir>[/\\\\]node_modules[/\\\\](?!react-dnd|dnd-core|@react-dnd|react-dnd-scrolling|react-dnd-html5-backend|age-encryption|@noble)",
   ],
   modulePaths: ["<rootDir>/src"],
   moduleNameMapper: {

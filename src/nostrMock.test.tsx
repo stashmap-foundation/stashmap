@@ -12,6 +12,17 @@ import {
 } from "nostr-tools";
 import { v4 } from "uuid";
 import { KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT } from "./nostr";
+import { decryptStorageEvent } from "./storageEncryption";
+
+// Storage events cross the mock relay encrypted, but parts of the test
+// harness (route resolution, fork helpers) need the plaintext view. The
+// pool keeps a decrypted shadow of every published event, opened with the
+// fixture keypairs registered here (utils.test registers ALICE/BOB/CAROL).
+// eslint-disable-next-line functional/no-let
+let storageDecryptUsers: ReadonlyArray<User> = [];
+export function registerStorageDecryptUsers(users: ReadonlyArray<User>): void {
+  storageDecryptUsers = users;
+}
 
 type SubscriptionRecord = {
   filters: Filter[];
@@ -25,6 +36,7 @@ type QueryRecord = {
 
 export type MockRelayPool = SimplePool & {
   getEvents: () => Array<Event & { relays?: string[] }>;
+  getDecryptedEvents: () => Array<Event & EventAttachment>;
   getPublishedOnRelays: () => Array<string>;
   resetPublishedOnRelays: () => void;
   getSubscriptions: () => Array<SubscriptionRecord>;
@@ -90,6 +102,18 @@ export function mockRelayPool(): MockRelayPool {
   // eslint-disable-next-line functional/no-let
   let queryRecords = Map<string, QueryRecord>();
   const events: Array<Event & { relays?: string[] }> = [];
+  const decryptedEvents: Array<Event & EventAttachment> = [];
+
+  const addToDecryptedShadow = async (event: Event): Promise<void> => {
+    const author = storageDecryptUsers.find(
+      (user) => user.publicKey === event.pubkey
+    );
+    const opened = await decryptStorageEvent(event, author, []);
+    if (opened) {
+      // eslint-disable-next-line functional/immutable-data
+      decryptedEvents.push(opened as Event & EventAttachment);
+    }
+  };
 
   return {
     subscribeMany: (
@@ -126,9 +150,11 @@ export function mockRelayPool(): MockRelayPool {
       events.push({ ...event, relays });
       publishedOnRelays = Set([...publishedOnRelays, ...relays]).toArray();
       act(() => broadcastEvent(subs, event));
-      return relays.map(() => Promise.resolve(""));
+      const shadowed = addToDecryptedShadow(event);
+      return relays.map(() => shadowed.then(() => ""));
     },
     getEvents: () => events,
+    getDecryptedEvents: () => decryptedEvents,
     getPublishedOnRelays: () => publishedOnRelays,
     resetPublishedOnRelays: () => {
       publishedOnRelays = [];

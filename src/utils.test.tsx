@@ -37,7 +37,11 @@ import { NostrBackendProvider } from "./infra/nostr/NostrBackendProvider";
 import { NostrDataProvider } from "./infra/nostr/NostrDataProvider";
 import { App } from "./App";
 import { DataContextProps } from "./DataContext";
-import { MockRelayPool, mockRelayPool } from "./nostrMock.test";
+import {
+  MockRelayPool,
+  mockRelayPool,
+  registerStorageDecryptUsers,
+} from "./nostrMock.test";
 import { isUserLoggedInWithSeed } from "./NostrAuthContext";
 import { AuthProvider } from "./AuthProvider";
 import { nodeText } from "./core/nodeSpans";
@@ -55,6 +59,12 @@ import { createEmptyGraphIndex } from "./graphIndex";
 import { buildNodeRouteUrl } from "./navigationUrl";
 import { decodePublicKeyInputSync } from "./infra/nostr/publicKeys";
 import { processEvents } from "./eventProcessing";
+import { KIND_KNOWLEDGE_DOCUMENT } from "./nostr";
+import {
+  buildStorageEnvelope,
+  decryptStorageEvent,
+  newStorageKey,
+} from "./storageEncryption";
 
 import { PaneIndexProvider } from "./SplitPanesContext";
 
@@ -97,6 +107,8 @@ export const CAROL: User = {
   publicKey: CAROL_PUBLIC_KEY,
   privateKey: hexToBytes(CAROL_PRIVATE_KEY),
 };
+
+registerStorageDecryptUsers([ALICE, BOB, CAROL]);
 
 export const TEST_RELAYS = [
   { url: "wss://relay.test.first.success/", read: true, write: true },
@@ -149,6 +161,58 @@ function finalizeEventWithoutWasm(
 export function mockFinalizeEvent(): FinalizeEvent {
   return (t: EventTemplate, secretKey: Uint8Array): VerifiedEvent =>
     finalizeEventWithoutWasm(t, secretKey);
+}
+
+// Wire storage events are encrypted; fixtures that represent relay state
+// must be too. Encrypts the event's content under a fresh (or given)
+// storage key wrapped for the author.
+export async function encryptStorageEventForTest<T extends { content: string }>(
+  author: User,
+  event: T,
+  storageKey: string = newStorageKey()
+): Promise<T> {
+  return {
+    ...event,
+    content: await buildStorageEnvelope(author, storageKey, event.content),
+  };
+}
+
+// Opens wire storage events the way the app does — as the author or through
+// capability keys — so tests can assert on published plaintext.
+export async function decryptStorageEventsForTest(
+  reader: User,
+  events: ReadonlyArray<Event | UnsignedEvent>,
+  capabilityKeys: ReadonlyArray<string> = []
+): Promise<Array<(Event | UnsignedEvent) & EventAttachment>> {
+  const opened = await Promise.all(
+    events.map((event) => decryptStorageEvent(event, reader, capabilityKeys))
+  );
+  return opened.filter(
+    (event): event is (Event | UnsignedEvent) & EventAttachment =>
+      event !== undefined
+  );
+}
+
+// The capability a share link would carry: the storage key of the author's
+// newest wire event for the document.
+export async function storageKeyForTest(
+  author: User,
+  events: ReadonlyArray<Event | UnsignedEvent>,
+  docId: string
+): Promise<string> {
+  const opened = await decryptStorageEventsForTest(
+    author,
+    events.filter(
+      (event) =>
+        event.kind === KIND_KNOWLEDGE_DOCUMENT &&
+        event.tags.some((tag) => tag[0] === "d" && tag[1] === docId)
+    )
+  );
+  const newest = opened[opened.length - 1];
+  if (!newest?.storageKey) {
+    throw new Error(`No storage key found for document ${docId}`);
+  }
+  return newest.storageKey;
 }
 
 type TestApis = Omit<Apis, "fileStore" | "relayPool"> & {
@@ -288,8 +352,9 @@ function normalizeTestInitialRoute(
       ? decodedSource ?? (querySource as PublicKey)
       : options.user?.publicKey || ALICE.publicKey;
   const eventKnowledgeDB = options.relayPool
-    ? processEvents(List(options.relayPool.getEvents())).get(eventAuthor)
-        ?.knowledgeDB
+    ? processEvents(List(options.relayPool.getDecryptedEvents())).get(
+        eventAuthor
+      )?.knowledgeDB
     : undefined;
   const nodes =
     options.knowledgeDBs.get(sourceId)?.nodes || eventKnowledgeDB?.nodes;
@@ -310,9 +375,32 @@ function normalizeTestInitialRoute(
     },
     undefined
   );
-  return targetNode
-    ? buildNodeRouteUrl(targetNode.id, querySource ?? LOCAL)
-    : route;
+  if (!targetNode) {
+    return route;
+  }
+  const url = buildNodeRouteUrl(targetNode.id, querySource ?? LOCAL);
+  if (!querySource || querySource === LOCAL) {
+    return url;
+  }
+  // A foreign source needs the capability a share link would carry: the
+  // storage key of the document holding the target node.
+  const rootNode =
+    targetNode.id === targetNode.root
+      ? targetNode
+      : nodes?.get(targetNode.root);
+  const docId = rootNode?.docId ?? rootNode?.id;
+  const capability = options.relayPool
+    ?.getDecryptedEvents()
+    .filter(
+      (event) =>
+        event.kind === KIND_KNOWLEDGE_DOCUMENT &&
+        event.pubkey === eventAuthor &&
+        event.tags.some((tag) => tag[0] === "d" && tag[1] === docId)
+    )
+    .map((event) => event.storageKey)
+    .filter((key): key is string => key !== undefined)
+    .pop();
+  return capability ? `${url}#key=${encodeURIComponent(capability)}` : url;
 }
 
 export function renderApis(
@@ -448,9 +536,9 @@ export async function forkOwnRoot(
   if (!author) {
     throw new Error("forkOwnRoot requires a logged-in user");
   }
-  const parsedDB = processEvents(List(utils.relayPool.getEvents())).get(
-    author
-  )?.knowledgeDB;
+  const parsedDB = processEvents(
+    List(utils.relayPool.getDecryptedEvents())
+  ).get(author)?.knowledgeDB;
   const knowledgeDB = parsedDB
     ? {
         ...parsedDB,

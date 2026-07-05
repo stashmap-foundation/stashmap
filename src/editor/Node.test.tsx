@@ -222,15 +222,20 @@ My Notes
     // Wait for the new node to appear
     await screen.findByLabelText("edit New Sibling");
 
-    // Verify a document event was sent with the newly created sibling.
+    // Verify a document event was sent with the newly created sibling —
+    // encrypted on the wire, plaintext only after opening it as the author.
     const events = utils.relayPool.getEvents();
     const documentEvents = events.filter(
       (e) => e.kind === KIND_KNOWLEDGE_DOCUMENT
     );
-    const eventWithSibling = documentEvents.find((e) =>
-      e.content.includes("New Sibling")
-    );
     expect(documentEvents.length).toBeGreaterThan(0);
+    expect(documentEvents.some((e) => e.content.includes("New Sibling"))).toBe(
+      false
+    );
+    const eventWithSibling = utils.relayPool
+      .getDecryptedEvents()
+      .filter((e) => e.kind === KIND_KNOWLEDGE_DOCUMENT)
+      .find((e) => e.content.includes("New Sibling"));
     expect(eventWithSibling).toBeTruthy();
   });
 

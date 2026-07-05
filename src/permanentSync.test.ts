@@ -18,6 +18,8 @@ import {
   toStoredDeleteRecord,
   toStoredDocumentRecord,
 } from "./permanentSync";
+import { buildStorageEnvelope, newStorageKey } from "./storageEncryption";
+import { BOB as BOB_KEYPAIR } from "./utils.test";
 
 jest.mock("./infra/nostr/cache/indexedDB", () => ({
   getSyncCheckpoint: jest.fn(),
@@ -287,6 +289,12 @@ test("startPermanentDocumentSync applies document events immediately", async () 
   indexedDBModule.getStoredDocument.mockResolvedValue(undefined);
   indexedDBModule.getStoredDelete.mockResolvedValue(undefined);
   indexedDBModule.getSyncCheckpoint.mockResolvedValue(undefined);
+  const storageKey = newStorageKey();
+  const envelope = await buildStorageEnvelope(
+    BOB_KEYPAIR,
+    storageKey,
+    "# Root"
+  );
   const subscribeMany = jest.fn(
     (
       _relayUrls: string[],
@@ -295,14 +303,14 @@ test("startPermanentDocumentSync applies document events immediately", async () 
     ) => {
       handlers.onevent({
         id: "doc-1",
-        pubkey: ALICE,
+        pubkey: BOB_KEYPAIR.publicKey,
         created_at: 10,
         kind: KIND_KNOWLEDGE_DOCUMENT,
         tags: [
           ["d", "root-1"],
           ["ms", "1234"],
         ],
-        content: "# Root",
+        content: envelope,
       } as unknown as Event);
       return { close: jest.fn() };
     }
@@ -312,7 +320,9 @@ test("startPermanentDocumentSync applies document events immediately", async () 
     db,
     relayPool: { subscribeMany } as unknown as import("nostr-tools").SimplePool,
     relayUrls: ["wss://relay.example"],
-    authors: [ALICE],
+    authors: [BOB_KEYPAIR.publicKey],
+    user: BOB_KEYPAIR,
+    capabilityKeys: [],
   });
 
   await new Promise((resolve) => {
@@ -320,8 +330,8 @@ test("startPermanentDocumentSync applies document events immediately", async () 
   });
 
   expect(indexedDBModule.putStoredDocument).toHaveBeenCalledWith(db, {
-    replaceableKey: `${KIND_KNOWLEDGE_DOCUMENT}:alice:root-1`,
-    author: ALICE,
+    replaceableKey: `${KIND_KNOWLEDGE_DOCUMENT}:${BOB_KEYPAIR.publicKey}:root-1`,
+    author: BOB_KEYPAIR.publicKey,
     eventId: "doc-1",
     dTag: "root-1",
     createdAt: 10,
@@ -331,6 +341,7 @@ test("startPermanentDocumentSync applies document events immediately", async () 
       ["d", "root-1"],
       ["ms", "1234"],
     ],
+    storageKey,
   });
   expect(indexedDBModule.putSyncCheckpoint).toHaveBeenCalled();
 });
@@ -361,6 +372,8 @@ test("startPermanentDocumentSync uses live limit-0 subscription and catch-up sub
     } as unknown as import("nostr-tools").SimplePool,
     relayUrls: ["wss://relay.example"],
     authors: [ALICE],
+    user: undefined,
+    capabilityKeys: [],
   });
 
   await new Promise((resolve) => {

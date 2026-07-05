@@ -45,7 +45,7 @@ async function uploadMarkdown(alice: UpdateState): Promise<KnowledgeData> {
     plan,
   });
 
-  const processed = processEvents(List(alice().relayPool.getEvents()));
+  const processed = processEvents(List(alice().relayPool.getDecryptedEvents()));
   const knowledgeDB = processed.get(
     requireUser(alice()).publicKey
   )?.knowledgeDB;

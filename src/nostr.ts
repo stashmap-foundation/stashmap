@@ -1,6 +1,11 @@
 export const KIND_SETTINGS = 11071;
 
-export const KIND_KNOWLEDGE_DOCUMENT = 34772;
+// Storage is encrypted on the wire: content is {"key": <nip44 to self>,
+// "data": <base64 age/scrypt ciphertext>} under a per-document storage key
+// (see storageEncryption.ts). 34775 replaces the plaintext 34772 — old
+// plaintext storage events are deliberately no longer read (pre-release,
+// no migration).
+export const KIND_KNOWLEDGE_DOCUMENT = 34775;
 export const KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT = 34773;
 // Deposits: published documents, tagged with the entities they are
 // published under. Distinct from storage (34772) so the same document can

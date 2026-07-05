@@ -488,9 +488,11 @@ Topic
     });
     await screen.findByText("READONLY");
 
+    // Alice's fork lives in a document Bob was never handed a key for, so
+    // its versions cannot reach him — encrypted storage closes the leak
+    // that used to surface [VO] +4 here.
     await expectTree(`
 [O] Topic
-  [VO] +4
     `);
   });
 

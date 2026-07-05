@@ -1,6 +1,7 @@
 import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ALICE, expectTree, renderApp, setup, type } from "../utils.test";
+import { clickRow } from "./Multiselect.testUtils";
 
 const FEED = [
   "BEGIN:VCALENDAR",
@@ -103,5 +104,85 @@ Salon
   // the link form's halves.
   expect(new Set(fetchedUrls)).toEqual(
     new Set(["https://scholarium.at/salon.ics"])
+  );
+});
+
+test("judging a projected entry materializes it with the judgment", async () => {
+  const [alice] = setup([ALICE]);
+  renderApp({
+    ...alice(),
+    fetchCalendarFeed: async () => FEED,
+  });
+
+  await type(
+    "Salon{Enter}{Tab}Termine https://scholarium.at/salon.ics{Escape}"
+  );
+  await userEvent.click(
+    await screen.findByLabelText(
+      "expand Termine https://scholarium.at/salon.ics"
+    )
+  );
+
+  await clickRow("14.07.2030 Sommerfest");
+  await userEvent.keyboard("!");
+
+  // Materialized with the judgment; the projected siblings stay computed.
+  await expectTree(
+    `
+Salon
+  Termine https://scholarium.at/salon.ics
+    {~} 01.01.2020 Founding seminar
+    {!} 14.07.2030 Sommerfest
+    ${dunbarText()}
+  `,
+    { showGutter: true }
+  );
+
+  // Survives a reload: the entry is real workspace content now (the
+  // expanded view state persists too, so no second expand click).
+  cleanup();
+  renderApp({ ...alice(), fetchCalendarFeed: async () => FEED });
+  await expectTree(
+    `
+Salon
+  Termine https://scholarium.at/salon.ics
+    {~} 01.01.2020 Founding seminar
+    {!} 14.07.2030 Sommerfest
+    ${dunbarText()}
+  `,
+    { showGutter: true }
+  );
+});
+
+test("multiselect judgment materializes projected and spares untouched", async () => {
+  const [alice] = setup([ALICE]);
+  renderApp({
+    ...alice(),
+    fetchCalendarFeed: async () => FEED,
+  });
+
+  await type(
+    "Salon{Enter}{Tab}Termine https://scholarium.at/salon.ics{Escape}"
+  );
+  await userEvent.click(
+    await screen.findByLabelText(
+      "expand Termine https://scholarium.at/salon.ics"
+    )
+  );
+
+  // Select the two future entries (shift-j extends the selection down).
+  await clickRow("14.07.2030 Sommerfest");
+  await userEvent.keyboard("{Shift>}j{/Shift}");
+  await userEvent.keyboard("?");
+
+  await expectTree(
+    `
+Salon
+  Termine https://scholarium.at/salon.ics
+    {~} 01.01.2020 Founding seminar
+    {?} 14.07.2030 Sommerfest
+    {?} ${dunbarText()}
+  `,
+    { showGutter: true }
   );
 });

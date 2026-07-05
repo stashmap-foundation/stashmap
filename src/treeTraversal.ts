@@ -458,7 +458,8 @@ function createProjectionRow(
   parentRow: Row,
   parentNode: GraphNode,
   parentSourceId: SourceId,
-  entry: IcalEntry
+  entry: IcalEntry,
+  precededBy: ID[]
 ): Row {
   const node: GraphNode = {
     children: List<ID>(),
@@ -473,7 +474,7 @@ function createProjectionRow(
   };
   const parentPath = addNodesToLastElement(parentRow.viewPath, parentNode.id);
   const viewPath = appendNodeToPath(parentPath, node.id);
-  return createRow(
+  const row = createRow(
     data,
     graph,
     viewPath,
@@ -487,6 +488,7 @@ function createProjectionRow(
     undefined,
     undefined
   );
+  return { ...row, materialize: { precededBy } };
 }
 
 // The machine-feeds merge at row level: children keep document order,
@@ -509,8 +511,13 @@ function interleaveProjectionRows(
   }
   const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
   const merged = mergeProjectedEntries(parentNode.children.toArray(), entries);
-  return List(
-    merged.flatMap((item) => {
+  // Nearest-first anchors of everything displayed above, materialized or
+  // not — ids are deterministic, so an anchor may reference a row that
+  // doesn't exist yet. Projections obey the marker filters like every
+  // row — the ~ proposal on past entries makes the existing filter the
+  // way to fold the past away.
+  const { rows } = merged.reduce<{ rows: Row[]; precededBy: ID[] }>(
+    (acc, item) => {
       if (item.kind === "projection") {
         const row = createProjectionRow(
           data,
@@ -518,17 +525,25 @@ function interleaveProjectionRows(
           parentRow,
           parentNode,
           parentSourceId,
-          item.entry
+          item.entry,
+          acc.precededBy
         );
-        // Projections obey the marker filters like every row — the ~
-        // proposal on past entries makes the existing filter the way to
-        // fold the past away.
-        return itemPassesFilters(row.node, activeFilters) ? [row] : [];
+        return {
+          rows: itemPassesFilters(row.node, activeFilters)
+            ? [...acc.rows, row]
+            : acc.rows,
+          precededBy: [item.entry.id as ID, ...acc.precededBy],
+        };
       }
       const row = rowsByChildId.get(item.childId as ID);
-      return row ? [row] : [];
-    })
+      return {
+        rows: row ? [...acc.rows, row] : acc.rows,
+        precededBy: [item.childId as ID, ...acc.precededBy],
+      };
+    },
+    { rows: [], precededBy: [] }
   );
+  return List(rows);
 }
 
 function appendVirtualFooterRows(

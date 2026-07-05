@@ -19,7 +19,13 @@ import { icalFeedLinkText, isBareIcalFeedUrl } from "./ical";
 import { getWorkspaceNode, withWorkspace, workspaceOf } from "./knowledge";
 import { PublishState, withPublishState } from "./knowstrFrontmatter";
 import { newGraphNode } from "./nodeFactory";
-import { fileLinkSpan, linkSpan, nodeText, plainSpans } from "./nodeSpans";
+import {
+  fileLinkSpan,
+  getBlockLinkTarget,
+  linkSpan,
+  nodeText,
+  plainSpans,
+} from "./nodeSpans";
 import {
   LOG_ROOT_ROLE,
   getOwnSystemRoot,
@@ -523,6 +529,97 @@ export function createGraphPlan(props: CreateGraphPlanProps): GraphPlan {
     affectedDocuments: ImmutableSet<string>(),
     deletedDocs: ImmutableSet<string>(),
   };
+}
+
+// The materialization seam (idea.md: write gestures take first; the
+// canonical-id law). A computed row proposes — plain data: its synthetic
+// node, its parent, and nearest-first anchors of the display rows above
+// it — and the workspace disposes: id absent → mint the node at the
+// anchor position; id homed elsewhere → a link row targeting it; id
+// already under this parent → no-op (stale row). Overlay-agnostic: the
+// interpreter never learns what produced the row.
+export type MaterializableRow = {
+  node: GraphNode;
+  parentRef?: NodeRef;
+  materialize?: { precededBy: ID[] };
+};
+
+function materializeInsertIndex(
+  plan: GraphPlan,
+  parentNode: GraphNode,
+  precededBy: ID[]
+): number {
+  const matchesAnchor = (childId: ID, anchor: ID): boolean => {
+    if (childId === anchor) return true;
+    const child = getWorkspaceNode(plan.knowledgeDBs, childId);
+    return getBlockLinkTarget(child) === anchor;
+  };
+  const children = parentNode.children.toArray();
+  const found = precededBy
+    .map((anchor) =>
+      children.findIndex((childId) => matchesAnchor(childId, anchor))
+    )
+    .find((index) => index >= 0);
+  return found !== undefined ? found + 1 : 0;
+}
+
+export function planMaterializeComputedRow<T extends GraphPlan>(
+  plan: T,
+  row: MaterializableRow,
+  metadata?: { relevance?: Relevance; argument?: Argument }
+): [T, GraphNode, boolean] {
+  const parentID = row.parentRef?.id;
+  if (!row.materialize || parentID === undefined) {
+    return [plan, row.node, false];
+  }
+  const parentNode = getWorkspaceNode(plan.knowledgeDBs, parentID);
+  if (!parentNode) {
+    return [plan, row.node, false];
+  }
+  if (parentNode.children.includes(row.node.id)) {
+    const already = getWorkspaceNode(plan.knowledgeDBs, row.node.id);
+    return [plan, already ?? row.node, false];
+  }
+  const insertIndex = materializeInsertIndex(
+    plan,
+    parentNode,
+    row.materialize.precededBy
+  );
+  const existing = getWorkspaceNode(plan.knowledgeDBs, row.node.id);
+  if (existing) {
+    // Homed elsewhere: this placement becomes a link row (mint or link,
+    // never duplicate) and the gesture applies to the link — judgment at
+    // a placement is placement-local.
+    const [planWithLink, ids] = planAddTargetsToNode(
+      plan,
+      parentID,
+      { targetID: row.node.id, linkText: nodeText(existing) },
+      insertIndex,
+      metadata?.relevance,
+      metadata?.argument
+    );
+    const linkNode = getWorkspaceNode(planWithLink.knowledgeDBs, ids[0]);
+    return [planWithLink, linkNode ?? row.node, true];
+  }
+  const minted: GraphNode = {
+    ...row.node,
+    parent: parentID,
+    root: parentNode.root,
+    updated: Date.now(),
+    ...(metadata?.relevance !== undefined && {
+      relevance: metadata.relevance,
+    }),
+    ...(metadata?.argument !== undefined && { argument: metadata.argument }),
+  };
+  const planWithNode = planUpsertNodes(plan, minted);
+  const [planAttached] = planAddTargetsToNode(
+    planWithNode,
+    parentID,
+    minted.id,
+    insertIndex
+  );
+  const node = getWorkspaceNode(planAttached.knowledgeDBs, minted.id);
+  return [planAttached, node ?? minted, true];
 }
 
 export type AddToParentTarget =

@@ -199,6 +199,11 @@ declare global {
     parentChildIndex: number | undefined;
     childIndex: number | undefined;
     hasChildren: boolean;
+    // The materialization recipe (idea.md: write gestures take first).
+    // Plain data attached by the row's producer: nearest-first ids of the
+    // display rows above it under the same parent. Present = the row is
+    // computed and a write gesture must materialize it first.
+    materialize?: { precededBy: ID[] };
     isFirstVirtual: boolean;
     virtualType: "suggestion" | "search" | "incoming" | "version" | undefined;
     versionMeta:

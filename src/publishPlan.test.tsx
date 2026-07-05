@@ -4,7 +4,7 @@ import { newGraphNode } from "./core/nodeFactory";
 import type { Document } from "./core/Document";
 import {
   unpublishedLinkTarget,
-  documentEntityCandidates,
+  documentEntityLadder,
 } from "./editor/publishReach";
 import {
   createPlan,
@@ -278,7 +278,7 @@ test("marker created under a parent becomes a link row, never a duplicate", () =
   ).toBeUndefined();
 });
 
-test("link placements feed the publish candidates", () => {
+test("link placements feed the publish ladder", () => {
   const { plan, docId, rootId } = planWithEssay();
   const parent = plan.knowledgeDBs.get(LOCAL)?.nodes.get(rootId);
   if (!parent) {
@@ -294,7 +294,47 @@ test("link placements feed the publish candidates", () => {
   if (!document) {
     throw new Error("document missing");
   }
-  expect(documentEntityCandidates(pasted.knowledgeDBs, document)).toContain(
+  expect(documentEntityLadder(pasted.knowledgeDBs, document)).toContain(
     `asset:${CONTRACT_ID}`
   );
+});
+
+test("the ladder reads through link targets with full context sets", () => {
+  const [alice] = setup([ALICE]);
+  const [plan] = planCreateNodesFromMarkdown(
+    createPlan(alice()),
+    [
+      "# Travel",
+      "",
+      "- [Barcelona](#wd:Q1492)",
+      "  - [Sagrada Familia](#wd:Q48435)",
+      "    - I want to see it",
+      "  - Book flights",
+    ].join("\n")
+  );
+  const document = plan.documents.first(undefined);
+  if (!document) {
+    throw new Error("document missing");
+  }
+  const rungs = documentEntityLadder(plan.knowledgeDBs, document);
+  expect([...rungs].sort()).toEqual(["wd:Q1492", "wd:Q1492 wd:Q48435"]);
+});
+
+test("rungs are order-independent: sorted, space-joined sets", () => {
+  const [alice] = setup([ALICE]);
+  const [plan] = planCreateNodesFromMarkdown(
+    createPlan(alice()),
+    [
+      "# Notes",
+      "",
+      "- [Sagrada Familia](#wd:Q48435)",
+      "  - [Barcelona](#wd:Q1492)",
+    ].join("\n")
+  );
+  const document = plan.documents.first(undefined);
+  if (!document) {
+    throw new Error("document missing");
+  }
+  const rungs = documentEntityLadder(plan.knowledgeDBs, document);
+  expect([...rungs].sort()).toEqual(["wd:Q1492 wd:Q48435", "wd:Q48435"]);
 });

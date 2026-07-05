@@ -11,11 +11,17 @@ import {
 import { getNode } from "../core/connections";
 import { publishStateOf } from "../core/knowstrFrontmatter";
 
-// Contained canonical entities: nodes of this document whose own ids —
-// or whose link targets — carry an entity scheme. Pasting an entity's
-// marker into a document (which creates a link row under E3's mint-or-link
-// rule) is one of the three gestures that put the document into a context.
-export function documentEntityCandidates(
+// The identified-context ladder (idea.md, Entities): one rung per
+// identified node in the document — a node whose own id, or whose link
+// target, carries an entity scheme. Each rung is that node's full context
+// set (every identified ancestor on its path plus itself), deduplicated,
+// sorted, space-joined; sorting makes rungs order-independent, and a
+// joined rung is a precomputed AND that only context-sharers derive.
+// `- [Barcelona] / - [Sagrada Familia] / - I want to see it` yields
+// `wd:Q1492` and `wd:Q1492 wd:Q48435` — linear in chain depth, never a
+// power set. The ladder reads THROUGH link targets: identification comes
+// from the target id, traversal stays within this document's tree.
+export function documentEntityLadder(
   knowledgeDBs: KnowledgeDBs,
   document: Document
 ): string[] {
@@ -23,25 +29,28 @@ export function documentEntityCandidates(
   if (!nodes) {
     return [];
   }
-  return [
-    ...new Set(
-      nodes
-        .valueSeq()
-        .toArray()
-        .filter(
-          (node) =>
-            document.topNodeShortIds.includes(node.id) ||
-            document.topNodeShortIds.includes(node.root)
-        )
-        .flatMap((node) => {
-          const own = ENTITY_SCHEME_RE.test(node.id) ? [node.id as string] : [];
-          const target = getBlockLinkTarget(node);
-          const viaLink =
-            target && ENTITY_SCHEME_RE.test(target) ? [target as string] : [];
-          return [...own, ...viaLink];
-        })
-    ),
-  ];
+  const entityOf = (node: GraphNode): string | undefined => {
+    if (ENTITY_SCHEME_RE.test(node.id)) {
+      return node.id;
+    }
+    const target = getBlockLinkTarget(node);
+    return target && ENTITY_SCHEME_RE.test(target) ? target : undefined;
+  };
+  const rungs = new Set<string>();
+  const walk = (nodeId: ID, context: ReadonlySet<string>): void => {
+    const node = nodes.get(nodeId);
+    if (!node) {
+      return;
+    }
+    const entity = entityOf(node);
+    const next = entity ? new Set([...context, entity]) : context;
+    if (entity) {
+      rungs.add([...next].sort().join(" "));
+    }
+    node.children.forEach((childId) => walk(childId, next));
+  };
+  document.topNodeShortIds.forEach((id) => walk(id as ID, new Set<string>()));
+  return [...rungs];
 }
 
 // The "not shared here" chip: a link row inside a published document whose

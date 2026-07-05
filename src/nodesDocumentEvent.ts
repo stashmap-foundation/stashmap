@@ -46,6 +46,15 @@ export function depositEntityTags(document: Document): string[] {
   return [...new Set([...document.topNodeShortIds, ...entities])];
 }
 
+// Whether any tag involves an asset entity. Ladder rungs are space-joined
+// sets, so the asset id can sit anywhere inside a rung, not only at the
+// start of a bare tag.
+export function hasAssetEntityTag(tags: string[]): boolean {
+  return tags.some((tag) =>
+    tag.split(" ").some((id) => id.startsWith("asset:"))
+  );
+}
+
 export function buildDepositEvent(
   document: Document,
   pubkey: PublicKey,
@@ -80,9 +89,7 @@ export function depositWriteRelayConf(
   assetRelay: string | undefined = ASSET_ENTITY_RELAY
 ): WriteRelayConf {
   const declared = publishStateOf(document.frontMatter)?.relays;
-  const hasAssetEntity = depositEntityTags(document).some((tag) =>
-    tag.startsWith("asset:")
-  );
+  const hasAssetEntity = hasAssetEntityTag(depositEntityTags(document));
   const scheme = assetRelay && hasAssetEntity ? [assetRelay] : [];
   const toRelay = (url: string): Relay => ({ url, read: false, write: true });
   if (declared !== undefined) {

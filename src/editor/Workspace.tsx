@@ -8,10 +8,10 @@ import { useUserRelayContext } from "../UserRelayContext";
 import { useBackend } from "../BackendContext";
 import { getWriteRelays } from "../relayUtils";
 import { ASSET_ENTITY_RELAY, DEFAULT_RELAYS } from "../nostr";
-import { depositEntityTags } from "../nodesDocumentEvent";
+import { depositEntityTags, hasAssetEntityTag } from "../nodesDocumentEvent";
 import { publishStateOf, type PublishState } from "../core/knowstrFrontmatter";
 import { getNodeDocumentId, planSetDocumentPublishState } from "../core/plan";
-import { documentEntityCandidates } from "./publishReach";
+import { documentEntityLadder } from "./publishReach";
 import { TemporaryViewProvider, useTemporaryView } from "./temporaryViewState";
 
 import { getDisplayTextForRow, getIndependentRows } from "../rowModel";
@@ -565,9 +565,7 @@ function PublishButton(): JSX.Element | null {
     configured.length > 0
       ? configured
       : getWriteRelays(DEFAULT_RELAYS).map((relay) => relay.url);
-  const hasAssetEntity = depositEntityTags(document).some((tag) =>
-    tag.startsWith("asset:")
-  );
+  const hasAssetEntity = hasAssetEntityTag(depositEntityTags(document));
   const baseline = hasAssetEntity ? [ASSET_ENTITY_RELAY] : configuredOrDefault;
   const declared = state?.relays;
   const effective = declared !== undefined ? declared : baseline;
@@ -596,7 +594,7 @@ function PublishButton(): JSX.Element | null {
       entities: [
         ...new Set([
           ...(state?.entities ?? []),
-          ...documentEntityCandidates(data.knowledgeDBs, document),
+          ...documentEntityLadder(data.knowledgeDBs, document),
         ]),
       ],
       relays: state?.relays,

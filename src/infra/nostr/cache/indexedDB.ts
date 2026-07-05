@@ -32,6 +32,7 @@ export type StoredDocumentRecord = {
   readonly content: string;
   readonly tags: string[][];
   readonly filePath?: string;
+  readonly storageKey?: string;
 };
 
 export type StoredDeleteRecord = {

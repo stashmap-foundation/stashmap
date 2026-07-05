@@ -101,6 +101,10 @@ declare global {
 
   type EventAttachment = {
     writeRelayConf?: WriteRelayConf;
+    // Per-document storage encryption key, carried alongside the event while
+    // it travels inside the app (plaintext internally). The publish seam
+    // encrypts the content with it and never signs it into the wire event.
+    storageKey?: string;
   };
 
   type TemporaryEvent =

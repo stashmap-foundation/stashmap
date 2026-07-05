@@ -23,6 +23,10 @@ export type Document = {
   filePath?: string;
   relativePath?: string;
   systemRole?: RootSystemRole;
+  // Per-document storage encryption key (nostr storage only; filesystem
+  // documents never carry one). Absent until the document first rides a
+  // storage event.
+  storageKey?: string;
 };
 
 export type ParsedDocument = {

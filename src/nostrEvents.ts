@@ -70,7 +70,7 @@ export function sanitizeAuthorsFilter(filter: Filter): Filter {
 }
 
 export function eventToParsed(
-  event: Event | UnsignedEvent
+  event: (Event | UnsignedEvent) & EventAttachment
 ): ParsedDocument | undefined {
   if (event.kind !== KIND_KNOWLEDGE_DOCUMENT) return undefined;
   const dTag = findTag(event, "d");
@@ -83,7 +83,11 @@ export function eventToParsed(
       ? { systemRoleOverride: "log" as RootSystemRole }
       : {}),
   });
-  return { document: parsed.document, nodes: parsed.nodes };
+  const { storageKey } = event;
+  return {
+    document: storageKey ? { ...parsed.document, storageKey } : parsed.document,
+    nodes: parsed.nodes,
+  };
 }
 
 export function eventToDocumentDelete(

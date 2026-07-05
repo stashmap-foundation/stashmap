@@ -41,7 +41,7 @@ export async function signEvents(
     ? List<SignedEventWithConf>(
         await Promise.all(
           events.map(async (e) => {
-            const { writeRelayConf, ...template } = e;
+            const { writeRelayConf, storageKey, ...template } = e;
             const signedEvent = await signEventWithExtension(template);
             return {
               event: signedEvent as VerifiedEvent,
@@ -51,7 +51,7 @@ export async function signEvents(
         )
       )
     : events.map((e) => {
-        const { writeRelayConf, ...template } = e;
+        const { writeRelayConf, storageKey, ...template } = e;
         const event = finalizeEvent(
           template,
           (user as KeyPair).privateKey

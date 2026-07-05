@@ -3,6 +3,7 @@ import { sha256 } from "@noble/hashes/sha256";
 import { bytesToHex } from "@noble/hashes/utils";
 import type { Document } from "./core/Document";
 import { publishStateOf } from "./core/knowstrFrontmatter";
+import { newStorageKey } from "./storageEncryption";
 import { getWriteRelays } from "./relayUtils";
 import {
   ASSET_ENTITY_RELAY,
@@ -25,7 +26,7 @@ export function buildDocumentEvent(
   document: Document,
   pubkey: PublicKey,
   content: string
-): UnsignedEvent {
+): UnsignedEvent & EventAttachment {
   const systemRoleTags = document.systemRole
     ? ([["s", document.systemRole]] as string[][])
     : [];
@@ -35,6 +36,7 @@ export function buildDocumentEvent(
     created_at: newTimestamp(),
     tags: [["d", document.docId], ...systemRoleTags, msTag()],
     content,
+    storageKey: document.storageKey ?? newStorageKey(),
   };
 }
 
@@ -110,7 +112,7 @@ export function depositWriteRelayConf(
 export function buildSnapshotEvent(
   snapshotAuthor: PublicKey,
   content: string
-): UnsignedEvent {
+): UnsignedEvent & EventAttachment {
   return {
     kind: KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
     pubkey: snapshotAuthor,

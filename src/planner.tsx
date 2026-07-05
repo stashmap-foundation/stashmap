@@ -780,15 +780,12 @@ export function buildDocumentEvents(
   const pubkey = plan.user.publicKey;
   const withUpserts = buildDocumentWrites(plan).reduce((events, write) => {
     const snapshotEvent = write.snapshotContent
-      ? (buildSnapshotEvent(pubkey, write.snapshotContent) as UnsignedEvent &
-          EventAttachment)
+      ? buildSnapshotEvent(pubkey, write.snapshotContent)
       : undefined;
     const event = buildDocumentEvent(write.document, pubkey, write.content);
     const depositEvent = depositEventFor(plan, pubkey, write);
     const withSnapshot = snapshotEvent ? events.push(snapshotEvent) : events;
-    const withDocument = withSnapshot.push(
-      event as UnsignedEvent & EventAttachment
-    );
+    const withDocument = withSnapshot.push(event);
     return depositEvent ? withDocument.push(depositEvent) : withDocument;
   }, plan.publishEvents);
   return plan.deletedDocs.reduce((events, docId) => {

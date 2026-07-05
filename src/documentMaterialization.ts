@@ -12,13 +12,16 @@ import { eventToParsed, findTag, getEventMs, sortEvents } from "./nostrEvents";
 
 export function storedDocumentToEvent(
   document: StoredDocumentRecord
-): UnsignedEvent {
+): UnsignedEvent & EventAttachment {
   return {
     pubkey: document.author,
     created_at: document.createdAt,
     kind: KIND_KNOWLEDGE_DOCUMENT,
     tags: document.tags,
     content: document.content,
+    ...(document.storageKey !== undefined && {
+      storageKey: document.storageKey,
+    }),
   };
 }
 

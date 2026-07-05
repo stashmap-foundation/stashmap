@@ -35,6 +35,42 @@ module.exports = {
     historyApiFallback: {
       disableDotRule: true,
     },
+    // Dev twin of netlify/functions/ical-proxy.mjs: calendar feeds are
+    // fetched server-side so the browser never hits CORS.
+    setupMiddlewares: (middlewares, devServer) => {
+      devServer.app.get(
+        "/.netlify/functions/ical-proxy",
+        async (request, response) => {
+          const raw = request.query.url;
+          if (!raw) {
+            response.status(400).send("missing url parameter");
+            return;
+          }
+          try {
+            const target = new URL(
+              String(raw).replace(/^webcal:\/\//u, "https://")
+            );
+            if (target.protocol !== "https:" && target.protocol !== "http:") {
+              response.status(400).send("unsupported scheme");
+              return;
+            }
+            const upstream = await fetch(target, {
+              signal: AbortSignal.timeout(10000),
+            });
+            if (!upstream.ok) {
+              response.status(502).send(`upstream status ${upstream.status}`);
+              return;
+            }
+            response
+              .set("content-type", "text/calendar; charset=utf-8")
+              .send(await upstream.text());
+          } catch (error) {
+            response.status(502).send("upstream fetch failed");
+          }
+        }
+      );
+      return middlewares;
+    },
   },
   module: {
     rules: [

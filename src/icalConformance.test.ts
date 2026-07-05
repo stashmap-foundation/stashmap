@@ -142,6 +142,20 @@ describe("mergeProjectedEntries", () => {
     ]);
   });
 
+  test("a note after an entry keeps its slot; projections follow the segment", () => {
+    // children: [a, note]; feed: a, b — b anchors to a but emits after
+    // a's segment (the note), not between them.
+    const items = mergeProjectedEntries(
+      ["a", "note"],
+      [entry("a"), entry("b")]
+    );
+    expect(items).toEqual([
+      { kind: "child", childId: "a" },
+      { kind: "child", childId: "note" },
+      { kind: "projection", entry: entry("b") },
+    ]);
+  });
+
   test("reordered materialized entries win over feed order", () => {
     // Feed a,b — user materialized both and swapped them.
     const items = mergeProjectedEntries(

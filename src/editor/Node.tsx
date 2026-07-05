@@ -48,6 +48,7 @@ import { MiniEditor, preventEditorBlur } from "./AddNode";
 import { useOnToggleExpanded } from "./SelectNodes";
 import { useData } from "../DataContext";
 import { planMaterializeComputedRow } from "../core/plan";
+import { getWorkspaceNode } from "../core/knowledge";
 import {
   Plan,
   usePlanner,
@@ -449,7 +450,13 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       if (!row.materialize) {
         return createPlan();
       }
-      if (withFeedUrl(text).trim() === nodeText(row.node).trim()) {
+      // Enter is a write gesture (it opens a position below — the row
+      // materializes, per the machine-feeds law); plain blur/Escape with
+      // unchanged text reads only.
+      if (
+        !submitted &&
+        withFeedUrl(text).trim() === nodeText(row.node).trim()
+      ) {
         return undefined;
       }
       const [plan] = planMaterializeComputedRow(createPlan(), row);
@@ -499,11 +506,19 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       if (!parentRow) {
         return undefined;
       }
+      // A freshly materialized row has no childIndex; its real position
+      // comes from the plan's current children.
+      const insertAt = (() => {
+        if (nodeIndex !== undefined) return nodeIndex + 1;
+        const parent = getWorkspaceNode(basePlan.knowledgeDBs, parentNode.id);
+        const index = parent ? parent.children.indexOf(savedNode.id) : -1;
+        return index >= 0 ? index + 1 : 0;
+      })();
       return {
         parentNode,
         parentView: parentRow.view,
         parentViewPath: parentRow.viewPath,
-        insertAt: (nodeIndex ?? 0) + 1,
+        insertAt,
       };
     })();
 
@@ -534,9 +549,14 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
     if (isEmptyNode) {
       if (!prevSibling || !parentPath) return;
       if (isBlockLinkAny(prevSibling.node)) return;
+      // Indenting onto a computed row takes it first.
+      const [planMaterialized] = planMaterializeComputedRow(
+        basePlan,
+        prevSibling
+      );
       const planWithoutEmpty = parentNode
-        ? planRemoveEmptyNodePosition(basePlan, parentNode.id)
-        : basePlan;
+        ? planRemoveEmptyNodePosition(planMaterialized, parentNode.id)
+        : planMaterialized;
       const planWithExpand = planExpandNode(
         planWithoutEmpty,
         prevSibling.view,

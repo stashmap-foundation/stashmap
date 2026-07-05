@@ -29,6 +29,7 @@ import {
   AddToParentTarget,
 } from "./planner";
 import { planMoveNode } from "./treeMutations";
+import { planMaterializeComputedRow } from "./core/plan";
 
 type DragSource = {
   row: Row;
@@ -114,26 +115,55 @@ function getDropDestinationEndOfVisibleRoot(
     : undefined;
 }
 
+// A computed row has no childIndex; its drop position derives from the
+// nearest preceding PLACED sibling in display order — your arrangement
+// wins where displayed, the merge re-slots the projections around it.
+function placedIndexAfter(rows: List<Row>, row: Row): number {
+  const previousPlaced = rows
+    .slice(0, row.index)
+    .reverse()
+    .find(
+      (candidate) =>
+        candidate.childIndex !== undefined &&
+        candidate.parentRef?.sourceId === row.parentRef?.sourceId &&
+        candidate.parentRef?.id === row.parentRef?.id
+    );
+  return previousPlaced?.childIndex !== undefined
+    ? previousPlaced.childIndex + 1
+    : 0;
+}
+
+type DropDestination = {
+  parentRow: Row;
+  insertAtIndex: number;
+  // The display row the insertion conceptually follows. When it is a
+  // computed row, the drop materializes it — arranging something
+  // relative to an entry is touching it.
+  anchorRow?: Row;
+};
+
 function getInsertAfterRow(
   rows: List<Row>,
   row: Row
-): { parentRow: Row; insertAtIndex: number } | undefined {
+): DropDestination | undefined {
   if (!row.parentRef) {
     return {
       parentRow: row,
       insertAtIndex: row.node.children.size || 0,
     };
   }
-  if (row.childIndex === undefined) {
+  const parentRow = getVisibleParentRow(rows, row);
+  if (!parentRow) {
     return undefined;
   }
-  const parentRow = getVisibleParentRow(rows, row);
-  return parentRow
-    ? {
-        parentRow,
-        insertAtIndex: row.childIndex + 1,
-      }
-    : undefined;
+  return {
+    parentRow,
+    insertAtIndex:
+      row.childIndex !== undefined
+        ? row.childIndex + 1
+        : placedIndexAfter(rows, row),
+    anchorRow: row,
+  };
 }
 
 function getAncestorAtDepth(
@@ -157,14 +187,24 @@ function getAncestorAtDepth(
 function getDropBeforeParentDestination(
   rows: List<Row>,
   dropBefore: Row
-): { parentRow: Row; insertAtIndex: number } | undefined {
+): DropDestination | undefined {
   const parentRow = getVisibleParentRow(rows, dropBefore);
   if (!parentRow) {
     return getDropDestinationEndOfVisibleRoot(rows);
   }
+  // Inserting before a row = after its display predecessor under the
+  // same parent, which may be a computed row.
+  const displayPredecessor = rows.get(dropBefore.index - 1);
+  const anchorRow =
+    displayPredecessor &&
+    displayPredecessor.parentRef?.sourceId === dropBefore.parentRef?.sourceId &&
+    displayPredecessor.parentRef?.id === dropBefore.parentRef?.id
+      ? displayPredecessor
+      : undefined;
   return {
     parentRow,
-    insertAtIndex: dropBefore.childIndex ?? parentRow.node.children.size,
+    insertAtIndex: dropBefore.childIndex ?? placedIndexAfter(rows, dropBefore),
+    anchorRow,
   };
 }
 
@@ -226,7 +266,7 @@ export function getDropDestinationFromRows(
   targetRow: Row,
   targetDepth: number | undefined,
   sources: Row[]
-): { parentRow: Row; insertAtIndex: number } | undefined {
+): DropDestination | undefined {
   const dropBefore = findNextNonDraggedRow(rows, targetRow.index + 1, sources);
 
   if (targetDepth !== undefined) {
@@ -278,13 +318,16 @@ function resolveDeepCopySource(
 }
 
 export function dnd(
-  plan: Plan,
+  basePlan: Plan,
   sourceDrag: DragSource,
   targetPaneIndex: number,
   targetParentRow: Row,
   dropIndex: number,
   invertCopyMode: boolean
 ): Plan {
+  // Dropping INTO a computed row takes it first — the drop target must
+  // exist before anything can attach to it.
+  const [plan] = planMaterializeComputedRow(basePlan, targetParentRow);
   const source = sourceDrag.row.viewKey;
   const sources = sourceDrag.draggedRows.length
     ? sourceDrag.draggedRows
@@ -335,6 +378,18 @@ export function dnd(
     sourceRow: Row,
     insertAt: number
   ): Plan => {
+    // A computed row with a materialization recipe drags as itself: it
+    // materializes at the drop position (mint-or-link decides whether
+    // that means the node or a link row to its home elsewhere).
+    if (sourceRow.materialize) {
+      const [materializedPlan] = planMaterializeComputedRow(
+        accPlan,
+        sourceRow,
+        undefined,
+        { parentID: targetParentRow.node.id, insertIndex: insertAt }
+      );
+      return materializedPlan;
+    }
     return planAddToParent(
       accPlan,
       createRefTarget(

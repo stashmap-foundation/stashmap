@@ -3,13 +3,16 @@ import { List, OrderedSet } from "immutable";
 import { ConnectDropTarget, DropTargetMonitor, useDrop } from "react-dnd";
 import { NativeTypes } from "react-dnd-html5-backend";
 import { dnd, getDropDestinationFromRows } from "../dnd";
-import { useTemporaryView } from "./temporaryViewState";
+import { planMaterializeComputedRow } from "../core/plan";
+import { getWorkspaceNode } from "../core/knowledge";
 import {
+  Plan,
   AddToParentTarget,
   planSetTemporarySelectionState,
   planUpdatePanes,
   usePlanner,
 } from "../planner";
+import { useTemporaryView } from "./temporaryViewState";
 import { buildPaneTarget } from "../rowModel";
 import { NOTE_TYPE, INDENTATION } from "./Node";
 import { usePaneIndex } from "../SplitPanesContext";
@@ -424,7 +427,6 @@ export function useDroppable({
         return item;
       }
       const dragItem = item;
-      const plan = createPlan();
       const dropDestination = getDropDestinationFromRows(
         rows,
         row,
@@ -434,12 +436,37 @@ export function useDroppable({
       if (!dropDestination) {
         return item;
       }
+      // Arranging something relative to a computed row touches it: the
+      // anchor materializes first and the drop lands right after it.
+      const [plan, dropIndex] = ((): [Plan, number] => {
+        const base = createPlan();
+        const anchor = dropDestination.anchorRow;
+        if (!anchor?.materialize) {
+          return [base, dropDestination.insertAtIndex];
+        }
+        const [materialized, anchorNode, materializedNow] =
+          planMaterializeComputedRow(base, anchor);
+        if (!materializedNow) {
+          return [base, dropDestination.insertAtIndex];
+        }
+        const parent = getWorkspaceNode(
+          materialized.knowledgeDBs,
+          dropDestination.parentRow.node.id
+        );
+        const anchorIndex = parent
+          ? parent.children.indexOf(anchorNode.id)
+          : -1;
+        return [
+          materialized,
+          anchorIndex >= 0 ? anchorIndex + 1 : dropDestination.insertAtIndex,
+        ];
+      })();
       const dropped = dnd(
         plan,
         dragItem,
         paneIndex,
         dropDestination.parentRow,
-        dropDestination.insertAtIndex,
+        dropIndex,
         invertCopyModeRef.current
       );
       executePlan(

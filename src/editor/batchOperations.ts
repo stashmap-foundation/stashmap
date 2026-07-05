@@ -228,8 +228,11 @@ export function planBatchIndent(
   if (!prevSibling) return undefined;
   if (isBlockLinkAny(prevSibling.node)) return undefined;
 
+  // Indenting onto a computed row takes it first.
+  const [planMaterialized] = planMaterializeComputedRow(plan, prevSibling);
+
   const planWithExpand = planExpandNode(
-    plan,
+    planMaterialized,
     prevSibling.view,
     prevSibling.viewPath
   );

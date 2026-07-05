@@ -566,9 +566,10 @@ function materializeInsertIndex(
 export function planMaterializeComputedRow<T extends GraphPlan>(
   plan: T,
   row: MaterializableRow,
-  metadata?: { relevance?: Relevance; argument?: Argument }
+  metadata?: { relevance?: Relevance; argument?: Argument },
+  placement?: { parentID?: ID; insertIndex?: number }
 ): [T, GraphNode, boolean] {
-  const parentID = row.parentRef?.id;
+  const parentID = placement?.parentID ?? row.parentRef?.id;
   if (!row.materialize || parentID === undefined) {
     return [plan, row.node, false];
   }
@@ -580,11 +581,9 @@ export function planMaterializeComputedRow<T extends GraphPlan>(
     const already = getWorkspaceNode(plan.knowledgeDBs, row.node.id);
     return [plan, already ?? row.node, false];
   }
-  const insertIndex = materializeInsertIndex(
-    plan,
-    parentNode,
-    row.materialize.precededBy
-  );
+  const insertIndex =
+    placement?.insertIndex ??
+    materializeInsertIndex(plan, parentNode, row.materialize.precededBy);
   const existing = getWorkspaceNode(plan.knowledgeDBs, row.node.id);
   if (existing) {
     // Homed elsewhere: this placement becomes a link row (mint or link,

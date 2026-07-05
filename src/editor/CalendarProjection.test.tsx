@@ -1,4 +1,4 @@
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ALICE, expectTree, renderApp, setup, type } from "../utils.test";
 import { clickRow } from "./Multiselect.testUtils";
@@ -182,6 +182,114 @@ Salon
     {~} 01.01.2020 Founding seminar
     {?} 14.07.2030 Sommerfest
     {?} ${dunbarText()}
+  `,
+    { showGutter: true }
+  );
+});
+
+test("writing under a projected entry materializes it with the note", async () => {
+  const [alice] = setup([ALICE]);
+  renderApp({
+    ...alice(),
+    fetchCalendarFeed: async () => FEED,
+  });
+
+  await type(
+    "Salon{Enter}{Tab}Termine https://scholarium.at/salon.ics{Escape}"
+  );
+  await userEvent.click(
+    await screen.findByLabelText(
+      "expand Termine https://scholarium.at/salon.ics"
+    )
+  );
+
+  // Focus the projected entry's editor, Enter to open a position below,
+  // Tab to indent under it, write the note.
+  await userEvent.click(
+    await screen.findByLabelText("edit 14.07.2030 Sommerfest")
+  );
+  await userEvent.keyboard("{Enter}{Tab}Excerpts we are going to read{Escape}");
+
+  await expectTree(
+    `
+Salon
+  Termine https://scholarium.at/salon.ics
+    {~} 01.01.2020 Founding seminar
+    14.07.2030 Sommerfest
+      Excerpts we are going to read
+    ${dunbarText()}
+  `,
+    { showGutter: true }
+  );
+
+  // Real content: survives reload.
+  cleanup();
+  renderApp({ ...alice(), fetchCalendarFeed: async () => FEED });
+  await expectTree(
+    `
+Salon
+  Termine https://scholarium.at/salon.ics
+    {~} 01.01.2020 Founding seminar
+    14.07.2030 Sommerfest
+      Excerpts we are going to read
+    ${dunbarText()}
+  `,
+    { showGutter: true }
+  );
+});
+
+function dragTextOnto(sourceText: string, targetText: string): void {
+  // Dropping on a row's text element means "into that row as a child".
+  const source = screen.getAllByText(sourceText)[0];
+  const target = screen.getAllByText(targetText)[0];
+  fireEvent.dragStart(source);
+  fireEvent.dragOver(target);
+  fireEvent.drop(target);
+}
+
+test("dnd both ways: projections drag as themselves and accept drops", async () => {
+  const [alice] = setup([ALICE]);
+  renderApp({
+    ...alice(),
+    fetchCalendarFeed: async () => FEED,
+  });
+
+  await type(
+    "Salon{Enter}{Tab}Termine https://scholarium.at/salon.ics{Enter}Notes{Escape}"
+  );
+  await userEvent.click(
+    await screen.findByLabelText(
+      "expand Termine https://scholarium.at/salon.ics"
+    )
+  );
+
+  // Drop a real row after a projected entry (drop-on-text inserts as a
+  // sibling): the anchor entry materializes and the note keeps its slot;
+  // the next projection follows the segment.
+  dragTextOnto("Notes", "14.07.2030 Sommerfest");
+  await expectTree(
+    `
+Salon
+  Termine https://scholarium.at/salon.ics
+    {~} 01.01.2020 Founding seminar
+    14.07.2030 Sommerfest
+    Notes
+    ${dunbarText()}
+  `,
+    { showGutter: true }
+  );
+
+  // Drag a still-projected entry to resort it: it materializes at the
+  // drop position, and the calendar projects no duplicate.
+  dragTextOnto(dunbarText(), "14.07.2030 Sommerfest");
+  await expectTree(
+    `
+Salon
+  Termine https://scholarium.at/salon.ics
+    {~} 01.01.2020 Founding seminar
+    14.07.2030 Sommerfest
+    ${dunbarText()}
+    Notes
   `,
     { showGutter: true }
   );

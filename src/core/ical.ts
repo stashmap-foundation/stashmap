@@ -243,12 +243,23 @@ export function mergeProjectedEntries(
     kind: "projection",
     entry,
   }));
+  const entryIds = new Set(entries.map((entry) => entry.id));
+  // Anchored projections emit after the anchor's SEGMENT — the anchor
+  // child plus its consecutive non-entry children (notes dropped right
+  // after an entry stay right after it; the next projection follows the
+  // segment, still after its feed predecessor).
+  let pending: IcalEntry[] = [];
   childIds.forEach((childId) => {
+    if (entryIds.has(childId) && pending.length > 0) {
+      pending.forEach((entry) => items.push({ kind: "projection", entry }));
+      pending = [];
+    }
     items.push({ kind: "child", childId });
-    (anchored.get(childId) ?? []).forEach((entry) =>
-      items.push({ kind: "projection", entry })
-    );
+    if (anchored.has(childId)) {
+      pending = [...pending, ...(anchored.get(childId) ?? [])];
+    }
   });
+  pending.forEach((entry) => items.push({ kind: "projection", entry }));
   return items;
 }
 

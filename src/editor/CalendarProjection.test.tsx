@@ -65,3 +65,31 @@ Salon
     { showGutter: true }
   );
 });
+
+test("bare feed urls wrap into the renameable link form", async () => {
+  const [alice] = setup([ALICE]);
+  renderApp({
+    ...alice(),
+    fetchCalendarFeed: async () => FEED,
+  });
+
+  await type("Salon{Enter}{Tab}https://scholarium.at/salon.ics{Escape}");
+
+  // The row displays the label (initially the URL); the raw text carries
+  // the link form — visible in the expand label — so renaming later never
+  // loses the feed.
+  await userEvent.click(
+    await screen.findByLabelText("expand https://scholarium.at/salon.ics")
+  );
+
+  await expectTree(
+    `
+Salon
+  https://scholarium.at/salon.ics
+    {~} 01.01.2020 Founding seminar
+    14.07.2030 Sommerfest
+    ${dunbarText()}
+  `,
+    { showGutter: true }
+  );
+});

@@ -14,6 +14,33 @@ export function icalFeedUrlOf(text: string): string | undefined {
   return match[0].replace(/[)\]}>,.]+$/u, "") || undefined;
 }
 
+const ICAL_FEED_LINK_RE =
+  /^\[([^\]]*)\]\((webcal:\/\/\S+|https?:\/\/\S+\.ics(\?\S*)?)\)$/iu;
+
+// The feed-as-link form: `[any name](https://…/feed.ics)` — text is yours,
+// identity lives in the parentheses, mirroring entity links. Returns the
+// renameable label and the feed URL.
+export function icalFeedLinkPartsOf(
+  text: string
+): { label: string; url: string } | undefined {
+  const match = ICAL_FEED_LINK_RE.exec(text.trim());
+  if (!match) {
+    return undefined;
+  }
+  return { label: match[1], url: match[2] };
+}
+
+// A row whose whole text is a feed URL — the paste/typing form that gets
+// wrapped into the link form so the name is free from the start.
+export function isBareIcalFeedUrl(text: string): boolean {
+  const url = icalFeedUrlOf(text);
+  return url !== undefined && text.trim() === url;
+}
+
+export function icalFeedLinkText(url: string): string {
+  return `[${url}](${url})`;
+}
+
 // A projected calendar entry: the literal-VEVENT subset of the machine-feeds
 // spec (UID, DTSTART, SUMMARY). Recurring events are skipped in v1 —
 // expansion is committed later work; the id scheme reserves @<RECURRENCE-ID>.

@@ -15,6 +15,7 @@ import {
   workspaceDocumentKey,
 } from "./Document";
 import { entityIdForText } from "./entityRecognition";
+import { icalFeedLinkText, isBareIcalFeedUrl } from "./ical";
 import { getWorkspaceNode, withWorkspace, workspaceOf } from "./knowledge";
 import { PublishState, withPublishState } from "./knowstrFrontmatter";
 import { newGraphNode } from "./nodeFactory";
@@ -664,6 +665,10 @@ export function planAddTargetsToNode<T extends GraphPlan>(
       const entityHome = entityId
         ? getWorkspaceNode(accPlan.knowledgeDBs, entityId as ID)
         : undefined;
+      const feedWrapped =
+        !entityId && isBareIcalFeedUrl(objectText || "")
+          ? icalFeedLinkText((objectText || "").trim())
+          : undefined;
       const childSpans = entityId
         ? [
             linkSpan(
@@ -671,7 +676,7 @@ export function planAddTargetsToNode<T extends GraphPlan>(
               entityHome ? nodeText(entityHome) : (objectText || "").trim()
             ),
           ]
-        : plainSpans(objectText || "");
+        : plainSpans(feedWrapped ?? (objectText || ""));
       const childNode = newGraphNode(childSpans, {
         root: parentNode.root,
         parent: parentNode.id,

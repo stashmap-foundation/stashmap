@@ -36,6 +36,7 @@ import {
 import { isBlockLinkAny } from "../core/nodeSpans";
 import { getBlockLink } from "../core/blockLink";
 import { ENTITY_SCHEME_RE } from "../core/entityRecognition";
+import { icalFeedLinkPartsOf } from "../core/ical";
 import { inlineTargetToHref, linkStyle, linkToHref } from "./linkOperations";
 import { ReferenceDisplay } from "./referenceDisplay";
 import { MiniEditor, preventEditorBlur } from "./AddNode";
@@ -77,7 +78,11 @@ function getLevels(viewPath: ViewPath): number {
 
 function ExpandCollapseToggle(): JSX.Element | null {
   const [rowID] = useCurrentRowID();
-  const displayText = useDisplayText();
+  const rawDisplayText = useDisplayText();
+  // Feed-as-link rows read by their label; the raw text (with the URL)
+  // belongs to edit mode.
+  const displayText =
+    icalFeedLinkPartsOf(rawDisplayText)?.label ?? rawDisplayText;
   const onToggleExpanded = useOnToggleExpanded();
   const isExpanded = useIsExpanded();
   const isEmptyNode = isEmptySemanticID(rowID);

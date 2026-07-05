@@ -10,6 +10,7 @@ import {
 import { MarkdownTreeNode, parseMarkdown } from "../core/markdownTree";
 import { planInsertMarkdownTrees } from "../markdownPlan";
 import { linkSpan, nodeText, plainSpans, spansText } from "../core/nodeSpans";
+import { icalFeedLinkText, isBareIcalFeedUrl } from "../core/ical";
 import { entityIdForText } from "../core/entityRecognition";
 import { getWorkspaceNode } from "../core/knowledge";
 import { newGraphNode } from "../core/nodeFactory";
@@ -193,24 +194,26 @@ function entityLinkedTrees(
   trees: MarkdownTreeNode[]
 ): MarkdownTreeNode[] {
   return trees.map((tree) => {
-    const entityId = tree.uuid
-      ? undefined
-      : entityIdForText(spansText(tree.spans));
+    const text = spansText(tree.spans);
+    const entityId = tree.uuid ? undefined : entityIdForText(text);
     const home = entityId
       ? getWorkspaceNode(plan.knowledgeDBs, entityId as ID)
       : undefined;
+    // A bare feed URL wraps into the link form so the name is free from
+    // the start — text is yours, identity lives in the parentheses.
+    const feedWrap =
+      !tree.uuid && !entityId && isBareIcalFeedUrl(text)
+        ? { spans: plainSpans(icalFeedLinkText(text.trim())) }
+        : {};
     return {
       ...tree,
       ...(entityId
         ? {
             spans: [
-              linkSpan(
-                entityId as ID,
-                home ? nodeText(home) : spansText(tree.spans).trim()
-              ),
+              linkSpan(entityId as ID, home ? nodeText(home) : text.trim()),
             ],
           }
-        : {}),
+        : feedWrap),
       children: entityLinkedTrees(plan, tree.children),
     };
   });

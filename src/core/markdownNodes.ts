@@ -5,7 +5,7 @@ import { ensureNodeNativeFields } from "./connections";
 import { newDB } from "./knowledge";
 import { MarkdownTreeNode } from "./markdownTree";
 import { newGraphNode } from "./nodeFactory";
-import { fileLinkSpan, linkSpan, nodeText } from "./nodeSpans";
+import { nodeText } from "./nodeSpans";
 
 export type WalkContext = {
   knowledgeDBs: KnowledgeDBs;
@@ -42,13 +42,6 @@ function assertUnusedTreeNodeId(
   }
 }
 
-function singleBlockLinkSpan(spans: InlineSpan[]): InlineSpan | undefined {
-  if (spans.length !== 1) return undefined;
-  const span = spans[0];
-  if (span.kind === "link" || span.kind === "fileLink") return span;
-  return undefined;
-}
-
 type IdMaterializationMode = "default" | "preserve-explicit";
 
 function usesExactTreeNodeId(
@@ -59,7 +52,6 @@ function usesExactTreeNodeId(
 }
 
 function newMarkdownGraphNode(
-  ctx: WalkContext,
   treeNode: MarkdownTreeNode,
   spans: InlineSpan[],
   options: Parameters<typeof newGraphNode>[1],
@@ -74,22 +66,6 @@ function newMarkdownGraphNode(
     : node;
 }
 
-function withTreeNodeAttrs(
-  node: GraphNode,
-  treeNode: MarkdownTreeNode
-): GraphNode {
-  return {
-    ...node,
-    ...(treeNode.basedOn ? { basedOn: treeNode.basedOn as ID } : {}),
-    ...(treeNode.snapshotId !== undefined && {
-      snapshotId: treeNode.snapshotId,
-    }),
-    ...(treeNode.extraAttrs !== undefined && {
-      extraAttrs: treeNode.extraAttrs,
-    }),
-  };
-}
-
 function materializeTreeNode(
   ctx: WalkContext,
   treeNode: MarkdownTreeNode,
@@ -98,7 +74,6 @@ function materializeTreeNode(
   mode: IdMaterializationMode
 ): [WalkContext, ID, GraphNode] {
   const baseNode = newMarkdownGraphNode(
-    ctx,
     treeNode,
     treeNode.spans,
     {
@@ -130,51 +105,11 @@ function materializeTreeNode(
 
   const [withVisible, childIDs] = treeNode.children.reduce(
     ([accCtx, accChildren], childNode) => {
-      const blockLink = singleBlockLinkSpan(childNode.spans);
-      if (blockLink && blockLink.kind === "link") {
-        assertUnusedTreeNodeId(accCtx, childNode);
-        const refNode = withTreeNodeAttrs(
-          newMarkdownGraphNode(
-            ctx,
-            childNode,
-            [linkSpan(blockLink.targetID, blockLink.text)],
-            {
-              root,
-              parent: nodeBaseWithFields.id,
-              relevance: childNode.relevance,
-              argument: childNode.argument,
-            },
-            mode
-          ),
-          childNode
-        );
-        return [
-          walkUpsertNode(accCtx, refNode),
-          [...accChildren, refNode.id],
-        ] as [WalkContext, ID[]];
-      }
-      if (blockLink && blockLink.kind === "fileLink") {
-        assertUnusedTreeNodeId(accCtx, childNode);
-        const fileNode = withTreeNodeAttrs(
-          newMarkdownGraphNode(
-            ctx,
-            childNode,
-            [fileLinkSpan(blockLink.path, blockLink.text)],
-            {
-              root,
-              parent: nodeBaseWithFields.id,
-              relevance: childNode.relevance,
-              argument: childNode.argument,
-            },
-            mode
-          ),
-          childNode
-        );
-        return [
-          walkUpsertNode(accCtx, fileNode),
-          [...accChildren, fileNode.id],
-        ] as [WalkContext, ID[]];
-      }
+      // Link rows take the ordinary recursive path: they are nodes like
+      // any other and carry children (idea.md, Entity nodes). The tree
+      // parser already normalizes them to a single link span, so no
+      // special materialization is needed — the old special case here
+      // silently dropped everything nested under a link row.
       const [afterChild, , materializedChild] = materializeTreeNode(
         accCtx,
         childNode,

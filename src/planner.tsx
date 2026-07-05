@@ -50,6 +50,7 @@ import {
 } from "./rowModel";
 import { nodeText, plainSpans } from "./core/nodeSpans";
 import { LOCAL } from "./core/nodeRef";
+import { entityIdForText } from "./core/entityRecognition";
 import { getWorkspaceNode, newDB } from "./core/knowledge";
 import { useRelaysToCreatePlan } from "./relays";
 import {
@@ -468,14 +469,45 @@ type SaveNodeResult = {
   node: GraphNode;
 };
 
-function planCreateNoteAtRoot(
+export function planCreateNoteAtRoot(
   plan: Plan,
   text: string,
   paneIndex: number
 ): SaveNodeResult {
+  // Mint or link, root case: recognized entity text as a new document's
+  // root mints the entity node — idempotently. If the entity already has
+  // a home, nothing is created: the pane opens the existing document.
+  const entityId = entityIdForText(text);
+  const existingHome = entityId
+    ? getWorkspaceNode(plan.knowledgeDBs, entityId as ID)
+    : undefined;
+  if (entityId && existingHome) {
+    const panesAtExisting = plan.panes.map((p, i) =>
+      i === paneIndex
+        ? {
+            ...p,
+            author: LOCAL,
+            sourceId: LOCAL,
+            documentId: undefined,
+            rootNodeId: existingHome.root,
+            searchQuery: undefined,
+            searchResultIDs: undefined,
+          }
+        : p
+    );
+    return {
+      plan: planUpdatePanes(plan, panesAtExisting),
+      viewPath: [paneIndex, existingHome.root],
+      node: existingHome,
+    };
+  }
+
   const [planWithSeed, createdSeed] = planCreateNode(plan, text);
   const createdNode = withDocumentRoot(
-    newGraphNode(plainSpans(createdSeed.text))
+    newGraphNode(
+      plainSpans(createdSeed.text),
+      entityId ? { uuid: entityId } : {}
+    )
   );
   const planWithNode = planUpsertNodes(planWithSeed, createdNode);
 

@@ -9,7 +9,9 @@ import {
 } from "../planner";
 import { MarkdownTreeNode, parseMarkdown } from "../core/markdownTree";
 import { planInsertMarkdownTrees } from "../markdownPlan";
-import { plainSpans } from "../core/nodeSpans";
+import { linkSpan, nodeText, plainSpans, spansText } from "../core/nodeSpans";
+import { entityIdForText } from "../core/entityRecognition";
+import { getWorkspaceNode } from "../core/knowledge";
 import { newGraphNode } from "../core/nodeFactory";
 import { createDocumentLinkTarget } from "../core/connections";
 import { withDocumentRoot } from "../core/plan";
@@ -54,27 +56,6 @@ export function parseTextToTrees(text: string): MarkdownTreeNode[] {
     return parseMarkdown(text).tree;
   }
   return parsedLinesToTrees(parseClipboardText(text));
-}
-
-// The first entity-discovery gesture: pasting an RGB contract id creates a
-// node identified as asset:<contract id> — literally the asset's entity id
-// and its tag, so publishing a document that contains it reaches the
-// asset's relay. Real ids look like rgb:cdtFZh2Q-YTY1rYW-….
-export const RGB_CONTRACT_ID_RE = /^rgb:[A-Za-z0-9_~-]{20,}$/u;
-
-export function pasteTextToTrees(text: string): MarkdownTreeNode[] {
-  const marker = text.trim();
-  if (RGB_CONTRACT_ID_RE.test(marker)) {
-    return [
-      {
-        spans: plainSpans(marker),
-        children: [],
-        blockKind: "list_item",
-        uuid: `asset:${marker}`,
-      },
-    ];
-  }
-  return parseTextToTrees(text);
 }
 
 function titleFromFileName(fileName: string): string {
@@ -202,11 +183,49 @@ export function planImportMarkdownFilesAtEmptyRoot(
   return setPaneToDocument(wrapper.plan, paneIndex, wrapper.document);
 }
 
+// Mint or link, paste case: pasting always lands under a parent, so
+// recognized entity text becomes a link row targeting the entity —
+// dangling allowed, no page created. The entity's home, if any, lends
+// its text. Explicit uuids (real markdown with id comments) are never
+// touched.
+function entityLinkedTrees(
+  plan: Plan,
+  trees: MarkdownTreeNode[]
+): MarkdownTreeNode[] {
+  return trees.map((tree) => {
+    const entityId = tree.uuid
+      ? undefined
+      : entityIdForText(spansText(tree.spans));
+    const home = entityId
+      ? getWorkspaceNode(plan.knowledgeDBs, entityId as ID)
+      : undefined;
+    return {
+      ...tree,
+      ...(entityId
+        ? {
+            spans: [
+              linkSpan(
+                entityId as ID,
+                home ? nodeText(home) : spansText(tree.spans).trim()
+              ),
+            ],
+          }
+        : {}),
+      children: entityLinkedTrees(plan, tree.children),
+    };
+  });
+}
+
 export function planPasteMarkdownTrees(
   plan: Plan,
   trees: MarkdownTreeNode[],
   parentNode: GraphNode,
   insertAtIndex?: number
 ): Plan {
-  return planInsertMarkdownTrees(plan, trees, parentNode, insertAtIndex).plan;
+  return planInsertMarkdownTrees(
+    plan,
+    entityLinkedTrees(plan, trees),
+    parentNode,
+    insertAtIndex
+  ).plan;
 }

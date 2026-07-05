@@ -11,6 +11,7 @@ import { ASSET_ENTITY_RELAY, DEFAULT_RELAYS } from "../nostr";
 import { depositEntityTags } from "../nodesDocumentEvent";
 import { publishStateOf, type PublishState } from "../core/knowstrFrontmatter";
 import { getNodeDocumentId, planSetDocumentPublishState } from "../core/plan";
+import { documentEntityCandidates } from "./publishReach";
 import { TemporaryViewProvider, useTemporaryView } from "./temporaryViewState";
 
 import { getDisplayTextForRow, getIndependentRows } from "../rowModel";
@@ -51,7 +52,7 @@ import {
   planShiftTemporarySelection,
   planToggleTemporarySelection,
 } from "../planner";
-import { pasteTextToTrees, planPasteMarkdownTrees } from "./FileDropZone";
+import { parseTextToTrees, planPasteMarkdownTrees } from "./FileDropZone";
 import { getNodeText, getSemanticID } from "../core/connections";
 import { getOwnLogRoot } from "../core/systemRoots";
 import { buildDocumentRouteUrl, buildNodeRouteUrl } from "../navigationUrl";
@@ -507,8 +508,6 @@ function BackButton(): JSX.Element | null {
   );
 }
 
-const ENTITY_SCHEME_RE = /^(asset:|wd:|isbn:|doi:)/u;
-
 // Destinations render as plain hostnames: a user shouldn't need to know
 // what a relay or a wss:// URL is. The full URL stays in the tooltip.
 function hostLabel(url: string): string {
@@ -517,29 +516,6 @@ function hostLabel(url: string): string {
   } catch {
     return url;
   }
-}
-
-// Contained canonical entities: nodes of this document whose ids carry an
-// entity scheme. Pasting an entity's marker into a document is one of the
-// three gestures that put it into a context.
-function documentEntityCandidates(
-  knowledgeDBs: KnowledgeDBs,
-  document: Document
-): string[] {
-  const nodes = knowledgeDBs.get(LOCAL)?.nodes;
-  if (!nodes) {
-    return [];
-  }
-  return nodes
-    .valueSeq()
-    .toArray()
-    .filter(
-      (node) =>
-        ENTITY_SCHEME_RE.test(node.id) &&
-        (document.topNodeShortIds.includes(node.id) ||
-          document.topNodeShortIds.includes(node.root))
-    )
-    .map((node) => node.id);
 }
 
 // The header button is the publication state: publish (one click) / a
@@ -1444,7 +1420,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
         return;
       }
       navigator.clipboard.readText().then((text) => {
-        const trees = pasteTextToTrees(text);
+        const trees = parseTextToTrees(text);
         if (trees.length === 0) {
           return;
         }

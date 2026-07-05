@@ -1,14 +1,24 @@
 import { LOCAL } from "./core/nodeRef";
-import { linkSpan, plainSpans } from "./core/nodeSpans";
+import { linkSpan, plainSpans, getBlockLinkTarget } from "./core/nodeSpans";
 import { newGraphNode } from "./core/nodeFactory";
 import type { Document } from "./core/Document";
-import { unpublishedLinkTarget } from "./editor/publishReach";
-import { createPlan, buildDocumentEvents, Plan } from "./planner";
+import {
+  unpublishedLinkTarget,
+  documentEntityCandidates,
+} from "./editor/publishReach";
+import {
+  createPlan,
+  buildDocumentEvents,
+  Plan,
+  planCreateNoteAtRoot,
+  planAddToParent,
+} from "./planner";
 import { planCreateNodesFromMarkdown } from "./markdownPlan";
 import {
-  pasteTextToTrees,
+  parseTextToTrees,
   planPasteMarkdownTrees,
 } from "./editor/FileDropZone";
+import { entityIdForText } from "./core/entityRecognition";
 import { planSetDocumentPublishState } from "./core/plan";
 import { KIND_KNOWLEDGE_DEPOSIT, KIND_KNOWLEDGE_DOCUMENT } from "./nostr";
 import { parseFrontMatter, publishStateOf } from "./core/knowstrFrontmatter";
@@ -204,31 +214,87 @@ test("the reach chip resolves unpublished link targets in published documents", 
 
 const CONTRACT_ID = "rgb:cdtFZh2Q-YTY1rYW-yBdMlZb-GbkThw~-ArYpJ72-eXiti5Y";
 
-test("pasting an RGB contract id creates the identified asset node", () => {
-  expect(pasteTextToTrees(`  ${CONTRACT_ID}\n`)).toEqual([
-    {
-      spans: plainSpans(CONTRACT_ID),
-      children: [],
-      blockKind: "list_item",
-      uuid: `asset:${CONTRACT_ID}`,
-    },
-  ]);
-  expect(pasteTextToTrees("just some text").some((tree) => tree.uuid)).toBe(
-    false
+test("entity recognizers: rgb markers and wikidata urls", () => {
+  expect(entityIdForText(`  ${CONTRACT_ID}\n`)).toBe(`asset:${CONTRACT_ID}`);
+  expect(entityIdForText("https://www.wikidata.org/wiki/Q1492")).toBe(
+    "wd:Q1492"
   );
+  expect(entityIdForText("http://wikidata.org/wiki/Q42")).toBe("wd:Q42");
+  expect(entityIdForText("just some text")).toBeUndefined();
+  expect(entityIdForText("rgb:short")).toBeUndefined();
+});
 
+test("marker as new document root mints the entity node, idempotently", () => {
+  const { plan } = planWithEssay();
+  const first = planCreateNoteAtRoot(plan, CONTRACT_ID, 0);
+  expect(first.node.id).toBe(`asset:${CONTRACT_ID}`);
+  const countAfterFirst = first.plan.knowledgeDBs.get(LOCAL)?.nodes.size;
+
+  const second = planCreateNoteAtRoot(first.plan, CONTRACT_ID, 0);
+  expect(second.node.id).toBe(`asset:${CONTRACT_ID}`);
+  expect(second.plan.knowledgeDBs.get(LOCAL)?.nodes.size).toBe(countAfterFirst);
+  expect(second.plan.panes[0].rootNodeId).toBe(`asset:${CONTRACT_ID}`);
+});
+
+test("marker created under a parent becomes a link row, never a duplicate", () => {
   const { plan, rootId } = planWithEssay();
+  const parent = plan.knowledgeDBs.get(LOCAL)?.nodes.get(rootId);
+  if (!parent) {
+    throw new Error("parent missing");
+  }
+
+  const pasted = planPasteMarkdownTrees(
+    plan,
+    parseTextToTrees(CONTRACT_ID),
+    parent,
+    0
+  );
+  // No entity node is minted under a parent…
+  expect(
+    pasted.knowledgeDBs.get(LOCAL)?.nodes.get(`asset:${CONTRACT_ID}`)
+  ).toBeUndefined();
+  // …the created row is a link targeting the entity (dangling allowed).
+  const linkRow = pasted.knowledgeDBs
+    .get(LOCAL)
+    ?.nodes.valueSeq()
+    .find((n) => getBlockLinkTarget(n) === `asset:${CONTRACT_ID}`);
+  expect(linkRow).toBeDefined();
+  expect(linkRow?.parent).toBe(rootId);
+
+  // Typed children take the same path.
+  const [typed] = planAddToParent(
+    pasted,
+    { id: CONTRACT_ID as ID, text: CONTRACT_ID },
+    rootId
+  );
+  const links = typed.knowledgeDBs
+    .get(LOCAL)
+    ?.nodes.valueSeq()
+    .filter((n) => getBlockLinkTarget(n) === `asset:${CONTRACT_ID}`)
+    .toArray();
+  expect(links?.length).toBe(2);
+  expect(
+    typed.knowledgeDBs.get(LOCAL)?.nodes.get(`asset:${CONTRACT_ID}`)
+  ).toBeUndefined();
+});
+
+test("link placements feed the publish candidates", () => {
+  const { plan, docId, rootId } = planWithEssay();
   const parent = plan.knowledgeDBs.get(LOCAL)?.nodes.get(rootId);
   if (!parent) {
     throw new Error("parent missing");
   }
   const pasted = planPasteMarkdownTrees(
     plan,
-    pasteTextToTrees(CONTRACT_ID),
+    parseTextToTrees(CONTRACT_ID),
     parent,
     0
   );
-  expect(
-    pasted.knowledgeDBs.get(LOCAL)?.nodes.get(`asset:${CONTRACT_ID}`)
-  ).toBeDefined();
+  const document = pasted.documents.valueSeq().find((d) => d.docId === docId);
+  if (!document) {
+    throw new Error("document missing");
+  }
+  expect(documentEntityCandidates(pasted.knowledgeDBs, document)).toContain(
+    `asset:${CONTRACT_ID}`
+  );
 });

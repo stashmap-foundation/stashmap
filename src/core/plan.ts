@@ -14,10 +14,11 @@ import {
   documentKeyOf,
   workspaceDocumentKey,
 } from "./Document";
+import { entityIdForText } from "./entityRecognition";
 import { getWorkspaceNode, withWorkspace, workspaceOf } from "./knowledge";
 import { PublishState, withPublishState } from "./knowstrFrontmatter";
 import { newGraphNode } from "./nodeFactory";
-import { fileLinkSpan, linkSpan, plainSpans } from "./nodeSpans";
+import { fileLinkSpan, linkSpan, nodeText, plainSpans } from "./nodeSpans";
 import {
   LOG_ROOT_ROLE,
   getOwnSystemRoot,
@@ -656,7 +657,22 @@ export function planAddTargetsToNode<T extends GraphPlan>(
         ];
       }
 
-      const childNode = newGraphNode(plainSpans(objectText || ""), {
+      // Mint or link: recognized entity text created UNDER a parent is
+      // always a link row targeting the entity (dangling allowed, no page
+      // is created) — the entity's home, if any, lends its text.
+      const entityId = entityIdForText(objectText || "");
+      const entityHome = entityId
+        ? getWorkspaceNode(accPlan.knowledgeDBs, entityId as ID)
+        : undefined;
+      const childSpans = entityId
+        ? [
+            linkSpan(
+              entityId as ID,
+              entityHome ? nodeText(entityHome) : (objectText || "").trim()
+            ),
+          ]
+        : plainSpans(objectText || "");
+      const childNode = newGraphNode(childSpans, {
         root: parentNode.root,
         parent: parentNode.id,
       });

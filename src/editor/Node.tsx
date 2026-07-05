@@ -33,7 +33,7 @@ import {
   computeEmptyNodeMetadata,
   isRefNode,
 } from "../core/connections";
-import { isBlockLinkAny } from "../core/nodeSpans";
+import { isBlockLinkAny, nodeText } from "../core/nodeSpans";
 import { getBlockLink } from "../core/blockLink";
 import { ENTITY_SCHEME_RE } from "../core/entityRecognition";
 import {
@@ -47,6 +47,7 @@ import { ReferenceDisplay } from "./referenceDisplay";
 import { MiniEditor, preventEditorBlur } from "./AddNode";
 import { useOnToggleExpanded } from "./SelectNodes";
 import { useData } from "../DataContext";
+import { planMaterializeComputedRow } from "../core/plan";
 import {
   Plan,
   usePlanner,
@@ -441,12 +442,28 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
   };
 
   const handleSave = (text: string, submitted?: boolean): void => {
+    // Write gestures take first; read gestures read. A computed row's
+    // save materializes the row before the text lands — and an unchanged
+    // text writes nothing at all (blur/Escape must not take).
+    const materializedStart = ((): Plan | undefined => {
+      if (!row.materialize) {
+        return createPlan();
+      }
+      if (withFeedUrl(text).trim() === nodeText(row.node).trim()) {
+        return undefined;
+      }
+      const [plan] = planMaterializeComputedRow(createPlan(), row);
+      return plan;
+    })();
+    if (!materializedStart) {
+      return;
+    }
     const {
       plan: basePlan,
       viewPath: updatedViewPath,
       node: savedNode,
     } = planSaveNodeAndEnsureNodes(
-      createPlan(),
+      materializedStart,
       withFeedUrl(text),
       rowID,
       currentNode,

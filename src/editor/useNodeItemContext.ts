@@ -6,6 +6,7 @@ import {
   useRow,
 } from "../rowModel";
 import { isEmptySemanticID } from "../core/connections";
+import { planMaterializeComputedRow } from "../core/plan";
 import { usePlanner } from "../planner";
 import {
   planUpdateViewItemMetadata,
@@ -70,7 +71,10 @@ export function useNodeItemContext(): NodeItemContext {
   const isVisible =
     !isInSearchView &&
     (isDocumentTopLevel ||
-      (nodeIndex !== undefined && parentView !== undefined));
+      (nodeIndex !== undefined && parentView !== undefined) ||
+      // Computed rows are first-class in behavior: a row carrying a
+      // materialization recipe is as interactive as any placed row.
+      (row.materialize !== undefined && parentView !== undefined));
 
   // Get the current row using context-aware lookup
   const currentRow = (() => {
@@ -86,6 +90,22 @@ export function useNodeItemContext(): NodeItemContext {
   const updateMetadata = (metadata: NodeItemMetadata): void => {
     const editorText = editorTextContext?.text ?? "";
     if (isEmptyNode && !nodeID) return;
+    // Write gestures take first: the selector's judgment on a computed
+    // row materializes it with the judgment, one plan.
+    if (row.materialize !== undefined) {
+      const [materializedPlan, , materializedNow] = planMaterializeComputedRow(
+        createPlan(),
+        row,
+        {
+          relevance: metadata.relevance,
+          argument: metadata.argument,
+        }
+      );
+      if (materializedNow) {
+        executePlan(materializedPlan);
+        return;
+      }
+    }
     if (
       !isEmptyNode &&
       !isDocumentTopLevel &&

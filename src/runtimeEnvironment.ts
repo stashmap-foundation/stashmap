@@ -12,6 +12,7 @@ export type DesktopShellBridge = {
   workspace?: {
     load: () => Promise<DesktopWorkspaceLoad>;
   };
+  fetchText?: (url: string) => Promise<string>;
 };
 
 export function getDesktopBridgeFromWindow(source: {

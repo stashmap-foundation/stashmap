@@ -310,6 +310,22 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // Calendar feeds fetch in the main process: no CORS in Node, and the
+  // renderer never gets network powers beyond this one text fetch.
+  ipcMain.handle("net:fetch-text", async (_event, url) => {
+    const target = String(url).replace(/^webcal:\/\//u, "https://");
+    const parsed = new URL(target);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      throw new Error("unsupported scheme");
+    }
+    const response = await fetch(parsed, {
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!response.ok) {
+      throw new Error(`status ${response.status}`);
+    }
+    return response.text();
+  });
   ipcMain.handle("workspace:load", async () => loadCurrentWorkspace());
   ipcMain.handle("workspace:pickFolder", async () => pickWorkspaceFolder());
   ipcMain.handle("workspace:isInitialised", async (_event, folder) =>

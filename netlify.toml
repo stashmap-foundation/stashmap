@@ -1,3 +1,6 @@
+[functions]
+  directory = "netlify/functions"
+
 [[headers]]
   for = "/manifest.json"
     [headers.values]

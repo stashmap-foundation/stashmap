@@ -26,4 +26,6 @@ contextBridge.exposeInMainWorld("knowstrDesktop", {
   isElectron: true,
   platform: process.platform,
   workspace,
+  fetchText: (url: string): Promise<string> =>
+    ipcRenderer.invoke("net:fetch-text", url),
 });

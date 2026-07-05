@@ -60,6 +60,7 @@ declare global {
   type DesktopShellBridge = {
     isElectron: boolean;
     platform?: string;
+    fetchText?: (url: string) => Promise<string>;
   };
 
   interface Window {

@@ -662,7 +662,18 @@ function getGutter(row: Element): string | undefined {
   const relevance = relevanceTitle ? gutterMap[relevanceTitle] : undefined;
   const evidenceTitle = evidenceSelector?.getAttribute("title");
   const evidence = evidenceTitle ? evidenceMap[evidenceTitle] : undefined;
-  return `${relevance ?? ""}${evidence ?? ""}` || undefined;
+  // Rows without an interactive selector (projections) still show their
+  // relevance in the left indicator gutter — read it as a fallback.
+  const indicatorMap: Record<string, string> = {
+    "relevant-indicator": "!",
+    "maybe-relevant-indicator": "?",
+    "little-relevant-indicator": "~",
+  };
+  const indicator = Object.entries(indicatorMap).find(
+    // eslint-disable-next-line testing-library/no-node-access
+    ([className]) => row.querySelector(`.${className}`) !== null
+  )?.[1];
+  return `${relevance ?? indicator ?? ""}${evidence ?? ""}` || undefined;
 }
 
 function classifyRow(row: Element): RowInfo | null {

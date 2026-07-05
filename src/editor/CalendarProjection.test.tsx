@@ -7,20 +7,37 @@ const FEED = [
   "VERSION:2.0",
   "BEGIN:VEVENT",
   "UID:dunbar@scholarium.at",
-  "DTSTART:20260921T180000Z",
+  "DTSTART:20300921T180000Z",
   "SUMMARY:Seminar Robin Dunbar",
   "END:VEVENT",
   "BEGIN:VEVENT",
   "UID:sommerfest@scholarium.at",
-  "DTSTART;VALUE=DATE:20260714",
+  "DTSTART;VALUE=DATE:20300714",
   "SUMMARY:Sommerfest",
+  "END:VEVENT",
+  "BEGIN:VEVENT",
+  "UID:archive@scholarium.at",
+  "DTSTART;VALUE=DATE:20200101",
+  "SUMMARY:Founding seminar",
   "END:VEVENT",
   "END:VCALENDAR",
 ].join("\r\n");
 
+// Local wall time of the Z instant, mirroring icalEntryDisplayText — keeps
+// the expectation timezone-independent.
+function dunbarText(): string {
+  const date = new Date(Date.UTC(2030, 8, 21, 18, 0, 0));
+  const pad = (n: number): string => String(n).padStart(2, "0");
+  return `${pad(date.getDate())}.${pad(
+    date.getMonth() + 1
+  )}.${date.getFullYear()} ${pad(date.getHours())}:${pad(
+    date.getMinutes()
+  )} Seminar Robin Dunbar`;
+}
+
 afterEach(cleanup);
 
-test("calendar nodes project feed entries as rows", async () => {
+test("calendar nodes project dated rows; the past proposes ~", async () => {
   const [alice] = setup([ALICE]);
   renderApp({
     ...alice(),
@@ -37,10 +54,14 @@ test("calendar nodes project feed entries as rows", async () => {
     )
   );
 
-  await expectTree(`
+  await expectTree(
+    `
 Salon
   Termine https://scholarium.at/salon.ics
-    Sommerfest
-    Seminar Robin Dunbar
-  `);
+    {~} 01.01.2020 Founding seminar
+    14.07.2030 Sommerfest
+    ${dunbarText()}
+  `,
+    { showGutter: true }
+  );
 });

@@ -217,3 +217,41 @@ export function mergeProjectedEntries(
   });
   return items;
 }
+
+function pad2(value: number): string {
+  return String(value).padStart(2, "0");
+}
+
+// The projected row text: the date is text, not decoration — exactly how
+// people hand-write calendars in outlines. Times render in local wall
+// time; all-day entries carry no time; undated entries are bare summary.
+export function icalEntryDisplayText(entry: IcalEntry): string {
+  if (entry.startMs === undefined) {
+    return entry.summary;
+  }
+  const date = new Date(entry.startMs);
+  const day = `${pad2(date.getDate())}.${pad2(
+    date.getMonth() + 1
+  )}.${date.getFullYear()}`;
+  const time = entry.allDay
+    ? ""
+    : ` ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+  return `${day}${time} ${entry.summary}`.trim();
+}
+
+// Entries before today propose the ~ judgment (idea.md: projections may
+// propose, exactly like incoming references propose ?). The proposal is
+// projection-only — it is never written; the user's own judgment
+// overrides and materializes.
+export function isPastIcalEntry(entry: IcalEntry, nowMs: number): boolean {
+  if (entry.startMs === undefined) {
+    return false;
+  }
+  const now = new Date(nowMs);
+  const startOfToday = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate()
+  ).getTime();
+  return entry.startMs < startOfToday;
+}

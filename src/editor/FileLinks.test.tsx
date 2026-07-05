@@ -297,7 +297,7 @@ test("File link with prefix markers preserves them on the incoming reference", a
     `
 B
   B-child
-[I] A !+↩
+{?} [I] A !+↩
   `,
     { showGutter: true }
   );

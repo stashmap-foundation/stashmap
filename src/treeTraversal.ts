@@ -29,7 +29,13 @@ import {
   nodeText,
   plainSpans,
 } from "./core/nodeSpans";
-import { IcalEntry, icalFeedUrlOf, mergeProjectedEntries } from "./core/ical";
+import {
+  IcalEntry,
+  icalEntryDisplayText,
+  icalFeedUrlOf,
+  isPastIcalEntry,
+  mergeProjectedEntries,
+} from "./core/ical";
 import { getDocumentByIdOrFilePath, type Document } from "./core/Document";
 import { DEFAULT_TYPE_FILTERS } from "./core/constants";
 import {
@@ -457,11 +463,13 @@ function createProjectionRow(
   const node: GraphNode = {
     children: List<ID>(),
     id: entry.id as ID,
-    spans: plainSpans(entry.summary),
+    spans: plainSpans(icalEntryDisplayText(entry)),
     parent: parentNode.id,
     updated: parentNode.updated ?? Date.now(),
     root: parentNode.root ?? parentNode.id,
-    relevance: undefined,
+    relevance: isPastIcalEntry(entry, Date.now())
+      ? "little_relevant"
+      : undefined,
   };
   const parentPath = addNodesToLastElement(parentRow.viewPath, parentNode.id);
   const viewPath = appendNodeToPath(parentPath, node.id);
@@ -491,27 +499,31 @@ function interleaveProjectionRows(
   parentNode: GraphNode,
   parentSourceId: SourceId,
   rowsByChildId: Map<ID, Row>,
-  childRows: List<Row>
+  childRows: List<Row>,
+  typeFilters: Pane["typeFilters"]
 ): List<Row> {
   const feedUrl = icalFeedUrlOf(nodeText(parentNode));
   const entries = feedUrl ? data.calendarFeeds?.get(feedUrl) : undefined;
   if (!entries || entries.length === 0) {
     return childRows;
   }
+  const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
   const merged = mergeProjectedEntries(parentNode.children.toArray(), entries);
   return List(
     merged.flatMap((item) => {
       if (item.kind === "projection") {
-        return [
-          createProjectionRow(
-            data,
-            graph,
-            parentRow,
-            parentNode,
-            parentSourceId,
-            item.entry
-          ),
-        ];
+        const row = createProjectionRow(
+          data,
+          graph,
+          parentRow,
+          parentNode,
+          parentSourceId,
+          item.entry
+        );
+        // Projections obey the marker filters like every row — the ~
+        // proposal on past entries makes the existing filter the way to
+        // fold the past away.
+        return itemPassesFilters(row.node, activeFilters) ? [row] : [];
       }
       const row = rowsByChildId.get(item.childId as ID);
       return row ? [row] : [];
@@ -657,7 +669,8 @@ function getChildrenForRegularNode(
     nodes,
     nodeSourceId,
     rowsByChildId,
-    childRows
+    childRows,
+    typeFilters
   );
 
   const containingNodeID = parentRow.parentNode?.id;

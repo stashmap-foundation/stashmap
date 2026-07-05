@@ -58,7 +58,11 @@ import { useNodeIsLoading } from "../LoadingStatus";
 import { NodeCard } from "../commons/Ui";
 import { usePaneIndex, useNavigatePane } from "../SplitPanesContext";
 import { buildNodeRouteUrl } from "../navigationUrl";
-import { RightMenu } from "./RightMenu";
+import {
+  PublishReachChip,
+  RightMenu,
+  usePublishedPaneDocument,
+} from "./RightMenu";
 import { useItemStyle } from "./useItemStyle";
 import { EditorTextProvider } from "./EditorTextContext";
 
@@ -663,6 +667,7 @@ function NodeAutoLink({
   const row = useRow();
   const displayText = useDisplayText();
   const navigatePane = useNavigatePane();
+  const publishedDocument = usePublishedPaneDocument();
   const effectiveAuthor = row.sourceId;
   const { virtualType } = row;
   const blockLink =
@@ -677,18 +682,26 @@ function NodeAutoLink({
     );
     if (href) {
       return (
-        <a
-          href={href}
-          className="reference-link-btn"
-          style={linkStyle(blockLink)}
-          onClick={(e) => {
-            e.preventDefault();
-            navigatePane(href);
-          }}
-          aria-label={`Navigate to ${displayText}`}
-        >
-          {children}
-        </a>
+        <>
+          <a
+            href={href}
+            className="reference-link-btn"
+            style={linkStyle(blockLink)}
+            onClick={(e) => {
+              e.preventDefault();
+              navigatePane(href);
+            }}
+            aria-label={`Navigate to ${displayText}`}
+          >
+            {children}
+          </a>
+          {publishedDocument && virtualType === undefined && (
+            <PublishReachChip
+              paneDocument={publishedDocument}
+              node={row.node}
+            />
+          )}
+        </>
       );
     }
   }

@@ -147,28 +147,21 @@ body {
 // dashed frame = click to publish. Shared by the header button and the
 // per-row reach chip.
 
-// The reach chip's reserved slot: exists on every row of a published
-// document so chips align column-wise; costs nothing elsewhere. Deliberately
-// NOT in the hover-reveal list — the chip is state, not a hover control.
-.right-menu .publish-reach-slot {
-  align-items: center;
-  display: flex;
-  flex-shrink: 0;
-  justify-content: center;
-  width: 22px;
-}
-
 // The reach chip: a link row's target isn't shared with this document's
-// readers. Quiet dashed outline; violet on hover like other affordances.
+// readers. Inline after the link text; quiet dashed outline, violet on
+// hover like other affordances. Always visible — state, not a control.
 .publish-reach-chip {
   background: transparent;
   border: 1px dashed var(--base01);
   border-radius: 3px;
   color: var(--base01);
   cursor: pointer;
-  font-size: 0.8rem;
-  line-height: 1.2;
-  padding: 0 4px;
+  display: inline-block;
+  font-size: 0.7rem;
+  line-height: 1.3;
+  margin-left: 8px;
+  padding: 0 5px;
+  vertical-align: baseline;
   white-space: nowrap;
 
   &:hover {

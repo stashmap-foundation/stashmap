@@ -23,8 +23,8 @@ import { FullscreenButton } from "./FullscreenButton";
 import { OpenInSplitPaneButton } from "./OpenInSplitPaneButton";
 
 // The pane's document, but only when it is published — the condition for
-// the publish-reach slot to exist on its rows.
-function usePublishedPaneDocument(): Document | undefined {
+// reach chips to appear on its link rows.
+export function usePublishedPaneDocument(): Document | undefined {
   const data = useData();
   const pane = useCurrentPane();
   if (pane.sourceId !== LOCAL) {
@@ -52,17 +52,18 @@ function usePublishedPaneDocument(): Document | undefined {
     : undefined;
 }
 
-// A link row inside a published document whose target isn't shared: the
-// hollow publish glyph in a dashed frame — same visual language as the
-// header's publish button (hollow = not published, click to publish).
+// A link row inside a published document whose target isn't shared: a
+// worded chip inline after the link text, in the dashed
+// click-to-publish frame the header's publish button also wears.
 // Always visible: this is state, not a hover control.
-function PublishReachChip({
+export function PublishReachChip({
   paneDocument,
+  node,
 }: {
   paneDocument: Document;
+  node: GraphNode;
 }): JSX.Element | null {
   const data = useData();
-  const node = useCurrentNode();
   const { createPlan, executePlan } = usePlanner();
 
   const target = unpublishedLinkTarget(
@@ -98,9 +99,9 @@ function PublishReachChip({
       className="publish-reach-chip"
       onClick={grant}
       aria-label={`publish linked document ${target.title || target.docId}`}
-      title="Not shared — readers of this document can see this link but can't open it. Click to publish."
+      title="Readers of this document can see this link but can't open it. Click to publish."
     >
-      ◌
+      not published
     </button>
   );
 }
@@ -114,7 +115,6 @@ export function RightMenu(): JSX.Element {
   const isRoot = useIsRoot();
   const pane = useCurrentPane();
   const currentNode = useCurrentNode();
-  const publishedDocument = usePublishedPaneDocument();
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
   const isInSearchView = useIsInSearchView();
   const [rowID] = useCurrentRowID();
@@ -128,13 +128,6 @@ export function RightMenu(): JSX.Element {
 
   return (
     <div className="right-menu">
-      {publishedDocument && (
-        <div className="publish-reach-slot">
-          {!isVirtualItem && (
-            <PublishReachChip paneDocument={publishedDocument} />
-          )}
-        </div>
-      )}
       <div className="relevance-slot">
         {!isReadonly && <RelevanceSelector virtualType={virtualType} />}
       </div>

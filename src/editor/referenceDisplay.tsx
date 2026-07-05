@@ -2,6 +2,7 @@ import React from "react";
 import { LOCAL } from "../core/nodeRef";
 import { TYPE_COLORS } from "../core/constants";
 import {
+  INCOMING_ARROW,
   ReferencePart,
   argumentChar,
   buildReferenceParts,
@@ -25,14 +26,11 @@ function argumentColor(argument?: Argument): string | undefined {
 }
 
 function RenderPart({ part }: { part: ReferencePart }): JSX.Element {
-  if (part.type === "arrow") {
-    return <span className="ref-separator">{part.value}</span>;
-  }
-  if (part.type === "indicator") {
+  if (part.type === "incoming") {
     const relChar = relevanceChar(part.relevance);
     const argChar = argumentChar(part.argument);
     return (
-      <>
+      <sup className="incoming-part" title="Points back here">
         {relChar && (
           <span style={{ color: relevanceColor(part.relevance) }}>
             {relChar}
@@ -41,15 +39,16 @@ function RenderPart({ part }: { part: ReferencePart }): JSX.Element {
         {argChar && (
           <span style={{ color: argumentColor(part.argument) }}>{argChar}</span>
         )}
-      </>
+        {INCOMING_ARROW}
+      </sup>
     );
   }
   return <>{part.value}</>;
 }
 
 function partKey(part: ReferencePart, index: number): string {
-  if (part.type === "indicator") {
-    return `${index}-ind-${relevanceChar(part.relevance)}${argumentChar(
+  if (part.type === "incoming") {
+    return `${index}-in-${relevanceChar(part.relevance)}${argumentChar(
       part.argument
     )}`;
   }

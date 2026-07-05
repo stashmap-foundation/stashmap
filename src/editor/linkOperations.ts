@@ -1,4 +1,5 @@
 import { createDocumentLinkTarget, createRefTarget } from "../core/connections";
+import { ENTITY_SCHEME_RE } from "../core/entityRecognition";
 import { Document, getDocumentForNode, documentKeyOf } from "../core/Document";
 import {
   getNodeInSource,
@@ -138,8 +139,40 @@ export function navigationTargetToHref(
     : undefined;
 }
 
+// Inline link spans navigate like block links: to the target in its
+// context (parent as root, target scrolled to), but resolved from the
+// span's target id directly since the containing node is no block link.
+export function inlineTargetToHref(
+  data: Data,
+  targetID: ID,
+  sourceId: SourceId
+): string | undefined {
+  const graph = graphLookupFromData(data);
+  const target = lookupNode(graph, targetID, sourceId);
+  if (!target) {
+    return undefined;
+  }
+  const parent = target.node.parent
+    ? getNodeInSource(graph, {
+        sourceId: target.ref.sourceId,
+        id: target.node.parent,
+      })
+    : undefined;
+  const targetRoot = parent ?? target;
+  return buildNodeRouteUrl(
+    targetRoot.node.id,
+    targetRoot.ref.sourceId,
+    targetRoot.node.id === target.node.id ? undefined : target.node.id
+  );
+}
+
+// Violet means entity: the one use of color in the link language — the row
+// touches the shared world. Links themselves stay unmarked.
 export function linkStyle(link: Link): React.CSSProperties {
-  return link.kind === "document" ? { fontStyle: "italic" } : {};
+  if (link.kind === "document") {
+    return { fontStyle: "italic" };
+  }
+  return ENTITY_SCHEME_RE.test(link.targetID) ? { color: "var(--violet)" } : {};
 }
 
 export function linkToInsertTarget(

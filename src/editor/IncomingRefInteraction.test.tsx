@@ -46,7 +46,7 @@ async function setupItemLevelIncomingRef(
   await expectTree(`
 Crypto
   Bitcoin
-    [R] Money / Bitcoin >>>
+    [R] Money / Bitcoin
     Info
     `);
 
@@ -56,7 +56,7 @@ Crypto
 Money
   Bitcoin
     Details
-    [I] Crypto / Bitcoin ${relevanceKey}<<<
+    [I] Crypto / Bitcoin ${relevanceKey}↩
     `);
 }
 
@@ -80,8 +80,8 @@ async function setupTwoIncomingRefs(): Promise<void> {
 Money
   Bitcoin
     Details
-    [I] Crypto / Bitcoin !<<<
-    [I] Tech / Bitcoin !<<<
+    [I] Crypto / Bitcoin !↩
+    [I] Tech / Bitcoin !↩
     `);
 }
 
@@ -96,7 +96,7 @@ describe("Incoming reference display", () => {
     await expectTree(`
 Crypto
   Bitcoin
-    [R] Money / Bitcoin >>>
+    [R] Money / Bitcoin
     Info
     `);
 
@@ -106,7 +106,7 @@ Crypto
 Money
   Bitcoin
     Details
-    [I] Crypto / Bitcoin !<<<
+    [I] Crypto / Bitcoin !↩
     `);
 
     cleanup();
@@ -116,7 +116,7 @@ Money
 Money
   Bitcoin
     Details
-    [I] Crypto / Bitcoin !<<<
+    [I] Crypto / Bitcoin !↩
     `);
   });
 
@@ -130,7 +130,7 @@ Money
 Money
   Bitcoin
     Details
-    [I] Crypto / Bitcoin ?<<<
+    [I] Crypto / Bitcoin ?↩
     `);
 
     cleanup();
@@ -140,7 +140,7 @@ Money
 Money
   Bitcoin
     Details
-    [I] Crypto / Bitcoin ?<<<
+    [I] Crypto / Bitcoin ?↩
     `);
   });
 });
@@ -151,7 +151,7 @@ describe("Incoming keyboard relevance", () => {
     renderApp(alice());
     await setupItemLevelIncomingRef();
 
-    await clickRow("Crypto / Bitcoin !<<<");
+    await clickRow("Crypto / Bitcoin !↩");
     await userEvent.keyboard("?");
 
     await expectTree(
@@ -159,7 +159,7 @@ describe("Incoming keyboard relevance", () => {
 Money
   Bitcoin
     Details
-    {?} [R] Crypto / Bitcoin >>> !<<<
+    {?} [R] Crypto / Bitcoin !↩
     `,
       { showGutter: true }
     );
@@ -172,7 +172,7 @@ Money
 Money
   Bitcoin
     Details
-    {?} [R] Crypto / Bitcoin >>> !<<<
+    {?} [R] Crypto / Bitcoin !↩
     `,
       { showGutter: true }
     );
@@ -183,7 +183,7 @@ Money
     renderApp(alice());
     await setupItemLevelIncomingRef();
 
-    await clickRow("Crypto / Bitcoin !<<<");
+    await clickRow("Crypto / Bitcoin !↩");
     await userEvent.keyboard("~");
 
     await expectTree(
@@ -191,7 +191,7 @@ Money
 Money
   Bitcoin
     Details
-    {~} [R] Crypto / Bitcoin >>> !<<<
+    {~} [R] Crypto / Bitcoin !↩
     `,
       { showGutter: true }
     );
@@ -204,7 +204,7 @@ Money
 Money
   Bitcoin
     Details
-    {~} [R] Crypto / Bitcoin >>> !<<<
+    {~} [R] Crypto / Bitcoin !↩
     `,
       { showGutter: true }
     );
@@ -217,19 +217,17 @@ describe("Incoming keyboard argument", () => {
     renderApp(alice());
     await setupItemLevelIncomingRef();
 
-    await clickRow("Crypto / Bitcoin !<<<");
+    await clickRow("Crypto / Bitcoin !↩");
     await userEvent.keyboard("+");
 
     await expectTree(`
 Money
   Bitcoin
     Details
-    [R] Crypto / Bitcoin >>> !<<<
+    [R] Crypto / Bitcoin !↩
     `);
 
-    await screen.findByLabelText(
-      "Evidence for Crypto / Bitcoin >>> !<<<: Confirms"
-    );
+    await screen.findByLabelText("Evidence for Crypto / Bitcoin !↩: Confirms");
 
     cleanup();
     renderApp(alice());
@@ -238,12 +236,10 @@ Money
 Money
   Bitcoin
     Details
-    [R] Crypto / Bitcoin >>> !<<<
+    [R] Crypto / Bitcoin !↩
     `);
 
-    await screen.findByLabelText(
-      "Evidence for Crypto / Bitcoin >>> !<<<: Confirms"
-    );
+    await screen.findByLabelText("Evidence for Crypto / Bitcoin !↩: Confirms");
   });
 
   test("- accepts incoming and sets contra argument", async () => {
@@ -251,18 +247,18 @@ Money
     renderApp(alice());
     await setupItemLevelIncomingRef();
 
-    await clickRow("Crypto / Bitcoin !<<<");
+    await clickRow("Crypto / Bitcoin !↩");
     await userEvent.keyboard("-");
 
     await expectTree(`
 Money
   Bitcoin
     Details
-    [R] Crypto / Bitcoin >>> !<<<
+    [R] Crypto / Bitcoin !↩
     `);
 
     await screen.findByLabelText(
-      "Evidence for Crypto / Bitcoin >>> !<<<: Contradicts"
+      "Evidence for Crypto / Bitcoin !↩: Contradicts"
     );
 
     cleanup();
@@ -272,11 +268,11 @@ Money
 Money
   Bitcoin
     Details
-    [R] Crypto / Bitcoin >>> !<<<
+    [R] Crypto / Bitcoin !↩
     `);
 
     await screen.findByLabelText(
-      "Evidence for Crypto / Bitcoin >>> !<<<: Contradicts"
+      "Evidence for Crypto / Bitcoin !↩: Contradicts"
     );
   });
 
@@ -285,24 +281,22 @@ Money
     renderApp(alice());
     await setupItemLevelIncomingRef();
 
-    await clickRow("Crypto / Bitcoin !<<<");
+    await clickRow("Crypto / Bitcoin !↩");
     await userEvent.keyboard("+");
 
-    await screen.findByLabelText(
-      "Evidence for Crypto / Bitcoin >>> !<<<: Confirms"
-    );
+    await screen.findByLabelText("Evidence for Crypto / Bitcoin !↩: Confirms");
 
     await userEvent.keyboard("o");
 
     await screen.findByLabelText(
-      "Evidence for Crypto / Bitcoin >>> !<<<: No evidence type"
+      "Evidence for Crypto / Bitcoin !↩: No evidence type"
     );
 
     cleanup();
     renderApp(alice());
 
     await screen.findByLabelText(
-      "Evidence for Crypto / Bitcoin >>> !<<<: No evidence type"
+      "Evidence for Crypto / Bitcoin !↩: No evidence type"
     );
   });
 });
@@ -313,7 +307,7 @@ describe("Multiselect keyboard", () => {
     renderApp(alice());
     await setupTwoIncomingRefs();
 
-    await clickRow("Crypto / Bitcoin !<<<");
+    await clickRow("Crypto / Bitcoin !↩");
     await userEvent.keyboard("{Shift>}j{/Shift}");
     await userEvent.keyboard("!");
 
@@ -321,8 +315,8 @@ describe("Multiselect keyboard", () => {
 Money
   Bitcoin
     Details
-    [R] Crypto / Bitcoin >>> !<<<
-    [R] Tech / Bitcoin >>> !<<<
+    [R] Crypto / Bitcoin !↩
+    [R] Tech / Bitcoin !↩
     `);
 
     cleanup();
@@ -332,8 +326,8 @@ Money
 Money
   Bitcoin
     Details
-    [R] Crypto / Bitcoin >>> !<<<
-    [R] Tech / Bitcoin >>> !<<<
+    [R] Crypto / Bitcoin !↩
+    [R] Tech / Bitcoin !↩
     `);
   });
 
@@ -351,7 +345,7 @@ Money
 Money
   Bitcoin
     {!} Details
-    {!} [R] Crypto / Bitcoin >>> !<<<
+    {!} [R] Crypto / Bitcoin !↩
     `,
       { showGutter: true }
     );
@@ -364,7 +358,7 @@ Money
 Money
   Bitcoin
     {!} Details
-    {!} [R] Crypto / Bitcoin >>> !<<<
+    {!} [R] Crypto / Bitcoin !↩
     `,
       { showGutter: true }
     );
@@ -378,14 +372,14 @@ describe("Button clicks", () => {
     await setupItemLevelIncomingRef();
 
     await userEvent.click(
-      await screen.findByLabelText("accept Crypto / Bitcoin !<<< as relevant")
+      await screen.findByLabelText("accept Crypto / Bitcoin !↩ as relevant")
     );
 
     await expectTree(`
 Money
   Bitcoin
     Details
-    [R] Crypto / Bitcoin >>> !<<<
+    [R] Crypto / Bitcoin !↩
     `);
 
     cleanup();
@@ -395,7 +389,7 @@ Money
 Money
   Bitcoin
     Details
-    [R] Crypto / Bitcoin >>> !<<<
+    [R] Crypto / Bitcoin !↩
     `);
   });
 
@@ -405,7 +399,7 @@ Money
     await setupItemLevelIncomingRef();
 
     await userEvent.click(
-      await screen.findByLabelText("decline Crypto / Bitcoin !<<<")
+      await screen.findByLabelText("decline Crypto / Bitcoin !↩")
     );
 
     await expectTree(`
@@ -422,7 +416,7 @@ Money
 Money
   Bitcoin
     Details
-    [R] Crypto / Bitcoin !<<<
+    [R] Crypto / Bitcoin !↩
     `);
 
     cleanup();
@@ -432,7 +426,7 @@ Money
 Money
   Bitcoin
     Details
-    [R] Crypto / Bitcoin !<<<
+    [R] Crypto / Bitcoin !↩
     `);
   });
 });
@@ -445,7 +439,7 @@ describe("Evidence selector on incoming ref", () => {
 
     await userEvent.click(
       await screen.findByLabelText(
-        "Evidence for Crypto / Bitcoin !<<<: No evidence type"
+        "Evidence for Crypto / Bitcoin !↩: No evidence type"
       )
     );
 
@@ -453,12 +447,10 @@ describe("Evidence selector on incoming ref", () => {
 Money
   Bitcoin
     Details
-    [R] Crypto / Bitcoin >>> !<<<
+    [R] Crypto / Bitcoin !↩
     `);
 
-    await screen.findByLabelText(
-      "Evidence for Crypto / Bitcoin >>> !<<<: Confirms"
-    );
+    await screen.findByLabelText("Evidence for Crypto / Bitcoin !↩: Confirms");
 
     cleanup();
     renderApp(alice());
@@ -467,12 +459,10 @@ Money
 Money
   Bitcoin
     Details
-    [R] Crypto / Bitcoin >>> !<<<
+    [R] Crypto / Bitcoin !↩
     `);
 
-    await screen.findByLabelText(
-      "Evidence for Crypto / Bitcoin >>> !<<<: Confirms"
-    );
+    await screen.findByLabelText("Evidence for Crypto / Bitcoin !↩: Confirms");
   });
 });
 
@@ -508,7 +498,7 @@ Target
     await expectTree(`
 Source
   Child
-  [I] Target <<<
+  [I] Target ↩
     `);
 
     cleanup();
@@ -519,7 +509,7 @@ Source
     await expectTree(`
 Source
   Child
-  [I] Target <<<
+  [I] Target ↩
     `);
   });
 
@@ -546,13 +536,13 @@ Source
 
     await navigateToNodeViaSearch(0, "Source");
 
-    await clickRow("Target <<<");
+    await clickRow("Target ↩");
     await userEvent.keyboard("!");
 
     await expectTree(`
 Source
   Child
-  [R] Target >>> <<<
+  [R] Target ↩
     `);
 
     cleanup();
@@ -563,7 +553,7 @@ Source
     await expectTree(`
 Source
   Child
-  [R] Target >>> <<<
+  [R] Target ↩
     `);
   });
 
@@ -590,20 +580,20 @@ Source
 
     await navigateToNodeViaSearch(0, "Source");
 
-    await clickRow("Target <<<");
+    await clickRow("Target ↩");
     await userEvent.keyboard("!");
 
     await expectTree(`
 Source
   Child
-  [R] Target >>> <<<
+  [R] Target ↩
     `);
 
     await navigateToNodeViaSearch(0, "Target");
 
     await expectTree(`
 Target
-  [R] Source >>> !<<<
+  [R] Source !↩
   Items
     `);
 
@@ -615,14 +605,14 @@ Target
     await expectTree(`
 Source
   Child
-  [R] Target >>> <<<
+  [R] Target ↩
     `);
 
     await navigateToNodeViaSearch(0, "Target");
 
     await expectTree(`
 Target
-  [R] Source >>> !<<<
+  [R] Source !↩
   Items
     `);
   });
@@ -638,7 +628,7 @@ describe("Filter toggle", () => {
 Money
   Bitcoin
     Details
-    [I] Crypto / Bitcoin !<<<
+    [I] Crypto / Bitcoin !↩
     `);
 
     await userEvent.click(
@@ -659,7 +649,7 @@ Money
 Money
   Bitcoin
     Details
-    [I] Crypto / Bitcoin !<<<
+    [I] Crypto / Bitcoin !↩
     `);
   });
 });
@@ -674,11 +664,11 @@ describe("Drag and drop incoming refs", () => {
 Money
   Bitcoin
     Details
-    [I] Crypto / Bitcoin !<<<
+    [I] Crypto / Bitcoin !↩
     `);
 
     const source = screen.getByRole("treeitem", {
-      name: "Crypto / Bitcoin !<<<",
+      name: "Crypto / Bitcoin !↩",
     });
     const target = screen.getByRole("treeitem", { name: "Details" });
 
@@ -689,7 +679,7 @@ Money
 Money
   Bitcoin
     Details
-    [R] Crypto / Bitcoin >>> !<<<
+    [R] Crypto / Bitcoin !↩
     `);
 
     cleanup();
@@ -699,7 +689,7 @@ Money
 Money
   Bitcoin
     Details
-    [R] Crypto / Bitcoin >>> !<<<
+    [R] Crypto / Bitcoin !↩
     `);
   });
 
@@ -708,11 +698,11 @@ Money
     renderApp(alice());
     await setupTwoIncomingRefs();
 
-    await clickRow("Crypto / Bitcoin !<<<");
+    await clickRow("Crypto / Bitcoin !↩");
     await userEvent.keyboard("{Shift>}j{/Shift}");
 
     const source = screen.getByRole("treeitem", {
-      name: "Crypto / Bitcoin !<<<",
+      name: "Crypto / Bitcoin !↩",
     });
     const target = screen.getByRole("treeitem", { name: "Details" });
 
@@ -723,8 +713,8 @@ Money
 Money
   Bitcoin
     Details
-    [R] Crypto / Bitcoin >>> !<<<
-    [R] Tech / Bitcoin >>> !<<<
+    [R] Crypto / Bitcoin !↩
+    [R] Tech / Bitcoin !↩
     `);
 
     cleanup();
@@ -734,8 +724,8 @@ Money
 Money
   Bitcoin
     Details
-    [R] Crypto / Bitcoin >>> !<<<
-    [R] Tech / Bitcoin >>> !<<<
+    [R] Crypto / Bitcoin !↩
+    [R] Tech / Bitcoin !↩
     `);
   });
 
@@ -748,7 +738,7 @@ Money
     await navigateToNodeViaSearch(1, "Crypto");
 
     const source = screen.getAllByRole("treeitem", {
-      name: "Crypto / Bitcoin !<<<",
+      name: "Crypto / Bitcoin !↩",
     })[0];
     const targetItems = screen.getAllByRole("treeitem", { name: "Bitcoin" });
     const targetInPane1 = targetItems[targetItems.length - 1];
@@ -760,10 +750,10 @@ Money
 Money
   Bitcoin
     Details
-    [I] Crypto / Bitcoin !<<<
+    [I] Crypto / Bitcoin !↩
 Crypto
   Bitcoin
-  [R] Crypto / Bitcoin >>>
+  [R] Crypto / Bitcoin
     `);
 
     cleanup();
@@ -776,10 +766,10 @@ Crypto
 Money
   Bitcoin
     Details
-    [I] Crypto / Bitcoin !<<<
+    [I] Crypto / Bitcoin !↩
 Crypto
   Bitcoin
-  [R] Crypto / Bitcoin >>>
+  [R] Crypto / Bitcoin
     `);
   });
 
@@ -800,9 +790,9 @@ Crypto
     await expectTree(`
 Money
   Details
-  [R] Crypto / Bitcoin >>>
+  [R] Crypto / Bitcoin
   Bitcoin
-    [I] Crypto / Bitcoin !<<<
+    [I] Crypto / Bitcoin !↩
     `);
 
     cleanup();
@@ -811,9 +801,9 @@ Money
     await expectTree(`
 Money
   Details
-  [R] Crypto / Bitcoin >>>
+  [R] Crypto / Bitcoin
   Bitcoin
-    [I] Crypto / Bitcoin !<<<
+    [I] Crypto / Bitcoin !↩
     `);
   });
 });
@@ -824,14 +814,14 @@ describe("Item-level bidirectional", () => {
     renderApp(alice());
     await setupItemLevelIncomingRef();
 
-    await clickRow("Crypto / Bitcoin !<<<");
+    await clickRow("Crypto / Bitcoin !↩");
     await userEvent.keyboard("!");
 
     await expectTree(`
 Money
   Bitcoin
     Details
-    [R] Crypto / Bitcoin >>> !<<<
+    [R] Crypto / Bitcoin !↩
     `);
 
     cleanup();
@@ -841,7 +831,7 @@ Money
 Money
   Bitcoin
     Details
-    [R] Crypto / Bitcoin >>> !<<<
+    [R] Crypto / Bitcoin !↩
     `);
   });
 
@@ -850,7 +840,7 @@ Money
     renderApp(alice());
     await setupItemLevelIncomingRef();
 
-    await clickRow("Crypto / Bitcoin !<<<");
+    await clickRow("Crypto / Bitcoin !↩");
     await userEvent.keyboard("x");
 
     await expectTree(`
@@ -867,7 +857,7 @@ Money
 Money
   Bitcoin
     Details
-    [R] Crypto / Bitcoin !<<<
+    [R] Crypto / Bitcoin !↩
     `);
 
     cleanup();
@@ -877,7 +867,7 @@ Money
 Money
   Bitcoin
     Details
-    [R] Crypto / Bitcoin !<<<
+    [R] Crypto / Bitcoin !↩
     `);
   });
 
@@ -886,14 +876,14 @@ Money
     renderApp(alice());
     await setupItemLevelIncomingRef();
 
-    await clickRow("Crypto / Bitcoin !<<<");
+    await clickRow("Crypto / Bitcoin !↩");
     await userEvent.keyboard("!");
 
     await expectTree(`
 Money
   Bitcoin
     Details
-    [R] Crypto / Bitcoin >>> !<<<
+    [R] Crypto / Bitcoin !↩
     `);
 
     await navigateToNodeViaSearch(0, "Crypto");
@@ -901,11 +891,11 @@ Money
     await expectTree(`
 Crypto
   Bitcoin
-    [R] Money / Bitcoin >>> !<<<
+    [R] Money / Bitcoin !↩
     Info
     `);
 
-    await clickRow("Money / Bitcoin >>> !<<<");
+    await clickRow("Money / Bitcoin !↩");
     await userEvent.keyboard("x");
 
     await expectTree(`
@@ -920,7 +910,7 @@ Crypto
 Money
   Bitcoin
     Details
-    [R] Crypto / Bitcoin >>>
+    [R] Crypto / Bitcoin
     `);
 
     cleanup();
@@ -932,7 +922,7 @@ Money
 Money
   Bitcoin
     Details
-    [R] Crypto / Bitcoin >>>
+    [R] Crypto / Bitcoin
     `);
   });
 
@@ -941,14 +931,14 @@ Money
     renderApp(alice());
     await setupItemLevelIncomingRef();
 
-    await clickRow("Crypto / Bitcoin !<<<");
+    await clickRow("Crypto / Bitcoin !↩");
     await userEvent.keyboard("!");
 
     await expectTree(`
 Money
   Bitcoin
     Details
-    [R] Crypto / Bitcoin >>> !<<<
+    [R] Crypto / Bitcoin !↩
     `);
 
     await navigateToNodeViaSearch(0, "Crypto");
@@ -956,7 +946,7 @@ Money
     await expectTree(`
 Crypto
   Bitcoin
-    [R] Money / Bitcoin >>> !<<<
+    [R] Money / Bitcoin !↩
     Info
     `);
 
@@ -969,7 +959,7 @@ Crypto
 Money
   Bitcoin
     Details
-    [R] Crypto / Bitcoin >>> !<<<
+    [R] Crypto / Bitcoin !↩
     `);
 
     await navigateToNodeViaSearch(0, "Crypto");
@@ -977,7 +967,7 @@ Money
     await expectTree(`
 Crypto
   Bitcoin
-    [R] Money / Bitcoin >>> !<<<
+    [R] Money / Bitcoin !↩
     Info
     `);
   });
@@ -991,14 +981,14 @@ describe("Tombstone / deleted ref interactions", () => {
     renderApp(alice());
     await setupItemLevelIncomingRef();
 
-    await clickRow("Crypto / Bitcoin !<<<");
+    await clickRow("Crypto / Bitcoin !↩");
     await userEvent.keyboard("!");
 
     await expectTree(`
 Money
   Bitcoin
     Details
-    [R] Crypto / Bitcoin >>> !<<<
+    [R] Crypto / Bitcoin !↩
     `);
 
     await navigateToNodeViaSearch(0, "Crypto");
@@ -1006,7 +996,7 @@ Money
     await expectTree(`
 Crypto
   Bitcoin
-    [R] Money / Bitcoin >>> !<<<
+    [R] Money / Bitcoin !↩
     Info
     `);
 
@@ -1042,7 +1032,7 @@ Money
 Money
   Bitcoin
     Details
-    [I] Crypto / Bitcoin !<<<
+    [I] Crypto / Bitcoin !↩
     `);
 
     await navigateToNodeViaSearch(0, "Crypto");
@@ -1073,14 +1063,14 @@ Money
     renderApp(alice());
     await setupItemLevelIncomingRef();
 
-    await clickRow("Crypto / Bitcoin !<<<");
+    await clickRow("Crypto / Bitcoin !↩");
     await userEvent.keyboard("!");
 
     await expectTree(`
 Money
   Bitcoin
     Details
-    [R] Crypto / Bitcoin >>> !<<<
+    [R] Crypto / Bitcoin !↩
     `);
 
     await navigateToNodeViaSearch(0, "Crypto");
@@ -1088,7 +1078,7 @@ Money
     await expectTree(`
 Crypto
   Bitcoin
-    [R] Money / Bitcoin >>> !<<<
+    [R] Money / Bitcoin !↩
     Info
     `);
 

@@ -206,7 +206,7 @@ Barcelona
     await expectTree(`
 Other
   Target
-    [R] Notes / Level1 / Level2 / Level3 / Target >>>
+    [R] Notes / Level1 / Level2 / Level3 / Target
     Child
     `);
 
@@ -223,7 +223,7 @@ Other
 
     await expectTree(`
 ~Log
-  [R] My Notes >>>
+  [R] My Notes
     `);
 
     await userEvent.click(await screen.findByText("My Notes"));
@@ -264,7 +264,7 @@ My Notes
 
     await expectTree(`
 ~Log
-  [R] Investment >>>
+  [R] Investment
     `);
 
     await userEvent.click(await screen.findByText("Investment"));

@@ -127,7 +127,7 @@ My Notes
 
     await expectTree(`
 Search: Barcelona
-  [R] My Notes / Holiday Destinations / Spain / Barcelona >>>
+  [R] My Notes / Holiday Destinations / Spain / Barcelona
     `);
   });
 
@@ -344,7 +344,7 @@ Recipes
 
     await expectTree(`
 ~Log
-  [R] Alice Root >>>
+  [R] Alice Root
     `);
 
     expect(screen.queryByText("Error: Node not found")).toBeNull();
@@ -355,7 +355,7 @@ Recipes
 
     await expectTree(`
 ~Log
-  [R] Alice Root >>>
+  [R] Alice Root
     `);
 
     expect(screen.queryByText("Error: Node not found")).toBeNull();
@@ -713,7 +713,7 @@ describe("Cref suggestions", () => {
 
     await expectTree(`
 My Fork
-  [R] Source >>>
+  [R] Source
   Items
     `);
     cleanup();

@@ -649,6 +649,32 @@ body {
   }
 }
 
+// The link language (idea.md): inline links are dashed-underlined so
+// several links in one sentence stay individually visible — the dashes
+// break at the gaps. Violet (entities) comes via inline style.
+.inline-link {
+  color: inherit;
+  text-decoration: underline dashed;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  cursor: pointer;
+
+  &:hover {
+    text-decoration-style: solid;
+  }
+}
+
+// The incoming part: the other side's judgment chars plus the return
+// arrow, one superscript cluster. Link + incoming part = bidirectional;
+// the same cluster on a footer row is a suggested bidirectional link.
+.incoming-part {
+  font-size: 0.72em;
+  line-height: 0;
+  margin-left: 3px;
+  color: var(--base01);
+  white-space: nowrap;
+}
+
 // Dragging states
 .is-dragging,
 .is-dragging-child {

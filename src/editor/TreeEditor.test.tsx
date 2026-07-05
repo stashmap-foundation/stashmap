@@ -319,8 +319,8 @@ My Notes
 
       await expectTree(`
 ~Log
-  [R] Second Note >>>
-  [R] First Note >>>
+  [R] Second Note
+  [R] First Note
       `);
     }
 
@@ -333,9 +333,9 @@ My Notes
 
       await expectTree(`
 ~Log
-  [R] Second Note >>>
+  [R] Second Note
   [NEW NODE: Log note]
-  [R] First Note >>>
+  [R] First Note
       `);
     });
 
@@ -350,9 +350,9 @@ My Notes
 
       await expectTree(`
 ~Log
-  [R] Second Note >>>
+  [R] Second Note
   [NEW NODE: Log note]
-  [R] First Note >>>
+  [R] First Note
       `);
     });
 
@@ -368,9 +368,9 @@ My Notes
 
       await expectTree(`
 ~Log
-  [R] Second Note >>>
+  [R] Second Note
   Log note
-  [R] First Note >>>
+  [R] First Note
       `);
     });
   });

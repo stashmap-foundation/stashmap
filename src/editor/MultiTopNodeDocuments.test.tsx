@@ -248,12 +248,12 @@ Source
 Holiday Destinations
   Spain
     Barcelona
-    [R] Source >>>
+    [R] Source
 Packlist
   Charger
 Source
   Child
-  [I] Holiday Destinations / Spain <<<
+  [I] Holiday Destinations / Spain ↩
   `);
 
   cleanup();
@@ -684,11 +684,11 @@ Target
   await expectTree(`
 Holiday Destinations
   Spain
-  [I] Target <<<
+  [I] Target ↩
 Packlist
   Charger
 Target
-  [R] Holiday Destinations >>>
+  [R] Holiday Destinations
   Drop here
   `);
 
@@ -697,13 +697,13 @@ Target
   await expectTree(`
 Holiday Destinations
   Spain
-  [I] Target <<<
+  [I] Target ↩
 Packlist
   Charger
-  [I] Target <<<
+  [I] Target ↩
 Target
-  [R] Packlist >>>
-  [R] Holiday Destinations >>>
+  [R] Packlist
+  [R] Holiday Destinations
   Drop here
   `);
 
@@ -713,8 +713,8 @@ Target
 
   await expectTree(`
 Target
-  [R] Packlist >>>
-  [R] Holiday Destinations >>>
+  [R] Packlist
+  [R] Holiday Destinations
   Drop here
   `);
 
@@ -746,7 +746,7 @@ test("Alt-dragged child refs from unsaved markdown survive reload", async () => 
 Holiday Destinations
   Spain
 My Links
-  [R] Holiday Destinations / Spain >>>
+  [R] Holiday Destinations / Spain
   `);
 
   cleanup();
@@ -755,7 +755,7 @@ My Links
 
   await expectTree(`
 My Links
-  [R] Holiday Destinations / Spain >>>
+  [R] Holiday Destinations / Spain
   `);
 
   cleanup();
@@ -783,12 +783,12 @@ test("Deep-copying a node with graph refs keeps the copied ref live in markdown"
 
   await expectTree(`
 Source
-  [R] Target >>>
+  [R] Target
 Target
-  [I] Source <<<
+  [I] Source ↩
 Copy Here
 Source
-  [R] Target >>>
+  [R] Target
   `);
 
   await navigateToNodeViaSearch(1, "Copy Here");
@@ -803,15 +803,15 @@ Source
 
   await expectTree(`
 Source
-  [R] Target >>>
+  [R] Target
 Target
-  [I] Source <<<
-  [I] Copy Here / Source <<<
+  [I] Source ↩
+  [I] Copy Here / Source ↩
 Copy Here
   Source
 Copy Here
   Source
-    [R] Target >>>
+    [R] Target
   `);
 
   const targetId = readNodeId(workspacePath, "graph.md", "# Target");
@@ -850,7 +850,7 @@ test("Relative file links under the second top-level root resolve and show incom
 First
   one
 Second
-  [R] B >>>
+  [R] B
   `);
 
   const bLink = await screen.findByLabelText("Navigate to B");
@@ -860,7 +860,7 @@ Second
   await expectTree(`
 B
   B-child
-[I] Second <<<
+[I] Second ↩
   `);
 
   cleanup();
@@ -886,7 +886,7 @@ test("Graph links under the second top-level root resolve and show incoming refs
 First
   one
 Second
-  [R] Target >>>
+  [R] Target
   `);
 
   const targetLink = await screen.findByLabelText("Navigate to Target");
@@ -896,7 +896,7 @@ Second
   await expectTree(`
 Target
   Target child
-  [I] Second <<<
+  [I] Second ↩
   `);
 
   cleanup();
@@ -910,7 +910,7 @@ test("Top-level file-link roots render as document links and incoming refs", asy
   await renderDocumentRoute(workspacePath, "files.md");
 
   await expectTree(`
-[R] Holiday Destinations >>>
+[R] Holiday Destinations
   `);
 
   const holidaysLink = await screen.findByLabelText(
@@ -922,7 +922,7 @@ test("Top-level file-link roots render as document links and incoming refs", asy
   await expectTree(`
 Holiday Destinations
   Spain
-[I] Holiday Destinations <<<
+[I] Holiday Destinations ↩
   `);
 
   cleanup();
@@ -941,7 +941,7 @@ test("Top-level graph-link roots render as graph refs and incoming refs", async 
   await renderDocumentRoute(workspacePath, "links.md");
 
   await expectTree(`
-[R] Target >>>
+[R] Target
   `);
 
   const targetLink = await screen.findByLabelText("Navigate to Target");
@@ -951,7 +951,7 @@ test("Top-level graph-link roots render as graph refs and incoming refs", async 
   await expectTree(`
 Target
   Target child
-  [I] Target <<<
+  [I] Target ↩
   `);
 
   cleanup();
@@ -970,7 +970,7 @@ test("Mutual file links show outgoing from both sides without duplicate incoming
 
   await expectTree(`
 Holiday Destinations
-  [R] Links >>> <<<
+  [R] Links ↩
   `);
 
   cleanup();
@@ -978,7 +978,7 @@ Holiday Destinations
 
   await expectTree(`
 Links
-  [R] Holiday Destinations >>> <<<
+  [R] Holiday Destinations ↩
   `);
 
   cleanup();
@@ -995,7 +995,7 @@ test("Mutual graph links show outgoing from both sides without duplicate incomin
 
   await expectTree(`
 A
-  [R] B >>> <<<
+  [R] B ↩
   `);
 
   cleanup();
@@ -1003,7 +1003,7 @@ A
 
   await expectTree(`
 B
-  [R] A >>> <<<
+  [R] A ↩
   `);
 
   cleanup();
@@ -1024,27 +1024,23 @@ test("Graph incoming refs can become bidirectional from both sides", async () =>
   await expectTree(`
 Target
   Target child
-  [I] Source <<<
+  [I] Source ↩
   `);
 
-  await userEvent.click(
-    getPane(0).getByRole("treeitem", { name: "Source <<<" })
-  );
+  await userEvent.click(getPane(0).getByRole("treeitem", { name: "Source ↩" }));
   await userEvent.keyboard("!");
 
   await expectTree(`
 Target
   Target child
-  [R] Source >>> <<<
+  [R] Source ↩
   `);
 
-  await userEvent.click(
-    await screen.findByLabelText("Navigate to Source >>> <<<")
-  );
+  await userEvent.click(await screen.findByLabelText("Navigate to Source ↩"));
 
   await expectTree(`
 Source
-  [R] Target >>> !<<<
+  [R] Target !↩
   `);
 
   cleanup();
@@ -1068,7 +1064,7 @@ test("Bidirectional graph link labels keep endpoint paths intact", async () => {
 
   await expectTree(`
 Southern European Countries
-  [R] Holiday Destinations / Spain >>>
+  [R] Holiday Destinations / Spain
   `);
 
   cleanup();
@@ -1079,12 +1075,12 @@ Southern European Countries
 Holiday Destinations
   Spain
     Barcelona
-    [I] Southern European Countries <<<
+    [I] Southern European Countries ↩
   `);
 
   await userEvent.click(
     getPane(0).getByRole("treeitem", {
-      name: "Southern European Countries <<<",
+      name: "Southern European Countries ↩",
     })
   );
   await userEvent.keyboard("!");
@@ -1094,7 +1090,7 @@ Holiday Destinations
 Holiday Destinations
   Spain
     Barcelona
-    {!} [R] Southern European Countries >>> <<<
+    {!} [R] Southern European Countries ↩
   `,
     { showGutter: true }
   );
@@ -1104,7 +1100,7 @@ Holiday Destinations
 
   await expectTree(`
 Southern European Countries
-  [R] Holiday Destinations / Spain >>> !<<<
+  [R] Holiday Destinations / Spain !↩
   `);
 
   cleanup();
@@ -1136,9 +1132,9 @@ test("Dragging an existing file link preserves document-link behavior", async ()
 
   await expectTree(`
 A
-  [R] B >>>
+  [R] B
 My Links
-  [R] B >>>
+  [R] B
   `);
 
   await expectMarkdown(
@@ -1160,7 +1156,7 @@ My Links
 
   await expectTree(`
 My Links
-  [R] B >>>
+  [R] B
   `);
 
   const reloadedLink = await getPane(0).findByLabelText("Navigate to B");
@@ -1170,8 +1166,8 @@ My Links
   await expectTree(`
 B
   B-child
-[I] A <<<
-[I] My Links <<<
+[I] A ↩
+[I] My Links ↩
   `);
 
   cleanup();
@@ -1240,7 +1236,7 @@ test("Document file links are italic and incoming refs render at document level"
 
   await expectTree(`
 Links
-  [R] Holiday Destinations >>>
+  [R] Holiday Destinations
   `);
 
   const holidaysLink = await screen.findByLabelText(
@@ -1256,14 +1252,14 @@ Holiday Destinations
   Spain
 Pack List
   Charger
-[I] Links <<<
+[I] Links ↩
   `);
 
-  await userEvent.click(await screen.findByLabelText("Navigate to Links <<<"));
+  await userEvent.click(await screen.findByLabelText("Navigate to Links ↩"));
 
   await expectTree(`
 Links
-  [R] Holiday Destinations >>>
+  [R] Holiday Destinations
   `);
 
   cleanup();
@@ -1289,12 +1285,12 @@ test("Document file link row actions open the document target", async () => {
 
   await expectTree(`
 Links
-  [R] Holiday Destinations >>>
+  [R] Holiday Destinations
 Holiday Destinations
   Spain
 Pack List
   Charger
-[I] Links <<<
+[I] Links ↩
   `);
 
   cleanup();
@@ -1313,13 +1309,13 @@ Holiday Destinations
   Spain
 Pack List
   Charger
-[I] Links <<<
+[I] Links ↩
   `);
 
   await userEvent.keyboard("{Alt>}");
-  fireEvent.dragStart(getPane(0).getByRole("treeitem", { name: "Links <<<" }));
+  fireEvent.dragStart(getPane(0).getByRole("treeitem", { name: "Links ↩" }));
   const spain = getPane(0).getByRole("treeitem", { name: "Spain" });
-  setDropIndentLevel("Links <<<", "Spain", 3);
+  setDropIndentLevel("Links ↩", "Spain", 3);
   fireEvent.dragOver(spain, { altKey: true });
   fireEvent.drop(spain, { altKey: true });
   await userEvent.keyboard("{/Alt}");
@@ -1327,10 +1323,10 @@ Pack List
   await expectTree(`
 Holiday Destinations
   Spain
-  [R] Links >>> <<<
+  [R] Links ↩
 Pack List
   Charger
-[I] Links <<<
+[I] Links ↩
   `);
 
   cleanup();
@@ -1352,12 +1348,10 @@ Holiday Destinations
   Spain
 Pack List
   Charger
-[I] Links <<<
+[I] Links ↩
   `);
 
-  await userEvent.click(
-    getPane(0).getByRole("treeitem", { name: "Links <<<" })
-  );
+  await userEvent.click(getPane(0).getByRole("treeitem", { name: "Links ↩" }));
   await userEvent.keyboard("!");
 
   await expectTree(`
@@ -1365,16 +1359,14 @@ Holiday Destinations
   Spain
 Pack List
   Charger
-[R] Links >>> <<<
+[R] Links ↩
   `);
 
-  await userEvent.click(
-    await screen.findByLabelText("Navigate to Links >>> <<<")
-  );
+  await userEvent.click(await screen.findByLabelText("Navigate to Links ↩"));
 
   await expectTree(`
 Links
-  [R] Holiday Destinations >>> !<<<
+  [R] Holiday Destinations !↩
   `);
 
   await expectMarkdown(
@@ -1411,7 +1403,7 @@ Holiday Destinations
   Spain
 Pack List
   Charger
-[R] Links >>> <<<
+[R] Links ↩
   `);
 
   cleanup();
@@ -1433,12 +1425,10 @@ Holiday Destinations
   Spain
 Pack List
   Charger
-[I] Links <<<
+[I] Links ↩
   `);
 
-  await userEvent.click(
-    getPane(0).getByRole("treeitem", { name: "Links <<<" })
-  );
+  await userEvent.click(getPane(0).getByRole("treeitem", { name: "Links ↩" }));
   await userEvent.keyboard("!");
 
   await expectTree(`
@@ -1446,16 +1436,14 @@ Holiday Destinations
   Spain
 Pack List
   Charger
-[R] Links >>> <<<
+[R] Links ↩
   `);
 
-  await userEvent.click(
-    await screen.findByLabelText("Navigate to Links >>> <<<")
-  );
+  await userEvent.click(await screen.findByLabelText("Navigate to Links ↩"));
 
   await expectTree(`
 Links
-  [R] Holiday Destinations >>> !<<<
+  [R] Holiday Destinations !↩
   `);
 
   await expectMarkdown(
@@ -1487,7 +1475,7 @@ Holiday Destinations
   Spain
 Pack List
   Charger
-[R] Links >>> <<<
+[R] Links ↩
   `);
 
   cleanup();

@@ -76,7 +76,7 @@ test("Cross-file link round-trips through save and renders in tree", async () =>
 
   await expectTree(`
 A
-  [R] B >>>
+  [R] B
   `);
 });
 
@@ -140,7 +140,7 @@ test("File link surfaces as incoming reference on target's root", async () => {
   await expectTree(`
 B
   B-child
-[I] A <<<
+[I] A ↩
   `);
 });
 
@@ -155,26 +155,26 @@ test("Accepting a file-link incoming ref creates a document link back to the sou
   await expectTree(`
 B
   B-child
-[I] A <<<
+[I] A ↩
   `);
 
-  await userEvent.click(await screen.findByLabelText("A <<<"));
+  await userEvent.click(await screen.findByLabelText("A ↩"));
   await userEvent.keyboard("!");
 
   await expectTree(`
 B
   B-child
-[R] A >>> <<<
+[R] A ↩
   `);
 
-  const reverseLink = await screen.findByLabelText("Navigate to A >>> <<<");
+  const reverseLink = await screen.findByLabelText("Navigate to A ↩");
   expect(reverseLink.getAttribute("href")).toMatch(/^\/d\//u);
 
   await userEvent.click(reverseLink);
 
   await expectTree(`
 A
-  [R] B >>> !<<<
+  [R] B !↩
   `);
 });
 
@@ -217,9 +217,9 @@ test("Mixed node-links and file-links all render", async () => {
 
   await expectTree(`
 Links
-  [R] Holiday Destinations / France >>>
-  [R] Hello Doc >>>
-  [R] Hello Doc >>>
+  [R] Holiday Destinations / France
+  [R] Hello Doc
+  [R] Hello Doc
   `);
 });
 
@@ -271,8 +271,8 @@ test("Cross-document node links survive an app reload", async () => {
   await renderAppTree({ path: workspacePath, search: "Links" });
   await expectTree(`
 Links
-  [R] Holiday Destinations / France >>>
-  [R] Hello Doc >>>
+  [R] Holiday Destinations / France
+  [R] Hello Doc
   `);
 
   cleanup();
@@ -280,8 +280,8 @@ Links
 
   await expectTree(`
 Links
-  [R] Holiday Destinations / France >>>
-  [R] Hello Doc >>>
+  [R] Holiday Destinations / France
+  [R] Hello Doc
   `);
 });
 
@@ -297,7 +297,7 @@ test("File link with prefix markers preserves them on the incoming reference", a
     `
 B
   B-child
-[I] A !+<<<
+[I] A !+↩
   `,
     { showGutter: true }
   );

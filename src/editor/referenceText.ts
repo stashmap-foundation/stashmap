@@ -1,7 +1,6 @@
 export type ReferencePart =
   | { type: "text"; value: string }
-  | { type: "arrow"; value: ">>>" | "<<<" }
-  | { type: "indicator"; relevance: Relevance; argument?: Argument };
+  | { type: "incoming"; relevance?: Relevance; argument?: Argument };
 
 export type ReferenceDisplayConfig = {
   displayAs?: "bidirectional" | "incoming";
@@ -11,6 +10,8 @@ export type ReferenceDisplayConfig = {
   incomingArgument?: Argument;
   deleted?: boolean;
 };
+
+export const INCOMING_ARROW = "↩"; // ↩
 
 export function relevanceChar(relevance?: Relevance): string {
   if (relevance === "relevant") return "!";
@@ -25,15 +26,10 @@ export function argumentChar(argument?: Argument): string {
   return "";
 }
 
-function indicatorPart(
-  relevance: Relevance,
-  argument?: Argument
-): ReferencePart[] {
-  return relevanceChar(relevance) || argumentChar(argument)
-    ? [{ type: "indicator", relevance, argument }]
-    : [];
-}
-
+// The incoming part: the other side's judgment chars plus the return arrow,
+// rendered as one superscript cluster. Link + incoming part = bidirectional;
+// the same part on a footer row is a suggested bidirectional link. Outgoing
+// links are unmarked — a link is the default relationship.
 export function buildReferenceParts(
   config: ReferenceDisplayConfig
 ): readonly ReferencePart[] {
@@ -48,22 +44,9 @@ export function buildReferenceParts(
 
   const contextPath = contextLabels.join(" / ");
   const target: ReferencePart = { type: "text", value: targetLabel };
-  const indicator = indicatorPart(incomingRelevance!, incomingArgument);
-
-  if (deleted) {
-    return [
-      { type: "text", value: "(deleted)" },
-      ...(contextPath
-        ? [
-            { type: "text" as const, value: contextPath },
-            { type: "text" as const, value: "/" },
-          ]
-        : []),
-      target,
-    ];
-  }
 
   const endpoint = [
+    ...(deleted ? [{ type: "text" as const, value: "(deleted)" }] : []),
     ...(contextPath
       ? [
           { type: "text" as const, value: contextPath },
@@ -73,41 +56,36 @@ export function buildReferenceParts(
     target,
   ];
 
-  if (displayAs === "incoming") {
-    return [
-      ...endpoint,
-      ...indicator,
-      { type: "arrow" as const, value: "<<<" as const },
-    ];
+  if (deleted || !displayAs) {
+    return endpoint;
   }
 
-  if (displayAs === "bidirectional") {
-    return [
-      ...endpoint,
-      { type: "arrow" as const, value: ">>>" as const },
-      ...indicator,
-      { type: "arrow" as const, value: "<<<" as const },
-    ];
-  }
-
-  return [...endpoint, { type: "arrow" as const, value: ">>>" as const }];
+  return [
+    ...endpoint,
+    {
+      type: "incoming",
+      relevance: incomingRelevance,
+      argument: incomingArgument,
+    },
+  ];
 }
 
 function partToText(part: ReferencePart): string {
-  if (part.type === "indicator") {
-    return relevanceChar(part.relevance) + argumentChar(part.argument);
+  if (part.type === "incoming") {
+    return (
+      relevanceChar(part.relevance) +
+      argumentChar(part.argument) +
+      INCOMING_ARROW
+    );
   }
   return part.value;
 }
 
 export function needsReferencePartSpace(
-  parts: readonly ReferencePart[],
+  _parts: readonly ReferencePart[],
   index: number
 ): boolean {
-  if (index === 0) return false;
-  const previous = parts[index - 1];
-  const current = parts[index];
-  return !(previous.type === "indicator" && current.type === "arrow");
+  return index > 0;
 }
 
 export function referenceToText(config: ReferenceDisplayConfig): string {

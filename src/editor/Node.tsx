@@ -35,7 +35,8 @@ import {
 } from "../core/connections";
 import { isBlockLinkAny } from "../core/nodeSpans";
 import { getBlockLink } from "../core/blockLink";
-import { linkStyle, linkToHref } from "./linkOperations";
+import { ENTITY_SCHEME_RE } from "../core/entityRecognition";
+import { inlineTargetToHref, linkStyle, linkToHref } from "./linkOperations";
 import { ReferenceDisplay } from "./referenceDisplay";
 import { MiniEditor, preventEditorBlur } from "./AddNode";
 import { useOnToggleExpanded } from "./SelectNodes";
@@ -275,6 +276,74 @@ function ReferenceContent({
   return <ReferenceDisplay reference={reference} />;
 }
 
+function InlineLinkSpan({
+  span,
+  sourceId,
+}: {
+  span: Extract<InlineSpan, { kind: "link" }>;
+  sourceId: SourceId;
+}): JSX.Element {
+  const data = useData();
+  const navigatePane = useNavigatePane();
+  const href = inlineTargetToHref(data, span.targetID, sourceId);
+  const style = ENTITY_SCHEME_RE.test(span.targetID)
+    ? { color: "var(--violet)" }
+    : undefined;
+  if (!href) {
+    return (
+      <span className="inline-link" style={style}>
+        {span.text}
+      </span>
+    );
+  }
+  return (
+    <a
+      href={href}
+      className="inline-link"
+      style={style}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        navigatePane(href);
+      }}
+      aria-label={`Navigate to ${span.text}`}
+    >
+      {span.text}
+    </a>
+  );
+}
+
+// Inline links render as spans within ordinary text: dashed-underlined so
+// several links in one sentence stay individually visible, violet when the
+// target is an entity. Block-link rows keep their NodeAutoLink wrapper.
+function InlineSpans({
+  node,
+  sourceId,
+}: {
+  node: GraphNode;
+  sourceId: SourceId;
+}): JSX.Element {
+  return (
+    <span className="break-word">
+      {node.spans.map((span, index) => {
+        const key = `${index}-${span.kind}-${span.text}`;
+        if (span.kind === "link") {
+          return <InlineLinkSpan key={key} span={span} sourceId={sourceId} />;
+        }
+        return <React.Fragment key={key}>{span.text}</React.Fragment>;
+      })}
+    </span>
+  );
+}
+
+function hasInlineLinks(node: GraphNode | undefined): node is GraphNode {
+  return (
+    !!node &&
+    !isBlockLinkAny(node) &&
+    node.spans.some((span) => span.kind === "link")
+  );
+}
+
 function NodeContent(): JSX.Element {
   const data = useData();
   const row = useRow();
@@ -283,6 +352,10 @@ function NodeContent(): JSX.Element {
 
   if (reference) {
     return <ReferenceContent reference={reference} />;
+  }
+
+  if (hasInlineLinks(row.node)) {
+    return <InlineSpans node={row.node} sourceId={row.sourceId} />;
   }
 
   return <span className="break-word">{displayText}</span>;
@@ -796,11 +869,11 @@ function SuggestionIndicator(): JSX.Element {
 function IncomingRefGutterIndicator(): JSX.Element {
   return (
     <span
-      className="reference-indicator"
-      title="Incoming Reference"
+      className="maybe-relevant-indicator"
+      title="Suggested link — judge it (! ? ~ + -) to place it"
       aria-hidden="true"
     >
-      R
+      ?
     </span>
   );
 }

@@ -2,6 +2,7 @@ import { CSSProperties } from "react";
 import { useIsViewingOtherUserContent, useRow } from "../rowModel";
 import { isRefNode } from "../core/connections";
 import { isBlockFileLink } from "../core/nodeSpans";
+import { ENTITY_SCHEME_RE } from "../core/entityRecognition";
 import { TYPE_COLORS } from "../core/constants";
 
 type ItemStyle = {
@@ -89,6 +90,9 @@ export function useItemStyle(): ItemStyle {
   const normalizedRelevance =
     relevance === ("" as string) ? undefined : relevance;
   const isOutgoingRef = isRefNode(currentRow) || isBlockFileLink(currentRow);
+  // Violet means entity — the node itself carries a canonical entity id
+  // (an entity home's root). Links to entities get theirs via linkStyle.
+  const isEntityNode = !!currentRow && ENTITY_SCHEME_RE.test(currentRow.id);
 
   return {
     cardStyle: {},
@@ -96,6 +100,7 @@ export function useItemStyle(): ItemStyle {
       ...getRelevanceTextStyle(normalizedRelevance),
       ...getArgumentTextStyle(argument),
       ...(isOutgoingRef ? { fontStyle: "italic" as const } : {}),
+      ...(isEntityNode ? { color: "var(--violet)" } : {}),
     },
     textClassName: "",
     relevance: normalizedRelevance,

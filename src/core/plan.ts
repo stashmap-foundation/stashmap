@@ -600,15 +600,15 @@ export function planMaterializeComputedRow<T extends GraphPlan>(
     const linkNode = getWorkspaceNode(planWithLink.knowledgeDBs, ids[0]);
     return [planWithLink, linkNode ?? row.node, true];
   }
+  // Proposed judgments (a projection's ~ on past entries) are display
+  // only — the mint carries the user's explicit judgment or none at all.
   const minted: GraphNode = {
     ...row.node,
     parent: parentID,
     root: parentNode.root,
     updated: Date.now(),
-    ...(metadata?.relevance !== undefined && {
-      relevance: metadata.relevance,
-    }),
-    ...(metadata?.argument !== undefined && { argument: metadata.argument }),
+    relevance: metadata?.relevance,
+    argument: metadata?.argument,
   };
   const planWithNode = planUpsertNodes(plan, minted);
   const [planAttached] = planAddTargetsToNode(

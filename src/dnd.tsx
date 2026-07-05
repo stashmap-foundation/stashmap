@@ -380,15 +380,47 @@ export function dnd(
   ): Plan => {
     // A computed row with a materialization recipe drags as itself: it
     // materializes at the drop position (mint-or-link decides whether
-    // that means the node or a link row to its home elsewhere).
+    // that means the node or a link row to its home elsewhere). Already
+    // materialized (a projection-reorder pre-step ran): ordinary move.
     if (sourceRow.materialize) {
-      const [materializedPlan] = planMaterializeComputedRow(
-        accPlan,
-        sourceRow,
-        undefined,
-        { parentID: targetParentRow.node.id, insertIndex: insertAt }
+      const [materializedPlan, materializedNode, materializedNow] =
+        planMaterializeComputedRow(accPlan, sourceRow, undefined, {
+          parentID: targetParentRow.node.id,
+          insertIndex: insertAt,
+        });
+      if (materializedNow || !sourceRow.parentRef) {
+        return materializedPlan;
+      }
+      // Same-parent: an in-place reorder (planMoveNode is add-then-
+      // disconnect and not same-parent-safe). Cross-parent: a move.
+      if (sourceRow.parentRef.id === targetParentRow.node.id) {
+        const parentNode = getCurrentPlanNode(
+          materializedPlan,
+          targetParentRow.node
+        );
+        const fromIndex = parentNode.children.indexOf(materializedNode.id);
+        if (fromIndex < 0) {
+          return materializedPlan;
+        }
+        const reordered = planUpsertNodes(
+          materializedPlan,
+          moveNodes(parentNode, [fromIndex], insertAt)
+        );
+        return planUpdateViews(
+          reordered,
+          updateViewPathsAfterMoveNodes(reordered)
+        );
+      }
+      return planMoveNode(
+        materializedPlan,
+        materializedNode.id,
+        materializedNode.id,
+        sourceRow.parentRef.id,
+        sourceRow.viewPath,
+        targetParentRow.node.id,
+        targetParentRow.viewPath,
+        insertAt
       );
-      return materializedPlan;
     }
     return planAddToParent(
       accPlan,

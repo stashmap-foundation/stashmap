@@ -279,18 +279,56 @@ Salon
     { showGutter: true }
   );
 
-  // Drag a still-projected entry to resort it: it materializes at the
-  // drop position, and the calendar projects no duplicate.
+  // Drag a still-projected entry to resort it: a within-calendar
+  // reorder materializes the whole displayed sequence (Founding loses
+  // its ~ proposal — it is real content now, judged by nobody), and the
+  // dragged entry lands at the drop position with no duplicate.
   dragTextOnto(dunbarText(), "14.07.2030 Sommerfest");
   await expectTree(
     `
 Salon
   Termine https://scholarium.at/salon.ics
-    {~} 01.01.2020 Founding seminar
+    01.01.2020 Founding seminar
     14.07.2030 Sommerfest
     ${dunbarText()}
     Notes
   `,
     { showGutter: true }
   );
+});
+
+test("reordering within the calendar materializes the whole sequence", async () => {
+  const [alice] = setup([ALICE]);
+  renderApp({
+    ...alice(),
+    fetchCalendarFeed: async () => FEED,
+  });
+
+  await type(
+    "Salon{Enter}{Tab}Termine https://scholarium.at/salon.ics{Escape}"
+  );
+  await userEvent.click(
+    await screen.findByLabelText(
+      "expand Termine https://scholarium.at/salon.ics"
+    )
+  );
+
+  // Move the first (past) entry to the end: the displayed sequence
+  // materializes in the new order — document order is authoritative,
+  // nothing chases the moved row.
+  dragTextOnto("01.01.2020 Founding seminar", dunbarText());
+
+  const expected = `
+Salon
+  Termine https://scholarium.at/salon.ics
+    14.07.2030 Sommerfest
+    ${dunbarText()}
+    01.01.2020 Founding seminar
+  `;
+  await expectTree(expected, { showGutter: true });
+
+  // The order is file content now: it survives a reload.
+  cleanup();
+  renderApp({ ...alice(), fetchCalendarFeed: async () => FEED });
+  await expectTree(expected, { showGutter: true });
 });

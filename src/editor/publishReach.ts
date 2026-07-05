@@ -11,17 +11,13 @@ import {
 import { getNode } from "../core/connections";
 import { publishStateOf } from "../core/knowstrFrontmatter";
 
-// The identified-context ladder (idea.md, Entities): one rung per
-// identified node in the document — a node whose own id, or whose link
-// target, carries an entity scheme. Each rung is that node's full context
-// set (every identified ancestor on its path plus itself), deduplicated,
-// sorted, space-joined; sorting makes rungs order-independent, and a
-// joined rung is a precomputed AND that only context-sharers derive.
-// `- [Barcelona] / - [Sagrada Familia] / - I want to see it` yields
-// `wd:Q1492` and `wd:Q1492 wd:Q48435` — linear in chain depth, never a
-// power set. The ladder reads THROUGH link targets: identification comes
-// from the target id, traversal stays within this document's tree.
-export function documentEntityLadder(
+// Entity tags (idea.md, Entities): one bare tag per identified node in
+// the document — a node whose own id, or whose link target, carries an
+// entity scheme — deduplicated. Derivation reads THROUGH link targets:
+// identification comes from the target id, traversal stays within this
+// document's tree. Structure contributes nothing to the tags; readers
+// rank arrivals by tag overlap with what they hold.
+export function documentEntityTags(
   knowledgeDBs: KnowledgeDBs,
   document: Document
 ): string[] {
@@ -36,21 +32,20 @@ export function documentEntityLadder(
     const target = getBlockLinkTarget(node);
     return target && ENTITY_SCHEME_RE.test(target) ? target : undefined;
   };
-  const rungs = new Set<string>();
-  const walk = (nodeId: ID, context: ReadonlySet<string>): void => {
+  const tags = new Set<string>();
+  const walk = (nodeId: ID): void => {
     const node = nodes.get(nodeId);
     if (!node) {
       return;
     }
     const entity = entityOf(node);
-    const next = entity ? new Set([...context, entity]) : context;
     if (entity) {
-      rungs.add([...next].sort().join(" "));
+      tags.add(entity);
     }
-    node.children.forEach((childId) => walk(childId, next));
+    node.children.forEach((childId) => walk(childId));
   };
-  document.topNodeShortIds.forEach((id) => walk(id as ID, new Set<string>()));
-  return [...rungs];
+  document.topNodeShortIds.forEach((id) => walk(id as ID));
+  return [...tags];
 }
 
 // The "not shared here" chip: a link row inside a published document whose

@@ -11,7 +11,7 @@ import { ASSET_ENTITY_RELAY, DEFAULT_RELAYS } from "../nostr";
 import { depositEntityTags, hasAssetEntityTag } from "../nodesDocumentEvent";
 import { publishStateOf, type PublishState } from "../core/knowstrFrontmatter";
 import { getNodeDocumentId, planSetDocumentPublishState } from "../core/plan";
-import { documentEntityLadder } from "./publishReach";
+import { documentEntityTags } from "./publishReach";
 import { TemporaryViewProvider, useTemporaryView } from "./temporaryViewState";
 
 import { getDisplayTextForRow, getIndependentRows } from "../rowModel";
@@ -594,7 +594,7 @@ function PublishButton(): JSX.Element | null {
       entities: [
         ...new Set([
           ...(state?.entities ?? []),
-          ...documentEntityLadder(data.knowledgeDBs, document),
+          ...documentEntityTags(data.knowledgeDBs, document),
         ]),
       ],
       relays: state?.relays,

@@ -465,12 +465,12 @@ export function useDroppable({
                 base
               )
           : base;
-        const anchor = dropDestination.anchorRow;
-        if (!anchor?.materialize && !isProjectionReorder) {
+        const { anchorRow } = dropDestination;
+        if (!anchorRow?.materialize && !isProjectionReorder) {
           return [withSequence, dropDestination.insertAtIndex];
         }
-        const anchored = anchor
-          ? planMaterializeComputedRow(withSequence, anchor)
+        const anchored = anchorRow
+          ? planMaterializeComputedRow(withSequence, anchorRow)
           : undefined;
         const planWithAnchor = anchored ? anchored[0] : withSequence;
         const anchorNode = anchored?.[1];

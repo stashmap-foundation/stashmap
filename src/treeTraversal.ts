@@ -422,6 +422,28 @@ function appendNodeToPath(path: ViewPath, nodeID: ID): ViewPath {
 }
 
 // The prepared take for an incoming reference: the accepted row is a
+function sourceDocumentTakeTarget(
+  data: Data,
+  sourceRow: GraphNode
+): AddToParentTarget | undefined {
+  const graph = graphLookupFromData(data);
+  const sourceRoot =
+    sourceRow.id === sourceRow.root
+      ? sourceRow
+      : getNodeInSource(graph, { sourceId: LOCAL, id: sourceRow.root })?.node;
+  const sourceDocument = sourceRoot?.docId
+    ? data.documents.get(documentKeyOf(LOCAL, sourceRoot.docId))
+    : undefined;
+  return sourceDocument
+    ? createDocumentLinkTarget(
+        sourceDocument.sourceId,
+        sourceDocument.docId,
+        documentLinkPath(sourceDocument),
+        nodeText(sourceRoot as GraphNode) || sourceDocument.title
+      )
+    : undefined;
+}
+
 // reference (link row or document link), never an adoption — computed at
 // row build, carried as plain data (R3: incoming refs on the seam).
 function incomingTakeTarget(
@@ -445,28 +467,6 @@ function incomingTakeTarget(
   return targetID
     ? createRefTarget(targetID, getBlockLinkText(node))
     : (rowID as AddToParentTarget);
-}
-
-function sourceDocumentTakeTarget(
-  data: Data,
-  sourceRow: GraphNode
-): AddToParentTarget | undefined {
-  const graph = graphLookupFromData(data);
-  const sourceRoot =
-    sourceRow.id === sourceRow.root
-      ? sourceRow
-      : getNodeInSource(graph, { sourceId: LOCAL, id: sourceRow.root })?.node;
-  const sourceDocument = sourceRoot?.docId
-    ? data.documents.get(documentKeyOf(LOCAL, sourceRoot.docId))
-    : undefined;
-  return sourceDocument
-    ? createDocumentLinkTarget(
-        sourceDocument.sourceId,
-        sourceDocument.docId,
-        documentLinkPath(sourceDocument),
-        nodeText(sourceRoot as GraphNode) || sourceDocument.title
-      )
-    : undefined;
 }
 
 function createVirtualRow(

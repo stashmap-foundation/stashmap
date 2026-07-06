@@ -26,6 +26,11 @@ contextBridge.exposeInMainWorld("knowstrDesktop", {
   isElectron: true,
   platform: process.platform,
   workspace,
-  fetchText: (url: string): Promise<string> =>
-    ipcRenderer.invoke("net:fetch-text", url),
+  fetchText: async (url: string): Promise<string> => {
+    const text: unknown = await ipcRenderer.invoke("net:fetch-text", url);
+    if (typeof text !== "string") {
+      throw new Error("net:fetch-text returned a non-string");
+    }
+    return text;
+  },
 });

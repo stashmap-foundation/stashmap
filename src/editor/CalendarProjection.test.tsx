@@ -42,7 +42,7 @@ test("calendar nodes project dated rows; the past proposes ~", async () => {
   const [alice] = setup([ALICE]);
   renderApp({
     ...alice(),
-    fetchCalendarFeed: async () => FEED,
+    fetchCalendarFeed: () => Promise.resolve(FEED),
   });
 
   await type(
@@ -72,9 +72,10 @@ test("bare feed urls wrap; the label renames without losing the feed", async () 
   const fetchedUrls: string[] = [];
   renderApp({
     ...alice(),
-    fetchCalendarFeed: async (url: string) => {
+    fetchCalendarFeed: (url: string) => {
+      // eslint-disable-next-line functional/immutable-data
       fetchedUrls.push(url);
-      return FEED;
+      return Promise.resolve(FEED);
     },
   });
 
@@ -111,7 +112,7 @@ test("judging a projected entry materializes it with the judgment", async () => 
   const [alice] = setup([ALICE]);
   renderApp({
     ...alice(),
-    fetchCalendarFeed: async () => FEED,
+    fetchCalendarFeed: () => Promise.resolve(FEED),
   });
 
   await type(
@@ -141,7 +142,7 @@ Salon
   // Survives a reload: the entry is real workspace content now (the
   // expanded view state persists too, so no second expand click).
   cleanup();
-  renderApp({ ...alice(), fetchCalendarFeed: async () => FEED });
+  renderApp({ ...alice(), fetchCalendarFeed: () => Promise.resolve(FEED) });
   await expectTree(
     `
 Salon
@@ -158,7 +159,7 @@ test("multiselect judgment materializes projected and spares untouched", async (
   const [alice] = setup([ALICE]);
   renderApp({
     ...alice(),
-    fetchCalendarFeed: async () => FEED,
+    fetchCalendarFeed: () => Promise.resolve(FEED),
   });
 
   await type(
@@ -191,7 +192,7 @@ test("writing under a projected entry materializes it with the note", async () =
   const [alice] = setup([ALICE]);
   renderApp({
     ...alice(),
-    fetchCalendarFeed: async () => FEED,
+    fetchCalendarFeed: () => Promise.resolve(FEED),
   });
 
   await type(
@@ -224,7 +225,7 @@ Salon
 
   // Real content: survives reload.
   cleanup();
-  renderApp({ ...alice(), fetchCalendarFeed: async () => FEED });
+  renderApp({ ...alice(), fetchCalendarFeed: () => Promise.resolve(FEED) });
   await expectTree(
     `
 Salon
@@ -251,7 +252,7 @@ test("dnd both ways: projections drag as themselves and accept drops", async () 
   const [alice] = setup([ALICE]);
   renderApp({
     ...alice(),
-    fetchCalendarFeed: async () => FEED,
+    fetchCalendarFeed: () => Promise.resolve(FEED),
   });
 
   await type(
@@ -301,7 +302,7 @@ test("the ~ on a materialized past entry is a proposal, not content", async () =
   const [alice] = setup([ALICE]);
   renderApp({
     ...alice(),
-    fetchCalendarFeed: async () => FEED,
+    fetchCalendarFeed: () => Promise.resolve(FEED),
   });
 
   await type(
@@ -359,7 +360,7 @@ test("reordering within the calendar materializes the whole sequence", async () 
   const [alice] = setup([ALICE]);
   renderApp({
     ...alice(),
-    fetchCalendarFeed: async () => FEED,
+    fetchCalendarFeed: () => Promise.resolve(FEED),
   });
 
   await type(
@@ -389,6 +390,6 @@ Salon
 
   // The order is file content now: it survives a reload.
   cleanup();
-  renderApp({ ...alice(), fetchCalendarFeed: async () => FEED });
+  renderApp({ ...alice(), fetchCalendarFeed: () => Promise.resolve(FEED) });
   await expectTree(expected, { showGutter: true });
 });

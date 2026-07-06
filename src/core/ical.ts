@@ -6,21 +6,6 @@ import { icalEntryId } from "./icalId";
 const ICAL_URL_RE =
   /(webcal:\/\/[^\s\]()]+|https?:\/\/[^\s\]()]+\.ics(\?[^\s\]()]*)?)/iu;
 
-// The calendar-feed recognizer: a node whose text carries an iCal URL
-// (`.ics` or `webcal://`) is a calendar-feed node — recognized like
-// entities, no node-type UI. Returns the feed URL, or undefined.
-export function icalFeedUrlOf(text: string): string | undefined {
-  const linkForm = icalFeedLinkPartsOf(text);
-  if (linkForm) {
-    return linkForm.url;
-  }
-  const match = ICAL_URL_RE.exec(text);
-  if (!match) {
-    return undefined;
-  }
-  return match[0].replace(/[}>,.]+$/u, "") || undefined;
-}
-
 const ICAL_FEED_LINK_RE =
   /^\[([^\]]*)\]\((webcal:\/\/[^\s()]+|https?:\/\/[^\s()]+\.ics(\?[^\s()]*)?)\)$/iu;
 
@@ -35,6 +20,21 @@ export function icalFeedLinkPartsOf(
     return undefined;
   }
   return { label: match[1], url: match[2] };
+}
+
+// The calendar-feed recognizer: a node whose text carries an iCal URL
+// (`.ics` or `webcal://`) is a calendar-feed node — recognized like
+// entities, no node-type UI. Returns the feed URL, or undefined.
+export function icalFeedUrlOf(text: string): string | undefined {
+  const linkForm = icalFeedLinkPartsOf(text);
+  if (linkForm) {
+    return linkForm.url;
+  }
+  const match = ICAL_URL_RE.exec(text);
+  if (!match) {
+    return undefined;
+  }
+  return match[0].replace(/[}>,.]+$/u, "") || undefined;
 }
 
 // A row whose whole text is a feed URL — the paste/typing form that gets

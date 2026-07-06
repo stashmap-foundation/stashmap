@@ -582,6 +582,46 @@ function createProjectionRow(
   return { ...row, materialize: { precededBy } };
 }
 
+// The action row: a full-text, clickable, button-shaped thing in row
+// position that is obviously not content — the wallet's "Register as
+// Shareholder" element, shared instead of reinvented. One interaction
+// (click), no gutter, no editor, no judgment. Carries its own view
+// state (showPastEntries), so the reveal survives collapse/expand.
+function createPastDatesActionRow(
+  data: Data,
+  graph: GraphLookup,
+  parentRow: Row,
+  parentNode: GraphNode,
+  parentSourceId: SourceId
+): Row {
+  const node: GraphNode = {
+    children: List<ID>(),
+    id: `action:past:${parentNode.id}` as ID,
+    spans: plainSpans("past dates"),
+    parent: parentNode.id,
+    updated: parentNode.updated ?? Date.now(),
+    root: parentNode.root ?? parentNode.id,
+    relevance: undefined,
+  };
+  const parentPath = addNodesToLastElement(parentRow.viewPath, parentNode.id);
+  const viewPath = appendNodeToPath(parentPath, node.id);
+  const row = createRow(
+    data,
+    graph,
+    viewPath,
+    node,
+    graph.localSourceId,
+    parentRow,
+    parentNode,
+    { sourceId: parentSourceId, id: parentNode.id },
+    undefined,
+    false,
+    undefined,
+    undefined
+  );
+  return { ...row, action: "toggle-past-entries" };
+}
+
 // The machine-feeds merge at row level: children keep document order,
 // untouched projections slot in per mergeProjectedEntries. Projections
 // derive from data.calendarFeeds and never touch knowledgeDBs.
@@ -594,20 +634,36 @@ function interleaveProjectionRows(
   rowsByChildId: Map<ID, Row>,
   childRows: List<Row>,
   typeFilters: Pane["typeFilters"]
-): List<Row> {
+): { rows: List<Row>; actionRow?: Row } {
   const feedUrl = icalFeedUrlOf(nodeText(parentNode));
   const entries = feedUrl ? data.calendarFeeds?.get(feedUrl) : undefined;
   if (!entries || entries.length === 0) {
-    return childRows;
+    return { rows: childRows };
   }
   const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
-  // Bare past entries don't project by default (the feed row's chip
-  // reveals them); file content always shows. Pastness is node-type
-  // rendering, never a judgment.
+  // Bare past entries don't project by default; the action row reveals
+  // them. File content always shows. Pastness is node-type rendering,
+  // never a judgment.
+  const pastCount = hiddenPastEntryCount(
+    parentNode.children.toArray(),
+    entries,
+    Date.now()
+  );
+  const actionRow =
+    pastCount > 0
+      ? createPastDatesActionRow(
+          data,
+          graph,
+          parentRow,
+          parentNode,
+          parentSourceId
+        )
+      : undefined;
+  const showPast = actionRow?.view.showPastEntries === true;
   const merged = mergeProjectedEntries(
     parentNode.children.toArray(),
     entries,
-    parentRow.view.showPastEntries ? undefined : Date.now()
+    showPast ? undefined : Date.now()
   );
   // Nearest-first anchors of everything displayed above, materialized or
   // not — ids are deterministic, so an anchor may reference a row that
@@ -639,7 +695,10 @@ function interleaveProjectionRows(
     },
     { rows: [], precededBy: [] }
   );
-  return List(rows);
+  // The action row is footer territory — the caller places it below the
+  // dotted line, ahead of the other virtual rows. Never an anchor: its
+  // id is view furniture, not content.
+  return { rows: List(rows), actionRow };
 }
 
 function appendVirtualFooterRows(
@@ -802,7 +861,7 @@ function getChildrenForRegularNode(
   const rowsByChildId = Map<ID, Row>(
     childRowPairs.map(({ childID, row }) => [childID, row])
   );
-  const rowsWithProjections = interleaveProjectionRows(
+  const { rows: rowsWithProjections, actionRow } = interleaveProjectionRows(
     data,
     graph,
     parentRow,
@@ -854,8 +913,19 @@ function getChildrenForRegularNode(
     versionMetas,
   });
 
+  // The action row leads the footer block: it carries the dotted
+  // separator (isFirstVirtual) and the real virtual rows lose it.
+  const footerRows = actionRow
+    ? List<Row>([{ ...actionRow, isFirstVirtual: true }]).concat(
+        footerResult.rows.map((footerRow) => ({
+          ...footerRow,
+          isFirstVirtual: false,
+        }))
+      )
+    : footerResult.rows;
+
   return {
-    rows: rowsWithProjections.concat(footerResult.rows),
+    rows: rowsWithProjections.concat(footerRows),
   };
 }
 

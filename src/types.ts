@@ -233,6 +233,9 @@ declare global {
     };
     isFirstVirtual: boolean;
     virtualType: "suggestion" | "search" | "incoming" | "version" | undefined;
+    // The action row: a button in row position, obviously not content.
+    // One interaction (click); no gutter, no editor, no judgment, no drag.
+    action?: "toggle-past-entries";
     versionMeta:
       | {
           updated: number;

@@ -313,7 +313,10 @@ export function updateView(views: Views, path: ViewPath, view: View): Views {
   const key = viewPathToString(path);
   const rowID = getLast(path);
   const defaultView = getDefaultView(rowID, isRoot(path));
-  const isDefault = view.expanded === defaultView.expanded && !view.typeFilters;
+  const isDefault =
+    view.expanded === defaultView.expanded &&
+    !view.typeFilters &&
+    !view.showPastEntries;
   if (isDefault) {
     return views.delete(key);
   }

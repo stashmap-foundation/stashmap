@@ -12,6 +12,8 @@ import {
 import {
   EMPTY_SEMANTIC_ID,
   computeEmptyNodeMetadata,
+  createDocumentLinkTarget,
+  createRefTarget,
   getNodeContext,
   getNodeSemanticID,
   getSemanticID,
@@ -23,6 +25,7 @@ import {
   getBlockFileLinkText,
   getBlockLinkTarget,
   getBlockLinkText,
+  isBlockFileLink,
   isBlockLink,
   isBlockLinkAny,
   linkSpan,
@@ -37,13 +40,19 @@ import {
   mergeProjectedEntries,
   proposedEntryRelevance,
 } from "./core/ical";
-import { getDocumentByIdOrFilePath, type Document } from "./core/Document";
+import {
+  documentKeyOf,
+  documentLinkPath,
+  getDocumentByIdOrFilePath,
+  type Document,
+} from "./core/Document";
 import { DEFAULT_TYPE_FILTERS } from "./core/constants";
 import {
   getAlternativeFooterData,
   getIncomingCrefsForNode,
 } from "./semanticProjection";
 import { buildReferenceItem } from "./buildReferenceRow";
+import type { AddToParentTarget } from "./core/plan";
 import {
   GraphLookup,
   ResolvedNode,
@@ -405,13 +414,62 @@ function appendNodeToPath(path: ViewPath, nodeID: ID): ViewPath {
   return [path[0], ...path.slice(1), nodeID] as ViewPath;
 }
 
+// The prepared take for an incoming reference: the accepted row is a
+// reference (link row or document link), never an adoption — computed at
+// row build, carried as plain data (R3: incoming refs on the seam).
+function incomingTakeTarget(
+  data: Data,
+  node: GraphNode,
+  rowID: ID
+): AddToParentTarget {
+  const sourceID = getBlockLinkTarget(node) ?? node.id;
+  const sourceRow = getNodeInSource(graphLookupFromData(data), {
+    sourceId: LOCAL,
+    id: sourceID,
+  })?.node;
+  const documentTarget =
+    sourceRow && isBlockFileLink(sourceRow)
+      ? sourceDocumentTakeTarget(data, sourceRow)
+      : undefined;
+  if (documentTarget) {
+    return documentTarget;
+  }
+  const targetID = getBlockLinkTarget(node);
+  return targetID
+    ? createRefTarget(targetID, getBlockLinkText(node))
+    : (rowID as AddToParentTarget);
+}
+
+function sourceDocumentTakeTarget(
+  data: Data,
+  sourceRow: GraphNode
+): AddToParentTarget | undefined {
+  const graph = graphLookupFromData(data);
+  const sourceRoot =
+    sourceRow.id === sourceRow.root
+      ? sourceRow
+      : getNodeInSource(graph, { sourceId: LOCAL, id: sourceRow.root })?.node;
+  const sourceDocument = sourceRoot?.docId
+    ? data.documents.get(documentKeyOf(LOCAL, sourceRoot.docId))
+    : undefined;
+  return sourceDocument
+    ? createDocumentLinkTarget(
+        sourceDocument.sourceId,
+        sourceDocument.docId,
+        documentLinkPath(sourceDocument),
+        nodeText(sourceRoot as GraphNode) || sourceDocument.title
+      )
+    : undefined;
+}
+
 function createVirtualRow(
   data: Data,
   graph: GraphLookup,
   input: VirtualFooterInput,
   rowRef: NodeRef,
   virtualType: Row["virtualType"],
-  isFirstVirtual: boolean
+  isFirstVirtual: boolean,
+  priorAnchors: ID[] = []
 ): Row {
   const rowID = rowRef.id;
   const { node, sourceId } = createVirtualRowNode(
@@ -434,7 +492,7 @@ function createVirtualRow(
     : undefined;
   const versionMeta =
     virtualType === "version" ? input.versionMetas.get(rowID as ID) : undefined;
-  return createRow(
+  const row = createRow(
     data,
     graph,
     viewPath,
@@ -448,6 +506,33 @@ function createVirtualRow(
     virtualType,
     versionMeta
   );
+  if (virtualType !== "incoming" || input.parentID === undefined) {
+    return row;
+  }
+  // Incoming references are unordered proposals: they take at the
+  // boundary — the end of the parent's current children (idea.md,
+  // Proposals take at commit) — as references, with the source's
+  // judgment as default.
+  const parentChildren =
+    getNodeInSource(graph, {
+      sourceId: input.parentSourceId,
+      id: input.parentID,
+    })?.node.children.toArray() ?? [];
+  const targetID = getBlockLinkTarget(node);
+  const inherited = targetID
+    ? getNodeInSource(graph, { sourceId: LOCAL, id: targetID })?.node
+    : undefined;
+  return {
+    ...row,
+    materialize: {
+      precededBy: [...priorAnchors, ...([...parentChildren].reverse() as ID[])],
+      take: incomingTakeTarget(data, node, rowID as ID),
+      defaults: {
+        relevance: inherited?.relevance,
+        argument: inherited?.argument,
+      },
+    },
+  };
 }
 
 // A projected calendar entry as a behaviorally first-class row (idea.md,
@@ -566,10 +651,31 @@ function appendVirtualFooterRows(
   input: VirtualFooterInput,
   initial: TreeResult = emptyTreeResult()
 ): TreeResult {
-  const incomingRows = input.incomingCrefs.map((rowRef, index) =>
-    createVirtualRow(data, graph, input, rowRef, "incoming", index === 0)
-  );
-  const suggestionOffset = incomingRows.size;
+  // Each incoming row anchors on its predecessors too (nearest-first):
+  // batch accepts land in display order — a fresh link row matches its
+  // proposal's id through the anchor target check.
+  const incomingRows = input.incomingCrefs.reduce<{
+    rows: Row[];
+    priorAnchors: ID[];
+  }>(
+    (acc, rowRef, index) => {
+      const row = createVirtualRow(
+        data,
+        graph,
+        input,
+        rowRef,
+        "incoming",
+        index === 0,
+        acc.priorAnchors
+      );
+      return {
+        rows: [...acc.rows, row],
+        priorAnchors: [rowRef.id as ID, ...acc.priorAnchors],
+      };
+    },
+    { rows: [], priorAnchors: [] }
+  ).rows;
+  const suggestionOffset = incomingRows.length;
   const suggestionRows = input.suggestions.map((rowID, index) =>
     createVirtualRow(
       data,
@@ -580,7 +686,7 @@ function appendVirtualFooterRows(
       suggestionOffset + index === 0
     )
   );
-  const versionOffset = incomingRows.size + suggestionRows.size;
+  const versionOffset = incomingRows.length + suggestionRows.size;
   const versionRows = input.versionMetas
     .keySeq()
     .toList()

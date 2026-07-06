@@ -541,7 +541,17 @@ export function createGraphPlan(props: CreateGraphPlanProps): GraphPlan {
 export type MaterializableRow = {
   node: GraphNode;
   parentRef?: NodeRef;
-  materialize?: { precededBy: ID[] };
+  materialize?: {
+    precededBy: ID[];
+    // A prepared take: materialize by adding THIS target (a link row or
+    // document link) instead of minting the row's node — how proposals
+    // (incoming references, later suggestions) enter: reference, not
+    // adoption. Plain data, computed by the row's producer.
+    take?: AddToParentTarget;
+    // Judgment defaults inherited from the proposal's source, applied
+    // when the gesture carries none.
+    defaults?: { relevance?: Relevance; argument?: Argument };
+  };
 };
 
 function materializeInsertIndex(
@@ -584,6 +594,18 @@ export function planMaterializeComputedRow<T extends GraphPlan>(
   const insertIndex =
     placement?.insertIndex ??
     materializeInsertIndex(plan, parentNode, row.materialize.precededBy);
+  if (row.materialize.take !== undefined) {
+    const [planWithTake, ids] = planAddTargetsToNode(
+      plan,
+      parentID,
+      row.materialize.take,
+      insertIndex,
+      metadata?.relevance ?? row.materialize.defaults?.relevance,
+      metadata?.argument ?? row.materialize.defaults?.argument
+    );
+    const takenNode = getWorkspaceNode(planWithTake.knowledgeDBs, ids[0]);
+    return [planWithTake, takenNode ?? row.node, true];
+  }
   const existing = getWorkspaceNode(plan.knowledgeDBs, row.node.id);
   if (existing) {
     // Homed elsewhere: this placement becomes a link row (mint or link,

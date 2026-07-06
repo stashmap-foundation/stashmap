@@ -124,19 +124,6 @@ function getBlockLinkInsertTarget(
     : undefined;
 }
 
-function getIncomingFileLinkSource(
-  plan: Plan,
-  node: GraphNode,
-  virtualType: Row["virtualType"]
-): GraphNode | undefined {
-  if (virtualType !== "incoming") {
-    return undefined;
-  }
-  const sourceID = getBlockLinkTarget(node) ?? node.id;
-  const sourceRow = getNode(plan.knowledgeDBs, sourceID, LOCAL);
-  return isBlockFileLink(sourceRow) ? sourceRow : undefined;
-}
-
 function planAcceptDocumentTopIncoming(
   plan: Plan,
   input: {
@@ -295,17 +282,11 @@ export function planUpdateViewItemMetadata(
         metadata.argument
       );
     }
-    const incomingFileLinkSource = getIncomingFileLinkSource(
-      plan,
-      node,
-      virtualType
-    );
-    const targetItem =
-      (incomingFileLinkSource
-        ? getBlockLinkInsertTarget(plan, incomingFileLinkSource)
-        : undefined) ??
-      getBlockLinkInsertTarget(plan, node) ??
-      rowID;
+    // Incoming references route through the materialization seam
+    // (planMaterializeComputedRow with their prepared take) before this
+    // function is ever reached; what remains here serves versions and
+    // block-link suggestions.
+    const targetItem = getBlockLinkInsertTarget(plan, node) ?? rowID;
     const targetID = getBlockLinkTarget(node);
     const inheritedSourceNode = targetID
       ? getNode(plan.knowledgeDBs, targetID, LOCAL)

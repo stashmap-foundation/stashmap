@@ -5,6 +5,7 @@ import { RelayInformation } from "nostr-tools/lib/types/nip11";
 import { QueueStatus } from "./infra/nostr/cache/PublishQueue";
 import { Document as DocumentType } from "./core/Document";
 import { IcalEntry } from "./core/ical";
+import type { AddToParentTarget } from "./core/plan";
 
 declare global {
   type Children = {
@@ -200,10 +201,15 @@ declare global {
     childIndex: number | undefined;
     hasChildren: boolean;
     // The materialization recipe (idea.md: write gestures take first).
-    // Plain data attached by the row's producer: nearest-first ids of the
-    // display rows above it under the same parent. Present = the row is
-    // computed and a write gesture must materialize it first.
-    materialize?: { precededBy: ID[] };
+    // Plain data attached by the row's producer: nearest-first anchors,
+    // optionally a prepared take (references enter as references) and
+    // judgment defaults inherited from the proposal's source. Present =
+    // the row is computed and a write gesture must materialize it first.
+    materialize?: {
+      precededBy: ID[];
+      take?: AddToParentTarget;
+      defaults?: { relevance?: Relevance; argument?: Argument };
+    };
     isFirstVirtual: boolean;
     virtualType: "suggestion" | "search" | "incoming" | "version" | undefined;
     versionMeta:

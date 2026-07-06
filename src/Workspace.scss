@@ -554,54 +554,33 @@ body {
 
 
 // Expand/collapse toggle
-// The block flow inside the flex content wrapper: floats work here, so
-// the past chip can sit in the text flow and the label wraps around it.
-.node-content-flow {
-  flex: 1;
-  min-width: 0;
-}
-
-// The editor is inline-block (a sealed box) by default — on chip rows it
-// must be inline so its text lines actually flow around the float.
-.node-content-flow:has(> .past-entries-chip) .mini-editor {
-  display: inline;
-}
-
-// The feed row's past chip: same dashed language as the not-published
-// publish button, filter-symbol text size, sits after the expand triangle.
-.past-entries-chip {
+// The action row: a button in row position, obviously not content — the
+// wallet's "Register as Shareholder" element, shared instead of
+// reinvented. Dressed like the footer rows it lives among (italic,
+// muted, node-size text); button-ness reveals on hover.
+.action-row-btn {
   background: transparent;
-  border: 1px dashed var(--base01);
-  border-radius: 3px;
-  padding: 0 6px;
-  margin-right: 6px;
+  border: none;
+  padding: 0;
   cursor: pointer;
-  display: inline-flex;
-  float: left;
-  align-items: center;
-  white-space: nowrap;
   height: var(--row-height, 22px);
+  display: flex;
+  align-items: center;
   color: var(--base01);
-  font-size: 14px;
-  line-height: 1;
-  transition: color 150ms ease, border-color 150ms ease;
+  font-style: italic;
+  font-size: inherit;
+  transition: color 150ms ease;
 
   &:hover {
-    border-color: var(--violet);
-    color: var(--violet);
+    color: var(--blue);
+    text-decoration: underline;
   }
+}
 
-  // Past on screen: the solid header-action-btn look — dashed means absent.
-  &.past-entries-chip-shown {
-    background: var(--base02);
-    border: 1px solid transparent;
-    color: var(--base0);
-
-    &:hover {
-      background: var(--base01);
-      color: var(--base1);
-    }
-  }
+.action-row-indicator {
+  color: var(--base01);
+  font-weight: bold;
+  font-family: monospace;
 }
 
 .expand-collapse-toggle {

@@ -15,7 +15,6 @@ import {
   useCurrentNode,
   getCurrentReferenceForRow,
   useRow,
-  isFileRow,
   updateView,
 } from "../rowModel";
 import { isEditableNode } from "./temporaryViewState";
@@ -129,26 +128,31 @@ function ExpandCollapseToggle(): JSX.Element | null {
   );
 }
 
-// The feed row's past chip: bare past entries don't project by default;
-// this piece of row furniture (left of the editable label, like the expand
-// caret) reveals and hides them. A per-node view setting, never file
-// content — and never a row: nothing un-interactable appears in the tree.
-function PastEntriesChip(): JSX.Element | null {
+// The action row's content: a button in row position, obviously not
+// content — the wallet's "Register as Shareholder" element, shared
+// instead of reinvented. The label is the action; it always says what a
+// click does. State lives on the action row's own view.
+function PastDatesActionRow(): JSX.Element {
   const data = useData();
   const row = useRow();
   const { feeds } = useCalendarFeeds();
   const { createPlan, executePlan } = usePlanner();
-  const feedUrl = isFileRow(row)
-    ? icalFeedUrlOf(nodeText(row.node))
+  const feedUrl = row.parentNode
+    ? icalFeedUrlOf(nodeText(row.parentNode))
     : undefined;
   const entries = feedUrl ? feeds.get(feedUrl) : undefined;
-  const pastCount = entries
-    ? hiddenPastEntryCount(row.node.children.toArray(), entries, Date.now())
-    : 0;
-  if (pastCount === 0) {
-    return null;
-  }
+  const pastCount =
+    entries && row.parentNode
+      ? hiddenPastEntryCount(
+          row.parentNode.children.toArray(),
+          entries,
+          Date.now()
+        )
+      : 0;
   const showPast = row.view.showPastEntries === true;
+  const label = showPast
+    ? "Hide past dates"
+    : `Show ${pastCount} past ${pastCount === 1 ? "date" : "dates"}`;
   const onToggle = (): void => {
     executePlan(
       planUpdateViews(
@@ -156,27 +160,20 @@ function PastEntriesChip(): JSX.Element | null {
         updateView(data.views, row.viewPath, {
           ...row.view,
           showPastEntries: !showPast,
-          // Revealing the past also expands — the rows must land in view.
-          ...(showPast ? {} : { expanded: true }),
         })
       )
     );
   };
-  // The label is the action (like "Stop publishing"): it always says what
-  // a click does, and the skin doubles as the state — dashed = the past is
-  // absent (the not-published language), solid = it's on screen.
   return (
     <button
       type="button"
-      className={`past-entries-chip ${
-        showPast ? "past-entries-chip-shown" : ""
-      }`}
+      className="action-row-btn"
       onClick={onToggle}
       onMouseDown={preventEditorBlur}
-      aria-label={showPast ? "hide past" : `show ${pastCount} past`}
+      aria-label={label}
       aria-pressed={showPast}
     >
-      {showPast ? "hide past" : `show ${pastCount} past`}
+      {label}
     </button>
   );
 }
@@ -1066,6 +1063,34 @@ export function Node({
 
   const contentClass = isSuggestion ? "content-suggestion" : "";
 
+  if (row.action === "toggle-past-entries") {
+    // Footer-row dress: gutter mark, marker, node-size text — laid out by
+    // the ordinary row grid so it aligns by construction. The ellipsis is
+    // the honest glyph: content elided here.
+    return (
+      <NodeCard className={cls} cardBodyClassName={clsBody}>
+        <div className="indicator-gutter">
+          <span
+            className="action-row-indicator"
+            title="Hidden entries"
+            aria-hidden="true"
+          >
+            …
+          </span>
+        </div>
+        {levels > 0 && <Indent levels={levels} colorLevels={searchDepth} />}
+        <span
+          className="node-marker"
+          aria-hidden="true"
+          data-testid="node-marker"
+        />
+        <div className="w-100 node-content-wrapper">
+          <PastDatesActionRow />
+        </div>
+      </NodeCard>
+    );
+  }
+
   return (
     <EditorTextProvider>
       <NodeCard
@@ -1123,17 +1148,11 @@ export function Node({
           />
         )}
         <div className={`w-100 node-content-wrapper ${contentClass}`}>
-          {/* Block flow container: the chip floats and the label text
-              wraps around it instead of living in a separate column
-              (node-content-wrapper is flex, where floats don't exist). */}
-          <div className="node-content-flow">
-            <PastEntriesChip />
-            <span className={textClassName} style={textStyle}>
-              <NodeAutoLink>
-                <InteractiveNodeContent rows={rows} />
-              </NodeAutoLink>
-            </span>
-          </div>
+          <span className={textClassName} style={textStyle}>
+            <NodeAutoLink>
+              <InteractiveNodeContent rows={rows} />
+            </NodeAutoLink>
+          </span>
         </div>
         <RightMenu />
       </NodeCard>

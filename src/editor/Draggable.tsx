@@ -354,6 +354,21 @@ export function ListItem({
     paneIndex,
   });
 
+  // Action rows are buttons in row position: one interaction (click) —
+  // no drag, no drop, no keyboard row focus. As the first virtual row
+  // they carry the footer's dotted separator.
+  if (row.action) {
+    return (
+      <div
+        className={`visible-on-hover${
+          row.isFirstVirtual ? " first-virtual" : ""
+        }`}
+      >
+        <Node rows={rows} />
+      </div>
+    );
+  }
+
   if (isSuggestion) {
     return (
       <div

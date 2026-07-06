@@ -47,7 +47,7 @@ function dunbarText(): string {
 
 afterEach(cleanup);
 
-test("upcoming entries project; bare past entries live behind the chip", async () => {
+test("upcoming entries project; bare past entries live behind the action row", async () => {
   const [alice] = setup([ALICE]);
   renderApp({
     ...alice(),
@@ -64,7 +64,8 @@ test("upcoming entries project; bare past entries live behind the chip", async (
     )
   );
 
-  // The past entry doesn't project; the feed row wears the chip instead.
+  // The past entry doesn't project; the action row in the footer
+  // announces and reveals it.
   await expectTree(
     `
 Salon
@@ -75,9 +76,9 @@ Salon
     { showGutter: true }
   );
 
-  // The chip reveals the past — unjudged, no gutter mark: pastness is
-  // node-type rendering, never a judgment.
-  await userEvent.click(await screen.findByLabelText("show 1 past"));
+  // The action row reveals the past — unjudged, no judgment gutter mark:
+  // pastness is node-type rendering, never a judgment.
+  await userEvent.click(await screen.findByLabelText("Show 1 past date"));
   await expectTree(
     `
 Salon
@@ -90,7 +91,7 @@ Salon
   );
 
   // …and hides it again.
-  await userEvent.click(await screen.findByLabelText("hide past"));
+  await userEvent.click(await screen.findByLabelText("Hide past dates"));
   await expectTree(
     `
 Salon
@@ -324,7 +325,7 @@ Salon
   );
 });
 
-test("a touched past entry is file content: always visible, chip or not", async () => {
+test("a touched past entry is file content: always visible, revealed or not", async () => {
   const [alice] = setup([ALICE]);
   renderApp({
     ...alice(),
@@ -341,15 +342,14 @@ test("a touched past entry is file content: always visible, chip or not", async 
   );
 
   // Reveal the past, write under the entry — it materializes.
-  await userEvent.click(await screen.findByLabelText("show 1 past"));
+  await userEvent.click(await screen.findByLabelText("Show 1 past date"));
   await userEvent.click(
     await screen.findByLabelText("edit 01.01.2020 Founding seminar")
   );
   await userEvent.keyboard("{Enter}{Tab}Excerpts we are going to read{Escape}");
 
-  // Hide the past again: the touched entry stays — file content always
-  // shows, unjudged, no gutter mark; only bare projections hide. The
-  // chip is gone: nothing is hidden anymore.
+  // The touched entry is file content now — and with nothing left
+  // hidden, the action row is gone entirely.
   const expected = `
 Salon
   Termine https://scholarium.at/salon.ics
@@ -359,7 +359,7 @@ Salon
     ${dunbarText()}
   `;
   await expectTree(expected, { showGutter: true });
-  expect(screen.queryByLabelText("hide past")).toBeNull();
+  expect(screen.queryByLabelText("Hide past dates")).toBeNull();
 
   // An explicit judgment renders as any judgment does.
   await clickRow("01.01.2020 Founding seminar");
@@ -409,9 +409,9 @@ Salon
   renderApp({ ...alice(), fetchCalendarFeed: () => Promise.resolve(FEED) });
   await expectTree(reordered, { showGutter: true });
 
-  // The hidden past entry never materialized: it still lives behind the
-  // chip, projection-only.
-  await userEvent.click(await screen.findByLabelText("show 1 past"));
+  // The hidden past entry never materialized: it still lives behind
+  // the action row, projection-only.
+  await userEvent.click(await screen.findByLabelText("Show 1 past date"));
   await expectTree(
     `
 Salon
@@ -422,7 +422,7 @@ Salon
   `,
     { showGutter: true }
   );
-  await userEvent.click(await screen.findByLabelText("hide past"));
+  await userEvent.click(await screen.findByLabelText("Hide past dates"));
   await expectTree(reordered, { showGutter: true });
 });
 
@@ -441,7 +441,7 @@ test("past entries render dimmed by type, judged rows full strength", async () =
       "expand Termine https://scholarium.at/salon.ics"
     )
   );
-  await userEvent.click(await screen.findByLabelText("show 1 past"));
+  await userEvent.click(await screen.findByLabelText("Show 1 past date"));
 
   // Style assertions need the wrapping styled span — DOM traversal is the
   // point here.
@@ -490,5 +490,5 @@ Events
   [S] Termine
   `);
   expect(screen.queryByLabelText("expand Termine")).toBeNull();
-  expect(screen.queryByLabelText(/show \d+ past/u)).toBeNull();
+  expect(screen.queryByLabelText(/Show \d+ past/u)).toBeNull();
 });

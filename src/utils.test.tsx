@@ -56,7 +56,7 @@ import {
 import { UserRelayContextProvider } from "./UserRelayContext";
 import { StashmapDB } from "./infra/nostr/cache/indexedDB";
 import { createEmptyGraphIndex } from "./graphIndex";
-import { buildNodeRouteUrl } from "./navigationUrl";
+import { buildNodeRouteUrl, parseStorageKeyFromHash } from "./navigationUrl";
 import { decodePublicKeyInputSync } from "./infra/nostr/publicKeys";
 import { processEvents } from "./eventProcessing";
 import { KIND_KNOWLEDGE_DOCUMENT } from "./nostr";
@@ -326,6 +326,9 @@ type RenderApis = Partial<TestApis> &
     db?: StashmapDB | null;
     BackendProvider?: ProviderComponent;
     DataProvider?: ProviderComponent;
+    // The storage key a share link handed this session — appended to the
+    // resolved route's fragment instead of digging the relay shadow.
+    capabilityKey?: string;
   };
 
 function normalizeTestInitialRoute(
@@ -383,23 +386,26 @@ function normalizeTestInitialRoute(
     return url;
   }
   // A foreign source needs the capability a share link would carry: the
-  // storage key of the document holding the target node.
+  // one handed in (obtained through the audience chip), or — for tests
+  // exercising other features — the storage key dug from the relay shadow.
   const rootNode =
     targetNode.id === targetNode.root
       ? targetNode
       : nodes?.get(targetNode.root);
   const docId = rootNode?.docId ?? rootNode?.id;
-  const capability = options.relayPool
-    ?.getDecryptedEvents()
-    .filter(
-      (event) =>
-        event.kind === KIND_KNOWLEDGE_DOCUMENT &&
-        event.pubkey === eventAuthor &&
-        event.tags.some((tag) => tag[0] === "d" && tag[1] === docId)
-    )
-    .map((event) => event.storageKey)
-    .filter((key): key is string => key !== undefined)
-    .pop();
+  const capability =
+    options.capabilityKey ??
+    options.relayPool
+      ?.getDecryptedEvents()
+      .filter(
+        (event) =>
+          event.kind === KIND_KNOWLEDGE_DOCUMENT &&
+          event.pubkey === eventAuthor &&
+          event.tags.some((tag) => tag[0] === "d" && tag[1] === docId)
+      )
+      .map((event) => event.storageKey)
+      .filter((key): key is string => key !== undefined)
+      .pop();
   return capability ? `${url}#key=${encodeURIComponent(capability)}` : url;
 }
 
@@ -502,6 +508,34 @@ export function readonlyRoute(author: string, ...segments: string[]): string {
   return `/n/${segments.map(encodeURIComponent).join("/")}?source=${author}`;
 }
 
+// The sharing flow as the author performs it: open the document, tap the
+// audience chip, copy the secret link. Returns the copied URL.
+export async function copySecretLinkViaChip(
+  author: RenderApis,
+  rootText: string
+): Promise<string> {
+  cleanup();
+  window.history.pushState({}, "", "/");
+  const writeText = jest.fn<Promise<void>, [string]>(() => Promise.resolve());
+  // eslint-disable-next-line functional/immutable-data
+  Object.defineProperty(navigator, "clipboard", {
+    value: { writeText },
+    configurable: true,
+  });
+  renderApp({
+    ...author,
+    initialRoute: `/n/${encodeURIComponent(rootText)}`,
+  });
+  await userEvent.click(await screen.findByLabelText("audience options"));
+  await userEvent.click(await screen.findByLabelText("copy secret link"));
+  const url = writeText.mock.calls[0]?.[0];
+  if (typeof url !== "string") {
+    throw new Error(`copySecretLinkViaChip: nothing copied for ${rootText}`);
+  }
+  cleanup();
+  return url;
+}
+
 export async function forkReadonlyRoot(
   viewer: RenderApis,
   author: string,
@@ -509,9 +543,25 @@ export async function forkReadonlyRoot(
 ): Promise<void> {
   cleanup();
   const [rootSegment] = segments;
+  // The viewer's capability comes from the author's own share gesture.
+  const authorUser = [ALICE, BOB, CAROL].find(
+    (user) => user.publicKey === author
+  );
+  const capabilityKey =
+    rootSegment && authorUser
+      ? parseStorageKeyFromHash(
+          new URL(
+            await copySecretLinkViaChip(
+              { ...viewer, user: authorUser },
+              rootSegment
+            )
+          ).hash
+        )
+      : undefined;
   renderApp({
     ...viewer,
     initialRoute: rootSegment ? readonlyRoute(author, rootSegment) : "/",
+    ...(capabilityKey !== undefined && { capabilityKey }),
   });
   await screen.findByText("READONLY");
   const copyAction = await screen.findByLabelText(

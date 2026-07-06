@@ -27,8 +27,13 @@ test("publishing keeps the filename and deposits from the file workspace", async
     "essay"
   );
 
+  await userEvent.click(await screen.findByLabelText("audience options"));
   await userEvent.click(await screen.findByLabelText("publish document"));
-  await screen.findByLabelText("publishing options");
+  await waitFor(() =>
+    expect(screen.getByLabelText("audience options").textContent).toContain(
+      "everyone"
+    )
+  );
   expect(screen.getByLabelText("Navigation breadcrumbs").textContent).toContain(
     "essay"
   );

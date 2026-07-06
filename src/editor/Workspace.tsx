@@ -55,7 +55,12 @@ import {
 import { parseTextToTrees, planPasteMarkdownTrees } from "./FileDropZone";
 import { getNodeText, getSemanticID } from "../core/connections";
 import { getOwnLogRoot } from "../core/systemRoots";
-import { buildDocumentRouteUrl, buildNodeRouteUrl } from "../navigationUrl";
+import {
+  addressForSource,
+  buildDocumentRouteUrl,
+  buildNodeRouteUrl,
+  buildShareRouteUrl,
+} from "../navigationUrl";
 import {
   getNodeInSource,
   graphLookupFromData,
@@ -518,14 +523,16 @@ function hostLabel(url: string): string {
   }
 }
 
-// The header button is the publication state: publish (one click) / a
-// compact glyph with the relay count / paused. The popover edits the
-// state; there are no dialogs. The relay list shows the EFFECTIVE set —
-// the per-document choice when one exists, else the user's configured
-// write relays (which fall back to the defaults) — and toggling a relay
-// materializes the per-document override in knowstr_publish.relays.
+// The header chip states the document's audience — "who can open this" —
+// never a verb: private / everyone · N relays / paused. The popover is the
+// audience ladder: only me (the default), a secret link (the capability:
+// the per-document storage key in the URL fragment), everyone (publish).
+// No dialogs. The relay list shows the EFFECTIVE set — the per-document
+// choice when one exists, else the user's configured write relays (which
+// fall back to the defaults) — and toggling a relay materializes the
+// per-document override in knowstr_publish.relays.
 // Shown only on own documents; foreign panes get the fork button instead.
-function PublishButton(): JSX.Element | null {
+function AudienceChip(): JSX.Element | null {
   const data = useData();
   const currentPane = useCurrentPane();
   const { createPlan, executePlan } = usePlanner();
@@ -602,17 +609,76 @@ function PublishButton(): JSX.Element | null {
     });
   };
 
+  // The capability a share link carries: the document's storage key in the
+  // URL fragment — readable by anyone handed the link, discoverable by no
+  // one. The key exists once the document has ridden a storage event.
+  const { storageKey } = document;
+  const authorAddress = addressForSource(LOCAL, data.user.publicKey);
+  const secretLinkItem = storageKey !== undefined &&
+    authorAddress !== undefined && (
+      <Dropdown.Item
+        className="d-flex menu-item"
+        onClick={() => {
+          const url = buildShareRouteUrl(
+            authorAddress,
+            document.docId,
+            storageKey
+          );
+          // eslint-disable-next-line no-void
+          void navigator.clipboard.writeText(`${window.location.origin}${url}`);
+        }}
+        aria-label="copy secret link"
+        title="Anyone with the link can open this document"
+        tabIndex={0}
+      >
+        <span className="d-block dropdown-item-icon" aria-hidden="true">
+          🔗
+        </span>
+        <div className="menu-item-text">Copy secret link</div>
+      </Dropdown.Item>
+    );
+
   if (!state) {
     return (
-      <button
-        type="button"
-        className="header-action-btn publish-cta"
-        onClick={handlePublish}
-        aria-label="publish document"
-        title={`Publish this document to ${effective.length} relays`}
-      >
-        ◌ publish
-      </button>
+      <Dropdown className="options-dropdown publish-dropdown">
+        <Dropdown.Toggle
+          as="button"
+          className="header-action-btn"
+          aria-label="audience options"
+          title="Only you can open this document"
+          tabIndex={0}
+        >
+          ○ private
+        </Dropdown.Toggle>
+        <Dropdown.Menu>
+          <Dropdown.Item
+            className="d-flex menu-item"
+            aria-label="only me"
+            title="Encrypted — only you can open this document"
+            disabled
+          >
+            <span className="d-block dropdown-item-icon" aria-hidden="true">
+              ●
+            </span>
+            <div className="menu-item-text">Only me — encrypted</div>
+          </Dropdown.Item>
+          {secretLinkItem}
+          <Dropdown.Item
+            className="d-flex menu-item"
+            onClick={handlePublish}
+            aria-label="publish document"
+            title={`Publish this document to ${effective.length} relays — visible to everyone`}
+            tabIndex={0}
+          >
+            <span className="d-block dropdown-item-icon" aria-hidden="true">
+              ○
+            </span>
+            <div className="menu-item-text">
+              Everyone · {effective.length} relays
+            </div>
+          </Dropdown.Item>
+        </Dropdown.Menu>
+      </Dropdown>
     );
   }
 
@@ -626,7 +692,7 @@ function PublishButton(): JSX.Element | null {
       <Dropdown.Toggle
         as="button"
         className="header-action-btn"
-        aria-label="publishing options"
+        aria-label="audience options"
         title={
           state.paused
             ? "Paused — the last published version stays visible"
@@ -636,9 +702,11 @@ function PublishButton(): JSX.Element | null {
         }
         tabIndex={0}
       >
-        {state.paused ? "◌ paused" : "⦿ published"}
+        {state.paused ? "◌ paused" : `⦿ everyone · ${effective.length} relays`}
       </Dropdown.Toggle>
       <Dropdown.Menu>
+        {secretLinkItem}
+        {secretLinkItem && <Dropdown.Divider />}
         {state.entities.map((entity) => (
           <Dropdown.Item
             key={entity}
@@ -745,7 +813,7 @@ function PaneHeader(): JSX.Element {
       <div className="pane-header-left">
         <BackButton />
         <Breadcrumbs />
-        <PublishButton />
+        <AudienceChip />
         <ForkButton />
         {isFirstPane && <SignInMenuBtn />}
       </div>

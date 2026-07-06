@@ -3,6 +3,7 @@ import { Event, Filter, SubCloser, SubscribeManyParams } from "nostr-tools";
 import { LoadedCliProfile } from "./cli/config";
 import type {
   WorkspaceMarkdownFile,
+  WorkspaceSnapshotFile,
   WorkspaceWriteRequest,
 } from "./infra/filesystem/workspaceBackend";
 import type { FsEventHandler } from "./infra/filesystem/workspaceWatcher";
@@ -19,6 +20,7 @@ export type WorkspaceState = {
   subscribeFsEvents: (handler: FsEventHandler) => () => void;
   profile: LoadedCliProfile | null;
   files: WorkspaceMarkdownFile[];
+  snapshots: ReadonlyArray<WorkspaceSnapshotFile>;
 };
 
 export type Backend = {

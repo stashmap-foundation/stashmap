@@ -103,6 +103,7 @@ export function FilesystemDataProvider({
         key={workspaceKey}
         localPubkey={user?.publicKey}
         initialDocuments={initialDocuments}
+        initialSnapshots={workspace?.snapshots ?? []}
         unpublishedEvents={session.publishStatus.unsignedEvents}
       >
         <FilesystemWatcher />

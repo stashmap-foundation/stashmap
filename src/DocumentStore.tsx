@@ -6,6 +6,7 @@ import type { StoredSnapshotRecord } from "./infra/nostr/cache/indexedDB";
 import {
   toStoredSnapshotRecord,
   materializeSnapshot,
+  materializeSnapshotContent,
 } from "./infra/snapshotStore";
 import {
   addNodesToGraphIndex,
@@ -31,6 +32,13 @@ type DocumentSnapshot = {
   graphIndex: GraphIndex;
 };
 
+// Structural twin of WorkspaceSnapshotFile — DocumentStore must not import
+// the fs-backed workspaceBackend module.
+export type SnapshotContent = {
+  snapshotId: string;
+  content: string;
+};
+
 type DocumentStoreState = {
   knowledgeDBs: KnowledgeDBs;
   graphIndex: GraphIndex;
@@ -40,6 +48,7 @@ type DocumentStoreState = {
   upsertDocument: (parsed: ParsedDocument) => void;
   deleteDocument: (del: DocumentDelete) => void;
   addEvents: (events: ImmutableMap<string, Event | UnsignedEvent>) => void;
+  addSnapshotContents: (snapshots: ReadonlyArray<SnapshotContent>) => void;
 };
 
 const DocumentStoreContext = React.createContext<
@@ -267,17 +276,42 @@ export function DocumentStoreProvider({
   localPubkey,
   unpublishedEvents = List<UnsignedEvent>(),
   initialDocuments = [],
+  initialSnapshots = [],
 }: {
   children: React.ReactNode;
   localPubkey: PublicKey | undefined;
   unpublishedEvents?: List<UnsignedEvent>;
   initialDocuments?: ReadonlyArray<ParsedDocument>;
+  initialSnapshots?: ReadonlyArray<SnapshotContent>;
 }): JSX.Element {
   const [snapshot, setSnapshot] = React.useState<DocumentSnapshot>(() =>
     applyRecordsToSnapshot(createEmptySnapshot(), initialDocuments, [])
   );
-  const [snapshotNodes, setSnapshotNodes] = React.useState<SnapshotNodes>(
-    ImmutableMap()
+  const [snapshotNodes, setSnapshotNodes] = React.useState<SnapshotNodes>(() =>
+    ImmutableMap(
+      initialSnapshots.map((snap) => [
+        snap.snapshotId,
+        materializeSnapshotContent(snap.snapshotId, snap.content),
+      ])
+    )
+  );
+
+  const addSnapshotContents = React.useCallback(
+    (snapshots: ReadonlyArray<SnapshotContent>) => {
+      setSnapshotNodes((prev) =>
+        snapshots.reduce(
+          (acc, snap) =>
+            acc.has(snap.snapshotId)
+              ? acc
+              : acc.set(
+                  snap.snapshotId,
+                  materializeSnapshotContent(snap.snapshotId, snap.content)
+                ),
+          prev
+        )
+      );
+    },
+    []
   );
 
   const upsertDocument = React.useCallback((parsed: ParsedDocument) => {
@@ -349,8 +383,16 @@ export function DocumentStoreProvider({
       upsertDocument,
       deleteDocument,
       addEvents,
+      addSnapshotContents,
     }),
-    [activeSnapshot, upsertDocument, deleteDocument, addEvents, snapshotNodes]
+    [
+      activeSnapshot,
+      upsertDocument,
+      deleteDocument,
+      addEvents,
+      addSnapshotContents,
+      snapshotNodes,
+    ]
   );
 
   return (

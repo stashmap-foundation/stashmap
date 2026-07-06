@@ -1,6 +1,11 @@
 import path from "path";
 import fs from "fs/promises";
 import {
+  SNAPSHOTS_DIR,
+  isValidSnapshotId,
+  snapshotIdForContent,
+} from "../../nodesDocumentEvent";
+import {
   collectWorkspaceMarkdownFiles,
   ScannedWorkspaceDocument,
   scanWorkspaceDocuments,
@@ -16,6 +21,47 @@ export type WorkspaceWriteRequest = {
   relativePath: string;
   content: string;
 };
+
+// The filesystem snapshot store: .knowstr is excluded from the document
+// scan, so snapshots never parse as documents.
+export type WorkspaceSnapshotFile = {
+  snapshotId: string;
+  content: string;
+};
+
+export async function loadWorkspaceSnapshots(
+  profile: Pick<WorkspaceSaveProfile, "workspaceDir">
+): Promise<ReadonlyArray<WorkspaceSnapshotFile>> {
+  const dir = path.join(profile.workspaceDir, SNAPSHOTS_DIR);
+  const entries = await fs.readdir(dir).catch(() => [] as string[]);
+  const files = await Promise.all(
+    entries
+      .filter((name) => name.endsWith(".md"))
+      .map((name) => name.slice(0, -3))
+      .filter((snapshotId) => isValidSnapshotId(snapshotId))
+      .sort()
+      .map(async (snapshotId) => ({
+        snapshotId,
+        content: await fs.readFile(path.join(dir, `${snapshotId}.md`), "utf8"),
+      }))
+  );
+  const [valid, corrupt] = files.reduce<
+    [WorkspaceSnapshotFile[], WorkspaceSnapshotFile[]]
+  >(
+    ([good, bad], file) =>
+      snapshotIdForContent(file.content) === file.snapshotId
+        ? [[...good, file], bad]
+        : [good, [...bad, file]],
+    [[], []]
+  );
+  corrupt.forEach((file) => {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[snapshots] ${file.snapshotId}.md content does not match its id — ignored`
+    );
+  });
+  return valid;
+}
 
 export async function loadWorkspaceAsDocuments(
   profile: WorkspaceSaveProfile

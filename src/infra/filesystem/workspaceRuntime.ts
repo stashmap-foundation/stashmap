@@ -2,7 +2,9 @@ import crypto from "crypto";
 import { loadCliProfile } from "../../cli/config";
 import {
   loadWorkspaceFiles,
+  loadWorkspaceSnapshots,
   WorkspaceMarkdownFile,
+  WorkspaceSnapshotFile,
   saveDocumentsToWorkspace,
   WorkspaceWriteRequest,
 } from "./workspaceBackend";
@@ -18,6 +20,7 @@ const ECHO_TTL_MS = 30000;
 export type WorkspaceRuntimeLoaded = {
   profile: ReturnType<typeof loadCliProfile>;
   files: ReadonlyArray<WorkspaceMarkdownFile>;
+  snapshots: ReadonlyArray<WorkspaceSnapshotFile>;
 };
 
 export type WorkspaceRuntime = {
@@ -133,8 +136,11 @@ export function createWorkspaceRuntime(workspaceDir: string): WorkspaceRuntime {
       const files = await loadWorkspaceFiles({
         workspaceDir: profile.workspaceDir,
       });
+      const snapshots = await loadWorkspaceSnapshots({
+        workspaceDir: profile.workspaceDir,
+      });
       ensureWatcher();
-      return { profile, files: [...files] };
+      return { profile, files: [...files], snapshots: [...snapshots] };
     },
     ready: async () => {
       ensureWatcher();

@@ -300,3 +300,21 @@ export function isPastIcalEntry(entry: IcalEntry, nowMs: number): boolean {
   ).getTime();
   return entry.startMs < startOfToday;
 }
+
+// The ~ proposal is a fact about the entry's date, not about
+// materialization: a past entry proposes ~ while the user has no
+// explicit judgment on it — projected or materialized alike. The
+// proposal is display and filter behavior only; it never reaches the
+// file (mints strip it, judgments override it, and removing a judgment
+// brings it back).
+export function proposedEntryRelevance(
+  entries: readonly IcalEntry[] | undefined,
+  node: { id: string; relevance?: Relevance },
+  nowMs: number
+): Relevance {
+  if (!entries || node.relevance !== undefined) {
+    return undefined;
+  }
+  const entry = entries.find((candidate) => candidate.id === node.id);
+  return entry && isPastIcalEntry(entry, nowMs) ? "little_relevant" : undefined;
+}

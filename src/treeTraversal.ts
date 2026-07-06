@@ -35,6 +35,7 @@ import {
   icalFeedUrlOf,
   isPastIcalEntry,
   mergeProjectedEntries,
+  proposedEntryRelevance,
 } from "./core/ical";
 import { getDocumentByIdOrFilePath, type Document } from "./core/Document";
 import { DEFAULT_TYPE_FILTERS } from "./core/constants";
@@ -536,8 +537,21 @@ function interleaveProjectionRows(
         };
       }
       const row = rowsByChildId.get(item.childId as ID);
+      // A materialized-but-unjudged past entry keeps its standing ~
+      // proposal for filtering purposes — the past folds away whether
+      // touched or not.
+      const proposed = row
+        ? proposedEntryRelevance(entries, row.node, Date.now())
+        : undefined;
+      const visible =
+        row &&
+        (proposed === undefined ||
+          itemPassesFilters(
+            { ...row.node, relevance: proposed },
+            activeFilters
+          ));
       return {
-        rows: row ? [...acc.rows, row] : acc.rows,
+        rows: visible && row ? [...acc.rows, row] : acc.rows,
         precededBy: [item.childId as ID, ...acc.precededBy],
       };
     },

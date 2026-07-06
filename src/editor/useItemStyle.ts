@@ -1,9 +1,11 @@
 import { CSSProperties } from "react";
 import { useIsViewingOtherUserContent, useRow } from "../rowModel";
 import { isRefNode } from "../core/connections";
-import { isBlockFileLink } from "../core/nodeSpans";
+import { isBlockFileLink, nodeText } from "../core/nodeSpans";
 import { ENTITY_SCHEME_RE } from "../core/entityRecognition";
 import { TYPE_COLORS } from "../core/constants";
+import { icalFeedUrlOf, proposedEntryRelevance } from "../core/ical";
+import { useCalendarFeeds } from "../CalendarFeedContext";
 
 type ItemStyle = {
   cardStyle: CSSProperties;
@@ -48,6 +50,20 @@ export function useItemStyle(): ItemStyle {
   const row = useRow();
   const currentRow = row.node;
   const { virtualType } = row;
+  const { feeds } = useCalendarFeeds();
+  // The standing ~ proposal on past calendar entries: display-only, a
+  // fact about the entry's date — shown whether the row is projected or
+  // materialized, gone the moment the user judges, back when unjudged.
+  const parentFeedUrl = row.parentNode
+    ? icalFeedUrlOf(nodeText(row.parentNode))
+    : undefined;
+  const proposedRelevance = parentFeedUrl
+    ? proposedEntryRelevance(
+        feeds.get(parentFeedUrl),
+        currentRow ?? { id: "" },
+        Date.now()
+      )
+    : undefined;
 
   if (virtualType === "suggestion") {
     return {
@@ -85,7 +101,7 @@ export function useItemStyle(): ItemStyle {
     };
   }
 
-  const relevance = currentRow?.relevance;
+  const relevance = currentRow?.relevance ?? proposedRelevance;
   const argument = currentRow?.argument;
   const normalizedRelevance =
     relevance === ("" as string) ? undefined : relevance;

@@ -280,18 +280,76 @@ Salon
   );
 
   // Drag a still-projected entry to resort it: a within-calendar
-  // reorder materializes the whole displayed sequence (Founding loses
-  // its ~ proposal — it is real content now, judged by nobody), and the
-  // dragged entry lands at the drop position with no duplicate.
+  // reorder materializes the whole displayed sequence; the dragged
+  // entry lands at the drop position with no duplicate, and the past
+  // entry keeps its standing ~ proposal.
   dragTextOnto(dunbarText(), "14.07.2030 Sommerfest");
   await expectTree(
     `
 Salon
   Termine https://scholarium.at/salon.ics
-    01.01.2020 Founding seminar
+    {~} 01.01.2020 Founding seminar
     14.07.2030 Sommerfest
     ${dunbarText()}
     Notes
+  `,
+    { showGutter: true }
+  );
+});
+
+test("the ~ on a materialized past entry is a proposal, not content", async () => {
+  const [alice] = setup([ALICE]);
+  renderApp({
+    ...alice(),
+    fetchCalendarFeed: async () => FEED,
+  });
+
+  await type(
+    "Salon{Enter}{Tab}Termine https://scholarium.at/salon.ics{Escape}"
+  );
+  await userEvent.click(
+    await screen.findByLabelText(
+      "expand Termine https://scholarium.at/salon.ics"
+    )
+  );
+
+  // Materialize everything via a reorder; the past entry shows ~.
+  dragTextOnto("01.01.2020 Founding seminar", dunbarText());
+  await expectTree(
+    `
+Salon
+  Termine https://scholarium.at/salon.ics
+    14.07.2030 Sommerfest
+    ${dunbarText()}
+    {~} 01.01.2020 Founding seminar
+  `,
+    { showGutter: true }
+  );
+
+  // An explicit judgment overrides the proposal…
+  await clickRow("01.01.2020 Founding seminar");
+  await userEvent.keyboard("!");
+  await expectTree(
+    `
+Salon
+  Termine https://scholarium.at/salon.ics
+    14.07.2030 Sommerfest
+    ${dunbarText()}
+    {!} 01.01.2020 Founding seminar
+  `,
+    { showGutter: true }
+  );
+
+  // …and removing the judgment brings the proposal back — proving the
+  // ~ was never written into the file.
+  await userEvent.keyboard("!");
+  await expectTree(
+    `
+Salon
+  Termine https://scholarium.at/salon.ics
+    14.07.2030 Sommerfest
+    ${dunbarText()}
+    {~} 01.01.2020 Founding seminar
   `,
     { showGutter: true }
   );
@@ -318,12 +376,14 @@ test("reordering within the calendar materializes the whole sequence", async () 
   // nothing chases the moved row.
   dragTextOnto("01.01.2020 Founding seminar", dunbarText());
 
+  // The past entry keeps its standing ~ proposal after materializing —
+  // a fact about its date, not about its status.
   const expected = `
 Salon
   Termine https://scholarium.at/salon.ics
     14.07.2030 Sommerfest
     ${dunbarText()}
-    01.01.2020 Founding seminar
+    {~} 01.01.2020 Founding seminar
   `;
   await expectTree(expected, { showGutter: true });
 

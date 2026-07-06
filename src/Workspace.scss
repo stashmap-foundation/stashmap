@@ -571,6 +571,18 @@ body {
     border-color: var(--violet);
     color: var(--violet);
   }
+
+  // Past on screen: the solid header-action-btn look — dashed means absent.
+  &.past-entries-chip-shown {
+    background: var(--base02);
+    border: 1px solid transparent;
+    color: var(--base0);
+
+    &:hover {
+      background: var(--base01);
+      color: var(--base1);
+    }
+  }
 }
 
 .expand-collapse-toggle {

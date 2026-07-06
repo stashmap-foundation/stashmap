@@ -159,20 +159,21 @@ function PastEntriesChip(): JSX.Element | null {
       )
     );
   };
+  // The label is the action (like "Stop publishing"): it always says what
+  // a click does, and the skin doubles as the state — dashed = the past is
+  // absent (the not-published language), solid = it's on screen.
   return (
     <button
       type="button"
-      className="past-entries-chip"
+      className={`past-entries-chip ${
+        showPast ? "past-entries-chip-shown" : ""
+      }`}
       onClick={onToggle}
       onMouseDown={preventEditorBlur}
-      aria-label={
-        showPast
-          ? "hide past dates"
-          : `show ${pastCount} past ${pastCount === 1 ? "date" : "dates"}`
-      }
+      aria-label={showPast ? "hide past" : `show ${pastCount} past`}
       aria-pressed={showPast}
     >
-      {pastCount} past {showPast ? "▾" : "▸"}
+      {showPast ? "hide past" : `show ${pastCount} past`}
     </button>
   );
 }

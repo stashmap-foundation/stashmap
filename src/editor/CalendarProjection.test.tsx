@@ -68,7 +68,7 @@ Salon
 
   // The chip reveals the past — unjudged, no gutter mark: pastness is
   // node-type rendering, never a judgment.
-  await userEvent.click(await screen.findByLabelText("show 1 past date"));
+  await userEvent.click(await screen.findByLabelText("show 1 past"));
   await expectTree(
     `
 Salon
@@ -81,7 +81,7 @@ Salon
   );
 
   // …and hides it again.
-  await userEvent.click(await screen.findByLabelText("hide past dates"));
+  await userEvent.click(await screen.findByLabelText("hide past"));
   await expectTree(
     `
 Salon
@@ -332,7 +332,7 @@ test("a touched past entry is file content: always visible, chip or not", async 
   );
 
   // Reveal the past, write under the entry — it materializes.
-  await userEvent.click(await screen.findByLabelText("show 1 past date"));
+  await userEvent.click(await screen.findByLabelText("show 1 past"));
   await userEvent.click(
     await screen.findByLabelText("edit 01.01.2020 Founding seminar")
   );
@@ -350,7 +350,7 @@ Salon
     ${dunbarText()}
   `;
   await expectTree(expected, { showGutter: true });
-  expect(screen.queryByLabelText("hide past dates")).toBeNull();
+  expect(screen.queryByLabelText("hide past")).toBeNull();
 
   // An explicit judgment renders as any judgment does.
   await clickRow("01.01.2020 Founding seminar");
@@ -402,7 +402,7 @@ Salon
 
   // The hidden past entry never materialized: it still lives behind the
   // chip, projection-only.
-  await userEvent.click(await screen.findByLabelText("show 1 past date"));
+  await userEvent.click(await screen.findByLabelText("show 1 past"));
   await expectTree(
     `
 Salon
@@ -413,7 +413,7 @@ Salon
   `,
     { showGutter: true }
   );
-  await userEvent.click(await screen.findByLabelText("hide past dates"));
+  await userEvent.click(await screen.findByLabelText("hide past"));
   await expectTree(reordered, { showGutter: true });
 });
 
@@ -432,7 +432,7 @@ test("past entries render dimmed by type, judged rows full strength", async () =
       "expand Termine https://scholarium.at/salon.ics"
     )
   );
-  await userEvent.click(await screen.findByLabelText("show 1 past date"));
+  await userEvent.click(await screen.findByLabelText("show 1 past"));
 
   // Style assertions need the wrapping styled span — DOM traversal is the
   // point here.

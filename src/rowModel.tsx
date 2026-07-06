@@ -35,6 +35,13 @@ export function useRow(): Row {
   return row;
 }
 
+// A row is either file content or a proposal about file content. Node
+// types decide how a row RENDERS; only file rows BEHAVE — host overlays,
+// fetch feeds, offer row furniture like the past chip.
+export function isFileRow(row: Pick<Row, "virtualType">): boolean {
+  return row.virtualType === undefined;
+}
+
 export function getIndependentRows(rows: Row[]): Row[] {
   return rows.filter(
     (row) =>

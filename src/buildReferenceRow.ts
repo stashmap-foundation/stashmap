@@ -7,6 +7,7 @@ import {
   getSemanticID,
 } from "./core/connections";
 import { ENTITY_SCHEME_RE } from "./core/entityRecognition";
+import { displayTextOf } from "./core/ical";
 import {
   getBlockLinkTarget,
   getBlockLinkText,
@@ -280,9 +281,9 @@ function resolveLabels(
   sourceId: SourceId
 ): { contextLabels: string[]; targetLabel: string; fullContext: List<ID> } {
   const contextLabels = contextNodes.map((contextNode) =>
-    nodeText(contextNode)
+    displayTextOf(nodeText(contextNode))
   );
-  const targetLabel = nodeText(node);
+  const targetLabel = displayTextOf(nodeText(node));
   const fullContext = contextNodes.map((contextNode) =>
     getSemanticID(knowledgeDBs, contextNode, sourceId)
   );

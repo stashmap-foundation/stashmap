@@ -1,6 +1,15 @@
 import { cleanup, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { ALICE, expectTree, renderApp, setup, type } from "../utils.test";
+import {
+  ALICE,
+  expectTree,
+  forkOwnRoot,
+  navigateToNodeViaSearch,
+  renderApp,
+  renderTree,
+  setup,
+  type,
+} from "../utils.test";
 import { clickRow } from "./Multiselect.testUtils";
 
 const FEED = [
@@ -448,4 +457,38 @@ test("past entries render dimmed by type, judged rows full strength", async () =
   const judged = screen.getAllByText("01.01.2020 Founding seminar")[0];
   expect(judged.closest("span[style*='opacity']")).toBeNull();
   /* eslint-enable testing-library/no-node-access */
+});
+
+test("a suggested calendar link is a plain proposal: label, no liveness", async () => {
+  const [alice] = setup([ALICE]);
+  renderTree(alice);
+  await type("Events{Enter}{Tab}Placeholder{Escape}");
+  cleanup();
+
+  // Fork the root; in the fork, add a calendar feed link and name it.
+  await forkOwnRoot(alice, "Events", "Events Fork");
+  renderApp({ ...alice(), fetchCalendarFeed: () => Promise.resolve(FEED) });
+  await navigateToNodeViaSearch(0, "Events Fork");
+  await userEvent.click(await screen.findByLabelText("edit Placeholder"));
+  await userEvent.keyboard("{Enter}https://scholarium.at/salon.ics{Escape}");
+  const editor = await screen.findByLabelText(
+    "edit https://scholarium.at/salon.ics"
+  );
+  await userEvent.click(editor);
+  await userEvent.keyboard("{Control>}a{/Control}Termine{Escape}");
+  cleanup();
+
+  // The original sees the fork's addition as a suggestion: rendered by
+  // its LABEL, and dead — no triangle, no past chip, no projections.
+  // Overlays attach to file rows only; a proposal is a leaf of the
+  // proposal system.
+  renderApp({ ...alice(), fetchCalendarFeed: () => Promise.resolve(FEED) });
+  await navigateToNodeViaSearch(0, "Events");
+  await expectTree(`
+Events
+  Placeholder
+  [S] Termine
+  `);
+  expect(screen.queryByLabelText("expand Termine")).toBeNull();
+  expect(screen.queryByLabelText(/show \d+ past/u)).toBeNull();
 });

@@ -547,6 +547,19 @@ body {
 
 
 // Expand/collapse toggle
+// The block flow inside the flex content wrapper: floats work here, so
+// the past chip can sit in the text flow and the label wraps around it.
+.node-content-flow {
+  flex: 1;
+  min-width: 0;
+}
+
+// The editor is inline-block (a sealed box) by default — on chip rows it
+// must be inline so its text lines actually flow around the float.
+.node-content-flow:has(> .past-entries-chip) .mini-editor {
+  display: inline;
+}
+
 // The feed row's past chip: same dashed language as the not-published
 // publish button, filter-symbol text size, sits after the expand triangle.
 .past-entries-chip {
@@ -556,15 +569,14 @@ body {
   padding: 0 6px;
   margin-right: 6px;
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
+  float: left;
   align-items: center;
   white-space: nowrap;
   height: var(--row-height, 22px);
-  align-self: flex-start;
   color: var(--base01);
   font-size: 14px;
   line-height: 1;
-  flex-shrink: 0;
   transition: color 150ms ease, border-color 150ms ease;
 
   &:hover {

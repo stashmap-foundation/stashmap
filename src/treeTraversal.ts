@@ -7,6 +7,7 @@ import {
   getParentView,
   getViewForRowID,
   isEmptyViewPathID,
+  isFileRow,
   viewPathToString,
 } from "./rowModel";
 import {
@@ -790,6 +791,14 @@ function getChildrenForRegularNode(
     return { rows: childRows };
   }
 
+  // Overlays attach to file rows only: a proposal is a leaf of the
+  // proposal system, not a node in it. No projections, no footers, no
+  // feed fetches under suggested/version/incoming rows — their children
+  // render as the plain preview they are.
+  if (!isFileRow(parentRow)) {
+    return { rows: childRows };
+  }
+
   const rowsByChildId = Map<ID, Row>(
     childRowPairs.map(({ childID, row }) => [childID, row])
   );
@@ -935,9 +944,10 @@ function getNodesInRows(
       ...rootRow,
       // A calendar feed whose entries are all hidden past still expands
       // (and keeps its triangle): the children exist, they're behind the
-      // past chip.
+      // past chip. File rows only — proposals don't host the feed.
       hasChildren:
-        childResult.rows.size > 0 || hasHiddenPastEntries(data, rootRow.node),
+        childResult.rows.size > 0 ||
+        (isFileRow(rootRow) && hasHiddenPastEntries(data, rootRow.node)),
     };
     const withRoot = {
       rows: result.rows.push(row),

@@ -48,6 +48,14 @@ export function icalFeedLinkText(url: string, label?: string): string {
   return `[${label ?? url}](${url})`;
 }
 
+// The one display-text rule for the feed-link form, shared by every
+// renderer — editor display, suggestion and reference labels — and
+// mirroring the Dart side's nodeDisplayText: feed links read by their
+// label everywhere; the URL belongs to edit mode.
+export function displayTextOf(text: string): string {
+  return icalFeedLinkPartsOf(text)?.label ?? text;
+}
+
 // A projected calendar entry: the literal-VEVENT subset of the machine-feeds
 // spec (UID, DTSTART, SUMMARY). Recurring events are skipped in v1 —
 // expansion is committed later work; the id scheme reserves @<RECURRENCE-ID>.

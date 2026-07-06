@@ -141,6 +141,12 @@ function createRow(
       : undefined;
   const rowVirtualType =
     virtualType ?? (isSearchId(rowID) ? "search" : inheritedVirtualType);
+  const provenance =
+    rowVirtualType === "suggestion" ||
+    rowVirtualType === "incoming" ||
+    rowVirtualType === "version"
+      ? { kind: rowVirtualType, sourceId }
+      : undefined;
   const pane = data.panes[viewPath[0]];
   const reference = isBlockLinkAny(node)
     ? (() => {
@@ -195,6 +201,7 @@ function createRow(
     hasChildren: false,
     isFirstVirtual,
     virtualType: rowVirtualType,
+    provenance,
     versionMeta,
     reference,
   };

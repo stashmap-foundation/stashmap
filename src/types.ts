@@ -200,6 +200,14 @@ declare global {
     parentChildIndex: number | undefined;
     childIndex: number | undefined;
     hasChildren: boolean;
+    // Display provenance of a computed row (idea.md: gutter marks are
+    // provenance, not styling): what kind of proposal/alternative this
+    // is and whose content it carries. Derived once at row creation;
+    // display code branches on this, never on virtualType.
+    provenance?: {
+      kind: "suggestion" | "incoming" | "version";
+      sourceId: SourceId;
+    };
     // The materialization recipe (idea.md: write gestures take first).
     // Plain data attached by the row's producer: nearest-first anchors,
     // optionally a prepared take (references enter as references) and

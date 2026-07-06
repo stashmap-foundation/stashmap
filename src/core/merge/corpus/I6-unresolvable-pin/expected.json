@@ -1,0 +1,13 @@
+{
+  "changed": true,
+  "suggestions": [
+    {
+      "kind": "drift",
+      "node": "b"
+    }
+  ],
+  "detached": [],
+  "pins": [
+    "b"
+  ]
+}

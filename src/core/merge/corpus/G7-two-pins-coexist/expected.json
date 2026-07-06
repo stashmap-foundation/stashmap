@@ -1,0 +1,19 @@
+{
+  "changed": true,
+  "suggestions": [
+    {
+      "kind": "text",
+      "node": "b",
+      "theirs": "Reading Circle"
+    },
+    {
+      "kind": "order",
+      "parent": "root"
+    }
+  ],
+  "detached": [],
+  "pins": [
+    "b",
+    "root"
+  ]
+}

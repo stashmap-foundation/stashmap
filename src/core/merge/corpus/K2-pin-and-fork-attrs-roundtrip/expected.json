@@ -1,0 +1,14 @@
+{
+  "changed": false,
+  "suggestions": [
+    {
+      "kind": "text",
+      "node": "b",
+      "theirs": "Old title"
+    }
+  ],
+  "detached": [],
+  "pins": [
+    "b"
+  ]
+}

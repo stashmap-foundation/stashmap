@@ -1,0 +1,14 @@
+{
+  "changed": true,
+  "suggestions": [
+    {
+      "kind": "text",
+      "node": "b",
+      "theirs": "Reading Circle (Tuesday)"
+    }
+  ],
+  "detached": [],
+  "pins": [
+    "b"
+  ]
+}

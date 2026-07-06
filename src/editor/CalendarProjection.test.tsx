@@ -1,6 +1,15 @@
 import { cleanup, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { ALICE, expectTree, renderApp, setup, type } from "../utils.test";
+import {
+  ALICE,
+  expectTree,
+  forkOwnRoot,
+  navigateToNodeViaSearch,
+  renderApp,
+  renderTree,
+  setup,
+  type,
+} from "../utils.test";
 import { clickRow } from "./Multiselect.testUtils";
 
 const FEED = [
@@ -38,7 +47,7 @@ function dunbarText(): string {
 
 afterEach(cleanup);
 
-test("calendar nodes project dated rows; the past proposes ~", async () => {
+test("upcoming entries project; bare past entries live behind the chip", async () => {
   const [alice] = setup([ALICE]);
   renderApp({
     ...alice(),
@@ -55,11 +64,37 @@ test("calendar nodes project dated rows; the past proposes ~", async () => {
     )
   );
 
+  // The past entry doesn't project; the feed row wears the chip instead.
   await expectTree(
     `
 Salon
   Termine https://scholarium.at/salon.ics
-    {~} 01.01.2020 Founding seminar
+    14.07.2030 Sommerfest
+    ${dunbarText()}
+  `,
+    { showGutter: true }
+  );
+
+  // The chip reveals the past — unjudged, no gutter mark: pastness is
+  // node-type rendering, never a judgment.
+  await userEvent.click(await screen.findByLabelText("show 1 past"));
+  await expectTree(
+    `
+Salon
+  Termine https://scholarium.at/salon.ics
+    01.01.2020 Founding seminar
+    14.07.2030 Sommerfest
+    ${dunbarText()}
+  `,
+    { showGutter: true }
+  );
+
+  // …and hides it again.
+  await userEvent.click(await screen.findByLabelText("hide past"));
+  await expectTree(
+    `
+Salon
+  Termine https://scholarium.at/salon.ics
     14.07.2030 Sommerfest
     ${dunbarText()}
   `,
@@ -94,7 +129,6 @@ test("bare feed urls wrap; the label renames without losing the feed", async () 
     `
 Salon
   Salon Termine
-    {~} 01.01.2020 Founding seminar
     14.07.2030 Sommerfest
     ${dunbarText()}
   `,
@@ -132,7 +166,6 @@ test("judging a projected entry materializes it with the judgment", async () => 
     `
 Salon
   Termine https://scholarium.at/salon.ics
-    {~} 01.01.2020 Founding seminar
     {!} 14.07.2030 Sommerfest
     ${dunbarText()}
   `,
@@ -147,7 +180,6 @@ Salon
     `
 Salon
   Termine https://scholarium.at/salon.ics
-    {~} 01.01.2020 Founding seminar
     {!} 14.07.2030 Sommerfest
     ${dunbarText()}
   `,
@@ -171,7 +203,7 @@ test("multiselect judgment materializes projected and spares untouched", async (
     )
   );
 
-  // Select the two future entries (shift-j extends the selection down).
+  // Select the two upcoming entries (shift-j extends the selection down).
   await clickRow("14.07.2030 Sommerfest");
   await userEvent.keyboard("{Shift>}j{/Shift}");
   await userEvent.keyboard("?");
@@ -180,7 +212,6 @@ test("multiselect judgment materializes projected and spares untouched", async (
     `
 Salon
   Termine https://scholarium.at/salon.ics
-    {~} 01.01.2020 Founding seminar
     {?} 14.07.2030 Sommerfest
     {?} ${dunbarText()}
   `,
@@ -215,7 +246,6 @@ test("writing under a projected entry materializes it with the note", async () =
     `
 Salon
   Termine https://scholarium.at/salon.ics
-    {~} 01.01.2020 Founding seminar
     14.07.2030 Sommerfest
       Excerpts we are going to read
     ${dunbarText()}
@@ -230,7 +260,6 @@ Salon
     `
 Salon
   Termine https://scholarium.at/salon.ics
-    {~} 01.01.2020 Founding seminar
     14.07.2030 Sommerfest
       Excerpts we are going to read
     ${dunbarText()}
@@ -272,7 +301,6 @@ test("dnd both ways: projections drag as themselves and accept drops", async () 
     `
 Salon
   Termine https://scholarium.at/salon.ics
-    {~} 01.01.2020 Founding seminar
     14.07.2030 Sommerfest
     Notes
     ${dunbarText()}
@@ -282,14 +310,12 @@ Salon
 
   // Drag a still-projected entry to resort it: a within-calendar
   // reorder materializes the whole displayed sequence; the dragged
-  // entry lands at the drop position with no duplicate, and the past
-  // entry keeps its standing ~ proposal.
+  // entry lands at the drop position with no duplicate.
   dragTextOnto(dunbarText(), "14.07.2030 Sommerfest");
   await expectTree(
     `
 Salon
   Termine https://scholarium.at/salon.ics
-    {~} 01.01.2020 Founding seminar
     14.07.2030 Sommerfest
     ${dunbarText()}
     Notes
@@ -298,7 +324,7 @@ Salon
   );
 });
 
-test("the ~ on a materialized past entry is a proposal, not content", async () => {
+test("a touched past entry is file content: always visible, chip or not", async () => {
   const [alice] = setup([ALICE]);
   renderApp({
     ...alice(),
@@ -314,49 +340,44 @@ test("the ~ on a materialized past entry is a proposal, not content", async () =
     )
   );
 
-  // Materialize everything via a reorder; the past entry shows ~.
-  dragTextOnto("01.01.2020 Founding seminar", dunbarText());
-  await expectTree(
-    `
+  // Reveal the past, write under the entry — it materializes.
+  await userEvent.click(await screen.findByLabelText("show 1 past"));
+  await userEvent.click(
+    await screen.findByLabelText("edit 01.01.2020 Founding seminar")
+  );
+  await userEvent.keyboard("{Enter}{Tab}Excerpts we are going to read{Escape}");
+
+  // Hide the past again: the touched entry stays — file content always
+  // shows, unjudged, no gutter mark; only bare projections hide. The
+  // chip is gone: nothing is hidden anymore.
+  const expected = `
 Salon
   Termine https://scholarium.at/salon.ics
+    01.01.2020 Founding seminar
+      Excerpts we are going to read
     14.07.2030 Sommerfest
     ${dunbarText()}
-    {~} 01.01.2020 Founding seminar
-  `,
-    { showGutter: true }
-  );
+  `;
+  await expectTree(expected, { showGutter: true });
+  expect(screen.queryByLabelText("hide past")).toBeNull();
 
-  // An explicit judgment overrides the proposal…
+  // An explicit judgment renders as any judgment does.
   await clickRow("01.01.2020 Founding seminar");
   await userEvent.keyboard("!");
   await expectTree(
     `
 Salon
   Termine https://scholarium.at/salon.ics
-    14.07.2030 Sommerfest
-    ${dunbarText()}
     {!} 01.01.2020 Founding seminar
-  `,
-    { showGutter: true }
-  );
-
-  // …and removing the judgment brings the proposal back — proving the
-  // ~ was never written into the file.
-  await userEvent.keyboard("!");
-  await expectTree(
-    `
-Salon
-  Termine https://scholarium.at/salon.ics
+      Excerpts we are going to read
     14.07.2030 Sommerfest
     ${dunbarText()}
-    {~} 01.01.2020 Founding seminar
   `,
     { showGutter: true }
   );
 });
 
-test("reordering within the calendar materializes the whole sequence", async () => {
+test("reorder materializes only the displayed sequence — hidden past stays a projection", async () => {
   const [alice] = setup([ALICE]);
   renderApp({
     ...alice(),
@@ -372,24 +393,102 @@ test("reordering within the calendar materializes the whole sequence", async () 
     )
   );
 
-  // Move the first (past) entry to the end: the displayed sequence
-  // materializes in the new order — document order is authoritative,
-  // nothing chases the moved row.
-  dragTextOnto("01.01.2020 Founding seminar", dunbarText());
+  // Resort the two upcoming entries with the past hidden.
+  dragTextOnto(dunbarText(), "14.07.2030 Sommerfest");
 
-  // The past entry keeps its standing ~ proposal after materializing —
-  // a fact about its date, not about its status.
-  const expected = `
+  const reordered = `
 Salon
   Termine https://scholarium.at/salon.ics
     14.07.2030 Sommerfest
     ${dunbarText()}
-    {~} 01.01.2020 Founding seminar
   `;
-  await expectTree(expected, { showGutter: true });
+  await expectTree(reordered, { showGutter: true });
 
-  // The order is file content now: it survives a reload.
+  // The order is file content: it survives a reload.
   cleanup();
   renderApp({ ...alice(), fetchCalendarFeed: () => Promise.resolve(FEED) });
-  await expectTree(expected, { showGutter: true });
+  await expectTree(reordered, { showGutter: true });
+
+  // The hidden past entry never materialized: it still lives behind the
+  // chip, projection-only.
+  await userEvent.click(await screen.findByLabelText("show 1 past"));
+  await expectTree(
+    `
+Salon
+  Termine https://scholarium.at/salon.ics
+    01.01.2020 Founding seminar
+    14.07.2030 Sommerfest
+    ${dunbarText()}
+  `,
+    { showGutter: true }
+  );
+  await userEvent.click(await screen.findByLabelText("hide past"));
+  await expectTree(reordered, { showGutter: true });
+});
+
+test("past entries render dimmed by type, judged rows full strength", async () => {
+  const [alice] = setup([ALICE]);
+  renderApp({
+    ...alice(),
+    fetchCalendarFeed: () => Promise.resolve(FEED),
+  });
+
+  await type(
+    "Salon{Enter}{Tab}Termine https://scholarium.at/salon.ics{Escape}"
+  );
+  await userEvent.click(
+    await screen.findByLabelText(
+      "expand Termine https://scholarium.at/salon.ics"
+    )
+  );
+  await userEvent.click(await screen.findByLabelText("show 1 past"));
+
+  // Style assertions need the wrapping styled span — DOM traversal is the
+  // point here.
+  /* eslint-disable testing-library/no-node-access */
+  const pastText = screen.getAllByText("01.01.2020 Founding seminar")[0];
+  expect(pastText.closest("span[style*='opacity']")).not.toBeNull();
+  const upcomingText = screen.getAllByText("14.07.2030 Sommerfest")[0];
+  expect(upcomingText.closest("span[style*='opacity']")).toBeNull();
+
+  // Deliberate emphasis beats default de-emphasis.
+  await clickRow("01.01.2020 Founding seminar");
+  await userEvent.keyboard("!");
+  const judged = screen.getAllByText("01.01.2020 Founding seminar")[0];
+  expect(judged.closest("span[style*='opacity']")).toBeNull();
+  /* eslint-enable testing-library/no-node-access */
+});
+
+test("a suggested calendar link is a plain proposal: label, no liveness", async () => {
+  const [alice] = setup([ALICE]);
+  renderTree(alice);
+  await type("Events{Enter}{Tab}Placeholder{Escape}");
+  cleanup();
+
+  // Fork the root; in the fork, add a calendar feed link and name it.
+  await forkOwnRoot(alice, "Events", "Events Fork");
+  renderApp({ ...alice(), fetchCalendarFeed: () => Promise.resolve(FEED) });
+  await navigateToNodeViaSearch(0, "Events Fork");
+  await userEvent.click(await screen.findByLabelText("edit Placeholder"));
+  await userEvent.keyboard("{Enter}https://scholarium.at/salon.ics{Escape}");
+  const editor = await screen.findByLabelText(
+    "edit https://scholarium.at/salon.ics"
+  );
+  await userEvent.click(editor);
+  await userEvent.keyboard("{Control>}a{/Control}Termine{Escape}");
+  cleanup();
+
+  // The original sees the fork's addition as a suggestion: rendered by
+  // its LABEL, and dead — no triangle, no past chip, no projections.
+  // Overlays attach to file rows only; a proposal is a leaf of the
+  // proposal system.
+  renderApp({ ...alice(), fetchCalendarFeed: () => Promise.resolve(FEED) });
+  await navigateToNodeViaSearch(0, "Events");
+  await expectTree(`
+Events
+  Placeholder
+  [S] Termine
+  `);
+  expect(screen.queryByLabelText("expand Termine")).toBeNull();
+  expect(screen.queryByLabelText(/show \d+ past/u)).toBeNull();
 });

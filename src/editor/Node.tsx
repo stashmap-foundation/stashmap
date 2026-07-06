@@ -15,6 +15,8 @@ import {
   useCurrentNode,
   getCurrentReferenceForRow,
   useRow,
+  isFileRow,
+  updateView,
 } from "../rowModel";
 import { isEditableNode } from "./temporaryViewState";
 import {
@@ -37,11 +39,14 @@ import { isBlockLinkAny, nodeText } from "../core/nodeSpans";
 import { getBlockLink } from "../core/blockLink";
 import { ENTITY_SCHEME_RE } from "../core/entityRecognition";
 import {
+  displayTextOf,
+  hiddenPastEntryCount,
   icalFeedLinkPartsOf,
   icalFeedLinkText,
   icalFeedUrlOf,
   isBareIcalFeedUrl,
 } from "../core/ical";
+import { useCalendarFeeds } from "../CalendarFeedContext";
 import { inlineTargetToHref, linkStyle, linkToHref } from "./linkOperations";
 import { ReferenceDisplay } from "./referenceDisplay";
 import { MiniEditor, preventEditorBlur } from "./AddNode";
@@ -55,6 +60,7 @@ import {
   planSetEmptyNodePosition,
   planSaveNodeAndEnsureNodes,
   planExpandNode,
+  planUpdateViews,
   planRemoveEmptyNodePosition,
   planCreateNode,
   planAddToParent,
@@ -88,8 +94,7 @@ function ExpandCollapseToggle(): JSX.Element | null {
   const rawDisplayText = useDisplayText();
   // Feed-as-link rows read by their label; the raw text (with the URL)
   // belongs to edit mode.
-  const displayText =
-    icalFeedLinkPartsOf(rawDisplayText)?.label ?? rawDisplayText;
+  const displayText = displayTextOf(rawDisplayText);
   const onToggleExpanded = useOnToggleExpanded();
   const isExpanded = useIsExpanded();
   const isEmptyNode = isEmptySemanticID(rowID);
@@ -120,6 +125,58 @@ function ExpandCollapseToggle(): JSX.Element | null {
       <span className={`triangle ${isExpanded ? "expanded" : "collapsed"}`}>
         {isExpanded ? "▼" : "▶"}
       </span>
+    </button>
+  );
+}
+
+// The feed row's past chip: bare past entries don't project by default;
+// this piece of row furniture (left of the editable label, like the expand
+// caret) reveals and hides them. A per-node view setting, never file
+// content — and never a row: nothing un-interactable appears in the tree.
+function PastEntriesChip(): JSX.Element | null {
+  const data = useData();
+  const row = useRow();
+  const { feeds } = useCalendarFeeds();
+  const { createPlan, executePlan } = usePlanner();
+  const feedUrl = isFileRow(row)
+    ? icalFeedUrlOf(nodeText(row.node))
+    : undefined;
+  const entries = feedUrl ? feeds.get(feedUrl) : undefined;
+  const pastCount = entries
+    ? hiddenPastEntryCount(row.node.children.toArray(), entries, Date.now())
+    : 0;
+  if (pastCount === 0) {
+    return null;
+  }
+  const showPast = row.view.showPastEntries === true;
+  const onToggle = (): void => {
+    executePlan(
+      planUpdateViews(
+        createPlan(),
+        updateView(data.views, row.viewPath, {
+          ...row.view,
+          showPastEntries: !showPast,
+          // Revealing the past also expands — the rows must land in view.
+          ...(showPast ? {} : { expanded: true }),
+        })
+      )
+    );
+  };
+  // The label is the action (like "Stop publishing"): it always says what
+  // a click does, and the skin doubles as the state — dashed = the past is
+  // absent (the not-published language), solid = it's on screen.
+  return (
+    <button
+      type="button"
+      className={`past-entries-chip ${
+        showPast ? "past-entries-chip-shown" : ""
+      }`}
+      onClick={onToggle}
+      onMouseDown={preventEditorBlur}
+      aria-label={showPast ? "hide past" : `show ${pastCount} past`}
+      aria-pressed={showPast}
+    >
+      {showPast ? "hide past" : `show ${pastCount} past`}
     </button>
   );
 }
@@ -378,7 +435,9 @@ function NodeContent(): JSX.Element {
     return <InlineSpans node={row.node} sourceId={row.sourceId} />;
   }
 
-  return <span className="break-word">{displayText}</span>;
+  // Read display goes through the one display-text rule (feed links read
+  // by their label); raw text belongs to edit mode only.
+  return <span className="break-word">{displayTextOf(displayText)}</span>;
 }
 
 function getPreviousSiblingFromRows(
@@ -1062,11 +1121,17 @@ export function Node({
           />
         )}
         <div className={`w-100 node-content-wrapper ${contentClass}`}>
-          <span className={textClassName} style={textStyle}>
-            <NodeAutoLink>
-              <InteractiveNodeContent rows={rows} />
-            </NodeAutoLink>
-          </span>
+          {/* Block flow container: the chip floats and the label text
+              wraps around it instead of living in a separate column
+              (node-content-wrapper is flex, where floats don't exist). */}
+          <div className="node-content-flow">
+            <PastEntriesChip />
+            <span className={textClassName} style={textStyle}>
+              <NodeAutoLink>
+                <InteractiveNodeContent rows={rows} />
+              </NodeAutoLink>
+            </span>
+          </div>
         </div>
         <RightMenu />
       </NodeCard>

@@ -7,6 +7,7 @@ import {
   getParentView,
   getViewForRowID,
   isEmptyViewPathID,
+  isFileRow,
   viewPathToString,
 } from "./rowModel";
 import {
@@ -34,11 +35,10 @@ import {
 } from "./core/nodeSpans";
 import {
   IcalEntry,
+  hiddenPastEntryCount,
   icalEntryDisplayText,
   icalFeedUrlOf,
-  isPastIcalEntry,
   mergeProjectedEntries,
-  proposedEntryRelevance,
 } from "./core/ical";
 import {
   documentKeyOf,
@@ -561,9 +561,7 @@ function createProjectionRow(
     parent: parentNode.id,
     updated: parentNode.updated ?? Date.now(),
     root: parentNode.root ?? parentNode.id,
-    relevance: isPastIcalEntry(entry, Date.now())
-      ? "little_relevant"
-      : undefined,
+    relevance: undefined,
   };
   const parentPath = addNodesToLastElement(parentRow.viewPath, parentNode.id);
   const viewPath = appendNodeToPath(parentPath, node.id);
@@ -603,12 +601,17 @@ function interleaveProjectionRows(
     return childRows;
   }
   const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
-  const merged = mergeProjectedEntries(parentNode.children.toArray(), entries);
+  // Bare past entries don't project by default (the feed row's chip
+  // reveals them); file content always shows. Pastness is node-type
+  // rendering, never a judgment.
+  const merged = mergeProjectedEntries(
+    parentNode.children.toArray(),
+    entries,
+    parentRow.view.showPastEntries ? undefined : Date.now()
+  );
   // Nearest-first anchors of everything displayed above, materialized or
   // not — ids are deterministic, so an anchor may reference a row that
-  // doesn't exist yet. Projections obey the marker filters like every
-  // row — the ~ proposal on past entries makes the existing filter the
-  // way to fold the past away.
+  // doesn't exist yet. Projections obey the marker filters like every row.
   const { rows } = merged.reduce<{ rows: Row[]; precededBy: ID[] }>(
     (acc, item) => {
       if (item.kind === "projection") {
@@ -629,21 +632,8 @@ function interleaveProjectionRows(
         };
       }
       const row = rowsByChildId.get(item.childId as ID);
-      // A materialized-but-unjudged past entry keeps its standing ~
-      // proposal for filtering purposes — the past folds away whether
-      // touched or not.
-      const proposed = row
-        ? proposedEntryRelevance(entries, row.node, Date.now())
-        : undefined;
-      const visible =
-        row &&
-        (proposed === undefined ||
-          itemPassesFilters(
-            { ...row.node, relevance: proposed },
-            activeFilters
-          ));
       return {
-        rows: visible && row ? [...acc.rows, row] : acc.rows,
+        rows: row ? [...acc.rows, row] : acc.rows,
         precededBy: [item.childId as ID, ...acc.precededBy],
       };
     },
@@ -801,6 +791,14 @@ function getChildrenForRegularNode(
     return { rows: childRows };
   }
 
+  // Overlays attach to file rows only: a proposal is a leaf of the
+  // proposal system, not a node in it. No projections, no footers, no
+  // feed fetches under suggested/version/incoming rows — their children
+  // render as the plain preview they are.
+  if (!isFileRow(parentRow)) {
+    return { rows: childRows };
+  }
+
   const rowsByChildId = Map<ID, Row>(
     childRowPairs.map(({ childID, row }) => [childID, row])
   );
@@ -913,6 +911,15 @@ export function getTreeChildren(
   };
 }
 
+function hasHiddenPastEntries(data: Data, node: GraphNode): boolean {
+  const feedUrl = icalFeedUrlOf(nodeText(node));
+  const entries = feedUrl ? data.calendarFeeds?.get(feedUrl) : undefined;
+  return (
+    !!entries &&
+    hiddenPastEntryCount(node.children.toArray(), entries, Date.now()) > 0
+  );
+}
+
 function getNodesInRows(
   data: Data,
   graph: GraphLookup,
@@ -933,7 +940,15 @@ function getNodesInRows(
       typeFilters,
       options
     );
-    const row = { ...rootRow, hasChildren: childResult.rows.size > 0 };
+    const row = {
+      ...rootRow,
+      // A calendar feed whose entries are all hidden past still expands
+      // (and keeps its triangle): the children exist, they're behind the
+      // past chip. File rows only — proposals don't host the feed.
+      hasChildren:
+        childResult.rows.size > 0 ||
+        (isFileRow(rootRow) && hasHiddenPastEntries(data, rootRow.node)),
+    };
     const withRoot = {
       rows: result.rows.push(row),
     };

@@ -34,6 +34,7 @@ import {
 } from "./core/nodeSpans";
 import {
   IcalEntry,
+  hiddenPastEntryCount,
   icalEntryDisplayText,
   icalFeedUrlOf,
   mergeProjectedEntries,
@@ -901,6 +902,15 @@ export function getTreeChildren(
   };
 }
 
+function hasHiddenPastEntries(data: Data, node: GraphNode): boolean {
+  const feedUrl = icalFeedUrlOf(nodeText(node));
+  const entries = feedUrl ? data.calendarFeeds?.get(feedUrl) : undefined;
+  return (
+    !!entries &&
+    hiddenPastEntryCount(node.children.toArray(), entries, Date.now()) > 0
+  );
+}
+
 function getNodesInRows(
   data: Data,
   graph: GraphLookup,
@@ -921,7 +931,14 @@ function getNodesInRows(
       typeFilters,
       options
     );
-    const row = { ...rootRow, hasChildren: childResult.rows.size > 0 };
+    const row = {
+      ...rootRow,
+      // A calendar feed whose entries are all hidden past still expands
+      // (and keeps its triangle): the children exist, they're behind the
+      // past chip.
+      hasChildren:
+        childResult.rows.size > 0 || hasHiddenPastEntries(data, rootRow.node),
+    };
     const withRoot = {
       rows: result.rows.push(row),
     };

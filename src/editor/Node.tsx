@@ -153,6 +153,8 @@ function PastEntriesChip(): JSX.Element | null {
         updateView(data.views, row.viewPath, {
           ...row.view,
           showPastEntries: !showPast,
+          // Revealing the past also expands — the rows must land in view.
+          ...(showPast ? {} : { expanded: true }),
         })
       )
     );

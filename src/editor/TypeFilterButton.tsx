@@ -48,22 +48,23 @@ const RELEVANCE_FILTERS: {
 const SUGGESTIONS_FILTER = {
   id: "suggestions" as const,
   label: "Suggestions",
-  color: TYPE_COLORS.other_user,
+  color: TYPE_COLORS.proposal,
   symbol: "@",
 };
 
 const VERSIONS_FILTER = {
   id: "versions" as const,
   label: "Versions",
-  color: TYPE_COLORS.other_user,
+  color: TYPE_COLORS.proposal,
   symbol: "\u2225",
 };
 
+// The filter button wears the same symbol as the rows it controls.
 const INCOMING_FILTER = {
   id: "incoming" as const,
   label: "Incoming",
   color: TYPE_COLORS.referenced_by,
-  symbol: "R",
+  symbol: "\u21a9",
 };
 
 export type FilterId =

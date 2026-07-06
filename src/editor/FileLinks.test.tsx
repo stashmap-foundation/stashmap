@@ -293,11 +293,13 @@ test("File link with prefix markers preserves them on the incoming reference", a
   await knowstrSave(workspacePath);
   await renderAppTree({ path: workspacePath, search: "B" });
 
+  // The incoming row wears ↩, never a borrowed judgment mark — nobody
+  // judged anything (the !+ in the text are the SOURCE row's markers).
   await expectTree(
     `
 B
   B-child
-{?} [I] A !+↩
+[I] A !+↩
   `,
     { showGutter: true }
   );

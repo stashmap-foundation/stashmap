@@ -474,8 +474,15 @@ body {
 }
 
 // Suggestion indicator (suggestions from other users)
+// Computed proposals are neutral — violet means entity, nothing else.
 .suggestion-indicator {
-  color: var(--violet);
+  color: var(--base0);
+  font-weight: bold;
+  font-family: monospace;
+}
+
+.incoming-indicator {
+  color: var(--cyan);
   font-weight: bold;
   font-family: monospace;
 }
@@ -493,7 +500,7 @@ body {
 }
 
 .version-indicator-other {
-  color: var(--violet);
+  color: var(--base0);
   font-weight: bold;
   font-family: monospace;
 }

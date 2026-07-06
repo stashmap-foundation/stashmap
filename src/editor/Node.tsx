@@ -990,7 +990,7 @@ function SuggestionIndicator(): JSX.Element {
   return (
     <span
       className="suggestion-indicator"
-      title="Suggestion from other users"
+      title="Suggestion — a version of this list has this row"
       aria-hidden="true"
     >
       @
@@ -998,14 +998,16 @@ function SuggestionIndicator(): JSX.Element {
   );
 }
 
+// Incoming references speak ↩ everywhere — the gutter, the filter button,
+// the link cluster. Never a judgment symbol: nobody judged anything.
 function IncomingRefGutterIndicator(): JSX.Element {
   return (
     <span
-      className="maybe-relevant-indicator"
-      title="Suggested link — judge it (! ? ~ + -) to place it"
+      className="incoming-indicator"
+      title="Incoming link — judge it (! ? ~ + -) to place it"
       aria-hidden="true"
     >
-      ?
+      ↩
     </span>
   );
 }

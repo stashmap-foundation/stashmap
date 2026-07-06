@@ -1,0 +1,15 @@
+{
+  "changed": true,
+  "suggestions": [],
+  "detached": [
+    {
+      "node": "x",
+      "reason": "base-deleted"
+    },
+    {
+      "node": "y",
+      "reason": "base-deleted"
+    }
+  ],
+  "pins": []
+}

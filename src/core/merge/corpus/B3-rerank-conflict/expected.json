@@ -1,0 +1,16 @@
+{
+  "changed": true,
+  "suggestions": [
+    {
+      "kind": "judgment",
+      "node": "b",
+      "theirs": {
+        "relevance": "not_relevant"
+      }
+    }
+  ],
+  "detached": [],
+  "pins": [
+    "b"
+  ]
+}

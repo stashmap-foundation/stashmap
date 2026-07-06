@@ -1,0 +1,14 @@
+{
+  "changed": true,
+  "suggestions": [
+    {
+      "kind": "move",
+      "node": "x",
+      "theirsParent": "b"
+    }
+  ],
+  "detached": [],
+  "pins": [
+    "x"
+  ]
+}

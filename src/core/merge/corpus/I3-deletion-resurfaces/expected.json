@@ -1,0 +1,11 @@
+{
+  "suggestions": [
+    {
+      "kind": "add",
+      "parent": "wd_q1",
+      "node": "t1",
+      "theirs": "Torre Glories"
+    }
+  ],
+  "drift": 0
+}

@@ -6,7 +6,13 @@ export const KIND_SETTINGS = 11071;
 // plaintext storage events are deliberately no longer read (pre-release,
 // no migration).
 export const KIND_KNOWLEDGE_DOCUMENT = 34775;
-export const KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT = 34773;
+// Snapshots render the fork's SOURCE document — private storage, not
+// deposit content — so they are encrypted exactly like storage, under the
+// forking document's storage key. The d tag stays the plaintext hash, so
+// filesystem and web derive identical ids. 34776 replaces the plaintext
+// 34773, retired without migration (pre-release; it was a leak, not a
+// format evolution).
+export const KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT = 34776;
 // Deposits: published documents, tagged with the entities they are
 // published under. Distinct from storage (34772) so the same document can
 // be both stored and published without the replaceable events colliding.

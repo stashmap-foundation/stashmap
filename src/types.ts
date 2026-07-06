@@ -238,6 +238,9 @@ declare global {
           updated: number;
           addCount: number;
           removeCount: number;
+          // no baseline for this fork edge: counts are a direct comparison
+          // without direction, rendered as ±n
+          direct?: boolean;
         }
       | undefined;
     reference:

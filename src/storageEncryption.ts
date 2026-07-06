@@ -3,7 +3,10 @@ import { Event, UnsignedEvent, nip44 } from "nostr-tools";
 import { base64 } from "@scure/base";
 import { bytesToHex } from "@noble/hashes/utils";
 import { isUserLoggedInWithSeed } from "./NostrAuthContext";
-import { KIND_KNOWLEDGE_DOCUMENT } from "./nostr";
+import {
+  KIND_KNOWLEDGE_DOCUMENT,
+  KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
+} from "./nostr";
 
 // Storage keys are per-document, minted at first save and reused on every
 // republish so a shared key (capability link) keeps opening later versions.
@@ -98,7 +101,10 @@ export async function decryptStorageEvent(
   user: User | undefined,
   capabilityKeys: ReadonlyArray<string>
 ): Promise<((Event | UnsignedEvent) & EventAttachment) | undefined> {
-  if (event.kind !== KIND_KNOWLEDGE_DOCUMENT) {
+  if (
+    event.kind !== KIND_KNOWLEDGE_DOCUMENT &&
+    event.kind !== KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT
+  ) {
     return event;
   }
   const envelope = parseEnvelope(event.content);

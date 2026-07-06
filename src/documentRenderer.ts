@@ -1,3 +1,4 @@
+import type { Map as ImmutableMap } from "immutable";
 import {
   EMPTY_SEMANTIC_ID,
   getNode,
@@ -26,6 +27,12 @@ import {
 
 type SerializeResult = {
   lines: string[];
+};
+
+// snapshotIds: fork-time baselines to stamp per node (only nodes carrying
+// basedOn consult it; a snapshotId already on the node always wins).
+type RenderOptions = {
+  snapshotIds?: ImmutableMap<ID, string>;
 };
 
 function getSerializableNodeText(
@@ -68,10 +75,11 @@ function getSerializableNodeBody(
 
 function getSerializableNodeAttrs(
   node: GraphNode,
-  options?: { snapshotId?: string }
+  options?: RenderOptions
 ): string {
   const snapshotId =
-    node.snapshotId ?? (node.basedOn ? options?.snapshotId : undefined);
+    node.snapshotId ??
+    (node.basedOn ? options?.snapshotIds?.get(node.id) : undefined);
   return formatNodeAttrs(node.id, {
     ...(node.basedOn ? { basedOn: node.basedOn } : {}),
     ...(snapshotId ? { snapshotId } : {}),
@@ -85,9 +93,7 @@ function serializeNodeSequence(
   nodes: readonly GraphNode[],
   indent: string,
   current: SerializeResult,
-  options?: {
-    snapshotId?: string;
-  }
+  options?: RenderOptions
 ): SerializeResult {
   const serializeChildren = (
     children: GraphNode["children"],
@@ -195,9 +201,7 @@ function serializeNodeSequence(
 export function renderDocumentMarkdown(
   knowledgeDBs: KnowledgeDBs,
   document: Document,
-  options?: {
-    snapshotId?: string;
-  }
+  options?: RenderOptions
 ): string {
   if (document.topNodeShortIds.length === 0) {
     return formatWithFrontMatter("", document.frontMatter);

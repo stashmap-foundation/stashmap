@@ -100,6 +100,7 @@ async function loadProfileAndEvents(profile) {
   return {
     profile: loaded.profile,
     files: loaded.files,
+    snapshots: loaded.snapshots,
     privateKey: readProfilePrivateKey(loaded.profile),
   };
 }

@@ -5,6 +5,7 @@ import { Backend, BackendProvider, WorkspaceState } from "../../BackendContext";
 import { LoadedCliProfile } from "../../cli/config";
 import type {
   WorkspaceMarkdownFile,
+  WorkspaceSnapshotFile,
   WorkspaceWriteRequest,
 } from "./workspaceBackend";
 import type { FsEventHandler } from "./workspaceWatcher";
@@ -12,6 +13,7 @@ import type { FsEventHandler } from "./workspaceWatcher";
 export type WorkspaceLoaded = {
   profile: LoadedCliProfile;
   files: WorkspaceMarkdownFile[];
+  snapshots?: WorkspaceSnapshotFile[];
   // Hex private key from the profile's nsec file, when present. Publishing
   // signs deposits in the renderer; local work needs no key.
   privateKey?: string;
@@ -97,6 +99,7 @@ export function FilesystemBackendProvider({
     const workspace: WorkspaceState = {
       profile,
       files,
+      snapshots: data?.snapshots ?? [],
       pickFolder: () => ipc.pickFolder(),
       isInitialised: (folder) => ipc.isInitialised(folder),
       open: async (folder) => {

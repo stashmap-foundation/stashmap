@@ -22,6 +22,16 @@ export function isValidSnapshotId(snapshotId: string): boolean {
   return /^snap_sha256_[0-9a-f]{64}$/u.test(snapshotId);
 }
 
+// The filesystem snapshot store (idea.md, Baselines travel with the
+// workspace): content-addressed, write-once, committed like any other
+// file. Lives here (not in workspaceBackend) so the renderer can compute
+// paths without importing fs.
+export const SNAPSHOTS_DIR = ".knowstr/snapshots";
+
+export function snapshotRelativePath(snapshotId: string): string {
+  return `${SNAPSHOTS_DIR}/${snapshotId}.md`;
+}
+
 export function buildDocumentEvent(
   document: Document,
   pubkey: PublicKey,
@@ -109,9 +119,14 @@ export function depositWriteRelayConf(
   };
 }
 
+// Encrypted under the forking document's storage key: whoever can read the
+// fork holds this content since fork time anyway — they gain only the
+// ability to diff. The d tag is computed from the plaintext BEFORE the wire
+// envelope, so filesystem and web ids agree.
 export function buildSnapshotEvent(
   snapshotAuthor: PublicKey,
-  content: string
+  content: string,
+  storageKey: string
 ): UnsignedEvent & EventAttachment {
   return {
     kind: KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
@@ -119,5 +134,6 @@ export function buildSnapshotEvent(
     created_at: newTimestamp(),
     tags: [["d", snapshotIdForContent(content)], msTag()],
     content,
+    storageKey,
   };
 }

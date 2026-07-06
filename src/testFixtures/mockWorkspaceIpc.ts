@@ -86,6 +86,7 @@ export function mockWorkspaceIpc(
           (loaded): WorkspaceLoaded => ({
             profile: loaded.profile,
             files: [...loaded.files],
+            snapshots: [...loaded.snapshots],
             privateKey: readProfilePrivateKey(loaded.profile),
           })
         ) ?? Promise.resolve(null),

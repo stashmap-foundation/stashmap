@@ -237,13 +237,21 @@ function VersionContent({
       {dateStr}
       <span style={{ fontStyle: "normal" }}>
         {isOtherUser && " \u{1F464}"}
-        {meta && meta.addCount > 0 && (
+        {meta && meta.direct && (
+          <>
+            {" "}
+            <span style={{ color: "var(--yellow)" }}>
+              ±{meta.addCount + meta.removeCount}
+            </span>
+          </>
+        )}
+        {meta && !meta.direct && meta.addCount > 0 && (
           <>
             {" "}
             <span style={{ color: "var(--green)" }}>+{meta.addCount}</span>
           </>
         )}
-        {meta && meta.removeCount > 0 && (
+        {meta && !meta.direct && meta.removeCount > 0 && (
           <>
             {" "}
             <span style={{ color: "var(--red)" }}>-{meta.removeCount}</span>

@@ -1,6 +1,8 @@
 import { Map } from "immutable";
 import { Event, UnsignedEvent } from "nostr-tools";
 import { KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT, getReplaceableKey } from "../nostr";
+import { parseToDocument } from "../core/Document";
+import { LOCAL } from "../core/nodeRef";
 import { eventToParsed, findTag, getEventMs } from "../nostrEvents";
 import { collectEventsUntilIdle, EventQueryClient } from "../eventQuery";
 import { storedDocumentToEvent } from "../documentMaterialization";
@@ -109,6 +111,15 @@ export function materializeSnapshot(
   const parsed = eventToParsed(storedDocumentToEvent(record));
   const nodes = parsed?.nodes ?? Map<string, GraphNode>();
   return nodes;
+}
+
+// A snapshot loaded from the filesystem store: same materialization as a
+// snapshot event, minus the event envelope.
+export function materializeSnapshotContent(
+  snapshotId: string,
+  content: string
+): Map<string, GraphNode> {
+  return parseToDocument(LOCAL, content, { docIdFallback: snapshotId }).nodes;
 }
 
 export async function loadAndMaterializeSnapshots(

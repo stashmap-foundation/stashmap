@@ -21,6 +21,7 @@ import {
   snapshotIdForContent,
 } from "./nodesDocumentEvent";
 import { publishStateOf } from "./core/knowstrFrontmatter";
+import { newStorageKey } from "./storageEncryption";
 import {
   EMPTY_SEMANTIC_ID,
   isEmptySemanticID,
@@ -688,10 +689,40 @@ function getSnapshotSourceRoot(
   return root && source ? { node: root, sourceId: source.sourceId } : undefined;
 }
 
+// Every node of the document holding basedOn without a baseline — the fork
+// shape is irrelevant (root fork, child fork, fork into another document)
+// and so is the fork's age: the same predicate captures fresh forks and
+// repairs legacy ones at their next save. Existing snapshotIds are never
+// touched (absence is repaired, breakage is waited out).
+function collectUnbaselinedForks(
+  knowledgeDBs: KnowledgeDBs,
+  topNodes: readonly GraphNode[]
+): GraphNode[] {
+  type Acc = { seen: Map<ID, boolean>; forks: GraphNode[] };
+  const visit = (acc: Acc, node: GraphNode): Acc => {
+    if (acc.seen.get(node.id)) {
+      return acc;
+    }
+    const withSelf: Acc = {
+      seen: acc.seen.set(node.id, true),
+      forks:
+        node.basedOn && !node.snapshotId ? [...acc.forks, node] : acc.forks,
+    };
+    return node.children.reduce((childAcc, childID) => {
+      const child = getNode(knowledgeDBs, childID, LOCAL);
+      return child ? visit(childAcc, child) : childAcc;
+    }, withSelf);
+  };
+  return topNodes.reduce(visit, {
+    seen: Map<ID, boolean>(),
+    forks: [] as GraphNode[],
+  }).forks;
+}
+
 export function buildDocumentWrites(plan: GraphPlan): {
   document: KnowstrDocument;
   content: string;
-  snapshotContent: string | undefined;
+  snapshotContents: string[];
 }[] {
   return plan.affectedDocuments.toArray().flatMap((docId) => {
     const document = plan.documents.get(documentKeyOf(LOCAL, docId));
@@ -703,35 +734,45 @@ export function buildDocumentWrites(plan: GraphPlan): {
         plan.knowledgeDBs.get(LOCAL)?.nodes.get(topNodeShortId)
       )
       .filter((node): node is GraphNode => node !== undefined);
-    const snapshotAnchorNode = topNodes.find(
-      (topNode) => topNode.basedOn && !topNode.snapshotId
+    const forkNodes = collectUnbaselinedForks(plan.knowledgeDBs, topNodes);
+    // One snapshot per source document, however many forks came from it;
+    // forks from several sources stamp several snapshotIds in one write.
+    const baselines = forkNodes.reduce(
+      (acc, forkNode) => {
+        const sourceRoot = getSnapshotSourceRoot(
+          plan.knowledgeDBs,
+          forkNode,
+          LOCAL
+        );
+        const sourceDocKey = sourceRoot?.node.docId
+          ? documentKeyOf(sourceRoot.sourceId, sourceRoot.node.docId)
+          : undefined;
+        const sourceDocument = sourceDocKey
+          ? plan.documents.get(sourceDocKey)
+          : undefined;
+        if (!sourceDocKey || !sourceDocument) {
+          return acc;
+        }
+        const content =
+          acc.contentByDoc.get(sourceDocKey) ??
+          renderDocumentMarkdown(plan.knowledgeDBs, sourceDocument);
+        return {
+          contentByDoc: acc.contentByDoc.set(sourceDocKey, content),
+          snapshotIds: acc.snapshotIds.set(
+            forkNode.id,
+            snapshotIdForContent(content)
+          ),
+        };
+      },
+      { contentByDoc: Map<string, string>(), snapshotIds: Map<ID, string>() }
     );
-    const snapshotSourceRoot = getSnapshotSourceRoot(
-      plan.knowledgeDBs,
-      snapshotAnchorNode,
-      LOCAL
-    );
-    const sourceDocument = snapshotSourceRoot?.node.docId
-      ? plan.documents.get(
-          documentKeyOf(
-            snapshotSourceRoot.sourceId,
-            snapshotSourceRoot.node.docId
-          )
-        )
-      : undefined;
-    const snapshotContent = sourceDocument
-      ? renderDocumentMarkdown(plan.knowledgeDBs, sourceDocument)
-      : undefined;
-    const snapshotId =
-      topNodes.find((topNode) => topNode.snapshotId)?.snapshotId ??
-      (snapshotContent ? snapshotIdForContent(snapshotContent) : undefined);
     return [
       {
         document,
         content: renderDocumentMarkdown(plan.knowledgeDBs, document, {
-          snapshotId,
+          snapshotIds: baselines.snapshotIds,
         }),
-        snapshotContent,
+        snapshotContents: baselines.contentByDoc.valueSeq().toArray(),
       },
     ];
   });
@@ -825,13 +866,26 @@ export function buildDocumentEvents(
   }
   const pubkey = plan.user.publicKey;
   const withUpserts = buildDocumentWrites(plan).reduce((events, write) => {
-    const snapshotEvent = write.snapshotContent
-      ? buildSnapshotEvent(pubkey, write.snapshotContent)
-      : undefined;
-    const event = buildDocumentEvent(write.document, pubkey, write.content);
+    // One storage key per write, shared by the document and its fork
+    // snapshots: whoever can open the fork can diff against its baseline.
+    const documentWithKey = {
+      ...write.document,
+      storageKey: write.document.storageKey ?? newStorageKey(),
+    };
+    const event = buildDocumentEvent(documentWithKey, pubkey, write.content);
     const depositEvent = depositEventFor(plan, pubkey, write);
-    const withSnapshot = snapshotEvent ? events.push(snapshotEvent) : events;
-    const withDocument = withSnapshot.push(event);
+    const withSnapshots = write.snapshotContents.reduce(
+      (acc, snapshotContent) =>
+        acc.push(
+          buildSnapshotEvent(
+            pubkey,
+            snapshotContent,
+            documentWithKey.storageKey
+          )
+        ),
+      events
+    );
+    const withDocument = withSnapshots.push(event);
     return depositEvent ? withDocument.push(depositEvent) : withDocument;
   }, plan.publishEvents);
   return plan.deletedDocs.reduce((events, docId) => {

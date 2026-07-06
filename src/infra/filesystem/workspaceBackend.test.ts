@@ -4,7 +4,15 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { LOCAL } from "../../core/nodeRef";
-import { loadWorkspaceAsDocuments } from "./workspaceBackend";
+import {
+  loadWorkspaceAsDocuments,
+  loadWorkspaceSnapshots,
+  saveDocumentsToWorkspace,
+} from "./workspaceBackend";
+import {
+  snapshotIdForContent,
+  snapshotRelativePath,
+} from "../../nodesDocumentEvent";
 
 const TEST_PUBKEY = "a".repeat(64) as PublicKey;
 
@@ -113,4 +121,35 @@ test("loadWorkspaceAsDocuments does not mutate files on disk", async () => {
   expect(fs.readFileSync(path.join(workspaceDir, "notes.md"), "utf8")).toBe(
     before
   );
+});
+
+test("snapshot store round-trip: save writes, load returns, corrupt ignored", async () => {
+  const workspaceDir = makeTempWorkspace();
+  const content = "# Source\n- barcelona <!-- id:b1 -->\n";
+  const snapshotId = snapshotIdForContent(content);
+
+  await saveDocumentsToWorkspace({ pubkey: TEST_PUBKEY, workspaceDir }, [
+    { relativePath: snapshotRelativePath(snapshotId), content },
+  ]);
+
+  fs.writeFileSync(
+    path.join(
+      workspaceDir,
+      snapshotRelativePath(`snap_sha256_${"0".repeat(64)}`)
+    ),
+    "tampered content"
+  );
+  fs.writeFileSync(
+    path.join(workspaceDir, ".knowstr", "snapshots", "not-a-snapshot.md"),
+    "irrelevant"
+  );
+
+  const snapshots = await loadWorkspaceSnapshots({ workspaceDir });
+  expect(snapshots).toEqual([{ snapshotId, content }]);
+
+  const documents = await loadWorkspaceAsDocuments({
+    pubkey: TEST_PUBKEY,
+    workspaceDir,
+  });
+  expect(documents).toEqual([]);
 });

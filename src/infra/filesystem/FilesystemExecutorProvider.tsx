@@ -7,6 +7,10 @@ import { useBackend } from "../../BackendContext";
 import { useDocumentStore, useDocuments } from "../../DocumentStore";
 import { ExecutorProvider } from "../../ExecutorContext";
 import { buildDepositEvents, buildDocumentWrites, Plan } from "../../planner";
+import {
+  snapshotIdForContent,
+  snapshotRelativePath,
+} from "../../nodesDocumentEvent";
 import { publishEventsWithConf, signEvents } from "../nostr/executor";
 import {
   Document,
@@ -202,9 +206,20 @@ export function FilesystemExecutorProvider({
       { items: [], taken: collectTakenPaths(documents) }
     );
 
+    // Fork baselines: content-addressed, write-once. Rewriting an existing
+    // id is a byte-identical no-op, so no existence check is needed.
+    const snapshotWrites = [
+      ...new Map(
+        writes
+          .flatMap((write) => write.snapshotContents)
+          .map((content) => [snapshotIdForContent(content), content])
+      ),
+    ].map(([snapshotId, content]) => ({ snapshotId, content }));
+
     if (store) {
       enriched.items.forEach((write) => store.upsertDocument(write.parsed));
       deletions.forEach(({ del }) => store.deleteDocument(del));
+      store.addSnapshotContents(snapshotWrites);
     }
 
     if (workspace) {
@@ -212,10 +227,16 @@ export function FilesystemExecutorProvider({
         .map((item) => item.filePath)
         .filter((p): p is string => p !== undefined);
       await workspace.save(
-        enriched.items.map((write) => ({
-          relativePath: write.filePath,
-          content: write.content,
-        })),
+        [
+          ...enriched.items.map((write) => ({
+            relativePath: write.filePath,
+            content: write.content,
+          })),
+          ...snapshotWrites.map((snap) => ({
+            relativePath: snapshotRelativePath(snap.snapshotId),
+            content: snap.content,
+          })),
+        ],
         deletedPaths
       );
     }

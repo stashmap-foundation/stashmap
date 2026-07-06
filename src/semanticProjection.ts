@@ -16,7 +16,7 @@ import { getBlockLinkTarget } from "./core/nodeSpans";
 import { fileLinkIndexKey, resolveLinkPath } from "./core/linkPath";
 import { suggestionSettings } from "./core/constants";
 import { LOG_ROOT_ROLE } from "./core/systemRoots";
-import { computeVersionDiff } from "./core/snapshotBaseline";
+import { computeVersionDiff, VersionDiff } from "./core/snapshotBaseline";
 import { documentKeyOf, type Document } from "./core/Document";
 import {
   GraphLookup,
@@ -645,12 +645,17 @@ export function getAlternativeFooterData(
   };
 
   const versionNodes = getVersions(graph, visibleAuthors, current);
-  const versionDiffs = versionNodes.map((version) =>
-    computeVersionDiff(snapshotNodes, knowledgeDBs, currentNode, version)
-  );
+  const versionDiffs = versionNodes
+    .map((version) =>
+      computeVersionDiff(snapshotNodes, knowledgeDBs, current, version)
+    )
+    .filter((diff): diff is VersionDiff => diff !== undefined);
+  // Direction-less diffs (no baseline) propose nothing: "the other version
+  // has X" is indistinguishable from "you deleted X".
+  const baselinedDiffs = versionDiffs.filter((diff) => !diff.direct);
 
   const allSuggestionCandidates = suggestionsEnabled
-    ? versionDiffs
+    ? baselinedDiffs
         .filter(({ node }) => !declinedTargetIDs.has(node.id))
         .reduce(
           (acc, { additions }) =>
@@ -680,7 +685,18 @@ export function getAlternativeFooterData(
   const versionMetas = versionsEnabled
     ? versionDiffs
         .filter(({ node }) => !existingCrefTargetIDs.has(node.id))
-        .reduce((acc, { node, additions, deletions }) => {
+        .reduce((acc, { node, additions, deletions, direct }) => {
+          if (direct) {
+            const directCount = additions.size + deletions.size;
+            return directCount > 0
+              ? acc.set(node.id, {
+                  updated: node.updated,
+                  addCount: additions.size,
+                  removeCount: deletions.size,
+                  direct: true,
+                })
+              : acc;
+          }
           const addCount = additions.filter(
             (item) =>
               itemPassesFilters(item, filterTypes) && !isCoveredItem(item)

@@ -558,6 +558,22 @@ body {
 // wallet's "Register as Shareholder" element, shared instead of
 // reinvented. Dressed like the footer rows it lives among (italic,
 // muted, node-size text); button-ness reveals on hover.
+// E2: the caret zone after a link row's text — fills the rest of the
+// line so a click right of the link lands here, not on the link.
+.link-cursor-zone {
+  flex: 1;
+  min-width: 10px;
+  min-height: var(--row-height, 22px);
+  // Cancel the wrapper's flex gap (8px): the caret must sit flush at the
+  // end of the link text, not a gap away. One space of padding gives the
+  // caret its natural after-the-text position.
+  margin-left: -8px;
+  padding-left: 4px;
+  outline: none;
+  cursor: text;
+  caret-color: var(--base0);
+}
+
 .action-row-btn {
   background: transparent;
   border: none;

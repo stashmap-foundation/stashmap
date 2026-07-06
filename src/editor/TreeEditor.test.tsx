@@ -339,7 +339,10 @@ My Notes
       `);
     });
 
-    test("Tab in a new sibling after a block reference does not indent under the reference", async () => {
+    // E2 reversed the old guard: link rows carry children of their own
+    // (idea.md), so Tab onto a reference files the row as a placement
+    // note under it.
+    test("Tab in a new sibling after a block reference indents under it", async () => {
       await createLogWithTwoReferences();
 
       focusReferenceItem(0);
@@ -347,16 +350,17 @@ My Notes
       const editor = await findNewNodeEditor();
       await userEvent.type(editor, "Log note");
       await userEvent.keyboard("{Tab}");
+      await userEvent.keyboard("{Escape}");
 
       await expectTree(`
 ~Log
   [R] Second Note
-  [NEW NODE: Log note]
+    Log note
   [R] First Note
       `);
     });
 
-    test("Normal-mode Tab does not indent an existing row under a block reference", async () => {
+    test("Normal-mode Tab indents an existing row under a block reference", async () => {
       await createLogWithTwoReferences();
 
       focusReferenceItem(0);
@@ -369,7 +373,7 @@ My Notes
       await expectTree(`
 ~Log
   [R] Second Note
-  Log note
+    Log note
   [R] First Note
       `);
     });

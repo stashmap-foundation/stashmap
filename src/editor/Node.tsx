@@ -15,6 +15,7 @@ import {
   useCurrentNode,
   getCurrentReferenceForRow,
   useRow,
+  updateView,
 } from "../rowModel";
 import { isEditableNode } from "./temporaryViewState";
 import {
@@ -37,11 +38,13 @@ import { isBlockLinkAny, nodeText } from "../core/nodeSpans";
 import { getBlockLink } from "../core/blockLink";
 import { ENTITY_SCHEME_RE } from "../core/entityRecognition";
 import {
+  hiddenPastEntryCount,
   icalFeedLinkPartsOf,
   icalFeedLinkText,
   icalFeedUrlOf,
   isBareIcalFeedUrl,
 } from "../core/ical";
+import { useCalendarFeeds } from "../CalendarFeedContext";
 import { inlineTargetToHref, linkStyle, linkToHref } from "./linkOperations";
 import { ReferenceDisplay } from "./referenceDisplay";
 import { MiniEditor, preventEditorBlur } from "./AddNode";
@@ -55,6 +58,7 @@ import {
   planSetEmptyNodePosition,
   planSaveNodeAndEnsureNodes,
   planExpandNode,
+  planUpdateViews,
   planRemoveEmptyNodePosition,
   planCreateNode,
   planAddToParent,
@@ -120,6 +124,53 @@ function ExpandCollapseToggle(): JSX.Element | null {
       <span className={`triangle ${isExpanded ? "expanded" : "collapsed"}`}>
         {isExpanded ? "▼" : "▶"}
       </span>
+    </button>
+  );
+}
+
+// The feed row's past chip: bare past entries don't project by default;
+// this piece of row furniture (left of the editable label, like the expand
+// caret) reveals and hides them. A per-node view setting, never file
+// content — and never a row: nothing un-interactable appears in the tree.
+function PastEntriesChip(): JSX.Element | null {
+  const data = useData();
+  const row = useRow();
+  const { feeds } = useCalendarFeeds();
+  const { createPlan, executePlan } = usePlanner();
+  const feedUrl = icalFeedUrlOf(nodeText(row.node));
+  const entries = feedUrl ? feeds.get(feedUrl) : undefined;
+  const pastCount = entries
+    ? hiddenPastEntryCount(row.node.children.toArray(), entries, Date.now())
+    : 0;
+  if (pastCount === 0) {
+    return null;
+  }
+  const showPast = row.view.showPastEntries === true;
+  const onToggle = (): void => {
+    executePlan(
+      planUpdateViews(
+        createPlan(),
+        updateView(data.views, row.viewPath, {
+          ...row.view,
+          showPastEntries: !showPast,
+        })
+      )
+    );
+  };
+  return (
+    <button
+      type="button"
+      className="past-entries-chip"
+      onClick={onToggle}
+      onMouseDown={preventEditorBlur}
+      aria-label={
+        showPast
+          ? "hide past dates"
+          : `show ${pastCount} past ${pastCount === 1 ? "date" : "dates"}`
+      }
+      aria-pressed={showPast}
+    >
+      {pastCount} past {showPast ? "▾" : "▸"}
     </button>
   );
 }
@@ -1052,6 +1103,7 @@ export function Node({
         </div>
         {levels > 0 && <Indent levels={levels} colorLevels={searchDepth} />}
         {showExpandCollapse && hasChildren && <ExpandCollapseToggle />}
+        <PastEntriesChip />
         {((showExpandCollapse && !hasChildren) ||
           (isConcreteRef && !showExpandCollapse) ||
           (isSuggestion && !showExpandCollapse)) && (

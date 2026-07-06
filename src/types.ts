@@ -263,6 +263,9 @@ declare global {
 
   type View = {
     expanded?: boolean;
+    // Calendar feed nodes: project bare past entries too (default: only
+    // upcoming entries project; file content always shows).
+    showPastEntries?: boolean;
     typeFilters?: Array<
       Relevance | "suggestions" | "versions" | "incoming" | "contains"
     >;

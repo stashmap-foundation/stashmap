@@ -653,8 +653,8 @@ export function planMaterializeComputedRow<T extends GraphPlan>(
     const linkNode = getWorkspaceNode(planWithLink.knowledgeDBs, ids[0]);
     return [planWithLink, linkNode ?? row.node, true];
   }
-  // Proposed judgments (a projection's ~ on past entries) are display
-  // only — the mint carries the user's explicit judgment or none at all.
+  // The mint carries the user's explicit judgment or none at all —
+  // projection rows enter the file unjudged.
   const minted: GraphNode = {
     ...row.node,
     parent: parentID,

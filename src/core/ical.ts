@@ -214,21 +214,48 @@ export type CalendarMergeItem =
   | { kind: "child"; childId: string }
   | { kind: "projection"; entry: IcalEntry };
 
+function startOfDay(nowMs: number): number {
+  const now = new Date(nowMs);
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+}
+
+// Pastness is a fact about the node's type, never a judgment: calendar
+// entries render date-aware because of what they ARE (like entities render
+// violet), and the user's judgments stay human-only.
+export function isPastIcalEntry(entry: IcalEntry, nowMs: number): boolean {
+  if (entry.startMs === undefined) {
+    return false;
+  }
+  return entry.startMs < startOfDay(nowMs);
+}
+
 // Interleaves untouched projections with the calendar node's actual
 // children: your arrangement wins where you arranged (children keep
 // document order), the feed owns what you left alone (each untouched
 // projection rides after its nearest materialized feed predecessor;
 // projections before any materialized entry lead the list). With nothing
 // materialized this is pure feed order.
+// hidePastBefore: bare past entries (past AND not materialized) don't
+// project — the past stays in the feed; the file, when touched, stays
+// visible. Materialized entries always pass; they are file truth and they
+// anchor the projections that follow them.
 export function mergeProjectedEntries(
   childIds: readonly string[],
-  entries: readonly IcalEntry[]
+  entries: readonly IcalEntry[],
+  hidePastBefore?: number
 ): CalendarMergeItem[] {
   const childIdSet = new Set(childIds);
+  const projectable =
+    hidePastBefore === undefined
+      ? entries
+      : entries.filter(
+          (entry) =>
+            childIdSet.has(entry.id) || !isPastIcalEntry(entry, hidePastBefore)
+        );
   const leading: IcalEntry[] = [];
   const anchored = new Map<string, IcalEntry[]>();
   let anchor: string | undefined;
-  entries.forEach((entry) => {
+  projectable.forEach((entry) => {
     if (childIdSet.has(entry.id)) {
       anchor = entry.id;
       return;
@@ -284,37 +311,37 @@ export function icalEntryDisplayText(entry: IcalEntry): string {
   return `${day}${time} ${entry.summary}`.trim();
 }
 
-// Entries before today propose the ~ judgment (idea.md: projections may
-// propose, exactly like incoming references propose ?). The proposal is
-// projection-only — it is never written; the user's own judgment
-// overrides and materializes.
-export function isPastIcalEntry(entry: IcalEntry, nowMs: number): boolean {
-  if (entry.startMs === undefined) {
-    return false;
-  }
-  const now = new Date(nowMs);
-  const startOfToday = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate()
-  ).getTime();
-  return entry.startMs < startOfToday;
+// A calendar entry node is recognizable from file content alone: the
+// ical: id (canonical-id law) plus the date in the row text. Readers need
+// no feed fetch to render pastness — the wallet applies the same rule.
+export function isCalendarEntryId(id: string): boolean {
+  return id.startsWith("ical:");
 }
 
-// The ~ proposal is a fact about the entry's date, not about
-// materialization: a past entry proposes ~ while the user has no
-// explicit judgment on it — projected or materialized alike. The
-// proposal is display and filter behavior only; it never reaches the
-// file (mints strip it, judgments override it, and removing a judgment
-// brings it back).
-export function proposedEntryRelevance(
-  entries: readonly IcalEntry[] | undefined,
-  node: { id: string; relevance?: Relevance },
-  nowMs: number
-): Relevance {
-  if (!entries || node.relevance !== undefined) {
-    return undefined;
+const ICAL_ROW_DATE_RE = /^(\d{2})\.(\d{2})\.(\d{4})/u;
+
+export function isPastCalendarRowText(text: string, nowMs: number): boolean {
+  const match = text.match(ICAL_ROW_DATE_RE);
+  if (!match) {
+    return false;
   }
-  const entry = entries.find((candidate) => candidate.id === node.id);
-  return entry && isPastIcalEntry(entry, nowMs) ? "little_relevant" : undefined;
+  const dateMs = new Date(
+    Number(match[3]),
+    Number(match[2]) - 1,
+    Number(match[1])
+  ).getTime();
+  return dateMs < startOfDay(nowMs);
+}
+
+// The count behind the feed row's past chip: bare past entries currently
+// hidden from projection.
+export function hiddenPastEntryCount(
+  childIds: readonly string[],
+  entries: readonly IcalEntry[],
+  nowMs: number
+): number {
+  const childIdSet = new Set(childIds);
+  return entries.filter(
+    (entry) => !childIdSet.has(entry.id) && isPastIcalEntry(entry, nowMs)
+  ).length;
 }

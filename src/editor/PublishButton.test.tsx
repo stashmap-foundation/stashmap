@@ -12,6 +12,7 @@ import {
   setup,
 } from "../utils.test";
 import { parseStorageKeyFromHash } from "../navigationUrl";
+import { KIND_DELETE, KIND_KNOWLEDGE_DEPOSIT } from "../nostr";
 
 test("the audience chip publishes, pauses, and resumes a document", async () => {
   const [alice] = setup([ALICE]);
@@ -48,6 +49,61 @@ test("the audience chip publishes, pauses, and resumes a document", async () => 
       "everyone"
     )
   );
+});
+
+test("stop publishing retracts the deposit and returns the chip to private", async () => {
+  const [alice] = setup([ALICE]);
+  renderTree(alice);
+  await userEvent.type(await findNewNodeEditor(), "Loud Essay{Escape}");
+  cleanup();
+
+  const utils = renderTree(alice);
+  await navigateToNodeViaSearch(0, "Loud Essay");
+  await userEvent.click(await screen.findByLabelText("audience options"));
+  await userEvent.click(await screen.findByLabelText("publish document"));
+
+  const pubkey = requireUser(alice()).publicKey;
+  await waitFor(() => {
+    const deposit = utils.relayPool
+      .getEvents()
+      .find((event) => event.kind === KIND_KNOWLEDGE_DEPOSIT);
+    expect(deposit?.content).toContain("Loud Essay");
+  });
+  const docId = utils.relayPool
+    .getEvents()
+    .find((event) => event.kind === KIND_KNOWLEDGE_DEPOSIT)
+    ?.tags.find(([name]) => name === "d")?.[1];
+
+  await userEvent.click(screen.getByLabelText("audience options"));
+  await userEvent.click(await screen.findByLabelText("stop publishing"));
+
+  await waitFor(() =>
+    expect(screen.getByLabelText("audience options").textContent).toContain(
+      "private"
+    )
+  );
+
+  // The wire: a deletion request on the deposit coordinate, and an empty
+  // replacement so relays that ignore it still lose content and rendezvous.
+  await waitFor(() => {
+    const events = utils.relayPool.getEvents();
+    const retraction = events.find(
+      (event) =>
+        event.kind === KIND_DELETE &&
+        event.tags.some(
+          ([name, value]) =>
+            name === "a" &&
+            value === `${KIND_KNOWLEDGE_DEPOSIT}:${pubkey}:${docId}`
+        )
+    );
+    expect(retraction).toBeDefined();
+    const deposits = events.filter(
+      (event) => event.kind === KIND_KNOWLEDGE_DEPOSIT
+    );
+    const newest = deposits[deposits.length - 1];
+    expect(newest?.content).toBe("");
+    expect(newest?.tags.some(([name]) => name === "S")).toBe(false);
+  });
 });
 
 test("the copied secret link opens the private document for its holder", async () => {

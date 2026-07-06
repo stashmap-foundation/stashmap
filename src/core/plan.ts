@@ -17,7 +17,11 @@ import {
 import { entityIdForText } from "./entityRecognition";
 import { icalFeedLinkText, isBareIcalFeedUrl } from "./ical";
 import { getWorkspaceNode, withWorkspace, workspaceOf } from "./knowledge";
-import { PublishState, withPublishState } from "./knowstrFrontmatter";
+import {
+  PublishState,
+  withPublishState,
+  withoutPublishState,
+} from "./knowstrFrontmatter";
 import { newGraphNode } from "./nodeFactory";
 import {
   fileLinkSpan,
@@ -140,6 +144,33 @@ export function planSetDocumentPublishState<T extends GraphPlan>(
   const nextDocument: Document = {
     ...document,
     frontMatter: withPublishState(document.frontMatter, state),
+    updatedMs: Date.now(),
+  };
+  return withDocumentInFilePathIndex(
+    {
+      ...plan,
+      documents: plan.documents.set(key, nextDocument),
+      affectedDocuments: plan.affectedDocuments.add(docId),
+    },
+    nextDocument
+  );
+}
+
+// The explicit unpublish: the document forgets it was ever published. The
+// next save writes storage without knowstr_publish and emits no deposit;
+// the wire-side retraction rides separately (planner: planRetractDocument).
+export function planClearDocumentPublishState<T extends GraphPlan>(
+  plan: T,
+  docId: string
+): T {
+  const key = workspaceDocumentKey(docId);
+  const document = plan.documents.get(key);
+  if (!document) {
+    return plan;
+  }
+  const nextDocument: Document = {
+    ...document,
+    frontMatter: withoutPublishState(document.frontMatter),
     updatedMs: Date.now(),
   };
   return withDocumentInFilePathIndex(

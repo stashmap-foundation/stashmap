@@ -5,6 +5,7 @@ import { UnsignedEvent } from "nostr-tools";
 import {
   KIND_DELETE,
   KIND_KNOWLEDGE_DOCUMENT,
+  KIND_KNOWLEDGE_DEPOSIT,
   newTimestamp,
   msTag,
 } from "./nostr";
@@ -34,6 +35,7 @@ import {
   GraphPlan,
   createGraphPlan,
   planAddTargetsToNode,
+  planClearDocumentPublishState,
   planCopyDescendantNodes,
   planUpsertNodes,
   withDocumentRoot,
@@ -769,6 +771,50 @@ export function buildDepositEvents(
     const deposit = depositEventFor(plan, pubkey, write);
     return deposit ? events.push(deposit) : events;
   }, List<UnsignedEvent & EventAttachment>());
+}
+
+// Undo publishing (idea.md, M7 retract): a kind-5 on the deposit
+// coordinate PLUS an empty replacement at the same (pubkey, d) — relays
+// that ignore deletion requests still lose content and rendezvous — and
+// the document drops knowstr_publish. Copies and takes others made remain
+// theirs; that is the honest limit of retraction.
+export function planRetractDocument<T extends GraphPlan>(
+  plan: T,
+  document: KnowstrDocument
+): T {
+  if (!plan.user) {
+    return plan;
+  }
+  const pubkey = plan.user.publicKey;
+  const writeRelayConf = depositWriteRelayConf(
+    document,
+    plan.relays.userRelays
+  );
+  const retraction = {
+    kind: KIND_DELETE,
+    pubkey,
+    created_at: newTimestamp(),
+    tags: [
+      ["a", `${KIND_KNOWLEDGE_DEPOSIT}:${pubkey}:${document.docId}`],
+      ["k", `${KIND_KNOWLEDGE_DEPOSIT}`],
+      msTag(),
+    ],
+    content: "",
+    writeRelayConf,
+  };
+  const emptyReplacement = {
+    kind: KIND_KNOWLEDGE_DEPOSIT,
+    pubkey,
+    created_at: newTimestamp(),
+    tags: [["d", document.docId], msTag()],
+    content: "",
+    writeRelayConf,
+  };
+  const cleared = planClearDocumentPublishState(plan, document.docId);
+  return {
+    ...cleared,
+    publishEvents: cleared.publishEvents.push(retraction, emptyReplacement),
+  };
 }
 
 export function buildDocumentEvents(

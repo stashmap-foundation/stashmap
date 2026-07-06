@@ -46,6 +46,7 @@ import { SignInMenuBtn } from "../SignIn";
 import {
   usePlanner,
   planForkPane,
+  planRetractDocument,
   planClearTemporarySelection,
   planSetEmptyNodePosition,
   planSelectAllTemporaryRows,
@@ -797,6 +798,20 @@ function AudienceChip(): JSX.Element | null {
           <div className="menu-item-text">
             {state.paused ? "Resume publishing" : "Pause publishing"}
           </div>
+        </Dropdown.Item>
+        <Dropdown.Item
+          className="d-flex menu-item"
+          onClick={() =>
+            executePlan(planRetractDocument(createPlan(), document))
+          }
+          aria-label="stop publishing"
+          title="Retracts it from the relays — copies others made remain theirs"
+          tabIndex={0}
+        >
+          <span className="d-block dropdown-item-icon" aria-hidden="true">
+            ⏏
+          </span>
+          <div className="menu-item-text">Stop publishing</div>
         </Dropdown.Item>
       </Dropdown.Menu>
     </Dropdown>

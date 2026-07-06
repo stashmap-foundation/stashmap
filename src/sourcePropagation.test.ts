@@ -150,7 +150,6 @@ test("reference rows resolve duplicate bare ids in the current source", () => {
     data,
     SOURCE_B,
     undefined,
-    undefined,
     parentNode,
     { ref: { sourceId: SOURCE_B, id: parentNode.id }, node: parentNode },
     undefined

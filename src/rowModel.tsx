@@ -285,6 +285,17 @@ export function useCurrentRowID(): [ID, View] {
 }
 
 export function getDisplayTextForRow(data: Data, row: Row): string {
+  // A version row's text IS its meta: date, author mark, diff counts.
+  if (row.virtualType === "version" && row.versionMeta) {
+    const meta = row.versionMeta;
+    return [
+      new Date(meta.updated).toLocaleString(),
+      ...(row.sourceId !== LOCAL ? ["\u{1F464}"] : []),
+      ...(meta.direct ? [`±${meta.addCount + meta.removeCount}`] : []),
+      ...(!meta.direct && meta.addCount > 0 ? [`+${meta.addCount}`] : []),
+      ...(!meta.direct && meta.removeCount > 0 ? [`-${meta.removeCount}`] : []),
+    ].join(" ");
+  }
   const reference = getCurrentReferenceForRow(data, row);
   if (reference) {
     return reference.text;

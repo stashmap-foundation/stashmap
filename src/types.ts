@@ -250,9 +250,7 @@ declare global {
       | {
           id: ID;
           sourceId: SourceId;
-          type: "reference";
           text: string;
-          targetContext: List<ID>;
           contextLabels: string[];
           targetLabel: string;
           incomingRelevance?: Relevance;

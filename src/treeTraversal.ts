@@ -6,6 +6,7 @@ import {
   addNodesToLastElement,
   getParentView,
   getViewForRowID,
+  isEmbedRow,
   isEmptyViewPathID,
   isFileRow,
   viewPathToString,
@@ -770,7 +771,9 @@ function appendVirtualFooterRows(
   };
 }
 
-function getChildrenForConcreteRef(
+// The embed seam (idea.md): the target's subtree as a computed, read-only
+// block. One embed exists today — the suggestion preview.
+function getEmbedChildren(
   data: Data,
   graph: GraphLookup,
   parentRow: Row
@@ -943,8 +946,10 @@ function getTreeChildrenForResolvedRow(
   typeFilters: Pane["typeFilters"],
   options?: TreeTraversalOptions
 ): TreeResult {
-  if (parentRow.parentNode && isBlockLink(parentRow.node)) {
-    return getChildrenForConcreteRef(data, graph, parentRow);
+  // Embeds expand to the target's subtree; every other row — link rows
+  // included — expands to its own children, file truth.
+  if (isEmbedRow(parentRow)) {
+    return getEmbedChildren(data, graph, parentRow);
   }
 
   return getChildrenForRegularNode(

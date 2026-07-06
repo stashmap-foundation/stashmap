@@ -42,6 +42,15 @@ export function isFileRow(row: Pick<Row, "virtualType">): boolean {
   return row.virtualType === undefined;
 }
 
+// An embed row's expansion shows the TARGET's subtree — computed,
+// read-only, for inspection before taking. A non-embed row's expansion
+// shows its own children, file truth. The suggestion preview is the one
+// embed in the system today; when an explicit embed affordance lands,
+// this predicate graduates to a producer-set row field.
+export function isEmbedRow(row: Pick<Row, "virtualType" | "node">): boolean {
+  return row.virtualType === "suggestion" && isRefNode(row.node);
+}
+
 export function getIndependentRows(rows: Row[]): Row[] {
   return rows.filter(
     (row) =>

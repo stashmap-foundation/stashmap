@@ -16,6 +16,8 @@ import {
   getCurrentReferenceForRow,
   useRow,
   updateView,
+  getViewForRowID,
+  getLast,
 } from "../rowModel";
 import { isEditableNode } from "./temporaryViewState";
 import {
@@ -175,6 +177,68 @@ function PastDatesActionRow(): JSX.Element {
     >
       {label}
     </button>
+  );
+}
+
+// E2's cursor-at-end: the space right of a link row's text hosts a real
+// caret — click it and the cursor sits at the end of the link. Enter
+// opens the editor in the next row. Typing is swallowed for now; this
+// zone is the seed of link-text editing (the feed-label pattern).
+function LinkCursorZone(): JSX.Element | null {
+  const data = useData();
+  const row = useRow();
+  const { createPlan, executePlan } = usePlanner();
+  const paneIndex = usePaneIndex();
+  const isInSearchView = useIsInSearchView();
+  const isViewingOtherUserContent = useIsViewingOtherUserContent();
+  const displayText = useDisplayText();
+  if (
+    !isRefNode(row.node) ||
+    row.virtualType !== undefined ||
+    isInSearchView ||
+    isViewingOtherUserContent ||
+    !row.parentNode ||
+    row.childIndex === undefined ||
+    !row.parentViewPath
+  ) {
+    return null;
+  }
+  const parentViewPath = row.parentViewPath as ViewPath;
+  const openEditorBelow = (): void => {
+    if (!row.parentNode || row.childIndex === undefined) return;
+    executePlan(
+      planSetEmptyNodePosition(
+        createPlan(),
+        row.parentNode.id,
+        getViewForRowID(data, parentViewPath, getLast(parentViewPath)),
+        parentViewPath,
+        paneIndex,
+        row.childIndex + 1
+      )
+    );
+  };
+  return (
+    <span
+      className="link-cursor-zone"
+      role="textbox"
+      tabIndex={0}
+      contentEditable
+      suppressContentEditableWarning
+      aria-label={`cursor after ${displayText}`}
+      onBeforeInput={(e) => e.preventDefault()}
+      onPaste={(e) => e.preventDefault()}
+      onDrop={(e) => e.preventDefault()}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          openEditorBelow();
+        }
+        if (e.key === "Escape") {
+          e.preventDefault();
+          (e.target as HTMLElement).blur();
+        }
+      }}
+    />
   );
 }
 
@@ -619,7 +683,6 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
 
     if (isEmptyNode) {
       if (!prevSibling || !parentPath) return;
-      if (isBlockLinkAny(prevSibling.node)) return;
       // Indenting onto a computed row takes it first.
       const [planMaterialized] = planMaterializeComputedRow(
         basePlan,
@@ -1064,8 +1127,11 @@ export function Node({
   const isVersion = virtualType === "version" || !!node?.versionMeta;
   const isSuggestionWithChildren =
     isSuggestion && (isConcreteRef || !!currentNode);
+  // Link rows expand like any row — to their OWN children, file truth
+  // (E2). The target's subtree is reached by following the link; only
+  // embeds (the suggestion preview) show it inline.
   const showExpandCollapse =
-    (!isSuggestion && !isVersion && !isConcreteRef) || isSuggestionWithChildren;
+    (!isSuggestion && !isVersion) || isSuggestionWithChildren;
   const { hasChildren } = row;
 
   const contentClass = isSuggestion ? "content-suggestion" : "";
@@ -1160,6 +1226,7 @@ export function Node({
               <InteractiveNodeContent rows={rows} />
             </NodeAutoLink>
           </span>
+          <LinkCursorZone />
         </div>
         <RightMenu />
       </NodeCard>

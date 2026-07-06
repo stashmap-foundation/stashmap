@@ -276,15 +276,13 @@ function logNodeNotFoundDebug({
 }
 
 function VersionContent({
-  reference,
+  sourceId,
+  meta,
 }: {
-  reference: {
-    sourceId: SourceId;
-    versionMeta?: Row["versionMeta"];
-  };
+  sourceId: SourceId;
+  meta: Row["versionMeta"];
 }): JSX.Element {
-  const meta = reference.versionMeta;
-  const isOtherUser = reference.sourceId !== LOCAL;
+  const isOtherUser = sourceId !== LOCAL;
   const dateStr = meta ? new Date(meta.updated).toLocaleString() : "";
   return (
     <span className="break-word" data-testid="reference-row">
@@ -332,18 +330,14 @@ function ReferenceContent({
     versionMeta?: Row["versionMeta"];
   };
 }): JSX.Element {
-  const row = useRow();
-  const { virtualType } = row;
-
-  if (virtualType === "version" || reference.versionMeta) {
-    return <VersionContent reference={reference} />;
-  }
-
-  if (virtualType === "suggestion") {
+  // An outgoing link row whose target shares lineage: the ∥-with-counts
+  // display rides the reference (footer versions render from the row).
+  if (reference.versionMeta) {
     return (
-      <span className="break-word" data-testid="reference-row">
-        {reference.targetLabel}
-      </span>
+      <VersionContent
+        sourceId={reference.sourceId}
+        meta={reference.versionMeta}
+      />
     );
   }
 
@@ -423,6 +417,19 @@ function NodeContent(): JSX.Element {
   const row = useRow();
   const reference = getCurrentReferenceForRow(data, row);
   const displayText = useDisplayText();
+
+  // Footer proposals render straight from their node — no parallel
+  // presentation blob. A suggestion is its label; a version is its meta.
+  if (row.virtualType === "suggestion") {
+    return (
+      <span className="break-word" data-testid="reference-row">
+        {displayTextOf(displayText)}
+      </span>
+    );
+  }
+  if (row.virtualType === "version") {
+    return <VersionContent sourceId={row.sourceId} meta={row.versionMeta} />;
+  }
 
   if (reference) {
     return <ReferenceContent reference={reference} />;

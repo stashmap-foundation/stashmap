@@ -148,41 +148,46 @@ function createRow(
       ? { kind: rowVirtualType, sourceId }
       : undefined;
   const pane = data.panes[viewPath[0]];
-  const reference = isBlockLinkAny(node)
-    ? (() => {
-        const document = pane.documentId
-          ? getDocumentByIdOrFilePath(
-              data.documents,
-              data.documentByFilePath,
-              pane.sourceId,
-              pane.documentId
-            )
-          : undefined;
-        const topNodeID = document?.topNodeShortIds[0];
-        const documentRoot =
-          topNodeID && document
-            ? getNodeInSource(graph, {
-                sourceId: document.sourceId,
-                id: topNodeID,
-              })
+  // Suggestion and version rows render straight from the row (node,
+  // versionMeta, sourceId) — the reference blob is for link rows and
+  // incoming references only.
+  const wantsReference =
+    rowVirtualType !== "suggestion" && rowVirtualType !== "version";
+  const reference =
+    wantsReference && isBlockLinkAny(node)
+      ? (() => {
+          const document = pane.documentId
+            ? getDocumentByIdOrFilePath(
+                data.documents,
+                data.documentByFilePath,
+                pane.sourceId,
+                pane.documentId
+              )
             : undefined;
-        const containing =
-          parentNode && parentRef
-            ? { ref: parentRef, node: parentNode }
-            : documentRoot;
-        return buildReferenceItem(
-          graph,
-          node.id,
-          data,
-          sourceId,
-          rowVirtualType,
-          versionMeta,
-          parentNode,
-          containing,
-          pane.typeFilters
-        );
-      })()
-    : undefined;
+          const topNodeID = document?.topNodeShortIds[0];
+          const documentRoot =
+            topNodeID && document
+              ? getNodeInSource(graph, {
+                  sourceId: document.sourceId,
+                  id: topNodeID,
+                })
+              : undefined;
+          const containing =
+            parentNode && parentRef
+              ? { ref: parentRef, node: parentNode }
+              : documentRoot;
+          return buildReferenceItem(
+            graph,
+            node.id,
+            data,
+            sourceId,
+            rowVirtualType,
+            parentNode,
+            containing,
+            pane.typeFilters
+          );
+        })()
+      : undefined;
   return {
     viewPath,
     viewKey: viewPathToString(viewPath),

@@ -19,7 +19,7 @@ import {
 } from "./core/nodeSpans";
 import { Document, documentKeyOf, getDocumentForNode } from "./core/Document";
 import { fileLinkIndexKey, resolveLinkPath } from "./core/linkPath";
-import { LOCAL, nodeRefKey } from "./core/nodeRef";
+import { nodeRefKey } from "./core/nodeRef";
 import { DEFAULT_TYPE_FILTERS } from "./core/constants";
 import { referenceToText } from "./editor/referenceText";
 import {
@@ -275,53 +275,30 @@ function parseRefInSource(
 }
 
 function resolveLabels(
-  knowledgeDBs: KnowledgeDBs,
   node: GraphNode,
-  contextNodes: List<GraphNode>,
-  sourceId: SourceId
-): { contextLabels: string[]; targetLabel: string; fullContext: List<ID> } {
+  contextNodes: List<GraphNode>
+): { contextLabels: string[]; targetLabel: string } {
   const contextLabels = contextNodes.map((contextNode) =>
     displayTextOf(nodeText(contextNode))
   );
   const targetLabel = displayTextOf(nodeText(node));
-  const fullContext = contextNodes.map((contextNode) =>
-    getSemanticID(knowledgeDBs, contextNode, sourceId)
-  );
-  return { contextLabels: contextLabels.toArray(), targetLabel, fullContext };
+  return { contextLabels: contextLabels.toArray(), targetLabel };
 }
 
 function buildReferenceFromParsed(
   refId: ID,
-  knowledgeDBs: KnowledgeDBs,
   ref: ParsedRef
-): {
-  id: ID;
-  sourceId: SourceId;
-  type: "reference";
-  text: string;
-  targetContext: List<ID>;
-  contextLabels: string[];
-  targetLabel: string;
-  incomingRelevance?: Relevance;
-  incomingArgument?: Argument;
-  displayAs?: "bidirectional" | "incoming";
-  versionMeta?: Row["versionMeta"];
-  deleted?: boolean;
-} {
-  const { contextLabels, targetLabel, fullContext } = resolveLabels(
-    knowledgeDBs,
+): NonNullable<Row["reference"]> {
+  const { contextLabels, targetLabel } = resolveLabels(
     ref.node,
-    ref.contextNodes,
-    ref.nodeSourceId
+    ref.contextNodes
   );
   const contextPath = contextLabels.join(" / ");
   const text = contextPath ? `${contextPath} / ${targetLabel}` : targetLabel;
 
   return {
     id: refId,
-    type: "reference",
     text,
-    targetContext: fullContext,
     contextLabels,
     targetLabel,
     sourceId: ref.nodeSourceId,
@@ -348,9 +325,7 @@ function buildDeletedReference(
   const contextLabels = parts.slice(0, -1);
   return {
     id: refId,
-    type: "reference",
     text: `(deleted) ${linkText}`,
-    targetContext: List<ID>(),
     contextLabels,
     targetLabel,
     sourceId,
@@ -379,20 +354,16 @@ function buildSourceParentReference(
     sourceParent,
     sourceItemSourceId
   );
-  const { contextLabels, targetLabel, fullContext } = resolveLabels(
-    knowledgeDBs,
+  const { contextLabels, targetLabel } = resolveLabels(
     sourceParent,
-    contextNodes,
-    sourceItemSourceId
+    contextNodes
   );
   const contextPath = contextLabels.join(" / ");
   const text = contextPath ? `${contextPath} / ${targetLabel}` : targetLabel;
 
   return {
     id: sourceParent.id,
-    type: "reference",
     text,
-    targetContext: fullContext,
     contextLabels,
     targetLabel,
     sourceId: sourceItemSourceId,
@@ -422,20 +393,16 @@ export function buildOutgoingReference(
     );
   }
 
-  const { contextLabels, targetLabel, fullContext } = resolveLabels(
-    knowledgeDBs,
+  const { contextLabels, targetLabel } = resolveLabels(
     ref.node,
-    ref.contextNodes,
-    ref.nodeSourceId
+    ref.contextNodes
   );
   const contextPath = contextLabels.join(" / ");
   const text = contextPath ? `${contextPath} / ${targetLabel}` : targetLabel;
 
   return {
     id: refId,
-    type: "reference",
     text,
-    targetContext: fullContext,
     contextLabels,
     targetLabel,
     sourceId: ref.nodeSourceId,
@@ -642,20 +609,22 @@ function findIncomingCrefItem(
     : undefined;
 }
 
+// Builds the reference blob for LINK rows and INCOMING references only —
+// suggestion and version rows render straight from the row (node,
+// versionMeta, sourceId), no parallel presentation model.
 export function buildReferenceItem(
   graph: ReturnType<typeof graphLookupFromData>,
   refId: ID,
   data: Data,
   sourceId: SourceId,
   virtualType: Row["virtualType"],
-  versionMeta: Row["versionMeta"],
   parentNode: GraphNode | undefined,
   containing: ResolvedNode | undefined,
   typeFilters: Pane["typeFilters"]
 ): Row["reference"] {
   const ref = parseRefInSource(graph, refId, data, sourceId);
   const resolvedOutgoing = ref
-    ? buildReferenceFromParsed(refId, data.knowledgeDBs, ref)
+    ? buildReferenceFromParsed(refId, ref)
     : undefined;
   if (!ref) {
     const parentItem = parentNode
@@ -669,9 +638,7 @@ export function buildReferenceItem(
       const linkText = getBlockLinkText(parentItem) ?? entityTarget;
       return {
         id: refId,
-        type: "reference",
         text: linkText,
-        targetContext: List<ID>(),
         contextLabels: [],
         targetLabel: linkText,
         sourceId,
@@ -683,12 +650,6 @@ export function buildReferenceItem(
       getBlockLinkText(parentItem) ?? getBlockFileLinkText(parentItem)
     );
     return deleted;
-  }
-
-  if (virtualType === "suggestion") {
-    return resolvedOutgoing
-      ? { ...resolvedOutgoing, text: resolvedOutgoing.targetLabel }
-      : undefined;
   }
 
   if (virtualType === "incoming") {
@@ -719,23 +680,6 @@ export function buildReferenceItem(
       incomingRelevance,
       incomingArgument,
     };
-  }
-
-  if (virtualType === "version" && versionMeta) {
-    const outgoing = resolvedOutgoing;
-    if (!outgoing) {
-      return undefined;
-    }
-    const isOtherUser = outgoing.sourceId !== LOCAL;
-    const dateStr = new Date(versionMeta.updated).toLocaleString();
-    const parts = [
-      dateStr,
-      ...(isOtherUser ? ["\u{1F464}"] : []),
-      ...(versionMeta.addCount > 0 ? [`+${versionMeta.addCount}`] : []),
-      ...(versionMeta.removeCount > 0 ? [`-${versionMeta.removeCount}`] : []),
-    ];
-    const text = parts.join(" ");
-    return { ...outgoing, text, versionMeta };
   }
 
   const outgoing = resolvedOutgoing;

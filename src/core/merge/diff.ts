@@ -90,14 +90,17 @@ export function diffVersions(input: DiffInput): DiffResult {
       const t = theirs.nodes.get(theirsId);
       if (!m || !t) return;
 
-      // Text drift on the correlated pair.
+      // Text drift on the correlated pair. Each endpoint of a fork edge
+      // has its own base text: a dismissal-constructed baseline records
+      // the version's endpoint under its own id (historical snapshots
+      // carry only the shared origin record), so a dismissal on one side
+      // never changes what the other side sees.
       if (canonical(m) !== canonical(t)) {
-        const b = baseline?.nodes.get(
-          input.join === "id" ? mineId : String(m.basedOn ?? mineId)
-        );
-        const mineChanged = b === undefined || canonical(m) !== canonical(b);
-        const theirsChanged = b === undefined || canonical(t) !== canonical(b);
-        if (b !== undefined && theirsChanged && !mineChanged) {
+        const originKey =
+          input.join === "id" ? mineId : String(m.basedOn ?? mineId);
+        const bTheirs =
+          baseline?.nodes.get(theirsId) ?? baseline?.nodes.get(originKey);
+        if (bTheirs !== undefined && canonical(t) !== canonical(bTheirs)) {
           const key = `text:${mineId}`;
           if (!suggestedKeys.has(key)) {
             suggestedKeys.add(key);
@@ -107,17 +110,7 @@ export function diffVersions(input: DiffInput): DiffResult {
               theirs: nodeText(t),
             });
           }
-        } else if (b !== undefined && theirsChanged && mineChanged) {
-          const key = `text:${mineId}`;
-          if (!suggestedKeys.has(key)) {
-            suggestedKeys.add(key);
-            suggestions.push({
-              kind: "text",
-              node: mineId,
-              theirs: nodeText(t),
-            });
-          }
-        } else if (b === undefined) {
+        } else if (bTheirs === undefined) {
           drift += 1; // I2: ± only, no direction, no proposal
         }
       }

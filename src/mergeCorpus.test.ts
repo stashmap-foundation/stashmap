@@ -1,8 +1,9 @@
 /** @jest-environment node */
 import fs from "fs";
 import path from "path";
-import { mergeSubscribed } from "./core/merge/kernel";
+import { mergeSubscribed, parseDoc } from "./core/merge/kernel";
 import { diffVersions } from "./core/merge/diff";
+import { constructDismissalBaseline } from "./core/merge/dismissal";
 import { snapshotIdForContent } from "./nodesDocumentEvent";
 
 // The merge corpus: one directory per case, named by its matrix code.
@@ -15,6 +16,15 @@ const CORPUS_DIR = path.join(__dirname, "core", "merge", "corpus");
 type CaseConfig = {
   mode: "subscribe" | "display" | "hash" | "error";
   join?: "id" | "basedOn";
+  // Dismissal cases: baseline.md must be exactly what
+  // constructDismissalBaseline mints from the named snapshot.
+  construct?: {
+    from: string;
+    version: string;
+    mine: string;
+    origin: string;
+    theirs: string;
+  };
 };
 
 function read(dir: string, name: string): string {
@@ -84,6 +94,18 @@ describe.each(cases)("%s", (caseName) => {
       return;
     }
     const expected = JSON.parse(read(dir, "expected.json"));
+    if (config.construct) {
+      const constructed = constructDismissalBaseline(
+        parseDoc(read(dir, `snapshots/${config.construct.from}.md`)).nodes,
+        {
+          versionId: config.construct.version,
+          mineId: config.construct.mine,
+          originId: config.construct.origin,
+          theirsText: config.construct.theirs,
+        }
+      );
+      expect(constructed).toBe(read(dir, "baseline.md"));
+    }
     if (config.mode === "subscribe") {
       const result = mergeSubscribed({
         mine: read(dir, "mine.md"),

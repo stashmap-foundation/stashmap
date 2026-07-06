@@ -236,6 +236,16 @@ declare global {
     // The action row: a button in row position, obviously not content.
     // One interaction (click); no gutter, no editor, no judgment, no drag.
     action?: "toggle-past-entries";
+    // A rename suggestion (replacement-shaped): the version's text left
+    // the edge baseline. Rendered strikethrough-old + new; x dismisses
+    // that version's text, any other judgment takes it.
+    renameSuggestion?: {
+      theirs: string;
+      mine: string;
+      versionId: ID;
+      snapshotId: string;
+      baselineNodeId: ID;
+    };
     versionMeta:
       | {
           updated: number;

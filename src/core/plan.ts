@@ -22,6 +22,8 @@ import {
   withPublishState,
   withoutPublishState,
 } from "./knowstrFrontmatter";
+import { constructDismissalBaseline } from "./merge/dismissal";
+import { snapshotIdForContent } from "../nodesDocumentEvent";
 import { newGraphNode } from "./nodeFactory";
 import {
   fileLinkSpan,
@@ -60,6 +62,10 @@ export type GraphPlan = GraphPlanData & {
   affectedDocuments: ImmutableSet<string>;
   deletedDocs: ImmutableSet<string>;
   relays: AllRelays;
+  // Constructed baselines minted by dismissals this plan: content rides
+  // the affected document's write into the snapshot store, exactly like a
+  // fork-capture snapshot.
+  extraSnapshots?: List<string>;
 };
 
 function planEnsureSystemRoot<T extends GraphPlan>(
@@ -672,6 +678,57 @@ export function planMaterializeComputedRow<T extends GraphPlan>(
   );
   const node = getWorkspaceNode(planAttached.knowledgeDBs, minted.id);
   return [planAttached, node ?? minted, true];
+}
+
+// Rename suggestions are replacement-shaped (idea.md, the conflict
+// walkthrough). Any judgment but x TAKES the rename: the node's text
+// becomes theirs. x DISMISSES it, and dismissal is the baseline's job,
+// never a field: the edge advances to a CONSTRUCTED baseline — the old
+// baseline with only this node's text set to theirs — so that version's
+// rename is absorbed while the old children keep the child suggestions
+// alive. Mutes a version, not a row: their next rename differs from the
+// constructed baseline and surfaces fresh. The stamp we rewrite is always
+// on MY node: when I hold the fork the constructed id replaces my edge
+// stamp; when I hold the original, my node gains a per-node pin that the
+// diff reads before the (possibly foreign) fork stamp.
+export function planResolveRenameSuggestion<T extends GraphPlan>(
+  plan: T,
+  row: Pick<Row, "renameSuggestion" | "parentNode">,
+  metadata: { relevance?: Relevance; argument?: Argument }
+): T | undefined {
+  if (!row.renameSuggestion || !row.parentNode) {
+    return undefined;
+  }
+  const target = row.parentNode;
+  const { theirs, versionId, snapshotId, baselineNodeId } =
+    row.renameSuggestion;
+  if (metadata.relevance !== "not_relevant") {
+    return planUpsertNodes(plan, {
+      ...target,
+      spans: plainSpans(theirs),
+    });
+  }
+  const snapshotMap = plan.snapshotNodes.get(snapshotId);
+  if (!snapshotMap) {
+    return undefined;
+  }
+  const constructed = constructDismissalBaseline(snapshotMap, {
+    versionId,
+    mineId: target.id,
+    originId: baselineNodeId,
+    theirsText: theirs,
+  });
+  if (constructed === undefined) {
+    return undefined;
+  }
+  const withSnapshot = {
+    ...plan,
+    extraSnapshots: (plan.extraSnapshots ?? List<string>()).push(constructed),
+  };
+  return planUpsertNodes(withSnapshot, {
+    ...target,
+    snapshotId: snapshotIdForContent(constructed),
+  });
 }
 
 export type AddToParentTarget =

@@ -482,6 +482,20 @@ function NodeContent(): JSX.Element {
   const reference = getCurrentReferenceForRow(data, row);
   const displayText = useDisplayText();
 
+  // A rename suggestion: replacement-shaped — my text on the way out
+  // (strikethrough, the (x) treatment reused), theirs beside it.
+  if (row.renameSuggestion) {
+    return (
+      <span className="break-word" data-testid="reference-row">
+        {row.sourceId !== LOCAL && "\u{1F464} "}
+        <span style={{ textDecoration: "line-through" }}>
+          {row.renameSuggestion.mine}
+        </span>{" "}
+        {row.renameSuggestion.theirs}
+      </span>
+    );
+  }
+
   // Footer proposals render straight from their node — no parallel
   // presentation blob. A suggestion is its label; a version is its meta.
   if (row.virtualType === "suggestion") {

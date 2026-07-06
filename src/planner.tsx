@@ -772,7 +772,10 @@ export function buildDocumentWrites(plan: GraphPlan): {
         content: renderDocumentMarkdown(plan.knowledgeDBs, document, {
           snapshotIds: baselines.snapshotIds,
         }),
-        snapshotContents: baselines.contentByDoc.valueSeq().toArray(),
+        snapshotContents: [
+          ...baselines.contentByDoc.valueSeq().toArray(),
+          ...(plan.extraSnapshots?.toArray() ?? []),
+        ],
       },
     ];
   });

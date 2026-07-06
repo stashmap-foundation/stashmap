@@ -488,6 +488,7 @@ test("a suggested calendar link is a plain proposal: label, no liveness", async 
 Events
   Placeholder
   [S] Termine
+  [S] Events Events Fork
   `);
   expect(screen.queryByLabelText("expand Termine")).toBeNull();
   expect(screen.queryByLabelText(/Show \d+ past/u)).toBeNull();

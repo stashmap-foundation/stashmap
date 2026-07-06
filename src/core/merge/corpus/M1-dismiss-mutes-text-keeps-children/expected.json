@@ -1,0 +1,11 @@
+{
+  "suggestions": [
+    {
+      "kind": "add",
+      "parent": "f1",
+      "node": "c2",
+      "theirs": "New chapter"
+    }
+  ],
+  "drift": 0
+}

@@ -18,6 +18,7 @@ import {
   updateView,
   getViewForRowID,
   getLast,
+  addNodesToLastElement,
 } from "../rowModel";
 import { isEditableNode } from "./temporaryViewState";
 import {
@@ -40,6 +41,7 @@ import { isBlockLinkAny, nodeText } from "../core/nodeSpans";
 import { getBlockLink } from "../core/blockLink";
 import { ENTITY_SCHEME_RE } from "../core/entityRecognition";
 import {
+  calendarEntryTargetOf,
   displayTextOf,
   hiddenPastEntryCount,
   icalFeedLinkPartsOf,
@@ -146,7 +148,16 @@ function PastDatesActionRow(): JSX.Element {
   const pastCount =
     entries && row.parentNode
       ? hiddenPastEntryCount(
-          row.parentNode.children.toArray(),
+          // Children stand under their calendar identity: a placement
+          // counts as the entry it targets, never as its own uuid.
+          row.parentNode.children
+            .toArray()
+            .map(
+              (childId) =>
+                calendarEntryTargetOf(
+                  getNode(data.knowledgeDBs, childId, row.sourceId)
+                ) ?? childId
+            ),
           entries,
           Date.now()
         )
@@ -594,10 +605,12 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
   const handleSave = (text: string, submitted?: boolean): void => {
     // Write gestures take first; read gestures read. A computed row's
     // save materializes the row before the text lands — and an unchanged
-    // text writes nothing at all (blur/Escape must not take).
-    const materializedStart = ((): Plan | undefined => {
+    // text writes nothing at all (blur/Escape must not take). The take
+    // may land as a placement (a link row with its own id), so everything
+    // downstream works on the node the take returns.
+    const takeResult = ((): [Plan, GraphNode, ViewPath] | undefined => {
       if (!row.materialize) {
-        return createPlan();
+        return [createPlan(), currentNode, viewPath];
       }
       // Enter is a write gesture (it opens a position below — the row
       // materializes, per the machine-feeds law); plain blur/Escape with
@@ -608,12 +621,17 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       ) {
         return undefined;
       }
-      const [plan] = planMaterializeComputedRow(createPlan(), row);
-      return plan;
+      const [plan, takenNode] = planMaterializeComputedRow(createPlan(), row);
+      return [
+        plan,
+        takenNode,
+        addNodesToLastElement(viewPath, takenNode.id) as ViewPath,
+      ];
     })();
-    if (!materializedStart) {
+    if (!takeResult) {
       return;
     }
+    const [materializedStart, takenNode, takenViewPath] = takeResult;
     const {
       plan: basePlan,
       viewPath: updatedViewPath,
@@ -621,9 +639,9 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
     } = planSaveNodeAndEnsureNodes(
       materializedStart,
       withFeedUrl(text),
-      rowID,
-      currentNode,
-      viewPath,
+      takenNode === currentNode ? rowID : takenNode.id,
+      takenNode,
+      takenViewPath,
       parentNode,
       parentPath,
       paneIndex
@@ -697,10 +715,16 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
 
     if (isEmptyNode) {
       if (!prevSibling || !parentPath) return;
-      // Indenting onto a computed row takes it first.
-      const [planMaterialized] = planMaterializeComputedRow(
+      // Indenting onto a computed row takes it first. The take may land
+      // as a placement (a link row with its own id), so the indent
+      // target is the node the take returns, never the computed row's id.
+      const [planMaterialized, takenPrevSibling] = planMaterializeComputedRow(
         basePlan,
         prevSibling
+      );
+      const takenViewPath = addNodesToLastElement(
+        prevSibling.viewPath,
+        takenPrevSibling.id
       );
       const planWithoutEmpty = parentNode
         ? planRemoveEmptyNodePosition(planMaterialized, parentNode.id)
@@ -708,7 +732,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       const planWithExpand = planExpandNode(
         planWithoutEmpty,
         prevSibling.view,
-        prevSibling.viewPath
+        takenViewPath
       );
 
       if (trimmedText) {
@@ -717,15 +741,15 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
           trimmedText
         );
         executePlan(
-          planAddToParent(planWithNode, newNode, prevSibling.node.id)[0]
+          planAddToParent(planWithNode, newNode, takenPrevSibling.id)[0]
         );
       } else {
         executePlan(
           planSetEmptyNodePosition(
             planWithExpand,
-            prevSibling.node.id,
+            takenPrevSibling.id,
             prevSibling.view,
-            prevSibling.viewPath,
+            takenViewPath,
             paneIndex,
             0
           )
@@ -954,6 +978,7 @@ function NodeAutoLink({
   const displayText = useDisplayText();
   const navigatePane = useNavigatePane();
   const publishedDocument = usePublishedPaneDocument();
+  const { feeds: calendarFeeds } = useCalendarFeeds();
   const effectiveAuthor = row.sourceId;
   const { virtualType } = row;
   const blockLink =
@@ -961,8 +986,10 @@ function NodeAutoLink({
       ? undefined
       : getBlockLink(row.node, row.sourceId);
   if (blockLink) {
+    // Fetched feeds ride along so a dangling ical: target can resolve
+    // through the calendar carrying it.
     const href = linkToHref(
-      data,
+      { ...data, calendarFeeds },
       blockLink,
       virtualType === "version" ? "target" : "link"
     );

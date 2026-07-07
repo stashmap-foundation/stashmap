@@ -7,7 +7,7 @@ import {
   getSemanticID,
 } from "./core/connections";
 import { ENTITY_SCHEME_RE } from "./core/entityRecognition";
-import { displayTextOf } from "./core/ical";
+import { displayTextOf, isCalendarEntryId } from "./core/ical";
 import {
   getBlockLinkTarget,
   getBlockLinkText,
@@ -631,10 +631,13 @@ export function buildReferenceItem(
       ? lookupNode(graph, refId, sourceId)?.node
       : undefined;
     const entityTarget = getBlockLinkTarget(parentItem);
-    if (entityTarget && ENTITY_SCHEME_RE.test(entityTarget)) {
-      // A dangling entity link: the entity has no home page, which is its
-      // ordinary state — never deletion (idea.md: "dangling allowed, no
-      // page"). Renders as plain link text until E6 gives it a surface.
+    if (
+      entityTarget &&
+      (ENTITY_SCHEME_RE.test(entityTarget) || isCalendarEntryId(entityTarget))
+    ) {
+      // A dangling canonical-id link — entity or calendar entry: no home
+      // page is the ordinary state, never deletion (idea.md: "dangling
+      // allowed, no page"). Renders as plain link text.
       const linkText = getBlockLinkText(parentItem) ?? entityTarget;
       return {
         id: refId,

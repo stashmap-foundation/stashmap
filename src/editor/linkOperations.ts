@@ -1,5 +1,8 @@
 import { createDocumentLinkTarget, createRefTarget } from "../core/connections";
 import { ENTITY_SCHEME_RE } from "../core/entityRecognition";
+import { icalFeedUrlOf, isCalendarEntryId } from "../core/ical";
+import { isBlockLinkAny, nodeText } from "../core/nodeSpans";
+import { LOCAL } from "../core/nodeRef";
 import { Document, getDocumentForNode, documentKeyOf } from "../core/Document";
 import {
   getNodeInSource,
@@ -59,6 +62,48 @@ function sourceResolvedNode(
   );
 }
 
+// The feed is the fallback home (idea.md, machine feeds): an `ical:`
+// target with no minted node resolves through a reachable calendar
+// carrying the UID — the feed node opens scrolled to the projected
+// entry, the ordinary target-in-context presentation. Own calendars
+// win over other users'.
+function calendarEntryFallbackTarget(
+  data: Data,
+  targetID: ID
+): EditorNavigationTarget | undefined {
+  if (!isCalendarEntryId(targetID) || !data.calendarFeeds) {
+    return undefined;
+  }
+  const carryingUrl = data.calendarFeeds.findKey((entries) =>
+    entries.some((entry) => entry.id === targetID)
+  );
+  if (!carryingUrl) {
+    return undefined;
+  }
+  const findIn = (sourceId: SourceId): EditorNavigationTarget | undefined => {
+    const node = data.knowledgeDBs
+      .get(sourceId)
+      ?.nodes.find(
+        (candidate) =>
+          !isBlockLinkAny(candidate) &&
+          icalFeedUrlOf(nodeText(candidate)) === carryingUrl
+      );
+    return node
+      ? { sourceId, rootNodeId: node.id, scrollToId: targetID }
+      : undefined;
+  };
+  return (
+    findIn(LOCAL) ??
+    data.knowledgeDBs
+      .keySeq()
+      .filter((sourceId) => sourceId !== LOCAL)
+      .reduce<EditorNavigationTarget | undefined>(
+        (found, sourceId) => found ?? findIn(sourceId),
+        undefined
+      )
+  );
+}
+
 function nodeTarget(
   data: Data,
   link: Extract<Link, { kind: "node" }>,
@@ -69,7 +114,7 @@ function nodeTarget(
   const target =
     mode === "target" ? source : resolveBlockLinkTarget(graph, source);
   if (!target) {
-    return undefined;
+    return calendarEntryFallbackTarget(data, link.targetID);
   }
   const parent = target.node.parent
     ? getNodeInSource(graph, {
@@ -151,7 +196,8 @@ export function inlineTargetToHref(
   const graph = graphLookupFromData(data);
   const target = lookupNode(graph, targetID, sourceId);
   if (!target) {
-    return undefined;
+    const fallback = calendarEntryFallbackTarget(data, targetID);
+    return fallback ? navigationTargetToHref(fallback) : undefined;
   }
   const parent = target.node.parent
     ? getNodeInSource(graph, {

@@ -104,9 +104,7 @@ describe("icalFeedUrlOf", () => {
     expect(icalFeedUrlOf("[Kalender](feed:https://x.org/salon.ics)")).toEqual(
       "https://x.org/salon.ics"
     );
-    expect(
-      icalFeedUrlOf("Termine https://x.org/salon.ics")
-    ).toBeUndefined();
+    expect(icalFeedUrlOf("Termine https://x.org/salon.ics")).toBeUndefined();
     expect(icalFeedUrlOf("https://x.org/salon.ics")).toBeUndefined();
     expect(icalFeedUrlOf("webcal://x.org/feed")).toBeUndefined();
     expect(icalFeedUrlOf("just text")).toBeUndefined();

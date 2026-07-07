@@ -5,6 +5,7 @@ import {
   expectTree,
   forkOwnRoot,
   navigateToNodeViaSearch,
+  openNodeInFullscreen,
   renderApp,
   renderTree,
   setup,
@@ -54,14 +55,10 @@ test("upcoming entries project; bare past entries live behind the action row", a
     fetchCalendarFeed: () => Promise.resolve(FEED),
   });
 
-  await type(
-    "Salon{Enter}{Tab}https://scholarium.at/salon.ics{Escape}"
-  );
+  await type("Salon{Enter}{Tab}https://scholarium.at/salon.ics{Escape}");
 
   await userEvent.click(
-    await screen.findByLabelText(
-      "expand https://scholarium.at/salon.ics"
-    )
+    await screen.findByLabelText("expand https://scholarium.at/salon.ics")
   );
 
   // The past entry doesn't project; the action row in the footer
@@ -150,13 +147,9 @@ test("judging a projected entry materializes it with the judgment", async () => 
     fetchCalendarFeed: () => Promise.resolve(FEED),
   });
 
-  await type(
-    "Salon{Enter}{Tab}https://scholarium.at/salon.ics{Escape}"
-  );
+  await type("Salon{Enter}{Tab}https://scholarium.at/salon.ics{Escape}");
   await userEvent.click(
-    await screen.findByLabelText(
-      "expand https://scholarium.at/salon.ics"
-    )
+    await screen.findByLabelText("expand https://scholarium.at/salon.ics")
   );
 
   await clickRow("14.07.2030 Sommerfest");
@@ -195,13 +188,9 @@ test("multiselect judgment materializes projected and spares untouched", async (
     fetchCalendarFeed: () => Promise.resolve(FEED),
   });
 
-  await type(
-    "Salon{Enter}{Tab}https://scholarium.at/salon.ics{Escape}"
-  );
+  await type("Salon{Enter}{Tab}https://scholarium.at/salon.ics{Escape}");
   await userEvent.click(
-    await screen.findByLabelText(
-      "expand https://scholarium.at/salon.ics"
-    )
+    await screen.findByLabelText("expand https://scholarium.at/salon.ics")
   );
 
   // Select the two upcoming entries (shift-j extends the selection down).
@@ -227,13 +216,9 @@ test("writing under a projected entry materializes it with the note", async () =
     fetchCalendarFeed: () => Promise.resolve(FEED),
   });
 
-  await type(
-    "Salon{Enter}{Tab}https://scholarium.at/salon.ics{Escape}"
-  );
+  await type("Salon{Enter}{Tab}https://scholarium.at/salon.ics{Escape}");
   await userEvent.click(
-    await screen.findByLabelText(
-      "expand https://scholarium.at/salon.ics"
-    )
+    await screen.findByLabelText("expand https://scholarium.at/salon.ics")
   );
 
   // Focus the projected entry's editor, Enter to open a position below,
@@ -278,6 +263,211 @@ function dragTextOnto(sourceText: string, targetText: string): void {
   fireEvent.drop(target);
 }
 
+async function altDragTextOnto(
+  sourceText: string,
+  targetText: string
+): Promise<void> {
+  const source = screen.getAllByText(sourceText)[0];
+  const target = screen.getAllByText(targetText)[0];
+  await userEvent.keyboard("{Alt>}");
+  fireEvent.dragStart(source);
+  fireEvent.dragOver(target, { altKey: true });
+  fireEvent.drop(target, { altKey: true });
+  await userEvent.keyboard("{/Alt}");
+}
+
+test("the same feed in two places: independent placements, notes stay local", async () => {
+  const [alice] = setup([ALICE]);
+  renderApp({
+    ...alice(),
+    fetchCalendarFeed: () => Promise.resolve(FEED),
+  });
+
+  await type(
+    "Salon{Enter}{Tab}https://scholarium.at/salon.ics{Enter}{Shift>}{Tab}{/Shift}Studium{Enter}{Tab}https://scholarium.at/salon.ics{Escape}"
+  );
+  const expands = await screen.findAllByLabelText(
+    "expand https://scholarium.at/salon.ics"
+  );
+  await userEvent.click(expands[0]);
+  await userEvent.click(
+    (
+      await screen.findAllByLabelText("expand https://scholarium.at/salon.ics")
+    )[0]
+  );
+
+  await expectTree(`
+Salon
+  https://scholarium.at/salon.ics
+    14.07.2030 Sommerfest
+    ${dunbarText()}
+  Studium
+    https://scholarium.at/salon.ics
+      14.07.2030 Sommerfest
+      ${dunbarText()}
+  `);
+
+  // Write a different note under the same entry in each context. Every
+  // take is its own placement (a link row targeting the one canonical
+  // id) — never a second body, never a pointer into the other context.
+  const editors = await screen.findAllByLabelText("edit 14.07.2030 Sommerfest");
+  await userEvent.click(editors[0]);
+  await userEvent.keyboard("{Enter}{Tab}Meine Notiz{Escape}");
+  const editorsAfter = await screen.findAllByLabelText(
+    "edit 14.07.2030 Sommerfest"
+  );
+  await userEvent.click(editorsAfter[editorsAfter.length - 1]);
+  await userEvent.keyboard("{Enter}{Tab}Andere Notiz{Escape}");
+
+  const expected = `
+Salon
+  https://scholarium.at/salon.ics
+    14.07.2030 Sommerfest
+      Meine Notiz
+    ${dunbarText()}
+  Studium
+    https://scholarium.at/salon.ics
+      14.07.2030 Sommerfest
+        Andere Notiz
+      ${dunbarText()}
+  `;
+  await expectTree(expected);
+
+  // File truth round-trips: two placements of one entry id, each with
+  // its local note.
+  cleanup();
+  renderApp({ ...alice(), fetchCalendarFeed: () => Promise.resolve(FEED) });
+  await expectTree(expected);
+});
+
+test("following a dangling entry link opens the carrying calendar at the entry", async () => {
+  const [alice] = setup([ALICE]);
+  renderApp({
+    ...alice(),
+    fetchCalendarFeed: () => Promise.resolve(FEED),
+  });
+
+  await type(
+    "Salon{Enter}{Tab}https://scholarium.at/salon.ics{Enter}{Shift>}{Tab}{/Shift}Notes{Escape}"
+  );
+  await userEvent.click(
+    await screen.findByLabelText("expand https://scholarium.at/salon.ics")
+  );
+  await altDragTextOnto(dunbarText(), "Notes");
+
+  // No minted node anywhere carries the ical: id — the link resolves
+  // through the feed that carries the UID: the calendar opens as root,
+  // scrolled to the projected entry.
+  await userEvent.click(
+    await screen.findByLabelText(
+      `Navigate to Salon / https://scholarium.at/salon.ics / ${dunbarText()}`
+    )
+  );
+  await expectTree(`
+https://scholarium.at/salon.ics
+  14.07.2030 Sommerfest
+  ${dunbarText()}
+  `);
+});
+
+test("cross-pane drag of an entry lays down a link row, never a copy", async () => {
+  const [alice] = setup([ALICE]);
+  renderApp({
+    ...alice(),
+    fetchCalendarFeed: () => Promise.resolve(FEED),
+  });
+
+  await type(
+    "Salon{Enter}{Tab}https://scholarium.at/salon.ics{Enter}{Shift>}{Tab}{/Shift}Notes{Escape}"
+  );
+  await userEvent.click(
+    await screen.findByLabelText("expand https://scholarium.at/salon.ics")
+  );
+  await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+  await navigateToNodeViaSearch(1, "Notes");
+  await openNodeInFullscreen(1, "Notes");
+
+  // A plain cross-pane drag deep-copies ordinary rows — but a canonical
+  // id never copies into a second body: the appearance in the other
+  // pane is a link row targeting the one entry id.
+  const source = screen.getAllByText(dunbarText())[0];
+  const notesItems = screen.getAllByRole("treeitem", { name: "Notes" });
+  const target = notesItems[notesItems.length - 1];
+  fireEvent.dragStart(source);
+  fireEvent.dragOver(target);
+  fireEvent.drop(target);
+
+  await expectTree(`
+Salon
+  https://scholarium.at/salon.ics
+    14.07.2030 Sommerfest
+    ${dunbarText()}
+  Notes
+Notes
+  [R] ${dunbarText()}
+  `);
+});
+
+test("alt-drag references an entry: clean label, canonical target, dangling allowed", async () => {
+  const [alice] = setup([ALICE]);
+  renderApp({
+    ...alice(),
+    fetchCalendarFeed: () => Promise.resolve(FEED),
+  });
+
+  // The feed-as-link calendar: the raw markdown link form lives in the
+  // file; every read path shows the label.
+  await type(
+    "Salon{Enter}{Tab}https://scholarium.at/salon.ics{Enter}Notes{Escape}"
+  );
+  const editor = await screen.findByLabelText(
+    "edit https://scholarium.at/salon.ics"
+  );
+  await userEvent.click(editor);
+  await userEvent.keyboard("{Control>}a{/Control}Kalender Studium{Escape}");
+  await userEvent.click(
+    await screen.findByLabelText("expand Kalender Studium")
+  );
+
+  await expectTree(`
+Salon
+  Kalender Studium
+    14.07.2030 Sommerfest
+    ${dunbarText()}
+  Notes
+  `);
+
+  // Alt-drag a still-projected entry into Notes: a reference — dangling
+  // allowed, nothing materialized anywhere. The label is the breadcrumb
+  // in display form: the calendar reads by its label, never as raw link
+  // markdown, so the new row neither nests links nor carries the feed
+  // URL (which would make it read as the calendar itself).
+  await altDragTextOnto(dunbarText(), "Notes");
+
+  await expectTree(`
+Salon
+  Kalender Studium
+    14.07.2030 Sommerfest
+    ${dunbarText()}
+  Notes
+  [R] Salon / Kalender Studium / ${dunbarText()}
+  `);
+
+  // The persisted form survives the file round-trip: reload parses the
+  // link back rather than tripping over nested markdown.
+  cleanup();
+  renderApp({ ...alice(), fetchCalendarFeed: () => Promise.resolve(FEED) });
+  await expectTree(`
+Salon
+  Kalender Studium
+    14.07.2030 Sommerfest
+    ${dunbarText()}
+  Notes
+  [R] Salon / Kalender Studium / ${dunbarText()}
+  `);
+  expect(screen.queryByText(/deleted/)).toBeNull();
+});
+
 test("dnd both ways: projections drag as themselves and accept drops", async () => {
   const [alice] = setup([ALICE]);
   renderApp({
@@ -289,9 +479,7 @@ test("dnd both ways: projections drag as themselves and accept drops", async () 
     "Salon{Enter}{Tab}https://scholarium.at/salon.ics{Enter}Notes{Escape}"
   );
   await userEvent.click(
-    await screen.findByLabelText(
-      "expand https://scholarium.at/salon.ics"
-    )
+    await screen.findByLabelText("expand https://scholarium.at/salon.ics")
   );
 
   // Drop a real row after a projected entry (drop-on-text inserts as a
@@ -332,13 +520,9 @@ test("a touched past entry is file content: always visible, revealed or not", as
     fetchCalendarFeed: () => Promise.resolve(FEED),
   });
 
-  await type(
-    "Salon{Enter}{Tab}https://scholarium.at/salon.ics{Escape}"
-  );
+  await type("Salon{Enter}{Tab}https://scholarium.at/salon.ics{Escape}");
   await userEvent.click(
-    await screen.findByLabelText(
-      "expand https://scholarium.at/salon.ics"
-    )
+    await screen.findByLabelText("expand https://scholarium.at/salon.ics")
   );
 
   // Reveal the past, write under the entry — it materializes.
@@ -384,13 +568,9 @@ test("reorder materializes only the displayed sequence — hidden past stays a p
     fetchCalendarFeed: () => Promise.resolve(FEED),
   });
 
-  await type(
-    "Salon{Enter}{Tab}https://scholarium.at/salon.ics{Escape}"
-  );
+  await type("Salon{Enter}{Tab}https://scholarium.at/salon.ics{Escape}");
   await userEvent.click(
-    await screen.findByLabelText(
-      "expand https://scholarium.at/salon.ics"
-    )
+    await screen.findByLabelText("expand https://scholarium.at/salon.ics")
   );
 
   // Resort the two upcoming entries with the past hidden.
@@ -433,13 +613,9 @@ test("past entries render dimmed by type, judged rows full strength", async () =
     fetchCalendarFeed: () => Promise.resolve(FEED),
   });
 
-  await type(
-    "Salon{Enter}{Tab}https://scholarium.at/salon.ics{Escape}"
-  );
+  await type("Salon{Enter}{Tab}https://scholarium.at/salon.ics{Escape}");
   await userEvent.click(
-    await screen.findByLabelText(
-      "expand https://scholarium.at/salon.ics"
-    )
+    await screen.findByLabelText("expand https://scholarium.at/salon.ics")
   );
   await userEvent.click(await screen.findByLabelText("Show 1 past date"));
 

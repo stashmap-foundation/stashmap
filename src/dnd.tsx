@@ -16,7 +16,9 @@ import {
   getBlockLinkTarget,
   getBlockLinkText,
   isBlockLinkAny,
+  nodeText,
 } from "./core/nodeSpans";
+import { isCanonicalId } from "./core/entityRecognition";
 import { getBlockLink } from "./core/blockLink";
 import { linkToInsertTarget } from "./editor/linkOperations";
 import { getIndependentRows, updateViewPathsAfterMoveNodes } from "./rowModel";
@@ -538,7 +540,13 @@ export function dnd(
     sourceRow: Row
   ): AddToParentTarget =>
     resolveDragLinkTarget(accPlan, sourceRow) ??
-    createRefTarget(sourceRow.node.id, getBlockLinkText(sourceRow.node));
+    createRefTarget(
+      sourceRow.node.id,
+      getBlockLinkText(sourceRow.node) ??
+        (sourceRow.materialize && !sourceRow.virtualType
+          ? nodeText(sourceRow.node)
+          : undefined)
+    );
 
   const getSuggestionTargetID = (
     isPrimarySource: boolean,
@@ -622,6 +630,18 @@ export function dnd(
     }
 
     const deepCopySource = resolveDeepCopySource(accPlan, sourceRow);
+    // A canonical id never copies into a second body (idea.md, mint or
+    // link, never duplicate): a further appearance is another link row.
+    if (isCanonicalId(deepCopySource.node.id)) {
+      return planAddToParent(
+        accPlan,
+        createRefTarget(deepCopySource.node.id, nodeText(deepCopySource.node)),
+        targetNode.id,
+        insertAt,
+        sourceEdgeRelevance,
+        sourceEdgeArgument
+      )[0];
+    }
     return planDeepCopyNode(
       accPlan,
       deepCopySource.sourceId,

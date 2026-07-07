@@ -9,6 +9,7 @@ import {
   nodeText,
 } from "./nodeSpans";
 import { Document, documentKeyOf } from "./Document";
+import { displayTextOf } from "./ical";
 import { resolveLinkPath } from "./linkPath";
 
 // Empty text remains the sentinel for an empty placeholder row
@@ -207,6 +208,20 @@ export function getNodeStack(
     ...getNodeContext(knowledgeDBs, node, sourceId).toArray(),
     getSemanticID(knowledgeDBs, node, sourceId),
   ];
+}
+
+// The breadcrumb label used as persisted link text: every segment in
+// display form. A calendar feed's raw text is a markdown link carrying
+// the feed URL — verbatim inside link text it nests links and makes the
+// new row read as the calendar itself.
+export function nodePathLabel(
+  knowledgeDBs: KnowledgeDBs,
+  node: GraphNode,
+  sourceId: SourceId
+): string {
+  return getNodeStack(knowledgeDBs, node, sourceId)
+    .map((segment) => displayTextOf(segment))
+    .join(" / ");
 }
 
 export function getNodeDepth(

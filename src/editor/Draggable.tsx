@@ -13,11 +13,7 @@ import {
   useRow,
 } from "../rowModel";
 import { useData } from "../DataContext";
-import {
-  getNodeContext,
-  getSemanticID,
-  isEmptySemanticID,
-} from "../core/connections";
+import { isEmptySemanticID, nodePathLabel } from "../core/connections";
 import { getBlockLink } from "../core/blockLink";
 import { linkToInsertTarget } from "./linkOperations";
 import { NOTE_TYPE, Node } from "./Node";
@@ -39,9 +35,7 @@ function nodePathText(
   if (!node) {
     return undefined;
   }
-  return getNodeContext(data.knowledgeDBs, node, sourceId)
-    .push(getSemanticID(data.knowledgeDBs, node, sourceId))
-    .join(" / ");
+  return nodePathLabel(data.knowledgeDBs, node, sourceId);
 }
 
 function markDragDescendants(sourceViewKey: string): void {

@@ -1,6 +1,10 @@
 import { List, OrderedSet } from "immutable";
 import { LOCAL } from "../core/nodeRef";
-import { addNodeToPathWithNodes, viewPathToString } from "../rowModel";
+import {
+  addNodeToPathWithNodes,
+  addNodesToLastElement,
+  viewPathToString,
+} from "../rowModel";
 import { Plan, planExpandNode, planUpdateNodeText } from "../planner";
 import {
   planUpdateViewItemMetadata,
@@ -12,7 +16,7 @@ import {
   planMaterializeComputedRow,
   planResolveRenameSuggestion,
 } from "../core/plan";
-import { isBlockLinkAny, nodeText } from "../core/nodeSpans";
+import { nodeText } from "../core/nodeSpans";
 
 export type EditorInfo = {
   text: string;
@@ -236,13 +240,23 @@ export function planBatchIndent(
   const prevSibling = getPreviousSiblingFromRows(orderedRows, firstRow);
   if (!prevSibling) return undefined;
 
-  // Indenting onto a computed row takes it first.
-  const [planMaterialized] = planMaterializeComputedRow(plan, prevSibling);
+  // Indenting onto a computed row takes it first. The take may land as a
+  // placement (a link row with its own id), so the indent target is the
+  // node the take returns, never the computed row's id.
+  const [planMaterialized, takenPrevSibling] = planMaterializeComputedRow(
+    plan,
+    prevSibling
+  );
+
+  const takenViewPath = addNodesToLastElement(
+    prevSibling.viewPath,
+    takenPrevSibling.id
+  );
 
   const planWithExpand = planExpandNode(
     planMaterialized,
     prevSibling.view,
-    prevSibling.viewPath
+    takenViewPath
   );
 
   const { plan: updated, remappedKeys } = sortedRows.reduce<{
@@ -255,7 +269,7 @@ export function planBatchIndent(
       if (!row.parentNode) {
         return state;
       }
-      const targetNodeBefore = getCurrentPlanNode(state.plan, prevSibling.node);
+      const targetNodeBefore = getCurrentPlanNode(state.plan, takenPrevSibling);
       const insertAt = targetNodeBefore.children.size;
       const moved = planMoveNode(
         state.plan,
@@ -264,17 +278,13 @@ export function planBatchIndent(
         row.parentNode.id,
         viewPath,
         targetNodeBefore.id,
-        prevSibling.viewPath,
+        takenViewPath,
         insertAt
       );
-      const targetNodeAfter = getCurrentPlanNode(moved, prevSibling.node);
+      const targetNodeAfter = getCurrentPlanNode(moved, takenPrevSibling);
       const updatedViewPath =
         targetNodeAfter && insertAt < targetNodeAfter.children.size
-          ? addNodeToPathWithNodes(
-              prevSibling.viewPath,
-              targetNodeAfter,
-              insertAt
-            )
+          ? addNodeToPathWithNodes(takenViewPath, targetNodeAfter, insertAt)
           : undefined;
       const nextRemappedKeys = updatedViewPath
         ? [

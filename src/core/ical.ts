@@ -78,31 +78,26 @@ function unescapeText(value: string): string {
   );
 }
 
-const DATE_RE = /^(\d{4})(\d{2})(\d{2})$/u;
-const DATE_TIME_RE = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(Z?)$/u;
-
+// RFC 5545 DATE/DATE-TIME is ISO 8601 basic format; reshape to the
+// extended form and let the platform parse — Z as UTC, naive as local,
+// date-only as local midnight (bare dates would parse as UTC).
 function parseIcalDateTime(value: string | undefined): number | undefined {
   if (value === undefined) {
     return undefined;
   }
-  const date = DATE_RE.exec(value);
-  if (date) {
-    return new Date(
-      Number(date[1]),
-      Number(date[2]) - 1,
-      Number(date[3])
-    ).getTime();
-  }
-  const dateTime = DATE_TIME_RE.exec(value);
-  if (!dateTime) {
+  const v = value.trim();
+  if (!/^\d{8}(T\d{6}Z?)?$/u.test(v)) {
     return undefined;
   }
-  const [year, month, day, hour, minute, second] = dateTime
-    .slice(1, 7)
-    .map(Number);
-  return dateTime[7] === "Z"
-    ? Date.UTC(year, month - 1, day, hour, minute, second)
-    : new Date(year, month - 1, day, hour, minute, second).getTime();
+  const date = `${v.slice(0, 4)}-${v.slice(4, 6)}-${v.slice(6, 8)}`;
+  const time =
+    v.length > 8
+      ? `T${v.slice(9, 11)}:${v.slice(11, 13)}:${v.slice(13, 15)}${
+          v.endsWith("Z") ? "Z" : ""
+        }`
+      : "T00:00:00";
+  const ms = new Date(`${date}${time}`).getTime();
+  return Number.isNaN(ms) ? undefined : ms;
 }
 
 type RawVevent = {

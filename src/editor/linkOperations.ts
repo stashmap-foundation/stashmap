@@ -23,7 +23,7 @@ export type EditorNavigationTarget = {
 };
 
 function sourceFilePath(
-  data: Data,
+  data: Pick<Data, "knowledgeDBs" | "documents" | "documentByFilePath">,
   source: GraphNode,
   sourceId: SourceId
 ): string | undefined {
@@ -32,7 +32,7 @@ function sourceFilePath(
 }
 
 function documentTarget(
-  data: Data,
+  data: Pick<Data, "knowledgeDBs" | "documents" | "documentByFilePath">,
   link: Extract<Link, { kind: "document" }>
 ): Document | undefined {
   const resolvedPath = resolveLinkPath(
@@ -176,7 +176,7 @@ export function linkStyle(link: Link): React.CSSProperties {
 }
 
 export function linkToInsertTarget(
-  data: Data,
+  data: Pick<Data, "knowledgeDBs" | "documents" | "documentByFilePath">,
   link: Link | undefined
 ): AddToParentTarget | undefined {
   if (!link) {

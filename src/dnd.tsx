@@ -17,6 +17,8 @@ import {
   getBlockLinkText,
   isBlockLinkAny,
 } from "./core/nodeSpans";
+import { getBlockLink } from "./core/blockLink";
+import { linkToInsertTarget } from "./editor/linkOperations";
 import { getIndependentRows, updateViewPathsAfterMoveNodes } from "./rowModel";
 import { getDocumentByIdOrFilePath } from "./core/Document";
 import {
@@ -54,6 +56,19 @@ function refsEqual(
     right !== undefined &&
     left.sourceId === right.sourceId &&
     left.id === right.id
+  );
+}
+
+// The one drag-target resolution, applied to every dragged row: block links
+// resolve to their node target, file links (the Imported Files rows) to the
+// imported document — exactly what the primary row's drag payload carries.
+function resolveDragLinkTarget(
+  plan: Plan,
+  sourceRow: Row
+): AddToParentTarget | undefined {
+  return linkToInsertTarget(
+    plan,
+    getBlockLink(sourceRow.node, sourceRow.sourceId)
   );
 }
 
@@ -424,10 +439,11 @@ export function dnd(
     }
     return planAddToParent(
       accPlan,
-      createRefTarget(
-        getBlockLinkTarget(sourceRow.node) || sourceRow.rowID,
-        getBlockLinkText(sourceRow.node)
-      ),
+      resolveDragLinkTarget(accPlan, sourceRow) ??
+        createRefTarget(
+          getBlockLinkTarget(sourceRow.node) || sourceRow.rowID,
+          getBlockLinkText(sourceRow.node)
+        ),
       targetParentRow.node.id,
       insertAt
     )[0];
@@ -518,12 +534,11 @@ export function dnd(
   };
 
   const toReferenceTarget = (
-    sourceNode: GraphNode
-  ): ReturnType<typeof createRefTarget> =>
-    createRefTarget(
-      getBlockLinkTarget(sourceNode) || sourceNode.id,
-      getBlockLinkText(sourceNode)
-    );
+    accPlan: Plan,
+    sourceRow: Row
+  ): AddToParentTarget =>
+    resolveDragLinkTarget(accPlan, sourceRow) ??
+    createRefTarget(sourceRow.node.id, getBlockLinkText(sourceRow.node));
 
   const getSuggestionTargetID = (
     isPrimarySource: boolean,
@@ -598,7 +613,7 @@ export function dnd(
       }
       return planAddToParent(
         accPlan,
-        toReferenceTarget(sourceNode),
+        toReferenceTarget(accPlan, sourceRow),
         targetNode.id,
         insertAt,
         sourceEdgeRelevance,

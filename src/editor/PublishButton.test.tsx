@@ -136,3 +136,100 @@ test("the copied secret link opens the private document for its holder", async (
   ).rejects.toThrow();
   expect(requireUser(alice()).publicKey).not.toBe(requireUser(bob()).publicKey);
 });
+
+test("a single destination reads by name, not as a count", async () => {
+  const [alice] = setup([ALICE]);
+  renderTree(alice);
+  await userEvent.type(await findNewNodeEditor(), "Salon Essay{Escape}");
+  cleanup();
+
+  renderTree(alice);
+  await navigateToNodeViaSearch(0, "Salon Essay");
+  await userEvent.click(await screen.findByLabelText("audience options"));
+  await userEvent.click(await screen.findByLabelText("publish document"));
+
+  // Four configured write relays: the chip counts them.
+  await waitFor(() =>
+    expect(screen.getByLabelText("audience options").textContent).toContain(
+      "everyone · 4 relays"
+    )
+  );
+
+  // Deselect down to one destination: it reads by hostname — an asset
+  // document pinned to its relay says where it publishes, not "1 relays".
+  await userEvent.click(screen.getByLabelText("audience options"));
+  await userEvent.click(
+    await screen.findByLabelText("deselect relay wss://relay.test.second.fail/")
+  );
+  await userEvent.click(
+    await screen.findByLabelText("deselect relay wss://relay.test.third.rand/")
+  );
+  await userEvent.click(
+    await screen.findByLabelText(
+      "deselect relay wss://relay.test.fourth.success/"
+    )
+  );
+  await waitFor(() =>
+    expect(screen.getByLabelText("audience options").textContent).toContain(
+      "everyone · relay.test.first.success"
+    )
+  );
+});
+
+test("an asset-tagged document publishes to its asset relay from the ladder", async () => {
+  const [alice] = setup([ALICE]);
+  renderTree(alice);
+  await userEvent.type(
+    await findNewNodeEditor(),
+    "rgb:AAAABBBBCCCCDDDDEEEE12345{Escape}"
+  );
+  cleanup();
+
+  const utils = renderTree(alice);
+  await navigateToNodeViaSearch(0, "rgb:AAAABBBBCCCCDDDDEEEE12345");
+  await userEvent.click(await screen.findByLabelText("audience options"));
+  await userEvent.click(
+    await screen.findByLabelText("publish to asset relays")
+  );
+
+  // The v0 default: the asset's pinned relay only, named on the chip.
+  await waitFor(() =>
+    expect(screen.getByLabelText("audience options").textContent).toContain(
+      "everyone · nostr.nodesmap.com"
+    )
+  );
+  await waitFor(() => {
+    const deposit = utils.relayPool
+      .getEvents()
+      .find((event) => event.kind === KIND_KNOWLEDGE_DEPOSIT);
+    expect(
+      deposit?.tags.some(
+        ([name, value]) =>
+          name === "S" && value === "asset:rgb:AAAABBBBCCCCDDDDEEEE12345"
+      )
+    ).toBe(true);
+  });
+});
+
+test("Everyone on an asset-tagged document adds the write relays", async () => {
+  const [alice] = setup([ALICE]);
+  renderTree(alice);
+  await userEvent.type(
+    await findNewNodeEditor(),
+    "rgb:FFFFGGGGHHHHIIIIJJJJ67890{Escape}"
+  );
+  cleanup();
+
+  renderTree(alice);
+  await navigateToNodeViaSearch(0, "rgb:FFFFGGGGHHHHIIIIJJJJ67890");
+  await userEvent.click(await screen.findByLabelText("audience options"));
+  await userEvent.click(await screen.findByLabelText("publish document"));
+
+  // Four configured write relays plus the asset relay, declared per
+  // document so the choice rides the file.
+  await waitFor(() =>
+    expect(screen.getByLabelText("audience options").textContent).toContain(
+      "everyone · 5 relays"
+    )
+  );
+});

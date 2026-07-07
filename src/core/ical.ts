@@ -127,6 +127,11 @@ function buildEntry(raw: RawVevent): IcalEntry | undefined {
   };
 }
 
+// Hand-rolled on purpose (library trial verdict, Dart side): the Dart
+// candidates die on bad events or corrupt TEXT escapes, and both mirrors
+// must match byte-for-byte against the shared fixtures — a library on one
+// side only makes them less alike.
+//
 // Parses an iCalendar feed into projected entries, in calendar order
 // (entries without a parseable start sort last, original order kept).
 // Content without a BEGIN:VCALENDAR container throws — a server error page

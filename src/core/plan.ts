@@ -16,6 +16,7 @@ import {
 } from "./Document";
 import { entityIdForText } from "./entityRecognition";
 import { icalFeedLinkText, isBareIcalFeedUrl } from "./ical";
+import { documentLinkHref } from "./linkPath";
 import { getWorkspaceNode, withWorkspace, workspaceOf } from "./knowledge";
 import {
   PublishState,
@@ -798,7 +799,10 @@ export function planAddTargetsToNode<T extends GraphPlan>(
         const childNode = newGraphNode(
           [
             fileLinkSpan(
-              documentLinkTarget.filePath ?? documentLinkTarget.docId,
+              documentLinkHref(
+                documentLinkTarget.docId,
+                documentLinkTarget.filePath
+              ),
               documentLinkTarget.linkText || ""
             ),
           ],
@@ -981,7 +985,10 @@ export function planAddTopTargetsToDocument<T extends GraphPlan>(
       const topNode = newGraphNode(
         [
           fileLinkSpan(
-            documentLinkTarget.filePath ?? documentLinkTarget.docId,
+            documentLinkHref(
+              documentLinkTarget.docId,
+              documentLinkTarget.filePath
+            ),
             documentLinkTarget.linkText || ""
           ),
         ],

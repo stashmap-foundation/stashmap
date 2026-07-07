@@ -55,12 +55,12 @@ test("upcoming entries project; bare past entries live behind the action row", a
   });
 
   await type(
-    "Salon{Enter}{Tab}Termine https://scholarium.at/salon.ics{Escape}"
+    "Salon{Enter}{Tab}https://scholarium.at/salon.ics{Escape}"
   );
 
   await userEvent.click(
     await screen.findByLabelText(
-      "expand Termine https://scholarium.at/salon.ics"
+      "expand https://scholarium.at/salon.ics"
     )
   );
 
@@ -69,7 +69,7 @@ test("upcoming entries project; bare past entries live behind the action row", a
   await expectTree(
     `
 Salon
-  Termine https://scholarium.at/salon.ics
+  https://scholarium.at/salon.ics
     14.07.2030 Sommerfest
     ${dunbarText()}
   `,
@@ -82,7 +82,7 @@ Salon
   await expectTree(
     `
 Salon
-  Termine https://scholarium.at/salon.ics
+  https://scholarium.at/salon.ics
     01.01.2020 Founding seminar
     14.07.2030 Sommerfest
     ${dunbarText()}
@@ -95,7 +95,7 @@ Salon
   await expectTree(
     `
 Salon
-  Termine https://scholarium.at/salon.ics
+  https://scholarium.at/salon.ics
     14.07.2030 Sommerfest
     ${dunbarText()}
   `,
@@ -151,11 +151,11 @@ test("judging a projected entry materializes it with the judgment", async () => 
   });
 
   await type(
-    "Salon{Enter}{Tab}Termine https://scholarium.at/salon.ics{Escape}"
+    "Salon{Enter}{Tab}https://scholarium.at/salon.ics{Escape}"
   );
   await userEvent.click(
     await screen.findByLabelText(
-      "expand Termine https://scholarium.at/salon.ics"
+      "expand https://scholarium.at/salon.ics"
     )
   );
 
@@ -166,7 +166,7 @@ test("judging a projected entry materializes it with the judgment", async () => 
   await expectTree(
     `
 Salon
-  Termine https://scholarium.at/salon.ics
+  https://scholarium.at/salon.ics
     {!} 14.07.2030 Sommerfest
     ${dunbarText()}
   `,
@@ -180,7 +180,7 @@ Salon
   await expectTree(
     `
 Salon
-  Termine https://scholarium.at/salon.ics
+  https://scholarium.at/salon.ics
     {!} 14.07.2030 Sommerfest
     ${dunbarText()}
   `,
@@ -196,11 +196,11 @@ test("multiselect judgment materializes projected and spares untouched", async (
   });
 
   await type(
-    "Salon{Enter}{Tab}Termine https://scholarium.at/salon.ics{Escape}"
+    "Salon{Enter}{Tab}https://scholarium.at/salon.ics{Escape}"
   );
   await userEvent.click(
     await screen.findByLabelText(
-      "expand Termine https://scholarium.at/salon.ics"
+      "expand https://scholarium.at/salon.ics"
     )
   );
 
@@ -212,7 +212,7 @@ test("multiselect judgment materializes projected and spares untouched", async (
   await expectTree(
     `
 Salon
-  Termine https://scholarium.at/salon.ics
+  https://scholarium.at/salon.ics
     {?} 14.07.2030 Sommerfest
     {?} ${dunbarText()}
   `,
@@ -228,11 +228,11 @@ test("writing under a projected entry materializes it with the note", async () =
   });
 
   await type(
-    "Salon{Enter}{Tab}Termine https://scholarium.at/salon.ics{Escape}"
+    "Salon{Enter}{Tab}https://scholarium.at/salon.ics{Escape}"
   );
   await userEvent.click(
     await screen.findByLabelText(
-      "expand Termine https://scholarium.at/salon.ics"
+      "expand https://scholarium.at/salon.ics"
     )
   );
 
@@ -246,7 +246,7 @@ test("writing under a projected entry materializes it with the note", async () =
   await expectTree(
     `
 Salon
-  Termine https://scholarium.at/salon.ics
+  https://scholarium.at/salon.ics
     14.07.2030 Sommerfest
       Excerpts we are going to read
     ${dunbarText()}
@@ -260,7 +260,7 @@ Salon
   await expectTree(
     `
 Salon
-  Termine https://scholarium.at/salon.ics
+  https://scholarium.at/salon.ics
     14.07.2030 Sommerfest
       Excerpts we are going to read
     ${dunbarText()}
@@ -286,11 +286,11 @@ test("dnd both ways: projections drag as themselves and accept drops", async () 
   });
 
   await type(
-    "Salon{Enter}{Tab}Termine https://scholarium.at/salon.ics{Enter}Notes{Escape}"
+    "Salon{Enter}{Tab}https://scholarium.at/salon.ics{Enter}Notes{Escape}"
   );
   await userEvent.click(
     await screen.findByLabelText(
-      "expand Termine https://scholarium.at/salon.ics"
+      "expand https://scholarium.at/salon.ics"
     )
   );
 
@@ -301,7 +301,7 @@ test("dnd both ways: projections drag as themselves and accept drops", async () 
   await expectTree(
     `
 Salon
-  Termine https://scholarium.at/salon.ics
+  https://scholarium.at/salon.ics
     14.07.2030 Sommerfest
     Notes
     ${dunbarText()}
@@ -316,7 +316,7 @@ Salon
   await expectTree(
     `
 Salon
-  Termine https://scholarium.at/salon.ics
+  https://scholarium.at/salon.ics
     14.07.2030 Sommerfest
     ${dunbarText()}
     Notes
@@ -333,11 +333,11 @@ test("a touched past entry is file content: always visible, revealed or not", as
   });
 
   await type(
-    "Salon{Enter}{Tab}Termine https://scholarium.at/salon.ics{Escape}"
+    "Salon{Enter}{Tab}https://scholarium.at/salon.ics{Escape}"
   );
   await userEvent.click(
     await screen.findByLabelText(
-      "expand Termine https://scholarium.at/salon.ics"
+      "expand https://scholarium.at/salon.ics"
     )
   );
 
@@ -352,7 +352,7 @@ test("a touched past entry is file content: always visible, revealed or not", as
   // hidden, the action row is gone entirely.
   const expected = `
 Salon
-  Termine https://scholarium.at/salon.ics
+  https://scholarium.at/salon.ics
     01.01.2020 Founding seminar
       Excerpts we are going to read
     14.07.2030 Sommerfest
@@ -367,7 +367,7 @@ Salon
   await expectTree(
     `
 Salon
-  Termine https://scholarium.at/salon.ics
+  https://scholarium.at/salon.ics
     {!} 01.01.2020 Founding seminar
       Excerpts we are going to read
     14.07.2030 Sommerfest
@@ -385,11 +385,11 @@ test("reorder materializes only the displayed sequence — hidden past stays a p
   });
 
   await type(
-    "Salon{Enter}{Tab}Termine https://scholarium.at/salon.ics{Escape}"
+    "Salon{Enter}{Tab}https://scholarium.at/salon.ics{Escape}"
   );
   await userEvent.click(
     await screen.findByLabelText(
-      "expand Termine https://scholarium.at/salon.ics"
+      "expand https://scholarium.at/salon.ics"
     )
   );
 
@@ -398,7 +398,7 @@ test("reorder materializes only the displayed sequence — hidden past stays a p
 
   const reordered = `
 Salon
-  Termine https://scholarium.at/salon.ics
+  https://scholarium.at/salon.ics
     14.07.2030 Sommerfest
     ${dunbarText()}
   `;
@@ -415,7 +415,7 @@ Salon
   await expectTree(
     `
 Salon
-  Termine https://scholarium.at/salon.ics
+  https://scholarium.at/salon.ics
     01.01.2020 Founding seminar
     14.07.2030 Sommerfest
     ${dunbarText()}
@@ -434,11 +434,11 @@ test("past entries render dimmed by type, judged rows full strength", async () =
   });
 
   await type(
-    "Salon{Enter}{Tab}Termine https://scholarium.at/salon.ics{Escape}"
+    "Salon{Enter}{Tab}https://scholarium.at/salon.ics{Escape}"
   );
   await userEvent.click(
     await screen.findByLabelText(
-      "expand Termine https://scholarium.at/salon.ics"
+      "expand https://scholarium.at/salon.ics"
     )
   );
   await userEvent.click(await screen.findByLabelText("Show 1 past date"));

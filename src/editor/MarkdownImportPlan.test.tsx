@@ -340,10 +340,10 @@ test("Empty-root markdown file drop creates a wrapper document for multiple file
     "second",
   ]);
   expect(wrapperLinks.map((node) => getBlockFileLinkPath(node))).toEqual(
-    importedDocuments.map((document) => document.docId)
+    importedDocuments.map((document) => `doc:${document.docId}`)
   );
   expect(parsedWrapperLinks.map((node) => getBlockFileLinkPath(node))).toEqual(
-    importedDocuments.map((document) => document.docId)
+    importedDocuments.map((document) => `doc:${document.docId}`)
   );
 });
 
@@ -625,14 +625,26 @@ test("parseMarkdownHierarchy parses .md path link as fileLink span", () => {
   ]);
 });
 
-test("parseMarkdownHierarchy parses knowstr document id links as fileLink spans", () => {
+test("parseMarkdownHierarchy parses doc: links as fileLink spans; bare ids are text", () => {
   const docId = "123e4567-e89b-12d3-a456-426614174000";
-  const trees = parseTree(`# Root\n- [Imported](${docId})\n`);
+  const trees = parseTree(`# Root\n- [Imported](doc:${docId})\n`);
   expect(trees).toEqual([
     expect.objectContaining({
       children: [
         expect.objectContaining({
-          spans: [{ kind: "fileLink", path: docId, text: "Imported" }],
+          spans: [{ kind: "fileLink", path: `doc:${docId}`, text: "Imported" }],
+          blockKind: "list_item",
+        }),
+      ],
+    }),
+  ]);
+
+  const bare = parseTree(`# Root\n- [Imported](${docId})\n`);
+  expect(bare).toEqual([
+    expect.objectContaining({
+      children: [
+        expect.objectContaining({
+          spans: [{ kind: "text", text: `[Imported](${docId})` }],
           blockKind: "list_item",
         }),
       ],

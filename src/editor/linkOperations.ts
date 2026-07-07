@@ -9,7 +9,7 @@ import {
   ResolvedNode,
 } from "../core/graphLookup";
 import { Link } from "../core/link";
-import { resolveLinkPath } from "../core/linkPath";
+import { docLinkId, resolveLinkPath } from "../core/linkPath";
 import { buildDocumentRouteUrl, buildNodeRouteUrl } from "../navigationUrl";
 import { AddToParentTarget } from "../planner";
 
@@ -35,14 +35,15 @@ function documentTarget(
   data: Pick<Data, "knowledgeDBs" | "documents" | "documentByFilePath">,
   link: Extract<Link, { kind: "document" }>
 ): Document | undefined {
+  const docId = docLinkId(link.path);
+  if (docId !== undefined) {
+    return data.documents.get(documentKeyOf(link.sourceId, docId));
+  }
   const resolvedPath = resolveLinkPath(
     link.path,
     sourceFilePath(data, link.source, link.sourceId)
   );
-  return (
-    data.documentByFilePath.get(resolvedPath) ||
-    data.documents.get(documentKeyOf(link.sourceId, link.path))
-  );
+  return data.documentByFilePath.get(resolvedPath);
 }
 
 function sourceResolvedNode(

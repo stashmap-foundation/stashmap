@@ -2,7 +2,7 @@ import { Map as ImmutableMap } from "immutable";
 import { LOCAL, nodeRefKey } from "./core/nodeRef";
 import { EMPTY_SEMANTIC_ID } from "./core/connections";
 import { getAllFileLinks, getAllLinks, nodeText } from "./core/nodeSpans";
-import { fileLinkIndexKey, resolveLinkPath } from "./core/linkPath";
+import { fileLinkIndexKey, fileLinkIndexPath } from "./core/linkPath";
 
 export function createEmptyGraphIndex(): GraphIndex {
   return {
@@ -234,7 +234,7 @@ function addNodeLinkEntries(
     );
   });
   getAllFileLinks(node).forEach(({ path }) => {
-    const resolved = resolveLinkPath(path, sourceFilePath);
+    const resolved = fileLinkIndexPath(path, sourceFilePath);
     const key = fileLinkIndexKey(sourceId, resolved);
     addRefToMap(graphIndex.incomingFileLinks, key, {
       sourceId,
@@ -260,7 +260,7 @@ function removeNodeLinkEntries(
     );
   });
   getAllFileLinks(node).forEach(({ path }) => {
-    const resolved = resolveLinkPath(path, sourceFilePath);
+    const resolved = fileLinkIndexPath(path, sourceFilePath);
     const key = fileLinkIndexKey(sourceId, resolved);
     removeRefFromMap(graphIndex.incomingFileLinks, key, {
       sourceId,

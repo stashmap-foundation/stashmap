@@ -18,7 +18,7 @@ import {
   nodeText,
 } from "./core/nodeSpans";
 import { Document, documentKeyOf, getDocumentForNode } from "./core/Document";
-import { fileLinkIndexKey, resolveLinkPath } from "./core/linkPath";
+import { fileLinkIndexKey, fileLinkIndexPath } from "./core/linkPath";
 import { nodeRefKey } from "./core/nodeRef";
 import { DEFAULT_TYPE_FILTERS } from "./core/constants";
 import { referenceToText } from "./editor/referenceText";
@@ -64,7 +64,7 @@ function resolveFileLinkRoot(
   const sourceFilePath = sourceRoot?.docId
     ? documents.get(documentKeyOf(myself, sourceRoot.docId))?.filePath
     : undefined;
-  const resolved = resolveLinkPath(linkPath, sourceFilePath);
+  const resolved = fileLinkIndexPath(linkPath, sourceFilePath);
   const targetDoc =
     documentByFilePath.get(resolved) ||
     documents.get(documentKeyOf(myself, resolved));
@@ -209,7 +209,7 @@ function resolveFileLinkRootInSource(
   const sourceFilePath = sourceRoot?.docId
     ? documents.get(documentKeyOf(sourceId, sourceRoot.docId))?.filePath
     : undefined;
-  const resolved = resolveLinkPath(linkPath, sourceFilePath);
+  const resolved = fileLinkIndexPath(linkPath, sourceFilePath);
   const targetDoc =
     documentByFilePath.get(resolved) ||
     documents.get(documentKeyOf(sourceId, resolved));

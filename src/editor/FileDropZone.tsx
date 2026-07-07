@@ -151,7 +151,7 @@ function planCreateImportedFilesDocument(
     createDocumentLinkTarget(
       importedDocument.sourceId,
       importedDocument.docId,
-      importedDocument.docId,
+      undefined,
       documentDisplayName(importedDocument)
     )
   );

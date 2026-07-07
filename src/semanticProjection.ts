@@ -697,12 +697,15 @@ export function getAlternativeFooterData(
         .filter(({ node }) => !existingCrefTargetIDs.has(node.id))
         .reduce((acc, { node, additions, deletions, textDiffers, direct }) => {
           if (direct) {
+            // The text difference counts into the displayed ± (J1/J3 law:
+            // silent when they agree, ±n when they differ) — a bare [V]
+            // with hidden differences would lie.
             const directCount =
               additions.size + deletions.size + (textDiffers ? 1 : 0);
             return directCount > 0
               ? acc.set(node.id, {
                   updated: node.updated,
-                  addCount: additions.size,
+                  addCount: additions.size + (textDiffers ? 1 : 0),
                   removeCount: deletions.size,
                   direct: true,
                 })

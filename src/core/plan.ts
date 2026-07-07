@@ -687,10 +687,12 @@ export function planMaterializeComputedRow<T extends GraphPlan>(
 // baseline with only this node's text set to theirs — so that version's
 // rename is absorbed while the old children keep the child suggestions
 // alive. Mutes a version, not a row: their next rename differs from the
-// constructed baseline and surfaces fresh. The stamp we rewrite is always
-// on MY node: when I hold the fork the constructed id replaces my edge
-// stamp; when I hold the original, my node gains a per-node pin that the
-// diff reads before the (possibly foreign) fork stamp.
+// constructed baseline and surfaces fresh. The stamp always advances on
+// THE FORK NODE of the edge when that node is mine — the two-endpoint
+// construction keeps both directions honest. Only for a FOREIGN fork of
+// my pure original does a pin land on my own node instead; a chained
+// fork (basedOn present) can never carry a pin — its snapshot attr is
+// its own edge's stamp — so that case is honestly unrepresentable.
 export function planResolveRenameSuggestion<T extends GraphPlan>(
   plan: T,
   row: Pick<Row, "renameSuggestion" | "parentNode">,
@@ -721,12 +723,24 @@ export function planResolveRenameSuggestion<T extends GraphPlan>(
   if (constructed === undefined) {
     return undefined;
   }
+  const version = getWorkspaceNode(plan.knowledgeDBs, versionId);
+  const forkNode =
+    target.basedOn === versionId
+      ? target
+      : version?.basedOn === target.id
+      ? version
+      : undefined;
+  const stamped =
+    forkNode ?? (target.basedOn === undefined ? target : undefined);
+  if (!stamped) {
+    return undefined;
+  }
   const withSnapshot = {
     ...plan,
     extraSnapshots: (plan.extraSnapshots ?? List<string>()).push(constructed),
   };
   return planUpsertNodes(withSnapshot, {
-    ...target,
+    ...stamped,
     snapshotId: snapshotIdForContent(constructed),
   });
 }

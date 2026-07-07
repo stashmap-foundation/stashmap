@@ -69,12 +69,15 @@ function edgeBaseline(
   if (!forkedNode || !forkedNode.basedOn) {
     return undefined;
   }
-  // A pin on my side of the edge outranks the fork stamp (the kernel's
-  // per-node pin precedence): dismissing from the original's side cannot
-  // rewrite the foreign fork's stamp, so it advances a pin on my own node
-  // instead, and the diff reads that pin first.
+  // A pin is only a pin when it cannot be a fork stamp (the kernel's
+  // pinOf applies the same rule): a node with basedOn carries its OWN
+  // edge's stamp, which must never be borrowed as the baseline of some
+  // other edge — a chained fork is fork and origin at once, and reading
+  // its stamp for the wrong edge diffs against the wrong document.
+  const pin =
+    currentNode.basedOn === undefined ? currentNode.snapshotId : undefined;
   const snapshotId = forkedVersion
-    ? currentNode.snapshotId ?? forkedVersion.snapshotId
+    ? pin ?? forkedVersion.snapshotId
     : forkedNode.snapshotId;
   const snapshotMap = snapshotId ? snapshotNodes.get(snapshotId) : undefined;
   const snapshotNode = snapshotMap?.get(forkedNode.basedOn);

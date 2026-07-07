@@ -230,6 +230,7 @@ declare global {
       precededBy: ID[];
       take?: AddToParentTarget;
       defaults?: { relevance?: Relevance; argument?: Argument };
+      host?: Pick<Row, "node" | "parentRef" | "materialize">;
     };
     standsFor?: { id: ID; liveText?: string };
     isFirstVirtual: boolean;

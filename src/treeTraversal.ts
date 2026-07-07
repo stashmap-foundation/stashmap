@@ -548,6 +548,15 @@ function createVirtualRow(
         relevance: inherited?.relevance,
         argument: inherited?.argument,
       },
+      ...(input.parentRow?.materialize
+        ? {
+            host: {
+              node: input.parentRow.node,
+              parentRef: input.parentRow.parentRef,
+              materialize: input.parentRow.materialize,
+            },
+          }
+        : {}),
     },
   };
 }

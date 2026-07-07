@@ -399,6 +399,61 @@ Notes
   `);
 });
 
+test("judging a backlink under a projected entry takes the entry first", async () => {
+  const [alice] = setup([ALICE]);
+  renderApp({
+    ...alice(),
+    fetchCalendarFeed: () => Promise.resolve(FEED),
+  });
+
+  await type(
+    "Salon{Enter}{Tab}https://scholarium.at/salon.ics{Enter}{Shift>}{Tab}{/Shift}Was ist cool{Escape}"
+  );
+  await userEvent.click(
+    await screen.findByLabelText("expand https://scholarium.at/salon.ics")
+  );
+  await altDragTextOnto("14.07.2030 Sommerfest", "Was ist cool");
+  await userEvent.click(
+    await screen.findByLabelText("expand 14.07.2030 Sommerfest")
+  );
+
+  await clickRow("Salon ↩");
+  await userEvent.keyboard("!");
+  await userEvent.click(
+    await screen.findByLabelText("expand 14.07.2030 Sommerfest")
+  );
+
+  await expectTree(
+    `
+Salon
+  https://scholarium.at/salon.ics
+    14.07.2030 Sommerfest
+      {!} [R] Salon
+    ${dunbarText()}
+  Was ist cool
+  [R] Salon / https://scholarium.at/salon.ics / 14.07.2030 Sommerfest
+  [I] 14.07.2030 Sommerfest
+  `,
+    { showGutter: true }
+  );
+
+  cleanup();
+  renderApp({ ...alice(), fetchCalendarFeed: () => Promise.resolve(FEED) });
+  await expectTree(
+    `
+Salon
+  https://scholarium.at/salon.ics
+    14.07.2030 Sommerfest
+      {!} [R] Salon
+    ${dunbarText()}
+  Was ist cool
+  [R] Salon / https://scholarium.at/salon.ics / 14.07.2030 Sommerfest
+  [I] 14.07.2030 Sommerfest
+  `,
+    { showGutter: true }
+  );
+});
+
 test("a placed entry keeps its backlinks", async () => {
   const [alice] = setup([ALICE]);
   renderApp({

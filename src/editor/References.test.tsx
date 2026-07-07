@@ -230,6 +230,16 @@ Places
   [R] https://www.wikidata.org/wiki/Q131723
     `);
     expect(screen.queryByText(/deleted/)).toBeNull();
+
+    // Violet means entity — the link target carries the canonical id, so
+    // recognition feedback fires with or without a home page (the violet
+    // law: node id or link target).
+    /* eslint-disable testing-library/no-node-access */
+    const violetWrapper = screen
+      .getByText("https://www.wikidata.org/wiki/Q131723")
+      .closest('[style*="--violet"]');
+    /* eslint-enable testing-library/no-node-access */
+    expect(violetWrapper).not.toBeNull();
   });
 
   test("Deleted node shows (deleted) indicator in ~Log", async () => {

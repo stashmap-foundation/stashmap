@@ -4,6 +4,8 @@
 // Barcelona, get offered wd:Q1492") is a later feature, and ISBN/DOI wait
 // on the per-scheme normalization questions the model leaves open.
 
+import { isCalendarEntryId } from "./ical";
+
 // Real ids look like rgb:cdtFZh2Q-YTY1rYW-… (deedsats wallet config).
 export const RGB_CONTRACT_ID_RE = /^rgb:[A-Za-z0-9_~-]{20,}$/u;
 
@@ -13,6 +15,13 @@ const WIKIDATA_URL_RE =
 // Ids of these schemes are canonical entity ids wherever they appear
 // (node ids, link targets).
 export const ENTITY_SCHEME_RE = /^(asset:|wd:|isbn:|doi:)/u;
+
+// The canonical-id law's full domain: entity ids plus calendar-entry
+// ids. A canonical node is minted only as a document root; every other
+// appearance — copy gestures included — is a link row targeting it.
+export function isCanonicalId(id: string): boolean {
+  return ENTITY_SCHEME_RE.test(id) || isCalendarEntryId(id);
+}
 
 export function entityIdForText(text: string): string | undefined {
   const marker = text.trim();

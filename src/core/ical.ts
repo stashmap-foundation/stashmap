@@ -1,17 +1,16 @@
 /* eslint-disable functional/no-let, functional/immutable-data */
 import { icalEntryId } from "./icalId";
+import { getBlockLinkTarget } from "./nodeSpans";
 
-// URL charset excludes ] and parentheses so a URL inside the link form
-// stops at its own closing delimiter.
+// Write-time recognition only: a pasted or typed bare feed URL gets
+// wrapped into the typed feed link. Read paths never sniff URLs.
 const ICAL_URL_RE =
   /(webcal:\/\/[^\s\]()]+|https?:\/\/[^\s\]()]+\.ics(\?[^\s\]()]*)?)/iu;
 
-const ICAL_FEED_LINK_RE =
-  /^\[([^\]]*)\]\((webcal:\/\/[^\s()]+|https?:\/\/[^\s()]+\.ics(\?[^\s()]*)?)\)$/iu;
+const ICAL_FEED_LINK_RE = /^\[([^\]]*)\]\(feed:([^\s()]+)\)$/u;
 
-// The feed-as-link form: `[any name](https://…/feed.ics)` — text is yours,
-// identity lives in the parentheses, mirroring entity links. Returns the
-// renameable label and the feed URL.
+// The feed-as-link form: `[any name](feed:<url>)`. The scheme declares the
+// row a calendar-feed node; readers dispatch on it, never on the URL shape.
 export function icalFeedLinkPartsOf(
   text: string
 ): { label: string; url: string } | undefined {
@@ -22,30 +21,21 @@ export function icalFeedLinkPartsOf(
   return { label: match[1], url: match[2] };
 }
 
-// The calendar-feed recognizer: a node whose text carries an iCal URL
-// (`.ics` or `webcal://`) is a calendar-feed node — recognized like
-// entities, no node-type UI. Returns the feed URL, or undefined.
 export function icalFeedUrlOf(text: string): string | undefined {
-  const linkForm = icalFeedLinkPartsOf(text);
-  if (linkForm) {
-    return linkForm.url;
-  }
-  const match = ICAL_URL_RE.exec(text);
-  if (!match) {
-    return undefined;
-  }
-  return match[0].replace(/[}>,.]+$/u, "") || undefined;
+  return icalFeedLinkPartsOf(text)?.url;
 }
 
-// A row whose whole text is a feed URL — the paste/typing form that gets
-// wrapped into the link form so the name is free from the start.
 export function isBareIcalFeedUrl(text: string): boolean {
-  const url = icalFeedUrlOf(text);
-  return url !== undefined && text.trim() === url;
+  const match = ICAL_URL_RE.exec(text);
+  if (!match) {
+    return false;
+  }
+  const url = match[0].replace(/[}>,.]+$/u, "");
+  return text.trim() === url;
 }
 
 export function icalFeedLinkText(url: string, label?: string): string {
-  return `[${label ?? url}](${url})`;
+  return `[${label ?? url}](feed:${url})`;
 }
 
 // The one display-text rule for the feed-link form, shared by every
@@ -324,6 +314,21 @@ export function icalEntryDisplayText(entry: IcalEntry): string {
 // no feed fetch to render pastness — the wallet applies the same rule.
 export function isCalendarEntryId(id: string): boolean {
   return id.startsWith("ical:");
+}
+
+// The entry a child stands for, both placement forms: a link row
+// targeting an `ical:` id (the placement law) or a node minted at the id
+// itself (legacy in-place materialization). The projection merge, the
+// past count, and entry-type rendering all match through this — a
+// placement's own uuid never means anything to the calendar.
+export function calendarEntryTargetOf(
+  node: GraphNode | undefined
+): string | undefined {
+  const target = getBlockLinkTarget(node);
+  if (target && isCalendarEntryId(target)) {
+    return target;
+  }
+  return node && isCalendarEntryId(node.id) ? node.id : undefined;
 }
 
 const ICAL_ROW_DATE_RE = /^(\d{2})\.(\d{2})\.(\d{4})/u;

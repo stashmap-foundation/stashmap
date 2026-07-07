@@ -7,7 +7,7 @@ import {
   getSemanticID,
 } from "./core/connections";
 import { ENTITY_SCHEME_RE } from "./core/entityRecognition";
-import { displayTextOf } from "./core/ical";
+import { displayTextOf, isCalendarEntryId } from "./core/ical";
 import {
   getBlockLinkTarget,
   getBlockLinkText,
@@ -18,7 +18,7 @@ import {
   nodeText,
 } from "./core/nodeSpans";
 import { Document, documentKeyOf, getDocumentForNode } from "./core/Document";
-import { fileLinkIndexKey, resolveLinkPath } from "./core/linkPath";
+import { fileLinkIndexKey, fileLinkIndexPath } from "./core/linkPath";
 import { nodeRefKey } from "./core/nodeRef";
 import { DEFAULT_TYPE_FILTERS } from "./core/constants";
 import { referenceToText } from "./editor/referenceText";
@@ -64,7 +64,7 @@ function resolveFileLinkRoot(
   const sourceFilePath = sourceRoot?.docId
     ? documents.get(documentKeyOf(myself, sourceRoot.docId))?.filePath
     : undefined;
-  const resolved = resolveLinkPath(linkPath, sourceFilePath);
+  const resolved = fileLinkIndexPath(linkPath, sourceFilePath);
   const targetDoc =
     documentByFilePath.get(resolved) ||
     documents.get(documentKeyOf(myself, resolved));
@@ -209,7 +209,7 @@ function resolveFileLinkRootInSource(
   const sourceFilePath = sourceRoot?.docId
     ? documents.get(documentKeyOf(sourceId, sourceRoot.docId))?.filePath
     : undefined;
-  const resolved = resolveLinkPath(linkPath, sourceFilePath);
+  const resolved = fileLinkIndexPath(linkPath, sourceFilePath);
   const targetDoc =
     documentByFilePath.get(resolved) ||
     documents.get(documentKeyOf(sourceId, resolved));
@@ -631,10 +631,13 @@ export function buildReferenceItem(
       ? lookupNode(graph, refId, sourceId)?.node
       : undefined;
     const entityTarget = getBlockLinkTarget(parentItem);
-    if (entityTarget && ENTITY_SCHEME_RE.test(entityTarget)) {
-      // A dangling entity link: the entity has no home page, which is its
-      // ordinary state — never deletion (idea.md: "dangling allowed, no
-      // page"). Renders as plain link text until E6 gives it a surface.
+    if (
+      entityTarget &&
+      (ENTITY_SCHEME_RE.test(entityTarget) || isCalendarEntryId(entityTarget))
+    ) {
+      // A dangling canonical-id link — entity or calendar entry: no home
+      // page is the ordinary state, never deletion (idea.md: "dangling
+      // allowed, no page"). Renders as plain link text.
       const linkText = getBlockLinkText(parentItem) ?? entityTarget;
       return {
         id: refId,

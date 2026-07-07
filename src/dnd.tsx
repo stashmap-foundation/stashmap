@@ -16,7 +16,11 @@ import {
   getBlockLinkTarget,
   getBlockLinkText,
   isBlockLinkAny,
+  nodeText,
 } from "./core/nodeSpans";
+import { isCanonicalId } from "./core/entityRecognition";
+import { getBlockLink } from "./core/blockLink";
+import { linkToInsertTarget } from "./editor/linkOperations";
 import { getIndependentRows, updateViewPathsAfterMoveNodes } from "./rowModel";
 import { getDocumentByIdOrFilePath } from "./core/Document";
 import {
@@ -54,6 +58,19 @@ function refsEqual(
     right !== undefined &&
     left.sourceId === right.sourceId &&
     left.id === right.id
+  );
+}
+
+// The one drag-target resolution, applied to every dragged row: block links
+// resolve to their node target, file links (the Imported Files rows) to the
+// imported document — exactly what the primary row's drag payload carries.
+function resolveDragLinkTarget(
+  plan: Plan,
+  sourceRow: Row
+): AddToParentTarget | undefined {
+  return linkToInsertTarget(
+    plan,
+    getBlockLink(sourceRow.node, sourceRow.sourceId)
   );
 }
 
@@ -424,10 +441,11 @@ export function dnd(
     }
     return planAddToParent(
       accPlan,
-      createRefTarget(
-        getBlockLinkTarget(sourceRow.node) || sourceRow.rowID,
-        getBlockLinkText(sourceRow.node)
-      ),
+      resolveDragLinkTarget(accPlan, sourceRow) ??
+        createRefTarget(
+          getBlockLinkTarget(sourceRow.node) || sourceRow.rowID,
+          getBlockLinkText(sourceRow.node)
+        ),
       targetParentRow.node.id,
       insertAt
     )[0];
@@ -518,11 +536,16 @@ export function dnd(
   };
 
   const toReferenceTarget = (
-    sourceNode: GraphNode
-  ): ReturnType<typeof createRefTarget> =>
+    accPlan: Plan,
+    sourceRow: Row
+  ): AddToParentTarget =>
+    resolveDragLinkTarget(accPlan, sourceRow) ??
     createRefTarget(
-      getBlockLinkTarget(sourceNode) || sourceNode.id,
-      getBlockLinkText(sourceNode)
+      sourceRow.node.id,
+      getBlockLinkText(sourceRow.node) ??
+        (sourceRow.materialize && !sourceRow.virtualType
+          ? nodeText(sourceRow.node)
+          : undefined)
     );
 
   const getSuggestionTargetID = (
@@ -598,7 +621,7 @@ export function dnd(
       }
       return planAddToParent(
         accPlan,
-        toReferenceTarget(sourceNode),
+        toReferenceTarget(accPlan, sourceRow),
         targetNode.id,
         insertAt,
         sourceEdgeRelevance,
@@ -607,6 +630,18 @@ export function dnd(
     }
 
     const deepCopySource = resolveDeepCopySource(accPlan, sourceRow);
+    // A canonical id never copies into a second body (idea.md, mint or
+    // link, never duplicate): a further appearance is another link row.
+    if (isCanonicalId(deepCopySource.node.id)) {
+      return planAddToParent(
+        accPlan,
+        createRefTarget(deepCopySource.node.id, nodeText(deepCopySource.node)),
+        targetNode.id,
+        insertAt,
+        sourceEdgeRelevance,
+        sourceEdgeArgument
+      )[0];
+    }
     return planDeepCopyNode(
       accPlan,
       deepCopySource.sourceId,

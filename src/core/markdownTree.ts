@@ -4,7 +4,7 @@ import markdownItFrontMatter from "markdown-it-front-matter";
 // eslint-disable-next-line import/no-unresolved
 import Token from "markdown-it/lib/token";
 import { fileLinkSpan, linkSpan, plainSpans, spansText } from "./nodeSpans";
-import { isMarkdownPath } from "./linkPath";
+import { docLinkId, isMarkdownPath } from "./linkPath";
 import { parseFrontMatter } from "./knowstrFrontmatter";
 import { isSafeMarkdownNodeId } from "./graphLookup";
 
@@ -120,7 +120,7 @@ function classifyHref(href: string): RefLinkTarget | undefined {
     const targetID = href.slice(hashIndex + 1);
     return targetID ? { kind: "node", targetID } : undefined;
   }
-  if (isMarkdownPath(href)) {
+  if (docLinkId(href) !== undefined || isMarkdownPath(href)) {
     return { kind: "file", path: href };
   }
   return undefined;

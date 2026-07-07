@@ -13,7 +13,7 @@ import {
   isRefNode,
 } from "./core/connections";
 import { getBlockLinkTarget } from "./core/nodeSpans";
-import { fileLinkIndexKey, resolveLinkPath } from "./core/linkPath";
+import { fileLinkIndexKey } from "./core/linkPath";
 import { suggestionSettings } from "./core/constants";
 import { LOG_ROOT_ROLE } from "./core/systemRoots";
 import { computeVersionDiff, VersionDiff } from "./core/snapshotBaseline";
@@ -214,15 +214,11 @@ function sourceDocumentKey(
 function documentLinkerRefs(
   graphIndex: GraphIndex,
   effectiveAuthor: SourceId,
-  candidateDocument: Document,
-  currentNodeFilePath: string | undefined
+  candidateDocument: Document
 ): NodeRef[] {
   const lookupPaths = ImmutableSet<string>([
     ...(candidateDocument.filePath ? [candidateDocument.filePath] : []),
     candidateDocument.docId,
-    ...(currentNodeFilePath
-      ? [resolveLinkPath(candidateDocument.docId, currentNodeFilePath)]
-      : []),
   ]);
   return lookupPaths
     .toArray()
@@ -265,7 +261,6 @@ function subtreeLinksToDocument(
   documents: Map<string, Document> | undefined,
   candidate: ResolvedNode,
   currentNodeID: ID | undefined,
-  currentNodeFilePath: string | undefined,
   effectiveAuthor: SourceId,
   subtreeRootIDs: ImmutableSet<ID>
 ): boolean {
@@ -283,8 +278,7 @@ function subtreeLinksToDocument(
   return documentLinkerRefs(
     graphIndex,
     effectiveAuthor,
-    candidateDocument,
-    currentNodeFilePath
+    candidateDocument
   ).some((ref) => {
     const linker = getNodeInSource(graph, ref);
     return (
@@ -450,7 +444,6 @@ export function getIncomingCrefsForNode(
             documents,
             resolved,
             currentNodeID,
-            currentNodeFilePath,
             effectiveAuthor,
             subtreeRootIDs
           )

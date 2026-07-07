@@ -100,16 +100,14 @@ describe("parseIcalFeed conformance", () => {
 });
 
 describe("icalFeedUrlOf", () => {
-  test("recognizes bare and markdown-linked feed urls", () => {
-    expect(icalFeedUrlOf("Termine https://x.org/salon.ics")).toEqual(
+  test("recognizes only the typed feed link form", () => {
+    expect(icalFeedUrlOf("[Kalender](feed:https://x.org/salon.ics)")).toEqual(
       "https://x.org/salon.ics"
     );
-    expect(icalFeedUrlOf("[Kalender](https://x.org/salon.ics)")).toEqual(
-      "https://x.org/salon.ics"
-    );
-    expect(icalFeedUrlOf("webcal://x.org/feed")).toEqual("webcal://x.org/feed");
+    expect(icalFeedUrlOf("Termine https://x.org/salon.ics")).toBeUndefined();
+    expect(icalFeedUrlOf("https://x.org/salon.ics")).toBeUndefined();
+    expect(icalFeedUrlOf("webcal://x.org/feed")).toBeUndefined();
     expect(icalFeedUrlOf("just text")).toBeUndefined();
-    expect(icalFeedUrlOf("https://x.org/page.html")).toBeUndefined();
   });
 });
 
@@ -173,18 +171,22 @@ describe("mergeProjectedEntries", () => {
 describe("feed-as-link form", () => {
   test("parses label and url; text is yours, identity in the parentheses", () => {
     expect(
-      icalFeedLinkPartsOf("[Salon Kalender](https://x.org/salon.ics)")
+      icalFeedLinkPartsOf("[Salon Kalender](feed:https://x.org/salon.ics)")
     ).toEqual({ label: "Salon Kalender", url: "https://x.org/salon.ics" });
+    expect(
+      icalFeedLinkPartsOf("[Kalender](https://x.org/salon.ics)")
+    ).toBeUndefined();
     expect(icalFeedLinkPartsOf("https://x.org/salon.ics")).toBeUndefined();
     expect(icalFeedLinkPartsOf("[note](#u1)")).toBeUndefined();
   });
 
-  test("bare feed urls wrap; mixed text does not", () => {
+  test("bare feed urls wrap into the typed form; mixed text does not", () => {
     expect(isBareIcalFeedUrl("https://x.org/salon.ics")).toBe(true);
     expect(isBareIcalFeedUrl("  webcal://x.org/f.ics ")).toBe(true);
     expect(isBareIcalFeedUrl("Termine https://x.org/salon.ics")).toBe(false);
+    expect(isBareIcalFeedUrl("[x](feed:https://x.org/f.ics)")).toBe(false);
     expect(icalFeedLinkText("https://x.org/f.ics")).toEqual(
-      "[https://x.org/f.ics](https://x.org/f.ics)"
+      "[https://x.org/f.ics](feed:https://x.org/f.ics)"
     );
   });
 });

@@ -16,12 +16,11 @@ import {
   computeEmptyNodeMetadata,
   createDocumentLinkTarget,
   createRefTarget,
-  getNodeContext,
   getNodeSemanticID,
-  getSemanticID,
   isRefNode,
   isSearchId,
   itemPassesFilters,
+  nodePathLabel as nodePathLabelOf,
 } from "./core/connections";
 import {
   getBlockFileLinkText,
@@ -36,6 +35,7 @@ import {
 } from "./core/nodeSpans";
 import {
   IcalEntry,
+  calendarEntryTargetOf,
   hiddenPastEntryCount,
   icalEntryDisplayText,
   icalFeedUrlOf,
@@ -114,10 +114,7 @@ function nodePathLabel(
   if (!resolved) {
     return undefined;
   }
-  const { sourceId } = resolved.ref;
-  return getNodeContext(knowledgeDBs, resolved.node, sourceId)
-    .push(getSemanticID(knowledgeDBs, resolved.node, sourceId))
-    .join(" / ");
+  return nodePathLabelOf(knowledgeDBs, resolved.node, resolved.ref.sourceId);
 }
 
 function rowIDForNode(node: GraphNode): ID {
@@ -648,20 +645,47 @@ function interleaveProjectionRows(
   childRows: List<Row>,
   typeFilters: Pane["typeFilters"]
 ): { rows: List<Row>; actionRow?: Row } {
-  const feedUrl = icalFeedUrlOf(nodeText(parentNode));
+  // A link row's text is a label for its target, not own content — a
+  // feed URL inside it never makes the link row the calendar.
+  const feedUrl = isBlockLinkAny(parentNode)
+    ? undefined
+    : icalFeedUrlOf(nodeText(parentNode));
   const entries = feedUrl ? data.calendarFeeds?.get(feedUrl) : undefined;
   if (!entries || entries.length === 0) {
     return { rows: childRows };
   }
   const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
+  // A child stands in the merge under its calendar identity: the entry
+  // id of the placement it is (matched through the link target — every
+  // placement's own uuid is fresh), or its own id. First placement of an
+  // entry wins the identity; further links to the same entry stay
+  // ordinary children.
+  const childKeys = parentNode.children.toArray().reduce<{
+    keys: ID[];
+    childIdByKey: globalThis.Map<ID, ID>;
+  }>(
+    (acc, childId) => {
+      const childNode = getNodeInSource(graph, {
+        sourceId: parentSourceId,
+        id: childId,
+      })?.node;
+      const entryId = calendarEntryTargetOf(childNode) as ID | undefined;
+      const key =
+        entryId !== undefined && !acc.childIdByKey.has(entryId)
+          ? entryId
+          : childId;
+      acc.childIdByKey.set(key, childId);
+      return { keys: [...acc.keys, key], childIdByKey: acc.childIdByKey };
+    },
+    { keys: [], childIdByKey: new globalThis.Map<ID, ID>() }
+  );
+  const entriesById = new globalThis.Map(
+    entries.map((entry) => [entry.id as ID, entry])
+  );
   // Bare past entries don't project by default; the action row reveals
   // them. File content always shows. Pastness is node-type rendering,
   // never a judgment.
-  const pastCount = hiddenPastEntryCount(
-    parentNode.children.toArray(),
-    entries,
-    Date.now()
-  );
+  const pastCount = hiddenPastEntryCount(childKeys.keys, entries, Date.now());
   const actionRow =
     pastCount > 0
       ? createPastDatesActionRow(
@@ -674,7 +698,7 @@ function interleaveProjectionRows(
       : undefined;
   const showPast = actionRow?.view.showPastEntries === true;
   const merged = mergeProjectedEntries(
-    parentNode.children.toArray(),
+    childKeys.keys,
     entries,
     showPast ? undefined : Date.now()
   );
@@ -700,9 +724,26 @@ function interleaveProjectionRows(
           precededBy: [item.entry.id as ID, ...acc.precededBy],
         };
       }
-      const row = rowsByChildId.get(item.childId as ID);
+      const childId = childKeys.childIdByKey.get(item.childId as ID);
+      const row =
+        childId !== undefined ? rowsByChildId.get(childId) : undefined;
+      // A placement renders as the entry it places: label (or the feed's
+      // current text) instead of the reference presentation —
+      // materialization must be invisible.
+      const entry = entriesById.get(item.childId as ID);
+      const placementRow =
+        row && item.childId !== childId
+          ? {
+              ...row,
+              reference: undefined,
+              calendarEntry: {
+                entryId: item.childId as ID,
+                liveText: entry ? icalEntryDisplayText(entry) : undefined,
+              },
+            }
+          : row;
       return {
-        rows: row ? [...acc.rows, row] : acc.rows,
+        rows: placementRow ? [...acc.rows, placementRow] : acc.rows,
         precededBy: [item.childId as ID, ...acc.precededBy],
       };
     },
@@ -1039,13 +1080,28 @@ export function getTreeChildren(
   };
 }
 
-function hasHiddenPastEntries(data: Data, node: GraphNode): boolean {
-  const feedUrl = icalFeedUrlOf(nodeText(node));
+function hasHiddenPastEntries(
+  data: Data,
+  graph: GraphLookup,
+  node: GraphNode,
+  sourceId: SourceId
+): boolean {
+  const feedUrl = isBlockLinkAny(node)
+    ? undefined
+    : icalFeedUrlOf(nodeText(node));
   const entries = feedUrl ? data.calendarFeeds?.get(feedUrl) : undefined;
-  return (
-    !!entries &&
-    hiddenPastEntryCount(node.children.toArray(), entries, Date.now()) > 0
-  );
+  if (!entries) {
+    return false;
+  }
+  const childKeys = node.children
+    .toArray()
+    .map(
+      (childId) =>
+        calendarEntryTargetOf(
+          getNodeInSource(graph, { sourceId, id: childId })?.node
+        ) ?? childId
+    );
+  return hiddenPastEntryCount(childKeys, entries, Date.now()) > 0;
 }
 
 function getNodesInRows(
@@ -1078,7 +1134,8 @@ function getNodesInRows(
       hasChildren:
         !rootRow.renameSuggestion &&
         (childResult.rows.size > 0 ||
-          (isFileRow(rootRow) && hasHiddenPastEntries(data, rootRow.node))),
+          (isFileRow(rootRow) &&
+            hasHiddenPastEntries(data, graph, rootRow.node, rootRow.sourceId))),
     };
     const withRoot = {
       rows: result.rows.push(row),

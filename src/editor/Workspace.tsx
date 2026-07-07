@@ -528,6 +528,15 @@ function hostLabel(url: string): string {
   }
 }
 
+// A single destination reads by name — an asset document publishing to its
+// pinned relay says so instead of a bare "1 relays". Several stay a count.
+function destinationLabel(effective: ReadonlyArray<string>): string {
+  const single = effective.length === 1 ? effective[0] : undefined;
+  return single !== undefined
+    ? hostLabel(single)
+    : `${effective.length} relays`;
+}
+
 // The header chip states the document's audience — "who can open this" —
 // never a verb: private / everyone · N relays / paused. The popover is the
 // audience ladder: only me (the default), a secret link (the capability:
@@ -601,7 +610,7 @@ function AudienceChip(): JSX.Element | null {
     });
   };
 
-  const handlePublish = (): void => {
+  const handlePublish = (relays: string[] | undefined): void => {
     applyState({
       entities: [
         ...new Set([
@@ -609,10 +618,17 @@ function AudienceChip(): JSX.Element | null {
           ...documentEntityTags(data.knowledgeDBs, document),
         ]),
       ],
-      relays: state?.relays,
+      relays,
       paused: false,
     });
   };
+
+  // An asset-tagged document offers both reaches: its pinned relay only
+  // (the default the v0 cheat routes to) or the user's write relays too —
+  // declared per document, so the choice rides the file.
+  const everyoneRelays = hasAssetEntity
+    ? [...new Set([...configuredOrDefault, ASSET_ENTITY_RELAY])]
+    : effective;
 
   // The capability a share link carries: the document's storage key in the
   // URL fragment — readable by anyone handed the link, discoverable by no
@@ -668,18 +684,38 @@ function AudienceChip(): JSX.Element | null {
             <div className="menu-item-text">Only me — encrypted</div>
           </Dropdown.Item>
           {secretLinkItem}
+          {hasAssetEntity && (
+            <Dropdown.Item
+              className="d-flex menu-item"
+              onClick={() => handlePublish(undefined)}
+              aria-label="publish to asset relays"
+              title={`Publish this document to ${destinationLabel([
+                ASSET_ENTITY_RELAY,
+              ])} — where holders read`}
+              tabIndex={0}
+            >
+              <span className="d-block dropdown-item-icon" aria-hidden="true">
+                ○
+              </span>
+              <div className="menu-item-text">Publish to Asset Relays</div>
+            </Dropdown.Item>
+          )}
           <Dropdown.Item
             className="d-flex menu-item"
-            onClick={handlePublish}
+            onClick={() =>
+              handlePublish(hasAssetEntity ? everyoneRelays : undefined)
+            }
             aria-label="publish document"
-            title={`Publish this document to ${effective.length} relays — visible to everyone`}
+            title={`Publish this document to ${destinationLabel(
+              everyoneRelays
+            )} — visible to everyone`}
             tabIndex={0}
           >
             <span className="d-block dropdown-item-icon" aria-hidden="true">
               ○
             </span>
             <div className="menu-item-text">
-              Everyone · {effective.length} relays
+              Everyone · {destinationLabel(everyoneRelays)}
             </div>
           </Dropdown.Item>
         </Dropdown.Menu>
@@ -707,7 +743,9 @@ function AudienceChip(): JSX.Element | null {
         }
         tabIndex={0}
       >
-        {state.paused ? "◌ paused" : `⦿ everyone · ${effective.length} relays`}
+        {state.paused
+          ? "◌ paused"
+          : `⦿ everyone · ${destinationLabel(effective)}`}
       </Dropdown.Toggle>
       <Dropdown.Menu>
         {secretLinkItem}

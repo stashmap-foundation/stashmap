@@ -1,13 +1,20 @@
-function isKnowstrDocumentIdPath(href: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(
-    href
-  );
-}
-
 export function isMarkdownPath(href: string): boolean {
   if (href.startsWith("#")) return false;
   if (/^[a-z][a-z0-9+.-]*:/i.test(href)) return false;
-  return /\.md$/i.test(href) || isKnowstrDocumentIdPath(href);
+  return /\.md$/i.test(href);
+}
+
+// The typed document reference: `doc:<docId>` in href position. The payload
+// is opaque; readers dispatch on the scheme, never on id shape.
+export function docLinkId(href: string): string | undefined {
+  return href.startsWith("doc:") ? href.slice("doc:".length) : undefined;
+}
+
+export function documentLinkHref(
+  docId: string,
+  filePath: string | undefined
+): string {
+  return filePath ?? `doc:${docId}`;
 }
 
 export function toPosixPath(p: string): string {
@@ -60,4 +67,11 @@ export function fileLinkIndexKey(
   normalizedPath: string
 ): string {
   return `${author}:${normalizedPath}`;
+}
+
+export function fileLinkIndexPath(
+  path: string,
+  sourceFilePath: string | undefined
+): string {
+  return docLinkId(path) ?? resolveLinkPath(path, sourceFilePath);
 }

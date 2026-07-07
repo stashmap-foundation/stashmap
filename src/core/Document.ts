@@ -2,6 +2,7 @@ import { Map as ImmutableMap } from "immutable";
 import { LOCAL } from "./nodeRef";
 import { getNode } from "./connections";
 import { ensureKnowstrDocId } from "./knowstrFrontmatter";
+import { documentLinkHref } from "./linkPath";
 import { MarkdownTreeNode, parseMarkdown } from "./markdownTree";
 import {
   MaterializeOptions,
@@ -115,7 +116,7 @@ export function documentDisplayName(document: Document): string {
 }
 
 export function documentLinkPath(document: Document): string {
-  return document.filePath ?? document.docId;
+  return documentLinkHref(document.docId, document.filePath);
 }
 
 export function createDocumentFromRootNode(rootNode: GraphNode): Document {

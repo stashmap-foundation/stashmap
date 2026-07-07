@@ -297,10 +297,8 @@ export function getDisplayTextForRow(data: Data, row: Row): string {
   if (row.renameSuggestion) {
     return `${row.renameSuggestion.mine} ${row.renameSuggestion.theirs}`;
   }
-  // A placement reads as the entry it places: the feed lends the current
-  // text when in reach; the stored label is the offline fallback.
-  if (row.calendarEntry?.liveText !== undefined) {
-    return row.calendarEntry.liveText;
+  if (row.standsFor?.liveText !== undefined) {
+    return row.standsFor.liveText;
   }
   // A version row's text IS its meta: date, author mark, diff counts.
   if (row.virtualType === "version" && row.versionMeta) {

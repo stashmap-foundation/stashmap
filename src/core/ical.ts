@@ -1,6 +1,5 @@
 /* eslint-disable functional/no-let, functional/immutable-data */
 import { icalEntryId } from "./icalId";
-import { getBlockLinkTarget } from "./nodeSpans";
 
 // Write-time recognition only: a pasted or typed bare feed URL gets
 // wrapped into the typed feed link. Read paths never sniff URLs.
@@ -314,21 +313,6 @@ export function icalEntryDisplayText(entry: IcalEntry): string {
 // no feed fetch to render pastness — the wallet applies the same rule.
 export function isCalendarEntryId(id: string): boolean {
   return id.startsWith("ical:");
-}
-
-// The entry a child stands for, both placement forms: a link row
-// targeting an `ical:` id (the placement law) or a node minted at the id
-// itself (legacy in-place materialization). The projection merge, the
-// past count, and entry-type rendering all match through this — a
-// placement's own uuid never means anything to the calendar.
-export function calendarEntryTargetOf(
-  node: GraphNode | undefined
-): string | undefined {
-  const target = getBlockLinkTarget(node);
-  if (target && isCalendarEntryId(target)) {
-    return target;
-  }
-  return node && isCalendarEntryId(node.id) ? node.id : undefined;
 }
 
 const ICAL_ROW_DATE_RE = /^(\d{2})\.(\d{2})\.(\d{4})/u;

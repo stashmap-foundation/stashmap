@@ -62,11 +62,6 @@ function sourceResolvedNode(
   );
 }
 
-// The feed is the fallback home (idea.md, machine feeds): an `ical:`
-// target with no minted node resolves through a reachable calendar
-// carrying the UID — the feed node opens scrolled to the projected
-// entry, the ordinary target-in-context presentation. Own calendars
-// win over other users'.
 function calendarEntryFallbackTarget(
   data: Data,
   targetID: ID

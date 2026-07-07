@@ -39,9 +39,8 @@ import {
 } from "../core/connections";
 import { isBlockLinkAny, nodeText } from "../core/nodeSpans";
 import { getBlockLink } from "../core/blockLink";
-import { ENTITY_SCHEME_RE } from "../core/entityRecognition";
+import { ENTITY_SCHEME_RE, canonicalTargetOf } from "../core/entityRecognition";
 import {
-  calendarEntryTargetOf,
   displayTextOf,
   hiddenPastEntryCount,
   icalFeedLinkPartsOf,
@@ -148,13 +147,11 @@ function PastDatesActionRow(): JSX.Element {
   const pastCount =
     entries && row.parentNode
       ? hiddenPastEntryCount(
-          // Children stand under their calendar identity: a placement
-          // counts as the entry it targets, never as its own uuid.
           row.parentNode.children
             .toArray()
             .map(
               (childId) =>
-                calendarEntryTargetOf(
+                canonicalTargetOf(
                   getNode(data.knowledgeDBs, childId, row.sourceId)
                 ) ?? childId
             ),
@@ -605,9 +602,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
   const handleSave = (text: string, submitted?: boolean): void => {
     // Write gestures take first; read gestures read. A computed row's
     // save materializes the row before the text lands — and an unchanged
-    // text writes nothing at all (blur/Escape must not take). The take
-    // may land as a placement (a link row with its own id), so everything
-    // downstream works on the node the take returns.
+    // text writes nothing at all (blur/Escape must not take).
     const takeResult = ((): [Plan, GraphNode, ViewPath] | undefined => {
       if (!row.materialize) {
         return [createPlan(), currentNode, viewPath];
@@ -715,9 +710,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
 
     if (isEmptyNode) {
       if (!prevSibling || !parentPath) return;
-      // Indenting onto a computed row takes it first. The take may land
-      // as a placement (a link row with its own id), so the indent
-      // target is the node the take returns, never the computed row's id.
+      // Indenting onto a computed row takes it first.
       const [planMaterialized, takenPrevSibling] = planMaterializeComputedRow(
         basePlan,
         prevSibling
@@ -986,8 +979,6 @@ function NodeAutoLink({
       ? undefined
       : getBlockLink(row.node, row.sourceId);
   if (blockLink) {
-    // Fetched feeds ride along so a dangling ical: target can resolve
-    // through the calendar carrying it.
     const href = linkToHref(
       { ...data, calendarFeeds },
       blockLink,

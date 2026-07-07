@@ -14,8 +14,8 @@ import {
   documentKeyOf,
   workspaceDocumentKey,
 } from "./Document";
-import { entityIdForText } from "./entityRecognition";
-import { icalFeedLinkText, isBareIcalFeedUrl, isCalendarEntryId } from "./ical";
+import { entityIdForText, isCanonicalId } from "./entityRecognition";
+import { icalFeedLinkText, isBareIcalFeedUrl } from "./ical";
 import { documentLinkHref } from "./linkPath";
 import { getWorkspaceNode, withWorkspace, workspaceOf } from "./knowledge";
 import {
@@ -625,8 +625,6 @@ export function planMaterializeComputedRow<T extends GraphPlan>(
   if (!parentNode) {
     return [plan, row.node, false];
   }
-  // Already here — as the node itself or as a placement targeting it
-  // (a placement's own uuid never matches, so match through the link).
   const placedChildId = parentNode.children.find((childId) => {
     if (childId === row.node.id) {
       return true;
@@ -653,11 +651,7 @@ export function planMaterializeComputedRow<T extends GraphPlan>(
     const takenNode = getWorkspaceNode(planWithTake.knowledgeDBs, ids[0]);
     return [planWithTake, takenNode ?? row.node, true];
   }
-  // A canonical id never mints under a parent (idea.md, mint or link):
-  // the take lays down a placement — a link row targeting the id, its
-  // label the entry's projected text — and the gesture applies to the
-  // placement. Judgment at a placement is placement-local.
-  if (isCalendarEntryId(row.node.id)) {
+  if (isCanonicalId(row.node.id)) {
     const [planWithPlacement, ids] = planAddTargetsToNode(
       plan,
       parentID,

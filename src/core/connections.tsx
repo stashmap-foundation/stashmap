@@ -210,10 +210,6 @@ export function getNodeStack(
   ];
 }
 
-// The breadcrumb label used as persisted link text: every segment in
-// display form. A calendar feed's raw text is a markdown link carrying
-// the feed URL — verbatim inside link text it nests links and makes the
-// new row read as the calendar itself.
 export function nodePathLabel(
   knowledgeDBs: KnowledgeDBs,
   node: GraphNode,

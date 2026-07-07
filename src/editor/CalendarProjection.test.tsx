@@ -307,9 +307,6 @@ Salon
       ${dunbarText()}
   `);
 
-  // Write a different note under the same entry in each context. Every
-  // take is its own placement (a link row targeting the one canonical
-  // id) — never a second body, never a pointer into the other context.
   const editors = await screen.findAllByLabelText("edit 14.07.2030 Sommerfest");
   await userEvent.click(editors[0]);
   await userEvent.keyboard("{Enter}{Tab}Meine Notiz{Escape}");
@@ -324,17 +321,17 @@ Salon
   https://scholarium.at/salon.ics
     14.07.2030 Sommerfest
       Meine Notiz
+      [I] Salon / Studium / https://scholarium.at/salon.ics ↩
     ${dunbarText()}
   Studium
     https://scholarium.at/salon.ics
       14.07.2030 Sommerfest
         Andere Notiz
+        [I] Salon / https://scholarium.at/salon.ics ↩
       ${dunbarText()}
   `;
   await expectTree(expected);
 
-  // File truth round-trips: two placements of one entry id, each with
-  // its local note.
   cleanup();
   renderApp({ ...alice(), fetchCalendarFeed: () => Promise.resolve(FEED) });
   await expectTree(expected);
@@ -355,9 +352,6 @@ test("following a dangling entry link opens the carrying calendar at the entry",
   );
   await altDragTextOnto(dunbarText(), "Notes");
 
-  // No minted node anywhere carries the ical: id — the link resolves
-  // through the feed that carries the UID: the calendar opens as root,
-  // scrolled to the projected entry.
   await userEvent.click(
     await screen.findByLabelText(
       `Navigate to Salon / https://scholarium.at/salon.ics / ${dunbarText()}`
@@ -387,9 +381,6 @@ test("cross-pane drag of an entry lays down a link row, never a copy", async () 
   await navigateToNodeViaSearch(1, "Notes");
   await openNodeInFullscreen(1, "Notes");
 
-  // A plain cross-pane drag deep-copies ordinary rows — but a canonical
-  // id never copies into a second body: the appearance in the other
-  // pane is a link row targeting the one entry id.
   const source = screen.getAllByText(dunbarText())[0];
   const notesItems = screen.getAllByRole("treeitem", { name: "Notes" });
   const target = notesItems[notesItems.length - 1];
@@ -408,6 +399,43 @@ Notes
   `);
 });
 
+test("a placed entry keeps its backlinks", async () => {
+  const [alice] = setup([ALICE]);
+  renderApp({
+    ...alice(),
+    fetchCalendarFeed: () => Promise.resolve(FEED),
+  });
+
+  await type(
+    "Salon{Enter}{Tab}https://scholarium.at/salon.ics{Enter}{Shift>}{Tab}{/Shift}Was ist cool{Escape}"
+  );
+  await userEvent.click(
+    await screen.findByLabelText("expand https://scholarium.at/salon.ics")
+  );
+  await userEvent.click(
+    await screen.findByLabelText("edit 14.07.2030 Sommerfest")
+  );
+  await userEvent.keyboard("{Enter}{Tab}Meine Notiz{Escape}");
+
+  await altDragTextOnto("14.07.2030 Sommerfest", "Was ist cool");
+  await altDragTextOnto(dunbarText(), "Was ist cool");
+
+  await userEvent.click(await screen.findByLabelText(`expand ${dunbarText()}`));
+
+  await expectTree(`
+Salon
+  https://scholarium.at/salon.ics
+    14.07.2030 Sommerfest
+      Meine Notiz
+      [I] Salon ↩
+    ${dunbarText()}
+      [I] Salon ↩
+  Was ist cool
+  [R] Salon / https://scholarium.at/salon.ics / ${dunbarText()}
+  [R] 14.07.2030 Sommerfest
+  `);
+});
+
 test("alt-drag references an entry: clean label, canonical target, dangling allowed", async () => {
   const [alice] = setup([ALICE]);
   renderApp({
@@ -415,8 +443,6 @@ test("alt-drag references an entry: clean label, canonical target, dangling allo
     fetchCalendarFeed: () => Promise.resolve(FEED),
   });
 
-  // The feed-as-link calendar: the raw markdown link form lives in the
-  // file; every read path shows the label.
   await type(
     "Salon{Enter}{Tab}https://scholarium.at/salon.ics{Enter}Notes{Escape}"
   );
@@ -437,11 +463,6 @@ Salon
   Notes
   `);
 
-  // Alt-drag a still-projected entry into Notes: a reference — dangling
-  // allowed, nothing materialized anywhere. The label is the breadcrumb
-  // in display form: the calendar reads by its label, never as raw link
-  // markdown, so the new row neither nests links nor carries the feed
-  // URL (which would make it read as the calendar itself).
   await altDragTextOnto(dunbarText(), "Notes");
 
   await expectTree(`
@@ -453,8 +474,6 @@ Salon
   [R] Salon / Kalender Studium / ${dunbarText()}
   `);
 
-  // The persisted form survives the file round-trip: reload parses the
-  // link back rather than tripping over nested markdown.
   cleanup();
   renderApp({ ...alice(), fetchCalendarFeed: () => Promise.resolve(FEED) });
   await expectTree(`

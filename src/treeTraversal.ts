@@ -35,12 +35,12 @@ import {
 } from "./core/nodeSpans";
 import {
   IcalEntry,
-  calendarEntryTargetOf,
   hiddenPastEntryCount,
   icalEntryDisplayText,
   icalFeedUrlOf,
   mergeProjectedEntries,
 } from "./core/ical";
+import { canonicalTargetOf } from "./core/entityRecognition";
 import {
   documentKeyOf,
   documentLinkPath,
@@ -548,6 +548,15 @@ function createVirtualRow(
         relevance: inherited?.relevance,
         argument: inherited?.argument,
       },
+      ...(input.parentRow?.materialize
+        ? {
+            host: {
+              node: input.parentRow.node,
+              parentRef: input.parentRow.parentRef,
+              materialize: input.parentRow.materialize,
+            },
+          }
+        : {}),
     },
   };
 }
@@ -645,8 +654,6 @@ function interleaveProjectionRows(
   childRows: List<Row>,
   typeFilters: Pane["typeFilters"]
 ): { rows: List<Row>; actionRow?: Row } {
-  // A link row's text is a label for its target, not own content — a
-  // feed URL inside it never makes the link row the calendar.
   const feedUrl = isBlockLinkAny(parentNode)
     ? undefined
     : icalFeedUrlOf(nodeText(parentNode));
@@ -655,11 +662,6 @@ function interleaveProjectionRows(
     return { rows: childRows };
   }
   const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
-  // A child stands in the merge under its calendar identity: the entry
-  // id of the placement it is (matched through the link target — every
-  // placement's own uuid is fresh), or its own id. First placement of an
-  // entry wins the identity; further links to the same entry stay
-  // ordinary children.
   const childKeys = parentNode.children.toArray().reduce<{
     keys: ID[];
     childIdByKey: globalThis.Map<ID, ID>;
@@ -669,7 +671,7 @@ function interleaveProjectionRows(
         sourceId: parentSourceId,
         id: childId,
       })?.node;
-      const entryId = calendarEntryTargetOf(childNode) as ID | undefined;
+      const entryId = canonicalTargetOf(childNode) as ID | undefined;
       const key =
         entryId !== undefined && !acc.childIdByKey.has(entryId)
           ? entryId
@@ -727,17 +729,14 @@ function interleaveProjectionRows(
       const childId = childKeys.childIdByKey.get(item.childId as ID);
       const row =
         childId !== undefined ? rowsByChildId.get(childId) : undefined;
-      // A placement renders as the entry it places: label (or the feed's
-      // current text) instead of the reference presentation —
-      // materialization must be invisible.
       const entry = entriesById.get(item.childId as ID);
       const placementRow =
         row && item.childId !== childId
           ? {
               ...row,
               reference: undefined,
-              calendarEntry: {
-                entryId: item.childId as ID,
+              standsFor: {
+                id: item.childId as ID,
                 liveText: entry ? icalEntryDisplayText(entry) : undefined,
               },
             }
@@ -971,13 +970,13 @@ function getChildrenForRegularNode(
     graph,
     visibleAuthors,
     containingNodeID,
-    nodes.id,
+    parentRow.standsFor?.id ?? nodes.id,
     author,
     nodeSourceId,
     allChildNodes,
     undefined,
     data.documents
-  );
+  ).filter((ref) => ref.id !== nodes.id);
 
   const visibleIncomingCrefs = activeFilters.includes("incoming")
     ? incomingCrefs
@@ -1097,7 +1096,7 @@ function hasHiddenPastEntries(
     .toArray()
     .map(
       (childId) =>
-        calendarEntryTargetOf(
+        canonicalTargetOf(
           getNodeInSource(graph, { sourceId, id: childId })?.node
         ) ?? childId
     );

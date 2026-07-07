@@ -240,9 +240,7 @@ export function planBatchIndent(
   const prevSibling = getPreviousSiblingFromRows(orderedRows, firstRow);
   if (!prevSibling) return undefined;
 
-  // Indenting onto a computed row takes it first. The take may land as a
-  // placement (a link row with its own id), so the indent target is the
-  // node the take returns, never the computed row's id.
+  // Indenting onto a computed row takes it first.
   const [planMaterialized, takenPrevSibling] = planMaterializeComputedRow(
     plan,
     prevSibling

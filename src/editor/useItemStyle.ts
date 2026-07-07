@@ -50,19 +50,15 @@ export function useItemStyle(): ItemStyle {
   const currentRow = row.node;
   const { virtualType } = row;
   // Node-type rendering (like violet for entities): a calendar entry with
-  // a past date dims — derived from the row's own id or its link target
-  // plus the displayed text, so file rows render correctly with no feed
-  // fetch. An explicit judgment un-dims: deliberate emphasis beats
-  // default de-emphasis.
-  const isCalendarEntryRow =
-    !!currentRow &&
-    (isCalendarEntryId(currentRow.id) || row.calendarEntry !== undefined);
+  // a past date dims — derived from the row's own id and text, so file
+  // rows render correctly with no feed fetch. An explicit judgment
+  // un-dims: deliberate emphasis beats default de-emphasis.
   const isPastCalendarRow =
-    isCalendarEntryRow &&
     !!currentRow &&
+    isCalendarEntryId(row.standsFor?.id ?? currentRow.id) &&
     currentRow.relevance === undefined &&
     isPastCalendarRowText(
-      row.calendarEntry?.liveText ?? nodeText(currentRow),
+      row.standsFor?.liveText ?? nodeText(currentRow),
       Date.now()
     );
 
@@ -106,11 +102,9 @@ export function useItemStyle(): ItemStyle {
   const argument = currentRow?.argument;
   const normalizedRelevance =
     relevance === ("" as string) ? undefined : relevance;
-  // A placement is the entry, not a reference — no link italics
-  // (materialization must be invisible).
   const isOutgoingRef =
     (isRefNode(currentRow) || isBlockFileLink(currentRow)) &&
-    row.calendarEntry === undefined;
+    row.standsFor === undefined;
   // Violet means entity — the node itself carries a canonical entity id
   // (an entity home's root). Links to entities get theirs via linkStyle.
   const isEntityNode = !!currentRow && ENTITY_SCHEME_RE.test(currentRow.id);

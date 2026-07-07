@@ -14,8 +14,8 @@ import {
   documentKeyOf,
   workspaceDocumentKey,
 } from "./Document";
-import { entityIdForText } from "./entityRecognition";
-import { icalFeedLinkText, isBareIcalFeedUrl, isCalendarEntryId } from "./ical";
+import { entityIdForText, isCanonicalId } from "./entityRecognition";
+import { icalFeedLinkText, isBareIcalFeedUrl } from "./ical";
 import { documentLinkHref } from "./linkPath";
 import { getWorkspaceNode, withWorkspace, workspaceOf } from "./knowledge";
 import {
@@ -589,6 +589,9 @@ export type MaterializableRow = {
     // Judgment defaults inherited from the proposal's source, applied
     // when the gesture carries none.
     defaults?: { relevance?: Relevance; argument?: Argument };
+    // The row's parent when that parent is itself computed: the take
+    // materializes the host first, then lands under what it returns.
+    host?: MaterializableRow;
   };
 };
 
@@ -623,10 +626,19 @@ export function planMaterializeComputedRow<T extends GraphPlan>(
   }
   const parentNode = getWorkspaceNode(plan.knowledgeDBs, parentID);
   if (!parentNode) {
-    return [plan, row.node, false];
+    const { host } = row.materialize;
+    if (!host) {
+      return [plan, row.node, false];
+    }
+    const [planWithHost, hostNode] = planMaterializeComputedRow(plan, host);
+    if (!getWorkspaceNode(planWithHost.knowledgeDBs, hostNode.id)) {
+      return [plan, row.node, false];
+    }
+    return planMaterializeComputedRow(planWithHost, row, metadata, {
+      parentID: hostNode.id,
+      insertIndex: placement?.insertIndex,
+    });
   }
-  // Already here — as the node itself or as a placement targeting it
-  // (a placement's own uuid never matches, so match through the link).
   const placedChildId = parentNode.children.find((childId) => {
     if (childId === row.node.id) {
       return true;
@@ -653,11 +665,7 @@ export function planMaterializeComputedRow<T extends GraphPlan>(
     const takenNode = getWorkspaceNode(planWithTake.knowledgeDBs, ids[0]);
     return [planWithTake, takenNode ?? row.node, true];
   }
-  // A canonical id never mints under a parent (idea.md, mint or link):
-  // the take lays down a placement — a link row targeting the id, its
-  // label the entry's projected text — and the gesture applies to the
-  // placement. Judgment at a placement is placement-local.
-  if (isCalendarEntryId(row.node.id)) {
+  if (isCanonicalId(row.node.id)) {
     const [planWithPlacement, ids] = planAddTargetsToNode(
       plan,
       parentID,

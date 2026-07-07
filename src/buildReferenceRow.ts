@@ -6,8 +6,8 @@ import {
   itemPassesFilters,
   getSemanticID,
 } from "./core/connections";
-import { ENTITY_SCHEME_RE } from "./core/entityRecognition";
-import { displayTextOf, isCalendarEntryId } from "./core/ical";
+import { isCanonicalId } from "./core/entityRecognition";
+import { displayTextOf } from "./core/ical";
 import {
   getBlockLinkTarget,
   getBlockLinkText,
@@ -631,13 +631,9 @@ export function buildReferenceItem(
       ? lookupNode(graph, refId, sourceId)?.node
       : undefined;
     const entityTarget = getBlockLinkTarget(parentItem);
-    if (
-      entityTarget &&
-      (ENTITY_SCHEME_RE.test(entityTarget) || isCalendarEntryId(entityTarget))
-    ) {
-      // A dangling canonical-id link — entity or calendar entry: no home
-      // page is the ordinary state, never deletion (idea.md: "dangling
-      // allowed, no page"). Renders as plain link text.
+    if (entityTarget && isCanonicalId(entityTarget)) {
+      // A dangling canonical-id link: no home page is its ordinary state
+      // — never deletion (idea.md: "dangling allowed, no page").
       const linkText = getBlockLinkText(parentItem) ?? entityTarget;
       return {
         id: refId,

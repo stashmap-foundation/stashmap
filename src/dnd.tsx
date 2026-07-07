@@ -630,8 +630,6 @@ export function dnd(
     }
 
     const deepCopySource = resolveDeepCopySource(accPlan, sourceRow);
-    // A canonical id never copies into a second body (idea.md, mint or
-    // link, never duplicate): a further appearance is another link row.
     if (isCanonicalId(deepCopySource.node.id)) {
       return planAddToParent(
         accPlan,

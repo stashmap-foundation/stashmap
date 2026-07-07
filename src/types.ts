@@ -230,12 +230,9 @@ declare global {
       precededBy: ID[];
       take?: AddToParentTarget;
       defaults?: { relevance?: Relevance; argument?: Argument };
+      host?: Pick<Row, "node" | "parentRef" | "materialize">;
     };
-    // A placement of a projected calendar entry: a link-row child of the
-    // carrying feed, matched through its link target. Display prefers the
-    // feed's current text when the feed is in reach (the feed lends the
-    // entry); the stored label is the offline fallback.
-    calendarEntry?: { entryId: ID; liveText?: string };
+    standsFor?: { id: ID; liveText?: string };
     isFirstVirtual: boolean;
     virtualType: "suggestion" | "search" | "incoming" | "version" | undefined;
     // The action row: a button in row position, obviously not content.

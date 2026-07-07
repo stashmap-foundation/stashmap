@@ -792,7 +792,12 @@ function depositEventFor(
   const publishState = publishStateOf(write.document.frontMatter);
   return publishState && !publishState.paused
     ? ({
-        ...buildDepositEvent(write.document, pubkey, write.content),
+        ...buildDepositEvent(
+          write.document,
+          pubkey,
+          write.content,
+          plan.knowledgeDBs.get(LOCAL)?.nodes
+        ),
         writeRelayConf: depositWriteRelayConf(
           write.document,
           plan.relays.userRelays

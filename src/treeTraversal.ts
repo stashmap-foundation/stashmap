@@ -964,7 +964,13 @@ function getChildrenForRegularNode(
   );
 
   const containingNodeID = parentRow.parentNode?.id;
-  const visibleAuthors = ImmutableSet<SourceId>([LOCAL, author, nodeSourceId]);
+  // Pulled deposit authors are deliberately visible: pull follows
+  // attention, so what arrived was asked for (CP4).
+  const visibleAuthors = ImmutableSet<SourceId>([
+    LOCAL,
+    author,
+    nodeSourceId,
+  ]).union(ImmutableSet<SourceId>(data.pulledAuthors ?? []));
 
   const incomingCrefs = getIncomingCrefsForNode(
     graph,

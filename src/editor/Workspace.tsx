@@ -28,6 +28,7 @@ import {
 } from "../SplitPanesContext";
 import { useNavigationState } from "../NavigationStateContext";
 import { usePaneHistory } from "../PaneHistoryContext";
+import { PaneAttentionPull } from "../attentionPull";
 import {
   PaneTreeResultProvider,
   TreeView,
@@ -1930,6 +1931,7 @@ export function PaneView(): JSX.Element | null {
   return (
     <TemporaryViewProvider>
       <PaneTreeResultProvider>
+        <PaneAttentionPull />
         <PaneViewInner />
       </PaneTreeResultProvider>
     </TemporaryViewProvider>

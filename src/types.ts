@@ -170,6 +170,9 @@ declare global {
 
     views: Views;
     panes: Pane[];
+    // Authors of attention-pulled deposits (CP4): their versions and
+    // suggestions are deliberately visible — pulled is chosen.
+    pulledAuthors?: ReadonlyArray<SourceId>;
   };
 
   type LocalStorage = {

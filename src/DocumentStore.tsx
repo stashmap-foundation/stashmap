@@ -13,7 +13,14 @@ import {
   createEmptyGraphIndex,
   removeNodesFromGraphIndex,
 } from "./graphIndex";
-import { eventToParsed, eventToDocumentDelete } from "./nostrEvents";
+import {
+  depositToParsed,
+  eventToParsed,
+  eventToDocumentDelete,
+  findTag,
+} from "./nostrEvents";
+import { KIND_KNOWLEDGE_DEPOSIT } from "./nostr";
+import { snapshotIdForContent } from "./nodesDocumentEvent";
 import {
   Document,
   DocumentDelete,
@@ -48,6 +55,10 @@ type DocumentStoreState = {
   upsertDocument: (parsed: ParsedDocument) => void;
   deleteDocument: (del: DocumentDelete) => void;
   addEvents: (events: ImmutableMap<string, Event | UnsignedEvent>) => void;
+  // Attention-pulled deposits (34774): read-only foreign sources keyed by
+  // event coordinate, replaceable per (pubkey, d), in-memory only.
+  addDepositEvents: (events: ReadonlyArray<Event | UnsignedEvent>) => void;
+  pulledAuthors: ReadonlyArray<SourceId>;
   addSnapshotContents: (snapshots: ReadonlyArray<SnapshotContent>) => void;
 };
 
@@ -355,11 +366,75 @@ export function DocumentStoreProvider({
     [localPubkey]
   );
 
+  const [depositEvents, setDepositEvents] = React.useState(
+    ImmutableMap<string, Event | UnsignedEvent>()
+  );
+
+  const addDepositEvents = React.useCallback(
+    (events: ReadonlyArray<Event | UnsignedEvent>) => {
+      setDepositEvents((prev) =>
+        events.reduce((acc, event) => {
+          if (event.kind !== KIND_KNOWLEDGE_DEPOSIT) {
+            return acc;
+          }
+          const dTag = findTag(event, "d");
+          if (!dTag) {
+            return acc;
+          }
+          const coordinate = `${event.pubkey}:${dTag}`;
+          const existing = acc.get(coordinate);
+          return existing && existing.created_at >= event.created_at
+            ? acc
+            : acc.set(coordinate, event);
+        }, prev)
+      );
+    },
+    []
+  );
+
+  // First-observation baselines: a deposit's content hashes to its
+  // snapshot id by construction — the baseline a later take stamps.
+  React.useEffect(() => {
+    setSnapshotNodes((prev) =>
+      depositEvents.reduce((acc, event) => {
+        const snapshotId = snapshotIdForContent(event.content);
+        return acc.has(snapshotId)
+          ? acc
+          : acc.set(
+              snapshotId,
+              materializeSnapshotContent(snapshotId, event.content)
+            );
+      }, prev)
+    );
+  }, [depositEvents]);
+
+  const pulledAuthors = React.useMemo(
+    () =>
+      [
+        ...new Set(
+          depositEvents
+            .valueSeq()
+            .toArray()
+            .map((event) => event.pubkey as SourceId)
+        ),
+      ].sort(),
+    [depositEvents]
+  );
+
   const activeSnapshot = React.useMemo(() => {
     const eventList = unpublishedEvents.toArray();
     const { records, deletes } = eventsToParsed(eventList, localPubkey);
-    return applyRecordsToSnapshot(snapshot, records, deletes);
-  }, [snapshot, unpublishedEvents, localPubkey]);
+    const depositRecords = depositEvents
+      .valueSeq()
+      .toArray()
+      .map(depositToParsed)
+      .filter((record): record is ParsedDocument => record !== undefined);
+    return applyRecordsToSnapshot(
+      snapshot,
+      [...records, ...depositRecords],
+      deletes
+    );
+  }, [snapshot, unpublishedEvents, localPubkey, depositEvents]);
 
   React.useEffect(() => {
     setSnapshotNodes((prev) =>
@@ -384,6 +459,8 @@ export function DocumentStoreProvider({
       deleteDocument,
       addEvents,
       addSnapshotContents,
+      addDepositEvents,
+      pulledAuthors,
     }),
     [
       activeSnapshot,
@@ -391,6 +468,8 @@ export function DocumentStoreProvider({
       deleteDocument,
       addEvents,
       addSnapshotContents,
+      addDepositEvents,
+      pulledAuthors,
       snapshotNodes,
     ]
   );
@@ -421,6 +500,10 @@ export function useDocumentSnapshotNodes(): SnapshotNodes {
   return (
     React.useContext(DocumentStoreContext)?.snapshotNodes || ImmutableMap()
   );
+}
+
+export function useDocumentPulledAuthors(): ReadonlyArray<SourceId> {
+  return React.useContext(DocumentStoreContext)?.pulledAuthors ?? [];
 }
 
 export function useDocuments(): ImmutableMap<string, Document> {

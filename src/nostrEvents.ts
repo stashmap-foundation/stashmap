@@ -2,7 +2,11 @@ import { Collection, List } from "immutable";
 import { Event, EventTemplate, Filter, UnsignedEvent } from "nostr-tools";
 import type { DocumentDelete, ParsedDocument } from "./core/Document";
 import { parseToDocument } from "./core/Document";
-import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "./nostr";
+import {
+  KIND_DELETE,
+  KIND_KNOWLEDGE_DOCUMENT,
+  KIND_KNOWLEDGE_DEPOSIT,
+} from "./nostr";
 
 export function findAllTags(
   event: EventTemplate,
@@ -88,6 +92,23 @@ export function eventToParsed(
     document: storageKey ? { ...parsed.document, storageKey } : parsed.document,
     nodes: parsed.nodes,
   };
+}
+
+// A deposit (34774) is a published document: plaintext markdown, entity
+// S-tags for routing, replaceable per (pubkey, d). Parsed exactly like a
+// document event, under the depositor's own source id — a read-only
+// foreign source, never merged with anyone else's.
+export function depositToParsed(
+  event: Event | UnsignedEvent
+): ParsedDocument | undefined {
+  if (event.kind !== KIND_KNOWLEDGE_DEPOSIT) return undefined;
+  const dTag = findTag(event, "d");
+  if (!dTag) return undefined;
+  const parsed = parseToDocument(event.pubkey as PublicKey, event.content, {
+    updatedMsOverride: getEventMs(event),
+    docIdFallback: dTag,
+  });
+  return { document: parsed.document, nodes: parsed.nodes };
 }
 
 export function eventToDocumentDelete(

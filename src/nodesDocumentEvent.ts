@@ -1,4 +1,5 @@
 import { UnsignedEvent } from "nostr-tools";
+import type { Map as ImmutableMap } from "immutable";
 import { sha256 } from "@noble/hashes/sha256";
 import { bytesToHex } from "@noble/hashes/utils";
 import type { Document } from "./core/Document";
@@ -53,9 +54,50 @@ export function buildDocumentEvent(
 // The S set is {own roots} ∪ knowstr_publish.entities (interop rule: tags
 // and content sit inside one signature and MUST agree). Roots stay implicit
 // in the frontmatter; entities is the carried record of granted audiences.
-export function depositEntityTags(document: Document): string[] {
+const ENTITY_ID_PATTERN = /^(wd|asset|ical):/;
+
+// The real-world entities a document references: every wd:/asset:/ical:
+// link target reachable from its roots, block or inline. These join the
+// deposit's S-tags — the wire spec's "entities" — so two strangers
+// referencing the same entity rendezvous through it.
+export function referencedEntityIds(
+  nodes: ImmutableMap<string, GraphNode> | undefined,
+  topNodeShortIds: ReadonlyArray<string>
+): string[] {
+  if (!nodes) return [];
+  const seen = new Set<string>();
+  const linked = new Set<string>();
+  const visit = (id: string): void => {
+    if (seen.has(id)) return;
+    seen.add(id);
+    const node = nodes.get(id);
+    if (!node) return;
+    node.spans.forEach((span) => {
+      if (
+        span.kind === "link" &&
+        ENTITY_ID_PATTERN.test(String(span.targetID))
+      ) {
+        linked.add(String(span.targetID));
+      }
+    });
+    node.children.forEach((childId) => visit(String(childId)));
+  };
+  topNodeShortIds.forEach(visit);
+  return [...linked];
+}
+
+export function depositEntityTags(
+  document: Document,
+  nodes?: ImmutableMap<string, GraphNode>
+): string[] {
   const entities = publishStateOf(document.frontMatter)?.entities ?? [];
-  return [...new Set([...document.topNodeShortIds, ...entities])];
+  return [
+    ...new Set([
+      ...document.topNodeShortIds,
+      ...entities,
+      ...referencedEntityIds(nodes, document.topNodeShortIds),
+    ]),
+  ];
 }
 
 // Whether any tag involves an asset entity. Ladder rungs are space-joined
@@ -70,7 +112,8 @@ export function hasAssetEntityTag(tags: string[]): boolean {
 export function buildDepositEvent(
   document: Document,
   pubkey: PublicKey,
-  content: string
+  content: string,
+  nodes?: ImmutableMap<string, GraphNode>
 ): UnsignedEvent {
   const systemRoleTags = document.systemRole
     ? ([["s", document.systemRole]] as string[][])
@@ -81,7 +124,7 @@ export function buildDepositEvent(
     created_at: newTimestamp(),
     tags: [
       ["d", document.docId],
-      ...depositEntityTags(document).map((id) => ["S", id]),
+      ...depositEntityTags(document, nodes).map((id) => ["S", id]),
       ...systemRoleTags,
       msTag(),
     ],

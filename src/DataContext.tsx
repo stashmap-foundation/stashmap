@@ -9,6 +9,7 @@ import {
   useDocumentSnapshotNodes,
   useDocuments,
   useDocumentByFilePath,
+  useDocumentPulledAuthors,
 } from "./DocumentStore";
 
 export type DataContextProps = Data;
@@ -71,6 +72,7 @@ export function MergeKnowledgeDB({
   const snapshotNodes = useDocumentSnapshotNodes();
   const documents = useDocuments();
   const documentByFilePath = useDocumentByFilePath();
+  const pulledAuthors = useDocumentPulledAuthors();
   const mergedDataDBs = mergeKnowledgeDBs(data.knowledgeDBs, documentDBs);
   const baseDBs = knowledgeDBs
     ? mergeKnowledgeDBs(knowledgeDBs, mergedDataDBs)
@@ -91,6 +93,7 @@ export function MergeKnowledgeDB({
         snapshotNodes,
         documents,
         documentByFilePath,
+        pulledAuthors,
       }}
     >
       {children}

@@ -1,7 +1,11 @@
 import { CSSProperties } from "react";
 import { useIsViewingOtherUserContent, useRow } from "../rowModel";
 import { isRefNode } from "../core/connections";
-import { isBlockFileLink, nodeText } from "../core/nodeSpans";
+import {
+  getBlockLinkTarget,
+  isBlockFileLink,
+  nodeText,
+} from "../core/nodeSpans";
 import { ENTITY_SCHEME_RE } from "../core/entityRecognition";
 import { TYPE_COLORS } from "../core/constants";
 import { isCalendarEntryId, isPastCalendarRowText } from "../core/ical";
@@ -111,9 +115,14 @@ export function useItemStyle(): ItemStyle {
   const isOutgoingRef =
     (isRefNode(currentRow) || isBlockFileLink(currentRow)) &&
     row.calendarEntry === undefined;
-  // Violet means entity — the node itself carries a canonical entity id
-  // (an entity home's root). Links to entities get theirs via linkStyle.
-  const isEntityNode = !!currentRow && ENTITY_SCHEME_RE.test(currentRow.id);
+  // Violet means entity — the row's own id or its link target carries a
+  // canonical entity id (the violet law). The row-level color makes the
+  // dangling state violet too: recognition feedback fires the moment
+  // mint-or-link does, home page or not.
+  const isEntityNode =
+    !!currentRow &&
+    (ENTITY_SCHEME_RE.test(currentRow.id) ||
+      ENTITY_SCHEME_RE.test(getBlockLinkTarget(currentRow) ?? ""));
 
   return {
     cardStyle: {},

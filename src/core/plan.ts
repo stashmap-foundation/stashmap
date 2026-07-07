@@ -693,6 +693,19 @@ export function planMaterializeComputedRow<T extends GraphPlan>(
 // my pure original does a pin land on my own node instead; a chained
 // fork (basedOn present) can never carry a pin — its snapshot attr is
 // its own edge's stamp — so that case is honestly unrepresentable.
+export function planTakeRenameSuggestion<T extends GraphPlan>(
+  plan: T,
+  row: Pick<Row, "renameSuggestion" | "parentNode">
+): T | undefined {
+  if (!row.renameSuggestion || !row.parentNode) {
+    return undefined;
+  }
+  return planUpsertNodes(plan, {
+    ...row.parentNode,
+    spans: plainSpans(row.renameSuggestion.theirs),
+  });
+}
+
 export function planResolveRenameSuggestion<T extends GraphPlan>(
   plan: T,
   row: Pick<Row, "renameSuggestion" | "parentNode">,
@@ -705,10 +718,10 @@ export function planResolveRenameSuggestion<T extends GraphPlan>(
   const { theirs, versionId, snapshotId, baselineNodeId } =
     row.renameSuggestion;
   if (metadata.relevance !== "not_relevant") {
-    return planUpsertNodes(plan, {
-      ...target,
-      spans: plainSpans(theirs),
-    });
+    // Judgments are not acceptance on a replacement-shaped row — the
+    // question is "theirs or mine?", not "how relevant?". Taking is its
+    // own verb (Enter / the checkmark); everything but x is inert.
+    return plan;
   }
   const snapshotMap = plan.snapshotNodes.get(snapshotId);
   if (!snapshotMap) {

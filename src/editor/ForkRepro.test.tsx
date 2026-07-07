@@ -171,7 +171,7 @@ test("CP4.1: taking the rename replaces my text with theirs", async () => {
   await userEvent.click(screen.getAllByLabelText("edit Art Nouveau")[0]);
   await userEvent.keyboard("{Control>}a{/Control}Jugendstil{Escape}");
 
-  // Take: any non-x judgment on the rename row adopts their text.
+  // Judgments are not acceptance on a replacement-shaped row: ! is inert.
   await clickRow("Art Nouveau Jugendstil");
   await userEvent.keyboard("!");
   await expectTree(`
@@ -179,7 +179,110 @@ Architecture
   Jugendstil
     Barcelona
 My Hobbies
+  Art Nouveau
+    Barcelona
+    [S] Art Nouveau Jugendstil
+  `);
+
+  // Enter is the take key: my text becomes theirs.
+  await clickRow("Art Nouveau Jugendstil");
+  await userEvent.keyboard("{Enter}");
+  await expectTree(`
+Architecture
   Jugendstil
+    Barcelona
+My Hobbies
+  Jugendstil
+    Barcelona
+  `);
+});
+
+test("CP4.1: the checkmark takes, the selector x dismisses", async () => {
+  const [alice] = setup([ALICE]);
+  renderApp(alice());
+
+  await type(
+    "Architecture{Enter}{Tab}Art Nouveau{Enter}{Tab}Barcelona{Escape}"
+  );
+  await userEvent.click(await screen.findByLabelText("Create new note"));
+  await type("My Hobbies{Escape}");
+
+  await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+  await navigateToNodeViaSearch(0, "Architecture");
+
+  const hobbyItems = screen.getAllByRole("treeitem", { name: "My Hobbies" });
+  fireEvent.dragStart(screen.getAllByText("Art Nouveau")[0]);
+  fireEvent.dragOver(hobbyItems[hobbyItems.length - 1]);
+  fireEvent.drop(hobbyItems[hobbyItems.length - 1]);
+
+  await userEvent.click(screen.getAllByLabelText("edit Art Nouveau")[0]);
+  await userEvent.keyboard("{Control>}a{/Control}Jugendstil{Escape}");
+  await expectTree(`
+Architecture
+  Jugendstil
+    Barcelona
+My Hobbies
+  Art Nouveau
+    Barcelona
+    [S] Art Nouveau Jugendstil
+  `);
+
+  await userEvent.click(await screen.findByLabelText("take rename Jugendstil"));
+  await expectTree(`
+Architecture
+  Jugendstil
+    Barcelona
+My Hobbies
+  Jugendstil
+    Barcelona
+  `);
+});
+
+test("CP4.1: Enter accepts an [S] suggestion as relevant", async () => {
+  const [alice] = setup([ALICE]);
+  renderApp(alice());
+
+  await type(
+    "Architecture{Enter}{Tab}Art Nouveau{Enter}{Tab}Barcelona{Escape}"
+  );
+  await userEvent.click(await screen.findByLabelText("Create new note"));
+  await type("My Hobbies{Escape}");
+
+  await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+  await navigateToNodeViaSearch(0, "Architecture");
+
+  const hobbyItems = screen.getAllByRole("treeitem", { name: "My Hobbies" });
+  fireEvent.dragStart(screen.getAllByText("Art Nouveau")[0]);
+  fireEvent.dragOver(hobbyItems[hobbyItems.length - 1]);
+  fireEvent.drop(hobbyItems[hobbyItems.length - 1]);
+
+  // Drift on the fork side: the original sees an [S] suggestion.
+  const forkEditors = screen.getAllByLabelText("edit Art Nouveau");
+  await userEvent.click(forkEditors[forkEditors.length - 1]);
+  await userEvent.keyboard("{Enter}{Tab}Vienna{Escape}");
+  await navigateToNodeViaSearch(0, "Architecture");
+  await expectTree(`
+Architecture
+  Art Nouveau
+    Barcelona
+    [S] Vienna
+My Hobbies
+  Art Nouveau
+    Vienna
+    Barcelona
+  `);
+
+  // Proposals take at the boundary: Vienna lands at the end.
+  await userEvent.click(screen.getAllByLabelText("Vienna")[0]);
+  await userEvent.keyboard("{Enter}");
+  await expectTree(`
+Architecture
+  Art Nouveau
+    Barcelona
+    Vienna
+My Hobbies
+  Art Nouveau
+    Vienna
     Barcelona
   `);
 });

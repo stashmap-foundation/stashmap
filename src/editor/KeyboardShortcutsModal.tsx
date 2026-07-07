@@ -19,7 +19,9 @@ export function KeyboardShortcutsModal({
           <li>j/k or arrows: move between visible rows</li>
           <li>h/l or arrows: collapse/expand or move parent/child</li>
           <li>g g: first row, G: last row</li>
-          <li>Enter or i: edit current row</li>
+          <li>
+            Enter or i: edit current row (on a suggestion, Enter takes it)
+          </li>
           <li>/: search in current pane</li>
           <li>
             H: go home (~Log), N: new root note, P: open new pane, q: close pane

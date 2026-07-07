@@ -294,6 +294,9 @@ export function useCurrentRowID(): [ID, View] {
 }
 
 export function getDisplayTextForRow(data: Data, row: Row): string {
+  if (row.renameSuggestion) {
+    return `${row.renameSuggestion.mine} ${row.renameSuggestion.theirs}`;
+  }
   // A version row's text IS its meta: date, author mark, diff counts.
   if (row.virtualType === "version" && row.versionMeta) {
     const meta = row.versionMeta;

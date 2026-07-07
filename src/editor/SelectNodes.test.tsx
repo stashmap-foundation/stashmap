@@ -51,6 +51,7 @@ test("Shows dots when only other user has node (current user has none)", async (
   await expectTree(`
 Root
   Parent Node
+  [S] Root My Fork
   `);
 
   await userEvent.click(await screen.findByLabelText("expand Parent Node"));
@@ -59,5 +60,6 @@ Root
 Root
   Parent Node
     [S] Bob Child
+  [S] Root My Fork
   `);
 });

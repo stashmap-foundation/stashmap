@@ -35,6 +35,7 @@ test("Reference node opens with only reference path, not current pane stack", as
   await expectTree(`
 My Notes
   [S] Holiday Destinations
+  [S] My Notes My Fork
   `);
 
   await userEvent.click(

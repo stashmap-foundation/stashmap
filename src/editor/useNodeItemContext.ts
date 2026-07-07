@@ -6,7 +6,10 @@ import {
   useRow,
 } from "../rowModel";
 import { isEmptySemanticID } from "../core/connections";
-import { planMaterializeComputedRow } from "../core/plan";
+import {
+  planMaterializeComputedRow,
+  planResolveRenameSuggestion,
+} from "../core/plan";
 import { usePlanner } from "../planner";
 import {
   planUpdateViewItemMetadata,
@@ -90,6 +93,17 @@ export function useNodeItemContext(): NodeItemContext {
   const updateMetadata = (metadata: NodeItemMetadata): void => {
     const editorText = editorTextContext?.text ?? "";
     if (isEmptyNode && !nodeID) return;
+    // Rename suggestions resolve, never materialize: x dismisses that
+    // version's text, any other judgment takes it.
+    const renameResolved = planResolveRenameSuggestion(
+      createPlan(),
+      row,
+      metadata
+    );
+    if (renameResolved) {
+      executePlan(renameResolved);
+      return;
+    }
     // Write gestures take first: the selector's judgment on a computed
     // row materializes it with the judgment, one plan.
     if (row.materialize !== undefined) {

@@ -10,7 +10,11 @@ import { getWriteRelays } from "../relayUtils";
 import { ASSET_ENTITY_RELAY, DEFAULT_RELAYS } from "../nostr";
 import { depositEntityTags, hasAssetEntityTag } from "../nodesDocumentEvent";
 import { publishStateOf, type PublishState } from "../core/knowstrFrontmatter";
-import { getNodeDocumentId, planSetDocumentPublishState } from "../core/plan";
+import {
+  getNodeDocumentId,
+  planSetDocumentPublishState,
+  planTakeRenameSuggestion,
+} from "../core/plan";
 import { documentEntityTags } from "./publishReach";
 import { TemporaryViewProvider, useTemporaryView } from "./temporaryViewState";
 
@@ -1684,6 +1688,28 @@ function usePaneKeyboardNavigation(paneIndex: number): {
 
     if (e.key === "Enter" || e.key === "i") {
       e.preventDefault();
+      // Enter is the take key: it adopts a rename suggestion, and accepts
+      // an [S] suggestion as relevant. i stays pure edit.
+      if (e.key === "Enter") {
+        const takeRowKey = getRowKey(activeRow);
+        const takeRow = rows.find((row) => row.viewKey === takeRowKey);
+        if (takeRow?.renameSuggestion) {
+          const takePlan = planTakeRenameSuggestion(createPlan(), takeRow);
+          if (takePlan) {
+            executePlan(takePlan);
+            refocusPaneAfterRowMutation(root);
+            return;
+          }
+        }
+        if (
+          takeRow?.virtualType === "suggestion" &&
+          !takeRow.renameSuggestion
+        ) {
+          executePlan(planBatchRelevance(createPlan(), [takeRow], "relevant"));
+          refocusPaneAfterRowMutation(root);
+          return;
+        }
+      }
       if (focusRowEditor(activeRow)) {
         return;
       }

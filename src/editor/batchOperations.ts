@@ -8,7 +8,10 @@ import {
 } from "../nodeItemMutations";
 import { planMoveNode } from "../treeMutations";
 import { getNode } from "../core/connections";
-import { planMaterializeComputedRow } from "../core/plan";
+import {
+  planMaterializeComputedRow,
+  planResolveRenameSuggestion,
+} from "../core/plan";
 import { isBlockLinkAny, nodeText } from "../core/nodeSpans";
 
 export type EditorInfo = {
@@ -46,6 +49,12 @@ function planUpdateOneMetadata(
   metadata: NodeItemMetadata,
   editorText: string
 ): Plan {
+  // Rename suggestions resolve, never materialize: x dismisses the
+  // version's text, any other judgment takes it.
+  const renameResolved = planResolveRenameSuggestion(acc, row, metadata);
+  if (renameResolved) {
+    return renameResolved;
+  }
   // Write gestures take first: a computed row materializes with the
   // judgment applied at creation — one plan, one save.
   const [materializedPlan, , materializedNow] = planMaterializeComputedRow(

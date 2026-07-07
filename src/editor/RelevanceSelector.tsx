@@ -12,6 +12,7 @@ import { preventEditorBlur } from "./AddNode";
 import { useEditorText } from "./EditorTextContext";
 import { useTemporaryView } from "./temporaryViewState";
 import { planBatchRelevance, EditorInfo } from "./batchOperations";
+import { planTakeRenameSuggestion } from "../core/plan";
 import { nodeText } from "../core/nodeSpans";
 import { usePaneTreeResult } from "./TreeView";
 
@@ -117,6 +118,13 @@ export function RelevanceSelector({
 
   const isCurrentlyNotRelevant = !isVirtual && currentLevel === 0;
 
+  const handleTakeRename = (): void => {
+    const takePlan = planTakeRenameSuggestion(createPlan(), row);
+    if (takePlan) {
+      executePlan(takePlan);
+    }
+  };
+
   const handleXClick = (): void => {
     const relevance = isCurrentlyNotRelevant ? undefined : "not_relevant";
     executePlan(
@@ -176,41 +184,78 @@ export function RelevanceSelector({
         x
       </span>
 
-      {[1, 2, 3].map((level) => (
+      {row.renameSuggestion ? (
+        // Replacement-shaped rows ask "theirs or mine?", not "how
+        // relevant?": one checkmark takes, the x (in its usual place)
+        // dismisses.
         <span
-          key={level}
           className="relevance-symbol"
-          onClick={() => handleSetLevel(level)}
+          onClick={handleTakeRename}
           onMouseDown={preventEditorBlur}
-          onMouseEnter={() => setHoverLevel(level)}
           role="button"
           tabIndex={0}
-          aria-label={
-            isVirtual
-              ? `accept ${displayText} as ${RELEVANCE_LABELS[
-                  level
-                ].toLowerCase()}`
-              : `set ${displayText} to ${RELEVANCE_LABELS[level].toLowerCase()}`
-          }
+          aria-label={`take rename ${row.renameSuggestion.theirs}`}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
-              handleSetLevel(level);
+              handleTakeRename();
             }
           }}
-          style={{
-            color: getLevelColor(
-              level,
-              effectiveDisplayLevel,
-              isNotRelevant,
-              isContains,
-              hoverLevel !== null && hoverLevel === currentLevel
-            ),
-          }}
+          style={{ color: TYPE_COLORS.relevant }}
         >
-          {LEVEL_SYMBOLS[level]}
+          {"\u2713"}
         </span>
-      ))}
+      ) : null}
+      {row.renameSuggestion ? (
+        // Hidden spacers keep the pill at judgment-palette width, so the
+        // x sits in the same column on every row.
+        <>
+          <span className="relevance-symbol" style={{ visibility: "hidden" }}>
+            ?
+          </span>
+          <span className="relevance-symbol" style={{ visibility: "hidden" }}>
+            !
+          </span>
+        </>
+      ) : (
+        [1, 2, 3].map((level) => (
+          <span
+            key={level}
+            className="relevance-symbol"
+            onClick={() => handleSetLevel(level)}
+            onMouseDown={preventEditorBlur}
+            onMouseEnter={() => setHoverLevel(level)}
+            role="button"
+            tabIndex={0}
+            aria-label={
+              isVirtual
+                ? `accept ${displayText} as ${RELEVANCE_LABELS[
+                    level
+                  ].toLowerCase()}`
+                : `set ${displayText} to ${RELEVANCE_LABELS[
+                    level
+                  ].toLowerCase()}`
+            }
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                handleSetLevel(level);
+              }
+            }}
+            style={{
+              color: getLevelColor(
+                level,
+                effectiveDisplayLevel,
+                isNotRelevant,
+                isContains,
+                hoverLevel !== null && hoverLevel === currentLevel
+              ),
+            }}
+          >
+            {LEVEL_SYMBOLS[level]}
+          </span>
+        ))
+      )}
     </div>
   );
 }

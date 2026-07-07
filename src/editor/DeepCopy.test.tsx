@@ -585,6 +585,7 @@ My Fork
 My Notes
   Target
   [S] BobItem
+  [S] My Notes My Fork
     `);
 
     fireEvent.dragStart(screen.getByText("BobItem"));
@@ -594,6 +595,7 @@ My Notes
 My Notes
   BobItem
   Target
+  [S] My Notes My Fork
     `);
   });
 
@@ -625,6 +627,7 @@ My Fork
 My Notes
   Target
   [S] BobItem
+  [S] My Notes My Fork
     `);
 
     // Open split pane and navigate to Target
@@ -644,6 +647,7 @@ My Notes
 My Notes
   Target
   [S] BobItem
+  [S] My Notes My Fork
 Target
   BobItem
     `);
@@ -680,6 +684,7 @@ My Fork
 My Notes
   Target
   [S] Folder
+  [S] My Notes My Fork
     `);
 
     fireEvent.dragStart(screen.getByText("Folder"));
@@ -689,6 +694,7 @@ My Notes
 My Notes
   Folder
   Target
+  [S] My Notes My Fork
     `);
 
     // Expand Folder to verify Child was deep copied
@@ -699,6 +705,7 @@ My Notes
   Folder
     Child
   Target
+  [S] My Notes My Fork
     `);
 
     // Expand Child to verify GrandChildren were deep copied
@@ -711,6 +718,7 @@ My Notes
       GrandChild1
       GrandChild2
   Target
+  [S] My Notes My Fork
     `);
   });
 
@@ -746,6 +754,7 @@ My Fork
 My Notes
   Target
   [S] Folder
+  [S] My Notes My Fork
     `);
 
     // Open split pane and navigate to Target
@@ -764,6 +773,7 @@ My Notes
 My Notes
   Target
   [S] Folder
+  [S] My Notes My Fork
 Target
   Folder
     `);
@@ -777,6 +787,7 @@ Target
 My Notes
   Target
   [S] Folder
+  [S] My Notes My Fork
 Target
   Folder
     Child
@@ -790,6 +801,7 @@ Target
 My Notes
   Target
   [S] Folder
+  [S] My Notes My Fork
 Target
   Folder
     Child
@@ -827,6 +839,7 @@ My Notes
   Target
     AliceChild
   [S] BobFolder
+  [S] My Notes My Fork
     `);
 
     // Drag [S] BobFolder and drop on Target (inserts after Target, i.e. as first child of Target)
@@ -841,6 +854,7 @@ My Notes
     BobFolder
     AliceChild
   [S] BobFolder
+  [S] My Notes My Fork
     `);
 
     // Expand BobFolder to verify BobChild was deep copied (first is the copied one under Target)
@@ -854,6 +868,7 @@ My Notes
       BobChild
     AliceChild
   [S] BobFolder
+  [S] My Notes My Fork
     `);
   });
 
@@ -891,7 +906,9 @@ My Fork
 My Notes
   Target
     AliceChild
+    [S] Target Forked Copy
   [S] BobFolder
+  [S] My Notes My Fork
     `);
 
     // Open split pane and navigate to Target
@@ -902,9 +919,12 @@ My Notes
 My Notes
   Target
     AliceChild
+    [S] Target Forked Copy
   [S] BobFolder
+  [S] My Notes My Fork
 Target
   AliceChild
+  [S] Target Forked Copy
     `);
 
     // Drag [S] BobFolder from pane 0 to Target root in pane 1
@@ -921,10 +941,13 @@ My Notes
   Target
     BobFolder
     AliceChild
+    [S] Target Forked Copy
   [S] BobFolder
+  [S] My Notes My Fork
 Target
   BobFolder
   AliceChild
+  [S] Target Forked Copy
     `);
 
     // Expand BobFolder in pane 1 to verify deep copy
@@ -937,11 +960,14 @@ My Notes
   Target
     BobFolder
     AliceChild
+    [S] Target Forked Copy
   [S] BobFolder
+  [S] My Notes My Fork
 Target
   BobFolder
     BobChild
   AliceChild
+  [S] Target Forked Copy
     `);
 
     // Expand BobChild to verify grandchildren were deep copied
@@ -953,12 +979,15 @@ My Notes
   Target
     BobFolder
     AliceChild
+    [S] Target Forked Copy
   [S] BobFolder
+  [S] My Notes My Fork
 Target
   BobFolder
     BobChild
       BobGrandChild
   AliceChild
+  [S] Target Forked Copy
     `);
   });
 });
@@ -990,6 +1019,7 @@ My Fork
     await expectTree(`
 My Notes
   [S] BobItem
+  [S] My Notes My Fork
     `);
 
     // Alice clicks relevance selector to mark as "relevant" (accept)
@@ -1000,6 +1030,7 @@ My Notes
     await expectTree(`
 My Notes
   BobItem
+  [S] My Notes My Fork
     `);
 
     // Verify there's only one BobItem element (not duplicated)
@@ -1033,6 +1064,7 @@ My Fork
     await expectTree(`
 My Notes
   [S] BobItem
+  [S] My Notes My Fork
     `);
 
     // Accept the suggestion
@@ -1042,6 +1074,7 @@ My Notes
     await expectTree(`
 My Notes
   BobItem
+  [S] My Notes My Fork
     `);
 
     // Delete BobItem via Delete key
@@ -1083,6 +1116,7 @@ My Fork
     await expectTree(`
 My Notes
   [S] BobFolder
+  [S] My Notes My Fork
     `);
 
     // Alice accepts BobFolder via relevance selector
@@ -1093,6 +1127,7 @@ My Notes
     await expectTree(`
 My Notes
   BobFolder
+  [S] My Notes My Fork
     `);
 
     // Expand to verify children were copied
@@ -1102,6 +1137,7 @@ My Notes
 My Notes
   BobFolder
     BobChild
+  [S] My Notes My Fork
     `);
 
     // Verify text shows "BobFolder" not something like "cref:abc123..."
@@ -1138,6 +1174,7 @@ My Fork
 My Notes
   Target
   [S] BobItem
+  [S] My Notes My Fork
     `);
 
     fireEvent.dragStart(screen.getByText("BobItem"));
@@ -1147,6 +1184,7 @@ My Notes
 My Notes
   BobItem
   Target
+  [S] My Notes My Fork
     `);
   });
 
@@ -1179,6 +1217,7 @@ My Fork
 My Notes
   Target
   [S] BobItem
+  [S] My Notes My Fork
     `);
 
     await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
@@ -1193,6 +1232,7 @@ My Notes
 My Notes
   Target
   [S] BobItem
+  [S] My Notes My Fork
 Target
   BobItem
     `);
@@ -1227,6 +1267,7 @@ My Fork
 My Notes
   Target
   [S] BobItem
+  [S] My Notes My Fork
     `);
 
     await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
@@ -1243,6 +1284,7 @@ My Notes
 My Notes
   Target
   [S] BobItem
+  [S] My Notes My Fork
 Target
   [R] My Fork / BobItem
     `);
@@ -1370,6 +1412,7 @@ My Fork
     await expectTree(`
 My Notes
   [S] Holiday Destinations
+  [S] My Notes My Fork
     `);
 
     const suggestionText = await screen.findByText("Holiday Destinations");
@@ -1409,6 +1452,7 @@ My Notes
     [S] B2
     [S] B3
     [V] +4
+  [S] My Notes My Fork
     `);
 
     // eslint-disable-next-line testing-library/no-node-access
@@ -1446,6 +1490,7 @@ My Fork
     await expectTree(`
 My Notes
   [S] BobFolder
+  [S] My Notes My Fork
     `);
 
     await userEvent.click(await screen.findByLabelText("expand BobFolder"));
@@ -1454,6 +1499,7 @@ My Notes
 My Notes
   [S] BobFolder
     [S] BobChild
+  [S] My Notes My Fork
     `);
 
     // Children of suggestions should not have edit buttons
@@ -1485,6 +1531,7 @@ My Fork
     await expectTree(`
 My Notes
   [S] BobLeafNode
+  [S] My Notes My Fork
     `);
 
     expect(screen.queryByLabelText("edit BobLeafNode")).toBeNull();
@@ -1573,6 +1620,7 @@ My Fork
 My Notes
   Target
   [S] BobFolder
+  [S] My Notes My Fork
     `);
 
     await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
@@ -1587,6 +1635,7 @@ My Notes
 My Notes
   Target
   [S] BobFolder
+  [S] My Notes My Fork
 Target
   BobFolder
     `);
@@ -1639,6 +1688,7 @@ My Fork
     await expectTree(`
 My Notes
   [S] BobFolder
+  [S] My Notes My Fork
     `);
 
     const eventsBeforeAccept = utils.relayPool.getDecryptedEvents().length;
@@ -1649,6 +1699,7 @@ My Notes
     await expectTree(`
 My Notes
   BobFolder
+  [S] My Notes My Fork
     `);
 
     const newEvents = utils.relayPool
@@ -1806,6 +1857,8 @@ My Notes
     [S] B2
     [S] B3
     [V] +4
+    [S] Topic Forked Copy
+  [S] My Notes My Fork
     `);
 
     await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
@@ -1827,12 +1880,15 @@ My Notes
     [S] B1
     [S] B2
     [S] B3
+    [S] Topic Forked Copy
+  [S] My Notes My Fork
 Topic
   [V] +4 -1
   A1
   [S] B1
   [S] B2
   [S] B3
+  [S] Topic Forked Copy
     `);
   });
 
@@ -1870,6 +1926,8 @@ My Notes
     [S] B2
     [S] B3
     [V] +4
+    [S] Topic Forked Copy
+  [S] My Notes My Fork
     `);
 
     // eslint-disable-next-line testing-library/no-node-access
@@ -1887,6 +1945,8 @@ My Notes
     [S] B1
     [S] B2
     [S] B3
+    [S] Topic Forked Copy
+  [S] My Notes My Fork
     `);
   });
 });

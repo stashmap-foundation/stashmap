@@ -98,6 +98,13 @@ type VirtualFooterInput = {
       removeCount: number;
     }
   >;
+  renames: List<{
+    versionId: ID;
+    theirs: string;
+    sourceId: SourceId;
+    snapshotId: string;
+    baselineNodeId: ID;
+  }>;
 };
 
 function nodePathLabel(
@@ -763,11 +770,47 @@ function appendVirtualFooterRows(
       )
     );
 
+  // Rename suggestions: replacement-shaped rows (strikethrough old, new
+  // beside it). They ride the suggestion vocabulary — @ gutter, the
+  // suggestions filter — but carry their own take/dismiss semantics.
+  const renameOffset = versionOffset + versionRows.size;
+  const parentText = input.parentRow ? nodeText(input.parentRow.node) : "";
+  const renameRows = input.renames.map((rename, index) => {
+    const base = createVirtualRow(
+      data,
+      graph,
+      input,
+      { sourceId: rename.sourceId, id: rename.versionId },
+      "suggestion",
+      renameOffset + index === 0
+    );
+    const renamePath = [
+      ...base.viewPath.slice(0, -1),
+      `rename:${rename.versionId}` as ID,
+    ] as unknown as ViewPath;
+    return {
+      ...base,
+      viewPath: renamePath,
+      viewKey: viewPathToString(renamePath),
+      // Replacement-shaped: the row is about text, not a subtree — it
+      // never expands.
+      hasChildren: false,
+      renameSuggestion: {
+        theirs: rename.theirs,
+        mine: parentText,
+        versionId: rename.versionId,
+        snapshotId: rename.snapshotId,
+        baselineNodeId: rename.baselineNodeId,
+      },
+    };
+  });
+
   return {
     rows: initial.rows
       .concat(incomingRows)
       .concat(suggestionRows)
-      .concat(versionRows),
+      .concat(versionRows)
+      .concat(renameRows),
   };
 }
 
@@ -900,7 +943,11 @@ function getChildrenForRegularNode(
     : List<NodeRef>();
 
   const isOwnContent = nodeSourceId === LOCAL;
-  const { suggestions: diffItems, versionMetas } = getAlternativeFooterData(
+  const {
+    suggestions: diffItems,
+    versionMetas,
+    renames,
+  } = getAlternativeFooterData(
     graph,
     visibleAuthors,
     activeFilters,
@@ -919,6 +966,7 @@ function getChildrenForRegularNode(
     incomingCrefs: visibleIncomingCrefs,
     suggestions: diffItems,
     versionMetas,
+    renames,
   });
 
   // The action row leads the footer block: it carries the dotted
@@ -1025,9 +1073,12 @@ function getNodesInRows(
       // A calendar feed whose entries are all hidden past still expands
       // (and keeps its triangle): the children exist, they're behind the
       // past chip. File rows only — proposals don't host the feed.
+      // Rename suggestions are replacement-shaped: about text, not a
+      // subtree — they never expand.
       hasChildren:
-        childResult.rows.size > 0 ||
-        (isFileRow(rootRow) && hasHiddenPastEntries(data, rootRow.node)),
+        !rootRow.renameSuggestion &&
+        (childResult.rows.size > 0 ||
+          (isFileRow(rootRow) && hasHiddenPastEntries(data, rootRow.node))),
     };
     const withRoot = {
       rows: result.rows.push(row),
@@ -1149,6 +1200,13 @@ export function getNodesInDocument(
         ID,
         { updated: number; addCount: number; removeCount: number }
       >(),
+      renames: List<{
+        versionId: ID;
+        theirs: string;
+        sourceId: SourceId;
+        snapshotId: string;
+        baselineNodeId: ID;
+      }>(),
     },
     treeResult
   );

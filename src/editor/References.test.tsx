@@ -65,6 +65,7 @@ Notes
     Barcelona
       Alice child
       [S] Bob child
+  [S] Notes My Fork
     `);
   });
 
@@ -144,6 +145,7 @@ Notes
       [S] Bob2
       [S] Bob3
       [V] +4
+  [S] Notes My Fork
     `);
   });
 

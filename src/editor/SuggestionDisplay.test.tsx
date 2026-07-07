@@ -38,6 +38,7 @@ describe("Suggestion Display", () => {
     await expectTree(`
 My Notes
   [S] Holiday Destinations
+  [S] My Notes My Fork
     `);
   });
 
@@ -99,6 +100,7 @@ My Notes
   Topic
     AliceChild
     [S] BobChild
+  [S] My Notes My Fork
     `);
   });
 
@@ -157,6 +159,7 @@ My Notes
   Shared
     AliceChild
     [S] BobChild
+  [S] My Notes My Fork
     `);
   });
 
@@ -397,6 +400,7 @@ My Notes
   Holiday Destinations
     Spain
     [S] Austria
+  [S] My Notes My Fork
     `);
   });
 
@@ -450,6 +454,8 @@ My Notes
     [S] Austria
     [S] Berlin
     [V] +4
+  [S] My Notes Fork Two
+  [S] My Notes Fork One
     `);
   });
 
@@ -478,6 +484,7 @@ Topic
   [S] Child2
   [S] Child3
   [V] +4
+  [S] Topic Fork One
     `);
 
     cleanup();
@@ -523,6 +530,7 @@ Holiday Destinations
   [S] France
   [S] Italy
   [V] +5
+  [S] Holiday Destinations My Fork
     `);
 
     await userEvent.click(await screen.findByLabelText("decline Spain"));
@@ -533,6 +541,7 @@ Holiday Destinations
   [S] Italy
   [S] Portugal
   [V] +4
+  [S] Holiday Destinations My Fork
     `);
   });
 
@@ -560,6 +569,7 @@ Recipes
   [S] Pasta
   [S] Risotto
   [S] Curry
+  [S] Recipes My Fork
     `);
   });
 
@@ -590,6 +600,7 @@ Holiday Destinations
   [S] France
   [S] Italy
   [V] +5
+  [S] Holiday Destinations My Fork
     `);
 
     await userEvent.click(
@@ -603,6 +614,7 @@ Holiday Destinations
   [S] Italy
   [S] Portugal
   [V] +4
+  [S] Holiday Destinations My Fork
     `);
 
     await userEvent.click(
@@ -616,6 +628,7 @@ Holiday Destinations
   [S] Italy
   [S] Portugal
   [S] Greece
+  [S] Holiday Destinations My Fork
     `);
   });
 
@@ -653,6 +666,8 @@ Cooking
   [S] Tacos
   [S] Curry
   [V] +2
+  [S] Cooking Fork Two
+  [S] Cooking Fork One
     `);
   });
 
@@ -729,6 +744,7 @@ My Fork
 Target
   Items
   [S] Source
+  [S] Target My Fork
     `);
 
     await userEvent.click(await screen.findByLabelText("decline Source"));
@@ -736,6 +752,7 @@ Target
     await expectTree(`
 Target
   Items
+  [S] Target My Fork
     `);
   });
 });

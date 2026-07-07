@@ -477,14 +477,24 @@ export function getIncomingCrefsForNode(
     .toList();
 }
 
+export type RenameSuggestion = {
+  versionId: ID;
+  theirs: string;
+  sourceId: SourceId;
+  snapshotId: string;
+  baselineNodeId: ID;
+};
+
 type AlternativeFooterResult = {
   suggestions: List<ID>;
   versionMetas: Map<ID, NonNullable<Row["versionMeta"]>>;
+  renames: List<RenameSuggestion>;
 };
 
 const EMPTY_ALTERNATIVE_FOOTER_RESULT: AlternativeFooterResult = {
   suggestions: List<ID>(),
   versionMetas: Map<ID, NonNullable<Row["versionMeta"]>>(),
+  renames: List<RenameSuggestion>(),
 };
 
 function isVisibleVersion(
@@ -685,13 +695,17 @@ export function getAlternativeFooterData(
   const versionMetas = versionsEnabled
     ? versionDiffs
         .filter(({ node }) => !existingCrefTargetIDs.has(node.id))
-        .reduce((acc, { node, additions, deletions, direct }) => {
+        .reduce((acc, { node, additions, deletions, textDiffers, direct }) => {
           if (direct) {
-            const directCount = additions.size + deletions.size;
+            // The text difference counts into the displayed ± (J1/J3 law:
+            // silent when they agree, ±n when they differ) — a bare [V]
+            // with hidden differences would lie.
+            const directCount =
+              additions.size + deletions.size + (textDiffers ? 1 : 0);
             return directCount > 0
               ? acc.set(node.id, {
                   updated: node.updated,
-                  addCount: additions.size,
+                  addCount: additions.size + (textDiffers ? 1 : 0),
                   removeCount: deletions.size,
                   direct: true,
                 })
@@ -727,5 +741,23 @@ export function getAlternativeFooterData(
         }, Map<ID, NonNullable<Row["versionMeta"]>>())
     : Map<ID, NonNullable<Row["versionMeta"]>>();
 
-  return { suggestions, versionMetas };
+  // Renames travel as their own suggestion rows (strikethrough old, new
+  // beside it), not inside the [V] counts.
+  const renames = versionDiffs
+    .filter(
+      (diff) =>
+        diff.textDrift !== undefined &&
+        diff.baselineSnapshotId !== undefined &&
+        diff.baselineNodeId !== undefined
+    )
+    .map((diff) => ({
+      versionId: diff.node.id,
+      theirs: diff.textDrift as string,
+      sourceId: current.ref.sourceId,
+      snapshotId: diff.baselineSnapshotId as string,
+      baselineNodeId: diff.baselineNodeId as ID,
+    }))
+    .toList();
+
+  return { suggestions, versionMetas, renames };
 }

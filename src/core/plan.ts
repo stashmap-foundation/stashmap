@@ -14,7 +14,11 @@ import {
   documentKeyOf,
   workspaceDocumentKey,
 } from "./Document";
-import { entityIdForText, isCanonicalId } from "./entityRecognition";
+import {
+  entityIdForText,
+  ENTITY_SCHEME_RE,
+  isCanonicalId,
+} from "./entityRecognition";
 import { icalFeedLinkText, isBareIcalFeedUrl } from "./ical";
 import { documentLinkHref } from "./linkPath";
 import { getWorkspaceNode, withWorkspace, workspaceOf } from "./knowledge";
@@ -626,6 +630,20 @@ export function planMaterializeComputedRow<T extends GraphPlan>(
   }
   const parentNode = getWorkspaceNode(plan.knowledgeDBs, parentID);
   if (!parentNode) {
+    // First write on the computed pin mints the entity's document (E6):
+    // a placement needs a file, so the mint rides the gesture. Entity
+    // schemes only — calendar entries materialize through their host.
+    if (ENTITY_SCHEME_RE.test(parentID)) {
+      const minted = withDocumentRoot(
+        newGraphNode(plainSpans(parentID), { uuid: parentID })
+      );
+      return planMaterializeComputedRow(
+        planUpsertNodes(plan, minted),
+        row,
+        metadata,
+        placement
+      );
+    }
     const { host } = row.materialize;
     if (!host) {
       return [plan, row.node, false];

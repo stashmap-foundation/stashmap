@@ -41,7 +41,7 @@ import {
   icalFeedUrlOf,
   mergeProjectedEntries,
 } from "./core/ical";
-import { canonicalTargetOf } from "./core/entityRecognition";
+import { canonicalTargetOf, ENTITY_SCHEME_RE } from "./core/entityRecognition";
 import {
   documentKeyOf,
   documentLinkPath,
@@ -297,10 +297,22 @@ function resolveRowForPath(
     })?.node;
   })();
   const resolved = lookupNode(graph, rowID, paneSourceId);
+  // The entity surface: a dangling canonical id at the pane root renders
+  // as a computed pin — nothing stored until the first write mints (E6).
   const node =
     edgeNode ??
     resolved?.node ??
-    (rowID === EMPTY_SEMANTIC_ID ? emptyRootNode() : undefined);
+    (rowID === EMPTY_SEMANTIC_ID ? emptyRootNode() : undefined) ??
+    (segments.length === 1 && ENTITY_SCHEME_RE.test(rowID)
+      ? {
+          children: List<ID>(),
+          id: rowID,
+          spans: plainSpans(rowID),
+          updated: Date.now(),
+          root: rowID,
+          relevance: undefined,
+        }
+      : undefined);
   if (!node) {
     return undefined;
   }

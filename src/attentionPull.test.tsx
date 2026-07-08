@@ -114,6 +114,42 @@ Trip Notes
   `);
 });
 
+test("following a dangling entity link opens the computed pin", async () => {
+  const [alice, bob] = setup([ALICE, BOB]);
+
+  renderApp(bob());
+  await type(
+    "Barcelona Guide{Enter}{Tab}https://www.wikidata.org/wiki/Q1492{Enter}{Tab}Sagrada Familia{Escape}"
+  );
+  await publishViaChip();
+  cleanup();
+
+  window.history.pushState({}, "", "/");
+  renderApp(alice());
+  await type(
+    "Trip Notes{Enter}{Tab}https://www.wikidata.org/wiki/Q1492{Escape}"
+  );
+
+  await userEvent.click(
+    screen.getByText("https://www.wikidata.org/wiki/Q1492")
+  );
+
+  await expectTree(`
+wd:Q1492
+  [OI] Barcelona Guide ↩
+  [I] Trip Notes ↩
+  `);
+
+  await userEvent.click(await screen.findByLabelText("Barcelona Guide ↩"));
+  await userEvent.keyboard("!");
+
+  await expectTree(`
+wd:Q1492
+  [OR] Barcelona Guide
+  [I] Trip Notes ↩
+  `);
+});
+
 test("the subscription follows attention: entity tags on open, dropped on close", async () => {
   const [alice] = setup([ALICE]);
   renderApp(alice());

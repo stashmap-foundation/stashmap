@@ -11,6 +11,7 @@ import { usePaneTreeResult } from "./editor/TreeView";
 import { documentKeyOf, Document } from "./core/Document";
 import { KIND_KNOWLEDGE_DEPOSIT } from "./nostr";
 import { depositEntityTags } from "./nodesDocumentEvent";
+import { isCanonicalId } from "./core/entityRecognition";
 import { useRelaysToCreatePlan } from "./relays";
 import { getReadRelays, uniqueRelayUrls } from "./relayUtils";
 
@@ -71,14 +72,19 @@ export function usePaneAttentionPull(): void {
   const rootRow = treeResult?.rows.first(undefined);
   const docId = rootRow?.node.docId;
   const sourceId = rootRow?.sourceId;
+  const rootId = rootRow?.node.id;
   const tagsKey = useMemo(() => {
-    if (!docId || !sourceId) return "";
-    const document = documents.get(documentKeyOf(sourceId, docId));
-    if (!document) return "";
-    return [...new Set(pullTagsForDocument(knowledgeDBs, document))]
-      .sort()
-      .join(" ");
-  }, [docId, sourceId, documents, knowledgeDBs]);
+    if (docId && sourceId) {
+      const document = documents.get(documentKeyOf(sourceId, docId));
+      if (!document) return "";
+      return [...new Set(pullTagsForDocument(knowledgeDBs, document))]
+        .sort()
+        .join(" ");
+    }
+    // The computed pin (E6): a document-less canonical root is the
+    // degenerate one-tag pane.
+    return rootId && isCanonicalId(rootId) ? rootId : "";
+  }, [docId, sourceId, rootId, documents, knowledgeDBs]);
 
   const relaysKey = useMemo(
     () =>

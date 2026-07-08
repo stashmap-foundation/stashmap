@@ -109,7 +109,16 @@ function nodeTarget(
   const target =
     mode === "target" ? source : resolveBlockLinkTarget(graph, source);
   if (!target) {
-    return calendarEntryFallbackTarget(data, link.targetID);
+    const calendarTarget = calendarEntryFallbackTarget(data, link.targetID);
+    if (calendarTarget) {
+      return calendarTarget;
+    }
+    // Entity links resolve to the ordinary node view even without a
+    // local page — the computed pin (E6).
+    if (ENTITY_SCHEME_RE.test(link.targetID)) {
+      return { sourceId: LOCAL, rootNodeId: link.targetID };
+    }
+    return undefined;
   }
   const parent = target.node.parent
     ? getNodeInSource(graph, {

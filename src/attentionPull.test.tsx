@@ -1,7 +1,7 @@
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { KIND_KNOWLEDGE_DEPOSIT } from "./nostr";
-import { ALICE, BOB, renderApp, setup, type } from "./utils.test";
+import { ALICE, BOB, expectTree, renderApp, setup, type } from "./utils.test";
 
 afterEach(cleanup);
 
@@ -62,10 +62,57 @@ test("strangers rendezvous through a shared real-world entity", async () => {
   // foreign refs when any local ref exists. Pinned below.
 });
 
-// CP4.4 (pinned gap): the pulled source's link into the shared entity
-// must surface as an incoming reference on the entity's page.
-// eslint-disable-next-line jest/no-disabled-tests
-test.skip("the pulled reference surfaces as [I] on the entity page", () => {});
+test("the pulled reference surfaces as [I] on the entity page", async () => {
+  const [alice, bob] = setup([ALICE, BOB]);
+
+  renderApp(bob());
+  await type(
+    "Barcelona Guide{Enter}{Tab}https://www.wikidata.org/wiki/Q1492{Enter}{Tab}Sagrada Familia{Escape}"
+  );
+  await publishViaChip();
+  cleanup();
+
+  window.history.pushState({}, "", "/");
+  renderApp(alice());
+  await type("https://www.wikidata.org/wiki/Q1492{Escape}");
+
+  await expectTree(`
+https://www.wikidata.org/wiki/Q1492
+  [OI] Barcelona Guide ↩
+  `);
+});
+
+test("the pulled reference surfaces in the pane that pulled it", async () => {
+  const [alice, bob] = setup([ALICE, BOB]);
+
+  renderApp(bob());
+  await type(
+    "Barcelona Guide{Enter}{Tab}https://www.wikidata.org/wiki/Q1492{Enter}{Tab}Sagrada Familia{Escape}"
+  );
+  await publishViaChip();
+  cleanup();
+
+  window.history.pushState({}, "", "/");
+  renderApp(alice());
+  await type(
+    "Trip Notes{Enter}{Tab}https://www.wikidata.org/wiki/Q1492{Escape}"
+  );
+
+  await expectTree(`
+Trip Notes
+  [R] https://www.wikidata.org/wiki/Q1492
+  [OI] Barcelona Guide ↩
+  `);
+
+  await userEvent.click(await screen.findByLabelText("Barcelona Guide ↩"));
+  await userEvent.keyboard("!");
+
+  await expectTree(`
+Trip Notes
+  [R] https://www.wikidata.org/wiki/Q1492
+  [OR] Barcelona Guide
+  `);
+});
 
 test("the subscription follows attention: entity tags on open, dropped on close", async () => {
   const [alice] = setup([ALICE]);

@@ -7,6 +7,7 @@ import {
   itemPassesFilters,
   getSemanticID,
   getNodeContext,
+  getNodeSemanticID,
   getNodeText,
   getNode,
   resolveNode,
@@ -160,11 +161,16 @@ export function findRefsToNode(
     .toList();
 }
 
+// The key carries the owner's own title beside its ancestor context:
+// ancestors alone collapse every root-level document into one group, and
+// the local ref then shadows the stranger's (CP4.4).
 function getRefContextKey(
-  _knowledgeDBs: KnowledgeDBs,
+  knowledgeDBs: KnowledgeDBs,
   ref: ReferencedByRef
 ): string {
-  return getContextKey(ref.context);
+  const node = getNode(knowledgeDBs, ref.nodeID, ref.sourceId);
+  const semantic = node ? getNodeSemanticID(node) : ref.nodeID;
+  return getContextKey(ref.context.push(semantic));
 }
 
 function contextKeyForCref(
@@ -181,7 +187,9 @@ function contextKeyForCref(
     return undefined;
   }
   return getContextKey(
-    getNodeContext(knowledgeDBs, targetNode, effectiveAuthor)
+    getNodeContext(knowledgeDBs, targetNode, effectiveAuthor).push(
+      getNodeSemanticID(targetNode)
+    )
   );
 }
 
@@ -380,18 +388,9 @@ export function getIncomingCrefsForNode(
   const { graphIndex, knowledgeDBs } = graph;
   const current = currentItems || List<GraphNode>();
 
-  const graphLinkRefs = (() => {
-    if (!currentNodeID) {
-      return [];
-    }
-    const sourceScopedRefs =
-      graphIndex.incomingCrefsByTarget.get(
-        nodeRefKey({ sourceId: itemsSourceId, id: currentNodeID })
-      ) ?? [];
-    return sourceScopedRefs.length > 0
-      ? sourceScopedRefs
-      : graphIndex.incomingCrefs.get(currentNodeID) ?? [];
-  })();
+  const graphLinkRefs = currentNodeID
+    ? graphIndex.incomingCrefs.get(currentNodeID) ?? []
+    : [];
   const graphLinkSourceNodes = graphLinkRefs
     .map((ref) => getGraphLinkOwner(graph, ref))
     .filter((node): node is ResolvedNode => node !== undefined);

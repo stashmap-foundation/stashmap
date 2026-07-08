@@ -1,5 +1,6 @@
 import { List, Map, Set as ImmutableSet } from "immutable";
-import { LOCAL } from "./core/nodeRef";
+import { LOCAL, nodeRefKey } from "./core/nodeRef";
+import { referencedEntityIds } from "./nodesDocumentEvent";
 import {
   ViewPath,
   addNodeToPathWithNodes,
@@ -972,7 +973,7 @@ function getChildrenForRegularNode(
     nodeSourceId,
   ]).union(ImmutableSet<SourceId>(data.pulledAuthors ?? []));
 
-  const incomingCrefs = getIncomingCrefsForNode(
+  const ownCrefs = getIncomingCrefsForNode(
     graph,
     visibleAuthors,
     containingNodeID,
@@ -982,7 +983,46 @@ function getChildrenForRegularNode(
     allChildNodes,
     undefined,
     data.documents
-  ).filter((ref) => ref.id !== nodes.id);
+  );
+
+  // The pane that pulled renders: refs into the document's referenced
+  // entities surface at its root, pulled sources only — local backlinks
+  // stay on the entity page (CP4.4).
+  const pulledSet = ImmutableSet<SourceId>(data.pulledAuthors ?? []);
+  const contextEntityIds =
+    containingNodeID === undefined && !pulledSet.isEmpty()
+      ? List(
+          referencedEntityIds(graph.knowledgeDBs.get(nodeSourceId)?.nodes, [
+            nodes.id,
+          ])
+        ).filter((entityId) => entityId !== nodes.id)
+      : List<string>();
+  const contextCrefs = contextEntityIds.flatMap((entityId) =>
+    getIncomingCrefsForNode(
+      graph,
+      visibleAuthors,
+      containingNodeID,
+      entityId,
+      author,
+      nodeSourceId,
+      allChildNodes,
+      undefined,
+      data.documents
+    ).filter((ref) => pulledSet.has(ref.sourceId))
+  );
+
+  const seenRefKeys = new Set<string>();
+  const incomingCrefs = ownCrefs
+    .concat(contextCrefs)
+    .filter((ref) => {
+      const key = nodeRefKey(ref);
+      if (seenRefKeys.has(key)) {
+        return false;
+      }
+      seenRefKeys.add(key);
+      return true;
+    })
+    .filter((ref) => ref.id !== nodes.id);
 
   const visibleIncomingCrefs = activeFilters.includes("incoming")
     ? incomingCrefs

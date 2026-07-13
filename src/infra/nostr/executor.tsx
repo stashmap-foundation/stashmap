@@ -74,25 +74,25 @@ export async function signEvents(
 
   return isUserLoggedInWithExtension(user)
     ? List<SignedEventWithConf>(
-        await Promise.all(
-          wireEvents.map(async ({ template, writeRelayConf }) => {
-            const signedEvent = await signEventWithExtension(template);
-            return {
-              event: signedEvent as VerifiedEvent,
-              writeRelayConf,
-            };
-          })
-        )
-      )
-    : List<SignedEventWithConf>(
-        wireEvents.map(({ template, writeRelayConf }) => {
-          const event = finalizeEvent(
-            template,
-            (user as KeyPair).privateKey
-          ) as VerifiedEvent;
-          return { event, writeRelayConf };
+      await Promise.all(
+        wireEvents.map(async ({ template, writeRelayConf }) => {
+          const signedEvent = await signEventWithExtension(template);
+          return {
+            event: signedEvent as VerifiedEvent,
+            writeRelayConf,
+          };
         })
-      );
+      )
+    )
+    : List<SignedEventWithConf>(
+      wireEvents.map(({ template, writeRelayConf }) => {
+        const event = finalizeEvent(
+          template,
+          (user as KeyPair).privateKey
+        ) as VerifiedEvent;
+        return { event, writeRelayConf };
+      })
+    );
 }
 
 // Signed events out to relays, each routed by its writeRelayConf. Shared by
@@ -111,14 +111,6 @@ export async function publishEventsWithConf(
         writeRelayConf
       );
       const urls = Array.from(new Set(writeRelayUrls.map((r: Relay) => r.url)));
-      // eslint-disable-next-line no-console
-      console.log(
-        "[publish] event kind",
-        event.kind,
-        event.id.slice(0, 8),
-        "→",
-        urls.length > 0 ? urls.join(", ") : "(no relays!)"
-      );
       return publishEventToRelays(backend, event, urls);
     })
   );

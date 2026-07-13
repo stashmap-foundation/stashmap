@@ -1,15 +1,11 @@
 import { Map as ImmutableMap } from "immutable";
 import { LOCAL } from "../core/nodeRef";
 import { ENTITY_SCHEME_RE } from "../core/entityRecognition";
-import { getBlockLink } from "../core/blockLink";
-import { getBlockLinkTarget } from "../core/nodeSpans";
-import {
-  Document,
-  getDocumentByIdOrFilePath,
-  getDocumentForNode,
-} from "../core/Document";
+import { getAllLinks } from "../core/nodeSpans";
+import { Document, getDocumentForNode } from "../core/Document";
 import { getNode } from "../core/connections";
 import { publishStateOf } from "../core/knowstrFrontmatter";
+import { resolveDocumentTarget } from "./linkOperations";
 
 // Entity tags (idea.md, Entities): one bare tag per identified node in
 // the document — a node whose own id, or whose link target, carries an
@@ -25,64 +21,50 @@ export function documentEntityTags(
   if (!nodes) {
     return [];
   }
-  const entityOf = (node: GraphNode): string | undefined => {
-    if (ENTITY_SCHEME_RE.test(node.id)) {
-      return node.id;
-    }
-    const target = getBlockLinkTarget(node);
-    return target && ENTITY_SCHEME_RE.test(target) ? target : undefined;
-  };
+  const entitiesOf = (node: GraphNode): string[] => [
+    ...(ENTITY_SCHEME_RE.test(node.id) ? [node.id] : []),
+    ...getAllLinks(node)
+      .map((link) => link.targetID)
+      .filter((target) => ENTITY_SCHEME_RE.test(target)),
+  ];
   const tags = new Set<string>();
   const walk = (nodeId: ID): void => {
     const node = nodes.get(nodeId);
     if (!node) {
       return;
     }
-    const entity = entityOf(node);
-    if (entity) {
-      tags.add(entity);
-    }
+    entitiesOf(node).forEach((entity) => tags.add(entity));
     node.children.forEach((childId) => walk(childId));
   };
-  document.topNodeShortIds.forEach((id) => walk(id as ID));
+  document.topNodeShortIds.forEach((id) => walk(id));
   return [...tags];
 }
 
-// The "not shared here" chip: a link row inside a published document whose
-// target doesn't reach this document's readers. v0 detects the
-// unpublished-target case; the entity/relay-mismatch cases land with the
-// ladder walk. Returns the target document to grant, or undefined.
-export function unpublishedLinkTarget(
+export function unpublishedLinkTargetForHref(
   knowledgeDBs: KnowledgeDBs,
   documents: ImmutableMap<string, Document>,
   documentByFilePath: ImmutableMap<string, Document>,
   paneDocument: Document | undefined,
-  node: GraphNode | undefined
+  source: GraphNode,
+  sourceId: SourceId,
+  href: string
 ): Document | undefined {
-  if (!paneDocument || !node) {
+  if (!paneDocument || !publishStateOf(paneDocument.frontMatter)) {
     return undefined;
   }
-  if (!publishStateOf(paneDocument.frontMatter)) {
-    return undefined;
-  }
-  const link = getBlockLink(node, LOCAL);
-  if (!link) {
-    return undefined;
-  }
-  const target =
-    link.kind === "document"
-      ? getDocumentByIdOrFilePath(
-          documents,
-          documentByFilePath,
-          LOCAL,
-          link.path
-        )
-      : (() => {
-          const targetNode = getNode(knowledgeDBs, link.targetID, LOCAL);
-          return targetNode
-            ? getDocumentForNode(knowledgeDBs, documents, targetNode, LOCAL)
-            : undefined;
-        })();
+  const target = href.startsWith("#")
+    ? (() => {
+        const targetNode = getNode(knowledgeDBs, href.slice(1), sourceId);
+        return targetNode
+          ? getDocumentForNode(knowledgeDBs, documents, targetNode, sourceId)
+          : undefined;
+      })()
+    : resolveDocumentTarget(
+        { knowledgeDBs, documents, documentByFilePath },
+        source,
+        sourceId,
+        href
+      );
   if (!target || target.docId === paneDocument.docId) {
     return undefined;
   }

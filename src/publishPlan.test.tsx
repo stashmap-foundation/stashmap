@@ -1,11 +1,6 @@
 import { LOCAL } from "./core/nodeRef";
-import { linkSpan, plainSpans, getBlockLinkTarget } from "./core/nodeSpans";
-import { newGraphNode } from "./core/nodeFactory";
-import type { Document } from "./core/Document";
-import {
-  unpublishedLinkTarget,
-  documentEntityTags,
-} from "./editor/publishReach";
+import { documentEntityTags } from "./editor/publishReach";
+import { getAllLinks } from "./core/nodeSpans";
 import {
   createPlan,
   buildDocumentEvents,
@@ -134,84 +129,6 @@ test("unpublished documents emit no deposit", () => {
   ).toBe(false);
 });
 
-test("the reach chip resolves unpublished link targets in published documents", () => {
-  const { plan, docId, rootId } = planWithEssay();
-  const [planWithTarget] = planCreateNodesFromMarkdown(plan, "# Target\n");
-  const targetDoc = planWithTarget.documents
-    .valueSeq()
-    .find((doc) => doc.docId !== docId);
-  if (!targetDoc) {
-    throw new Error("target document missing");
-  }
-  const linkRow = newGraphNode([linkSpan(targetDoc.topNodeShortIds[0], "T")], {
-    parent: rootId,
-    root: rootId,
-  });
-  const essayDoc = (published: Plan): Document => {
-    const doc = published.documents.valueSeq().find((d) => d.docId === docId);
-    if (!doc) {
-      throw new Error("essay document missing");
-    }
-    return doc;
-  };
-
-  // Essay unpublished: no chip.
-  expect(
-    unpublishedLinkTarget(
-      planWithTarget.knowledgeDBs,
-      planWithTarget.documents,
-      planWithTarget.documentByFilePath,
-      essayDoc(planWithTarget),
-      linkRow
-    )
-  ).toBeUndefined();
-
-  // Essay published, target unpublished: the chip resolves the target.
-  const published = planSetDocumentPublishState(planWithTarget, docId, {
-    entities: [],
-    paused: false,
-  });
-  expect(
-    unpublishedLinkTarget(
-      published.knowledgeDBs,
-      published.documents,
-      published.documentByFilePath,
-      essayDoc(published),
-      linkRow
-    )?.docId
-  ).toBe(targetDoc.docId);
-
-  // Non-link rows never chip.
-  expect(
-    unpublishedLinkTarget(
-      published.knowledgeDBs,
-      published.documents,
-      published.documentByFilePath,
-      essayDoc(published),
-      newGraphNode(plainSpans("plain row"), { parent: rootId, root: rootId })
-    )
-  ).toBeUndefined();
-
-  // Target published too: chip gone.
-  const bothPublished = planSetDocumentPublishState(
-    published,
-    targetDoc.docId,
-    {
-      entities: [],
-      paused: false,
-    }
-  );
-  expect(
-    unpublishedLinkTarget(
-      bothPublished.knowledgeDBs,
-      bothPublished.documents,
-      bothPublished.documentByFilePath,
-      essayDoc(bothPublished),
-      linkRow
-    )
-  ).toBeUndefined();
-});
-
 const CONTRACT_ID = "rgb:cdtFZh2Q-YTY1rYW-yBdMlZb-GbkThw~-ArYpJ72-eXiti5Y";
 
 test("entity recognizers: rgb markers and wikidata urls", () => {
@@ -257,7 +174,9 @@ test("marker created under a parent becomes a link row, never a duplicate", () =
   const linkRow = pasted.knowledgeDBs
     .get(LOCAL)
     ?.nodes.valueSeq()
-    .find((n) => getBlockLinkTarget(n) === `asset:${CONTRACT_ID}`);
+    .find((node) =>
+      getAllLinks(node).some((link) => link.targetID === `asset:${CONTRACT_ID}`)
+    );
   expect(linkRow).toBeDefined();
   expect(linkRow?.parent).toBe(rootId);
 
@@ -266,7 +185,9 @@ test("marker created under a parent becomes a link row, never a duplicate", () =
   const links = typed.knowledgeDBs
     .get(LOCAL)
     ?.nodes.valueSeq()
-    .filter((n) => getBlockLinkTarget(n) === `asset:${CONTRACT_ID}`)
+    .filter((node) =>
+      getAllLinks(node).some((link) => link.targetID === `asset:${CONTRACT_ID}`)
+    )
     .toArray();
   expect(links?.length).toBe(2);
   expect(

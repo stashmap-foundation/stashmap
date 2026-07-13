@@ -12,11 +12,8 @@ import {
   useIsViewingOtherUserContent,
   viewPathToString,
   useCurrentNode,
-  getCurrentReferenceForRow,
   useRow,
   updateView,
-  getViewForNode,
-  getLast,
   addNodesToLastElement,
 } from "../rowModel";
 import { isEditableNode } from "./temporaryViewState";
@@ -26,38 +23,37 @@ import {
   planBatchOutdent,
 } from "./batchOperations";
 import {
-  getRefLinkTargetInfo,
-  getRefTargetInfo,
   getNodeText,
   getNode,
   getNodeContext,
   isEmptyNodeID,
   computeEmptyNodeMetadata,
-  isRefNode,
 } from "../core/connections";
+import { isEntityLinkHref } from "../core/entityRecognition";
 import {
-  nodeText,
-  plainSpans,
+  isInternalLinkHref,
+  isWebsiteLinkHref,
   spansText,
   spansToMarkdown,
 } from "../core/nodeSpans";
-import { getBlockLink } from "../core/blockLink";
-import { ENTITY_SCHEME_RE, canonicalTargetOf } from "../core/entityRecognition";
 import {
+  calendarEntryTarget,
+  calendarFeedUrl,
   displayTextOf,
   hiddenPastEntryCount,
-  icalFeedLinkPartsOf,
-  icalFeedLinkText,
-  icalFeedUrlOf,
   isBareIcalFeedUrl,
 } from "../core/ical";
 import { useCalendarFeeds } from "../CalendarFeedContext";
-import { inlineLinkToHref, linkStyle, linkToHref } from "./linkOperations";
+import { inlineLinkToHref } from "./linkOperations";
 import { ReferenceDisplay } from "./referenceDisplay";
 import { MiniEditor, preventEditorBlur } from "./AddNode";
 import { useOnToggleExpanded } from "./SelectNodes";
 import { useData } from "../DataContext";
-import { planMaterializeComputedRow } from "../core/plan";
+import {
+  planMaterializeComputedRow,
+  planSetDocumentPublishState,
+} from "../core/plan";
+import { publishStateOf } from "../core/knowstrFrontmatter";
 import { getWorkspaceNode } from "../core/knowledge";
 import {
   Plan,
@@ -77,12 +73,8 @@ import { planDisconnectFromParent } from "../treeMutations";
 import { useNodeIsLoading } from "../LoadingStatus";
 import { NodeCard } from "../commons/Ui";
 import { usePaneIndex, useNavigatePane } from "../SplitPanesContext";
-import { buildNodeRouteUrl } from "../navigationUrl";
-import {
-  PublishReachChip,
-  RightMenu,
-  usePublishedPaneDocument,
-} from "./RightMenu";
+import { RightMenu, usePublishedPaneDocument } from "./RightMenu";
+import { unpublishedLinkTargetForHref } from "./publishReach";
 import { useItemStyle } from "./useItemStyle";
 import { EditorTextProvider } from "./EditorTextContext";
 
@@ -143,9 +135,7 @@ function PastDatesActionRow(): JSX.Element {
   const row = useRow();
   const { feeds } = useCalendarFeeds();
   const { createPlan, executePlan } = usePlanner();
-  const feedUrl = row.parentNode
-    ? icalFeedUrlOf(nodeText(row.parentNode))
-    : undefined;
+  const feedUrl = row.parentNode ? calendarFeedUrl(row.parentNode) : undefined;
   const entries = feedUrl ? feeds.get(feedUrl) : undefined;
   const pastCount =
     entries && row.parentNode
@@ -154,7 +144,7 @@ function PastDatesActionRow(): JSX.Element {
             .toArray()
             .map(
               (childId) =>
-                canonicalTargetOf(
+                calendarEntryTarget(
                   getNode(data.knowledgeDBs, childId, row.sourceId)
                 ) ?? childId
             ),
@@ -188,68 +178,6 @@ function PastDatesActionRow(): JSX.Element {
     >
       {label}
     </button>
-  );
-}
-
-// E2's cursor-at-end: the space right of a link row's text hosts a real
-// caret — click it and the cursor sits at the end of the link. Enter
-// opens the editor in the next row. Typing is swallowed for now; this
-// zone is the seed of link-text editing (the feed-label pattern).
-function LinkCursorZone(): JSX.Element | null {
-  const data = useData();
-  const row = useRow();
-  const { createPlan, executePlan } = usePlanner();
-  const paneIndex = usePaneIndex();
-  const isInSearchView = useIsInSearchView();
-  const isViewingOtherUserContent = useIsViewingOtherUserContent();
-  const displayText = useDisplayText();
-  if (
-    !isRefNode(row.node) ||
-    row.virtualType !== undefined ||
-    isInSearchView ||
-    isViewingOtherUserContent ||
-    !row.parentNode ||
-    row.childIndex === undefined ||
-    !row.parentViewPath
-  ) {
-    return null;
-  }
-  const parentViewPath = row.parentViewPath as ViewPath;
-  const openEditorBelow = (): void => {
-    if (!row.parentNode || row.childIndex === undefined) return;
-    executePlan(
-      planSetEmptyNodePosition(
-        createPlan(),
-        row.parentNode.id,
-        getViewForNode(data, parentViewPath, getLast(parentViewPath)),
-        parentViewPath,
-        paneIndex,
-        row.childIndex + 1
-      )
-    );
-  };
-  return (
-    <span
-      className="link-cursor-zone"
-      role="textbox"
-      tabIndex={0}
-      contentEditable
-      suppressContentEditableWarning
-      aria-label={`cursor after ${displayText}`}
-      onBeforeInput={(e) => e.preventDefault()}
-      onPaste={(e) => e.preventDefault()}
-      onDrop={(e) => e.preventDefault()}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          openEditorBelow();
-        }
-        if (e.key === "Escape") {
-          e.preventDefault();
-          (e.target as HTMLElement).blur();
-        }
-      }}
-    />
   );
 }
 
@@ -397,25 +325,87 @@ function ReferenceContent({
     targetLabel: string;
     contextLabels: string[];
     sourceId: SourceId;
-    displayAs?: "bidirectional" | "incoming";
+    displayAs?: "incoming";
     incomingRelevance?: Relevance;
     incomingArgument?: Argument;
-    deleted?: boolean;
-    versionMeta?: Row["versionMeta"];
   };
 }): JSX.Element {
-  // An outgoing link row whose target shares lineage: the ∥-with-counts
-  // display rides the reference (footer versions render from the row).
-  if (reference.versionMeta) {
-    return (
-      <VersionContent
-        sourceId={reference.sourceId}
-        meta={reference.versionMeta}
-      />
-    );
-  }
+  const data = useData();
+  const row = useRow();
+  const navigatePane = useNavigatePane();
+  const href = inlineLinkToHref(
+    data,
+    `#${reference.id}`,
+    row.node,
+    reference.sourceId
+  );
+  if (!href) return <ReferenceDisplay reference={reference} />;
+  return (
+    <a
+      href={href}
+      className="reference-link-btn"
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        navigatePane(href);
+      }}
+      aria-label={`Navigate to ${reference.text}`}
+    >
+      <ReferenceDisplay reference={reference} />
+    </a>
+  );
+}
 
-  return <ReferenceDisplay reference={reference} />;
+function LinkReachChip({
+  span,
+  node,
+  sourceId,
+}: {
+  span: Extract<InlineSpan, { kind: "link" }>;
+  node: GraphNode;
+  sourceId: SourceId;
+}): JSX.Element | null {
+  const data = useData();
+  const paneDocument = usePublishedPaneDocument();
+  const { createPlan, executePlan } = usePlanner();
+  const target = unpublishedLinkTargetForHref(
+    data.knowledgeDBs,
+    data.documents,
+    data.documentByFilePath,
+    paneDocument,
+    node,
+    sourceId,
+    span.href
+  );
+  if (!paneDocument || !target) return null;
+  const grant = (): void => {
+    const state = publishStateOf(paneDocument.frontMatter);
+    executePlan(
+      planSetDocumentPublishState(createPlan(), target.docId, {
+        entities: [
+          ...new Set([
+            ...paneDocument.topNodeShortIds,
+            ...(state?.entities ?? []),
+          ]),
+        ],
+        relays: state?.relays,
+        paused: false,
+      })
+    );
+  };
+  return (
+    <button
+      type="button"
+      className="publish-reach-chip"
+      onClick={(event) => {
+        event.stopPropagation();
+        grant();
+      }}
+      aria-label={`publish linked document ${target.title || target.docId}`}
+    >
+      not published
+    </button>
+  );
 }
 
 function InlineLinkSpan({
@@ -429,46 +419,53 @@ function InlineLinkSpan({
 }): JSX.Element {
   const data = useData();
   const navigatePane = useNavigatePane();
-  const targetID = span.href.startsWith("#") ? span.href.slice(1) : "";
   const href = inlineLinkToHref(data, span.href, node, sourceId);
-  const style = ENTITY_SCHEME_RE.test(targetID)
-    ? { color: "var(--violet)" }
-    : undefined;
+  const isEntity = isEntityLinkHref(span.href);
+  const style = {
+    ...(isInternalLinkHref(span.href) && !isEntity
+      ? { fontStyle: "italic" }
+      : {}),
+    ...(isWebsiteLinkHref(span.href) ? { textDecoration: "underline" } : {}),
+    ...(isEntity ? { color: "var(--violet)" } : {}),
+  };
   if (!href) {
     return (
-      <span
-        role="link"
+      <>
+        <span
+          role="link"
+          className="inline-link"
+          style={style}
+          data-href={span.href}
+          data-target={span.href}
+        >
+          {span.text}
+        </span>
+        <LinkReachChip span={span} node={node} sourceId={sourceId} />
+      </>
+    );
+  }
+  return (
+    <>
+      <a
+        href={href}
         className="inline-link"
         style={style}
         data-href={span.href}
         data-target={span.href}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          navigatePane(href);
+        }}
+        aria-label={`Navigate to ${span.text}`}
       >
         {span.text}
-      </span>
-    );
-  }
-  return (
-    <a
-      href={href}
-      className="inline-link"
-      style={style}
-      data-href={span.href}
-      data-target={span.href}
-      onClick={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        navigatePane(href);
-      }}
-      aria-label={`Navigate to ${span.text}`}
-    >
-      {span.text}
-    </a>
+      </a>
+      <LinkReachChip span={span} node={node} sourceId={sourceId} />
+    </>
   );
 }
 
-// Inline links render as spans within ordinary text: dashed-underlined so
-// several links in one sentence stay individually visible, violet when the
-// target is an entity. Block-link rows keep their NodeAutoLink wrapper.
 function InlineSpans({
   node,
   sourceId,
@@ -501,9 +498,8 @@ function hasInlineLinks(node: GraphNode | undefined): node is GraphNode {
 }
 
 function NodeContent(): JSX.Element {
-  const data = useData();
   const row = useRow();
-  const reference = getCurrentReferenceForRow(data, row);
+  const { reference } = row;
   const displayText = useDisplayText();
 
   // A rename suggestion: replacement-shaped — my text on the way out
@@ -530,16 +526,19 @@ function NodeContent(): JSX.Element {
     );
   }
   if (row.virtualType === "version") {
-    return (
-      <VersionContent
-        sourceId={row.sourceId}
-        meta={row.versionMeta ?? reference?.versionMeta}
-      />
-    );
+    return <VersionContent sourceId={row.sourceId} meta={row.versionMeta} />;
   }
 
   if (row.virtualType === undefined && hasInlineLinks(row.node)) {
     return <InlineSpans node={row.node} sourceId={row.sourceId} />;
+  }
+
+  if (row.virtualType === "search" && hasInlineLinks(row.node)) {
+    return (
+      <span data-testid="reference-row">
+        <InlineSpans node={row.node} sourceId={row.sourceId} />
+      </span>
+    );
   }
 
   if (reference) {
@@ -585,7 +584,6 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
   const navigatePane = useNavigatePane();
   const { feeds: calendarFeeds } = useCalendarFeeds();
   const currentNode = useCurrentNode();
-  const displayText = useDisplayText();
   const prevSibling = getPreviousSiblingFromRows(rows, row);
   const parentPath = row.parentViewPath;
   const viewIsExpanded = useIsExpanded();
@@ -611,28 +609,15 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       viewKey: viewPathToString(targetViewPath),
     });
 
-  // Feed-as-link rows edit their label; the URL is structural, like an
-  // entity link's target. Saving re-wraps the new label around the known
-  // URL; typing a bare feed URL (re)wraps into the link form.
-  const feedLink = icalFeedLinkPartsOf(displayText);
-  const editorSpans: InlineSpan[] = feedLink
-    ? [{ kind: "link", href: `feed:${feedLink.url}`, text: feedLink.label }]
-    : currentNode.spans;
+  const editorSpans = currentNode.spans;
   const persistedSpans = (spans: InlineSpan[]): InlineSpan[] => {
-    const text = spansText(spans);
-    if (feedLink) {
-      return plainSpans(icalFeedLinkText(feedLink.url, text));
-    }
-    if (spans.length === 1 && spans[0].kind === "link") {
-      const feedUrl = spans[0].href.startsWith("feed:")
-        ? spans[0].href.slice("feed:".length)
-        : undefined;
-      return feedUrl
-        ? plainSpans(icalFeedLinkText(feedUrl, spans[0].text))
-        : spans;
+    const text = spansText(spans).trim();
+    const feedUrl = calendarFeedUrl(currentNode);
+    if (feedUrl && spans.every((span) => span.kind === "text")) {
+      return [{ kind: "link", href: `feed:${feedUrl}`, text }];
     }
     return isBareIcalFeedUrl(text)
-      ? plainSpans(icalFeedLinkText(text.trim()))
+      ? [{ kind: "link", href: `feed:${text}`, text }]
       : spans;
   };
 
@@ -941,39 +926,49 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
   };
 
   return (
-    <MiniEditor
-      key={`${viewPathToString(viewPath)}:${nodeIndex}`}
-      initialSpans={editorSpans}
-      style={textStyle}
-      onSave={handleSave}
-      onTab={handleTab}
-      onShiftTab={handleShiftTab}
-      onClose={isEmptyNode ? handleClose : undefined}
-      autoFocus={shouldAutoFocus}
-      ariaLabel={
-        isEmptyNode ? "new node editor" : `edit ${spansText(editorSpans)}`
-      }
-      onEscape={handleEscapeRequest}
-      onRequestRowFocus={handleRequestRowFocus}
-      onDelete={isEmptyNode ? undefined : handleDelete}
-      onPasteMultiLine={handlePasteMultiLine}
-      onActivateLink={handleActivateLink}
-    />
+    <>
+      <MiniEditor
+        key={`${viewPathToString(viewPath)}:${nodeIndex}`}
+        initialSpans={editorSpans}
+        style={textStyle}
+        onSave={handleSave}
+        onTab={handleTab}
+        onShiftTab={handleShiftTab}
+        onClose={isEmptyNode ? handleClose : undefined}
+        autoFocus={shouldAutoFocus}
+        ariaLabel={
+          isEmptyNode ? "new node editor" : `edit ${spansText(editorSpans)}`
+        }
+        onEscape={handleEscapeRequest}
+        onRequestRowFocus={handleRequestRowFocus}
+        onDelete={isEmptyNode ? undefined : handleDelete}
+        onPasteMultiLine={handlePasteMultiLine}
+        onActivateLink={handleActivateLink}
+      />
+      {editorSpans.map((span) =>
+        span.kind === "link" ? (
+          <LinkReachChip
+            key={`${span.href}-${span.text}`}
+            span={span}
+            node={row.node}
+            sourceId={row.sourceId}
+          />
+        ) : null
+      )}
+    </>
   );
 }
 
 function InteractiveNodeContent({ rows }: { rows: List<Row> }): JSX.Element {
   const data = useData();
   const row = useRow();
-  const { viewPath } = row;
+  const { viewPath, virtualType, reference } = row;
   const currentNode = useCurrentNode();
   const isLoading = useNodeIsLoading();
   const isInSearchView = useIsInSearchView();
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
-  const { virtualType } = row;
   const isEmptyNode = isEmptyNodeID(row.node.id);
   const displayText = useDisplayText();
-  const reference = getCurrentReferenceForRow(data, row);
 
   const isReadonly =
     isInSearchView || isViewingOtherUserContent || virtualType !== undefined;
@@ -1003,97 +998,6 @@ function InteractiveNodeContent({ rows }: { rows: List<Row> }): JSX.Element {
 
   // Read-only content
   return <NodeContent />;
-}
-
-function NodeAutoLink({
-  children,
-}: {
-  children: React.ReactNode;
-}): JSX.Element | null {
-  const data = useData();
-  const { knowledgeDBs, documents, documentByFilePath } = data;
-  const row = useRow();
-  const displayText = useDisplayText();
-  const navigatePane = useNavigatePane();
-  const publishedDocument = usePublishedPaneDocument();
-  const { feeds: calendarFeeds } = useCalendarFeeds();
-  const effectiveAuthor = row.sourceId;
-  const { virtualType } = row;
-  const blockLink =
-    virtualType === "incoming"
-      ? undefined
-      : getBlockLink(row.node, row.sourceId);
-  if (blockLink) {
-    const href = linkToHref(
-      { ...data, calendarFeeds },
-      blockLink,
-      virtualType === "version" ? "target" : "link"
-    );
-    if (href) {
-      return (
-        <>
-          <a
-            href={href}
-            className="reference-link-btn"
-            style={linkStyle(blockLink)}
-            onClick={(e) => {
-              e.preventDefault();
-              navigatePane(href);
-            }}
-            aria-label={`Navigate to ${displayText}`}
-          >
-            {children}
-          </a>
-          {publishedDocument && virtualType === undefined && (
-            <PublishReachChip
-              paneDocument={publishedDocument}
-              node={row.node}
-            />
-          )}
-        </>
-      );
-    }
-  }
-
-  const node = getCurrentReferenceForRow(data, row);
-
-  if (!node) {
-    return <>{children}</>;
-  }
-
-  const refInfo =
-    virtualType === "version"
-      ? getRefTargetInfo(node.id, knowledgeDBs, effectiveAuthor)
-      : getRefLinkTargetInfo(
-          node.id,
-          knowledgeDBs,
-          effectiveAuthor,
-          documents,
-          documentByFilePath
-        );
-  if (!refInfo) {
-    return <>{children}</>;
-  }
-  const href = refInfo.rootNodeId
-    ? buildNodeRouteUrl(
-        refInfo.rootNodeId,
-        refInfo.sourceId,
-        refInfo.scrollToId
-      )
-    : "#";
-  return (
-    <a
-      href={href}
-      className="reference-link-btn"
-      onClick={(e) => {
-        e.preventDefault();
-        navigatePane(href);
-      }}
-      aria-label={`Navigate to ${displayText}`}
-    >
-      {children}
-    </a>
-  );
 }
 
 export const INDENTATION = 25;
@@ -1193,20 +1097,14 @@ export function Node({
     className !== undefined ? `${className} hover-light-bg` : "hover-light-bg";
   const clsBody = cardBodyClassName || "ps-0";
 
-  const data = useData();
-  const isConcreteRef = isRefNode(row.node);
   const { virtualType } = row;
   const currentNode = useCurrentNode();
   const isViewingOtherUser = useIsViewingOtherUserContent();
-  const node = getCurrentReferenceForRow(data, row);
+  const node = row.reference;
   const isOtherUser = (node && node.sourceId !== LOCAL) || isViewingOtherUser;
 
-  const isVersion = virtualType === "version" || !!node?.versionMeta;
-  const isSuggestionWithChildren =
-    isSuggestion && (isConcreteRef || !!currentNode);
-  // Link rows expand like any row — to their OWN children, file truth
-  // (E2). The target's subtree is reached by following the link; only
-  // embeds (the suggestion preview) show it inline.
+  const isVersion = virtualType === "version";
+  const isSuggestionWithChildren = isSuggestion && !!currentNode;
   const showExpandCollapse =
     (!isSuggestion && !isVersion) || isSuggestionWithChildren;
   const { hasChildren } = row;
@@ -1250,9 +1148,6 @@ export function Node({
         data-suggestion={isSuggestion ? "true" : undefined}
         data-virtual-type={virtualType || (isVersion ? "version" : undefined)}
         data-other-user={isOtherUser ? "true" : undefined}
-        data-deleted={
-          node && "deleted" in node && node.deleted ? "true" : undefined
-        }
       >
         <div className="indicator-gutter">
           {isSuggestion && <SuggestionIndicator />}
@@ -1289,7 +1184,6 @@ export function Node({
         {levels > 0 && <Indent levels={levels} colorLevels={searchDepth} />}
         {showExpandCollapse && hasChildren && <ExpandCollapseToggle />}
         {((showExpandCollapse && !hasChildren) ||
-          (isConcreteRef && !showExpandCollapse) ||
           (isSuggestion && !showExpandCollapse)) && (
           <span
             className="node-marker"
@@ -1299,11 +1193,8 @@ export function Node({
         )}
         <div className={`w-100 node-content-wrapper ${contentClass}`}>
           <span className={textClassName} style={textStyle}>
-            <NodeAutoLink>
-              <InteractiveNodeContent rows={rows} />
-            </NodeAutoLink>
+            <InteractiveNodeContent rows={rows} />
           </span>
-          <LinkCursorZone />
         </div>
         <RightMenu />
       </NodeCard>

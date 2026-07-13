@@ -1,22 +1,13 @@
-import { createDocumentLinkTarget, createRefTarget } from "../core/connections";
-import { ENTITY_SCHEME_RE } from "../core/entityRecognition";
-import { icalFeedUrlOf, isCalendarEntryId } from "../core/ical";
-import { isBlockLinkAny, nodeText } from "../core/nodeSpans";
+import { calendarFeedUrl, isCalendarEntryId } from "../core/ical";
 import { LOCAL } from "../core/nodeRef";
 import { Document, getDocumentForNode, documentKeyOf } from "../core/Document";
 import {
   getNodeInSource,
   graphLookupFromData,
   lookupNode,
-  resolveBlockLinkTarget,
-  ResolvedNode,
 } from "../core/graphLookup";
-import { Link } from "../core/link";
 import { docLinkId, resolveLinkPath } from "../core/linkPath";
 import { buildDocumentRouteUrl, buildNodeRouteUrl } from "../navigationUrl";
-import { AddToParentTarget } from "../planner";
-
-export type LinkNavigationMode = "link" | "target";
 
 export type EditorNavigationTarget = {
   sourceId: SourceId;
@@ -34,32 +25,21 @@ function sourceFilePath(
     ?.filePath;
 }
 
-function documentTarget(
+export function resolveDocumentTarget(
   data: Pick<Data, "knowledgeDBs" | "documents" | "documentByFilePath">,
-  link: Extract<Link, { kind: "document" }>
+  source: GraphNode,
+  sourceId: SourceId,
+  path: string
 ): Document | undefined {
-  const docId = docLinkId(link.path);
+  const docId = docLinkId(path);
   if (docId !== undefined) {
-    return data.documents.get(documentKeyOf(link.sourceId, docId));
+    return data.documents.get(documentKeyOf(sourceId, docId));
   }
   const resolvedPath = resolveLinkPath(
-    link.path,
-    sourceFilePath(data, link.source, link.sourceId)
+    path,
+    sourceFilePath(data, source, sourceId)
   );
   return data.documentByFilePath.get(resolvedPath);
-}
-
-function sourceResolvedNode(
-  graph: ReturnType<typeof graphLookupFromData>,
-  link: Extract<Link, { kind: "node" }>,
-  sourceId: SourceId
-): ResolvedNode {
-  return (
-    lookupNode(graph, link.source.id, sourceId) ?? {
-      ref: { sourceId, id: link.source.id },
-      node: link.source,
-    }
-  );
 }
 
 function calendarEntryFallbackTarget(
@@ -78,11 +58,7 @@ function calendarEntryFallbackTarget(
   const findIn = (sourceId: SourceId): EditorNavigationTarget | undefined => {
     const node = data.knowledgeDBs
       .get(sourceId)
-      ?.nodes.find(
-        (candidate) =>
-          !isBlockLinkAny(candidate) &&
-          icalFeedUrlOf(nodeText(candidate)) === carryingUrl
-      );
+      ?.nodes.find((candidate) => calendarFeedUrl(candidate) === carryingUrl);
     return node
       ? { sourceId, rootNodeId: node.id, scrollToId: targetID }
       : undefined;
@@ -97,72 +73,6 @@ function calendarEntryFallbackTarget(
         undefined
       )
   );
-}
-
-function nodeTarget(
-  data: Data,
-  link: Extract<Link, { kind: "node" }>,
-  mode: LinkNavigationMode
-): EditorNavigationTarget | undefined {
-  const graph = graphLookupFromData(data);
-  const source = sourceResolvedNode(graph, link, link.sourceId);
-  const target =
-    mode === "target" ? source : resolveBlockLinkTarget(graph, source);
-  if (!target) {
-    return calendarEntryFallbackTarget(data, link.targetID);
-  }
-  const parent = target.node.parent
-    ? getNodeInSource(graph, {
-        sourceId: target.ref.sourceId,
-        id: target.node.parent,
-      })
-    : undefined;
-  const targetRoot = mode === "target" ? target : parent ?? target;
-  return {
-    sourceId: targetRoot.ref.sourceId,
-    rootNodeId: targetRoot.node.id,
-    scrollToId:
-      targetRoot.node.id === target.node.id ? undefined : target.node.id,
-  };
-}
-
-export function linkToNavigationTarget(
-  data: Data,
-  link: Link,
-  mode: LinkNavigationMode = "link"
-): EditorNavigationTarget | undefined {
-  if (link.kind === "document") {
-    const document = documentTarget(data, link);
-    return document
-      ? {
-          sourceId: document.sourceId,
-          documentId: document.docId,
-        }
-      : undefined;
-  }
-
-  return nodeTarget(data, link, mode);
-}
-
-export function linkToHref(
-  data: Data,
-  link: Link,
-  mode: LinkNavigationMode = "link"
-): string | undefined {
-  const target = linkToNavigationTarget(data, link, mode);
-  if (!target) {
-    return undefined;
-  }
-  if (target.documentId) {
-    return buildDocumentRouteUrl(
-      target.sourceId,
-      target.documentId,
-      target.scrollToId
-    );
-  }
-  return target.rootNodeId
-    ? buildNodeRouteUrl(target.rootNodeId, target.sourceId, target.scrollToId)
-    : undefined;
 }
 
 export function navigationTargetToHref(
@@ -180,9 +90,6 @@ export function navigationTargetToHref(
     : undefined;
 }
 
-// Inline link spans navigate like block links: to the target in its
-// context (parent as root, target scrolled to), but resolved from the
-// span's target id directly since the containing node is no block link.
 export function inlineTargetToHref(
   data: Data,
   targetID: ID,
@@ -222,42 +129,12 @@ export function inlineLinkToHref(
   const hashIndex = href.lastIndexOf("#");
   const path = hashIndex < 0 ? href : href.slice(0, hashIndex);
   const scrollToId = hashIndex < 0 ? undefined : href.slice(hashIndex + 1);
-  const target = linkToNavigationTarget(data, {
-    kind: "document",
-    source,
-    sourceId,
-    path,
-    text: "",
-  });
-  return target
-    ? navigationTargetToHref({ ...target, scrollToId: scrollToId || undefined })
+  const document = resolveDocumentTarget(data, source, sourceId, path);
+  return document
+    ? buildDocumentRouteUrl(
+        document.sourceId,
+        document.docId,
+        scrollToId || undefined
+      )
     : undefined;
-}
-
-export function linkStyle(link: Link): React.CSSProperties {
-  if (link.kind === "document") {
-    return { fontStyle: "italic" };
-  }
-  return ENTITY_SCHEME_RE.test(link.targetID) ? { color: "var(--violet)" } : {};
-}
-
-export function linkToInsertTarget(
-  data: Pick<Data, "knowledgeDBs" | "documents" | "documentByFilePath">,
-  link: Link | undefined
-): AddToParentTarget | undefined {
-  if (!link) {
-    return undefined;
-  }
-  if (link.kind === "document") {
-    const document = documentTarget(data, link);
-    return document
-      ? createDocumentLinkTarget(
-          document.sourceId,
-          document.docId,
-          link.path,
-          link.text
-        )
-      : undefined;
-  }
-  return createRefTarget(link.targetID, link.text);
 }

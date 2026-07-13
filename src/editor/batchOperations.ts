@@ -13,9 +13,11 @@ import {
 import { planMoveNode } from "../treeMutations";
 import { getNode } from "../core/connections";
 import {
+  planAddTopTargetsToDocument,
   planMaterializeComputedRow,
   planResolveRenameSuggestion,
 } from "../core/plan";
+import { getDocumentByIdOrFilePath } from "../core/Document";
 import { spansToMarkdown } from "../core/nodeSpans";
 
 export type EditorInfo = {
@@ -66,6 +68,23 @@ function planUpdateOneMetadata(
   }
   const paneIndex = row.viewPath[0];
   const pane = acc.panes[paneIndex];
+  const document = pane.documentId
+    ? getDocumentByIdOrFilePath(
+        acc.documents,
+        acc.documentByFilePath,
+        pane.sourceId,
+        pane.documentId
+      )
+    : undefined;
+  if (row.materialize?.take && !row.parentRef && document) {
+    return planAddTopTargetsToDocument(
+      acc,
+      document,
+      row.materialize.take,
+      metadata.relevance,
+      metadata.argument
+    )[0];
+  }
   return planUpdateViewItemMetadata(
     acc,
     {
@@ -87,13 +106,20 @@ function planUpdateOneMetadata(
   );
 }
 
+function materializationFirst(rows: Row[]): Row[] {
+  return [
+    ...rows.filter((row) => row.materialize !== undefined),
+    ...rows.filter((row) => row.materialize === undefined),
+  ];
+}
+
 export function planBatchRelevance(
   plan: Plan,
   rows: Row[],
   relevance: Relevance,
   editorInfo?: EditorInfo
 ): Plan {
-  const updated = rows.reduce(
+  const updated = materializationFirst(rows).reduce(
     (acc, row) =>
       planUpdateOneMetadata(
         acc,
@@ -112,7 +138,7 @@ export function planBatchArgument(
   argument: Argument,
   editorInfo?: EditorInfo
 ): Plan {
-  const updated = rows.reduce(
+  const updated = materializationFirst(rows).reduce(
     (acc, row) =>
       planUpdateOneMetadata(
         acc,

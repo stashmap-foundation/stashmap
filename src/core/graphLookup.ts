@@ -1,5 +1,4 @@
 import { LOCAL } from "./nodeRef";
-import { getBlockLinkTarget, isBlockLink } from "./nodeSpans";
 
 export type ResolvedNode = {
   ref: NodeRef;
@@ -11,11 +10,6 @@ export type GraphLookup = {
   graphIndex: GraphIndex;
   localSourceId: SourceId;
   sourceOrder: readonly SourceId[];
-};
-
-export type ResolvedReference = {
-  source: ResolvedNode;
-  target: ResolvedNode;
 };
 
 const UNSAFE_MARKDOWN_ID_RE = /\s|["'<>]|-->/u;
@@ -132,16 +126,6 @@ export function lookupNode(
   return candidate ? getNodeInSource(graph, candidate) : undefined;
 }
 
-export function resolveBlockLinkTarget(
-  graph: GraphLookup,
-  source: ResolvedNode
-): ResolvedNode | undefined {
-  const targetID = getBlockLinkTarget(source.node);
-  return targetID
-    ? lookupNode(graph, targetID, source.ref.sourceId)
-    : undefined;
-}
-
 export function parentOf(
   graph: GraphLookup,
   node: ResolvedNode
@@ -164,28 +148,4 @@ export function childrenOf(
     )
     .filter((child): child is ResolvedNode => child !== undefined)
     .toArray();
-}
-
-function paneSourceId(panes: Pane[], paneIndex: number): SourceId | undefined {
-  return panes[paneIndex]?.sourceId;
-}
-
-export function resolveReferenceForView(
-  graph: GraphLookup,
-  panes: Pane[],
-  viewPath: readonly [number, ...ID[]],
-  refId: ID
-): ResolvedReference | undefined {
-  const sourceId = paneSourceId(panes, viewPath[0]);
-  if (!sourceId) {
-    return undefined;
-  }
-  const source = lookupNode(graph, refId, sourceId);
-  if (!source) {
-    return undefined;
-  }
-  const target = isBlockLink(source.node)
-    ? resolveBlockLinkTarget(graph, source)
-    : source;
-  return target ? { source, target } : undefined;
 }

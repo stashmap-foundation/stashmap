@@ -1,16 +1,8 @@
 /* eslint-disable @typescript-eslint/no-use-before-define, functional/immutable-data, functional/no-let */
 import { List, Set, Map } from "immutable";
 import { SEARCH_PREFIX } from "./constants";
-import {
-  getBlockFileLinkPath,
-  getBlockLinkTarget,
-  isBlockFileLink,
-  isBlockLink,
-  nodeText,
-} from "./nodeSpans";
-import { Document, documentKeyOf } from "./Document";
+import { nodeText } from "./nodeSpans";
 import { displayTextOf } from "./ical";
-import { resolveLinkPath } from "./linkPath";
 
 export const EMPTY_NODE_ID: ID = "";
 
@@ -49,30 +41,6 @@ export function createDocumentLinkTarget(
     ...(filePath !== undefined ? { filePath } : {}),
     linkText,
   };
-}
-
-export const isRefNode = isBlockLink;
-
-function getTargetNode(
-  knowledgeDBs: KnowledgeDBs,
-  node: GraphNode | undefined,
-  sourceId: SourceId
-): GraphNode | undefined {
-  const targetID = getBlockLinkTarget(node);
-  return targetID && node
-    ? getNode(knowledgeDBs, targetID, sourceId)
-    : undefined;
-}
-
-export function resolveNode(
-  knowledgeDBs: KnowledgeDBs,
-  node: GraphNode | undefined,
-  sourceId: SourceId
-): GraphNode | undefined {
-  if (!node) {
-    return undefined;
-  }
-  return isBlockLink(node) ? getTargetNode(knowledgeDBs, node, sourceId) : node;
 }
 
 export function isSearchId(id: ID): boolean {
@@ -190,11 +158,13 @@ export function nodePathLabel(
   node: GraphNode,
   sourceId: SourceId
 ): string {
-  const contextLabels = getNodeContext(knowledgeDBs, node, sourceId)
+  return getNodeContext(knowledgeDBs, node, sourceId)
     .map((nodeID) => getNode(knowledgeDBs, nodeID, sourceId))
     .filter((pathNode): pathNode is GraphNode => pathNode !== undefined)
-    .map((pathNode) => displayTextOf(nodeText(pathNode)));
-  return contextLabels.push(displayTextOf(nodeText(node))).join(" / ");
+    .map((pathNode) => displayTextOf(nodeText(pathNode)))
+    .push(displayTextOf(nodeText(node)))
+    .filter((label) => label !== "")
+    .join(" / ");
 }
 
 export function getNodeDepth(
@@ -239,11 +209,7 @@ export function getRefTargetInfo(
   knowledgeDBs: KnowledgeDBs,
   effectiveAuthor: SourceId
 ): RefTargetInfo | undefined {
-  const node = resolveNode(
-    knowledgeDBs,
-    getNode(knowledgeDBs, refId, effectiveAuthor),
-    effectiveAuthor
-  );
+  const node = getNode(knowledgeDBs, refId, effectiveAuthor);
   if (!node) {
     return undefined;
   }
@@ -253,97 +219,6 @@ export function getRefTargetInfo(
     stack,
     sourceId: effectiveAuthor,
     rootNodeId: node.id,
-  };
-}
-
-function resolveAnyLink(
-  knowledgeDBs: KnowledgeDBs,
-  documents: Map<string, Document> | undefined,
-  documentByFilePath: Map<string, Document> | undefined,
-  source: GraphNode | undefined,
-  sourceId: SourceId
-): { node: GraphNode; sourceId: SourceId } | undefined {
-  if (!source) {
-    return undefined;
-  }
-  if (isBlockLink(source)) {
-    const target = getTargetNode(knowledgeDBs, source, sourceId);
-    return target ? { node: target, sourceId } : undefined;
-  }
-  if (
-    isBlockFileLink(source) &&
-    documents !== undefined &&
-    documentByFilePath !== undefined
-  ) {
-    return resolveFileLinkRootByDocs(
-      knowledgeDBs,
-      documents,
-      documentByFilePath,
-      source,
-      sourceId
-    );
-  }
-  return { node: source, sourceId };
-}
-
-function resolveFileLinkRootByDocs(
-  knowledgeDBs: KnowledgeDBs,
-  documents: Map<string, Document>,
-  documentByFilePath: Map<string, Document>,
-  source: GraphNode,
-  sourceId: SourceId
-): { node: GraphNode; sourceId: SourceId } | undefined {
-  const linkPath = getBlockFileLinkPath(source);
-  if (!linkPath) return undefined;
-  const sourceRoot =
-    source.id === source.root
-      ? source
-      : getNode(knowledgeDBs, source.root, sourceId);
-  const sourceFilePath = sourceRoot?.docId
-    ? documents.get(documentKeyOf(sourceId, sourceRoot.docId))?.filePath
-    : undefined;
-  const resolved = resolveLinkPath(linkPath, sourceFilePath);
-  const targetDoc = documentByFilePath.get(resolved);
-  if (!targetDoc) return undefined;
-  const topNodeShortId = targetDoc.topNodeShortIds[0];
-  const targetRoot = topNodeShortId
-    ? getNode(knowledgeDBs, topNodeShortId as ID, targetDoc.sourceId)
-    : undefined;
-  return targetRoot
-    ? { node: targetRoot, sourceId: targetDoc.sourceId }
-    : undefined;
-}
-
-export function getRefLinkTargetInfo(
-  refId: ID,
-  knowledgeDBs: KnowledgeDBs,
-  effectiveAuthor: SourceId,
-  documents?: Map<string, Document>,
-  documentByFilePath?: Map<string, Document>
-): RefTargetInfo | undefined {
-  const source = getNode(knowledgeDBs, refId, effectiveAuthor);
-  const resolved = resolveAnyLink(
-    knowledgeDBs,
-    documents,
-    documentByFilePath,
-    source,
-    effectiveAuthor
-  );
-  if (!resolved) {
-    return undefined;
-  }
-  const { node } = resolved;
-
-  const parentNode = node.parent
-    ? getNode(knowledgeDBs, node.parent, resolved.sourceId)
-    : undefined;
-  const targetRoot = parentNode || node;
-
-  return {
-    stack: getNodeStack(knowledgeDBs, targetRoot, resolved.sourceId),
-    sourceId: resolved.sourceId,
-    rootNodeId: targetRoot.id,
-    scrollToId: targetRoot.id === node.id ? undefined : node.id,
   };
 }
 

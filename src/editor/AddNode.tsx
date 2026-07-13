@@ -2,6 +2,8 @@ import React, { useEffect, useLayoutEffect } from "react";
 import { useEditorText } from "./EditorTextContext";
 import { isEditableElement } from "./keyboardNavigation";
 import { ParsedLine, parseClipboardText } from "../planner";
+import { isEntityLinkHref } from "../core/entityRecognition";
+import { isInternalLinkHref, isWebsiteLinkHref } from "../core/nodeSpans";
 
 export function preventEditorBlur(e: React.MouseEvent): void {
   if (isEditableElement(document.activeElement)) {
@@ -63,10 +65,10 @@ function spansFromDomNode(node: ChildNode): InlineSpan[] {
 function trimSpans(spans: InlineSpan[]): InlineSpan[] {
   if (spans.length === 0) return spans;
   const trimText = (text: string, index: number): string => {
-    if (spans.length === 1) return text.trim();
-    if (index === 0) return text.trimStart();
-    if (index === spans.length - 1) return text.trimEnd();
-    return text;
+    const withoutLeading = index === 0 ? text.trimStart() : text;
+    return index === spans.length - 1
+      ? withoutLeading.trimEnd()
+      : withoutLeading;
   };
   return spans
     .map((span, index) => ({ ...span, text: trimText(span.text, index) }))
@@ -133,6 +135,17 @@ export function MiniEditor({
         mark.setAttribute("class", "inline-link");
         mark.setAttribute("data-href", span.href);
         mark.setAttribute("data-target", span.href);
+        const isEntity = isEntityLinkHref(span.href);
+        const markStyle = [
+          isEntity ? "color: var(--violet)" : "",
+          isInternalLinkHref(span.href) && !isEntity
+            ? "font-style: italic"
+            : "",
+          isWebsiteLinkHref(span.href) ? "text-decoration: underline" : "",
+        ]
+          .filter(Boolean)
+          .join("; ");
+        if (markStyle) mark.setAttribute("style", markStyle);
         mark.replaceChildren(document.createTextNode(span.text));
         return mark;
       })

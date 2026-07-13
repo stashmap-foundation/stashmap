@@ -12,8 +12,7 @@ import {
 } from "../rowModel";
 import { useData } from "../DataContext";
 import { useCalendarFeeds } from "../CalendarFeedContext";
-import { icalFeedUrlOf } from "../core/ical";
-import { nodeText } from "../core/nodeSpans";
+import { calendarFeedUrl } from "../core/ical";
 import { useCurrentPane, usePaneIndex } from "../SplitPanesContext";
 import { useApis } from "../Apis";
 import {
@@ -101,7 +100,7 @@ export function PaneTreeResultProvider({
   // the projection rows appear when the fetch resolves.
   useEffect(() => {
     treeResult.rows.forEach((row) => {
-      const feedUrl = icalFeedUrlOf(nodeText(row.node));
+      const feedUrl = calendarFeedUrl(row.node);
       if (feedUrl) {
         requestFeed(feedUrl);
       }
@@ -249,7 +248,7 @@ function Tree(): JSX.Element | null {
   const rows = treeResult?.rows || List<Row>();
   const nodeKeys = rows.map((row) => row.viewKey).toArray();
   const rootRow = rows.first();
-  const displayText = rootRow ? getDisplayTextForRow(data, rootRow) : "";
+  const displayText = rootRow ? getDisplayTextForRow(rootRow) : "";
   const ariaLabel = displayText ? `related to ${displayText}` : undefined;
   const rowFocusIntent =
     data.publishEventsStatus.temporaryView.rowFocusIntents.get(paneIndex);

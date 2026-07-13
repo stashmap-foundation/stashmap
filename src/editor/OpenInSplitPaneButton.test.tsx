@@ -88,8 +88,7 @@ Search: Spain
   await expectTree(`
 Search: Spain
   [R] My Notes / Holiday Destinations / Spain
-Holiday Destinations
-  Spain
+Spain
   `);
 });
 
@@ -113,7 +112,7 @@ Root
   `);
 });
 
-test("open head-level reference in split pane uses parent node route", async () => {
+test("open head-level link row in split pane uses the source row", async () => {
   const [alice] = setup([ALICE]);
   renderApp(alice());
 
@@ -129,9 +128,6 @@ Root
   OtherParent
 Target
   Source
-Root
-  Source
-  Target
-  OtherParent
+Source
   `);
 });

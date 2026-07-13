@@ -142,7 +142,7 @@ Root
     await expectTree(`
 Source
   Child
-  [I] Target ↩
+  [I] Target / Source ↩
     `);
 
     await screen.findByLabelText(/decline Target/);

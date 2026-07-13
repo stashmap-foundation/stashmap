@@ -1,6 +1,6 @@
 import { Set } from "immutable";
 import { getWorkspaceNode } from "./core/knowledge";
-import { deleteNodes, isRefNode } from "./core/connections";
+import { deleteNodes } from "./core/connections";
 import {
   GraphPlan,
   planDeleteDescendantNodes,
@@ -68,7 +68,7 @@ export function planRemoveNodeItemById<T extends GraphPlan>(
     plan,
     deleteNodes(parentNode, Set([nodeIndex]))
   );
-  if (!item || isRefNode(item)) {
+  if (!item) {
     return withoutItem;
   }
   const sourceNode = getWorkspaceNode(withoutItem.knowledgeDBs, item.id);

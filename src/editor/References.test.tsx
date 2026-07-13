@@ -234,12 +234,10 @@ Places
     // Violet means entity — the link target carries the canonical id, so
     // recognition feedback fires with or without a home page (the violet
     // law: node id or link target).
-    /* eslint-disable testing-library/no-node-access */
-    const violetWrapper = screen
-      .getByText("https://www.wikidata.org/wiki/Q131723")
-      .closest('[style*="--violet"]');
-    /* eslint-enable testing-library/no-node-access */
-    expect(violetWrapper).not.toBeNull();
+    const entityLink = screen.getByRole("link", {
+      name: "https://www.wikidata.org/wiki/Q131723",
+    });
+    expect(entityLink.style.color).toBe("var(--violet)");
   });
 
   test("Deleted node shows (deleted) indicator in ~Log", async () => {
@@ -269,7 +267,7 @@ My Notes
 
     await expectTree(`
 ~Log
-  [D] My Notes
+  My Notes
     `);
 
     cleanup();
@@ -279,7 +277,7 @@ My Notes
 
     await expectTree(`
 ~Log
-  [D] My Notes
+  My Notes
     `);
   });
 
@@ -311,7 +309,7 @@ Investment
 
     await expectTree(`
 ~Log
-  [D] Investment
+  Investment
     `);
 
     cleanup();
@@ -321,7 +319,7 @@ Investment
 
     await expectTree(`
 ~Log
-  [D] Investment
+  Investment
     `);
   });
 });

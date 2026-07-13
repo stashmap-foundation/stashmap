@@ -1,164 +1,24 @@
-import { List, Map as ImmutableMap, Set } from "immutable";
-import {
-  getChildNodes,
-  getNode,
-  resolveNode,
-  itemPassesFilters,
-} from "./core/connections";
-import { isCanonicalId } from "./core/entityRecognition";
+import { List, Set } from "immutable";
 import { displayTextOf } from "./core/ical";
-import {
-  getBlockLinkTarget,
-  getBlockLinkText,
-  getBlockFileLinkPath,
-  getBlockFileLinkText,
-  isBlockFileLink,
-  isBlockLink,
-  nodeText,
-} from "./core/nodeSpans";
-import { Document, documentKeyOf, getDocumentForNode } from "./core/Document";
-import { fileLinkIndexKey, fileLinkIndexPath } from "./core/linkPath";
+import { nodeText } from "./core/nodeSpans";
+import { getDocumentForNode } from "./core/Document";
+import { fileLinkIndexKey } from "./core/linkPath";
 import { nodeRefKey } from "./core/nodeRef";
-import { DEFAULT_TYPE_FILTERS } from "./core/constants";
 import { referenceToText } from "./editor/referenceText";
 import {
   ResolvedNode,
   getNodeInSource,
   graphLookupFromData,
   lookupNode,
-  resolveBlockLinkTarget,
 } from "./core/graphLookup";
-
-function argumentPrefix(argument?: Argument): string {
-  if (argument === "confirms") {
-    return "+";
-  }
-  if (argument === "contra") {
-    return "-";
-  }
-  return "";
-}
 
 type ParsedRef = {
   node: GraphNode;
   nodeSourceId: SourceId;
   contextNodes: List<GraphNode>;
-  sourceItem?: GraphNode;
-  sourceItemSourceId: SourceId;
 };
 
-function resolveFileLinkRoot(
-  sourceItem: GraphNode,
-  knowledgeDBs: KnowledgeDBs,
-  myself: SourceId,
-  documents: ImmutableMap<string, Document>,
-  documentByFilePath: ImmutableMap<string, Document>
-): { node: GraphNode; sourceId: SourceId } | undefined {
-  const linkPath = getBlockFileLinkPath(sourceItem);
-  if (!linkPath) return undefined;
-  const sourceRoot =
-    sourceItem.id === sourceItem.root
-      ? sourceItem
-      : getNode(knowledgeDBs, sourceItem.root, myself);
-  const sourceFilePath = sourceRoot?.docId
-    ? documents.get(documentKeyOf(myself, sourceRoot.docId))?.filePath
-    : undefined;
-  const resolved = fileLinkIndexPath(linkPath, sourceFilePath);
-  const targetDoc =
-    documentByFilePath.get(resolved) ||
-    documents.get(documentKeyOf(myself, resolved));
-  if (!targetDoc) return undefined;
-  const topNodeShortId = targetDoc.topNodeShortIds[0];
-  const node = topNodeShortId
-    ? getNode(knowledgeDBs, topNodeShortId as ID, targetDoc.sourceId)
-    : undefined;
-  return node ? { node, sourceId: targetDoc.sourceId } : undefined;
-}
-
 function getConcreteContextNodes(
-  knowledgeDBs: KnowledgeDBs,
-  node: GraphNode,
-  sourceId: SourceId
-): List<GraphNode> {
-  const loop = (
-    currentParentID: ID | undefined,
-    visited: Set<string>,
-    nodes: List<GraphNode>
-  ): List<GraphNode> => {
-    if (!currentParentID) {
-      return nodes;
-    }
-    const parentKey = currentParentID;
-    if (visited.has(parentKey)) {
-      return nodes;
-    }
-    const parentNode = getNode(knowledgeDBs, currentParentID, sourceId);
-    if (!parentNode) {
-      return nodes;
-    }
-    return loop(
-      parentNode.parent,
-      visited.add(parentKey),
-      nodes.unshift(parentNode)
-    );
-  };
-
-  return loop(node.parent, Set<string>([node.id]), List<GraphNode>());
-}
-
-function parseRef(
-  refId: ID,
-  knowledgeDBs: KnowledgeDBs,
-  myself: SourceId,
-  documents?: ImmutableMap<string, Document>,
-  documentByFilePath?: ImmutableMap<string, Document>
-): ParsedRef | undefined {
-  const sourceItem = getNode(knowledgeDBs, refId, myself);
-  if (
-    sourceItem &&
-    isBlockFileLink(sourceItem) &&
-    documents &&
-    documentByFilePath
-  ) {
-    const fileLinkTarget = resolveFileLinkRoot(
-      sourceItem,
-      knowledgeDBs,
-      myself,
-      documents,
-      documentByFilePath
-    );
-    if (!fileLinkTarget) return undefined;
-    const contextNodes = getConcreteContextNodes(
-      knowledgeDBs,
-      fileLinkTarget.node,
-      fileLinkTarget.sourceId
-    );
-    return {
-      node: fileLinkTarget.node,
-      nodeSourceId: fileLinkTarget.sourceId,
-      contextNodes,
-      sourceItem,
-      sourceItemSourceId: myself,
-    };
-  }
-  const node = resolveNode(knowledgeDBs, sourceItem, myself);
-  if (!node) {
-    return undefined;
-  }
-
-  const contextNodes = getConcreteContextNodes(knowledgeDBs, node, myself);
-
-  const effectiveSourceItem = sourceItem || node;
-  return {
-    node,
-    nodeSourceId: myself,
-    contextNodes,
-    sourceItem: effectiveSourceItem,
-    sourceItemSourceId: myself,
-  };
-}
-
-function getConcreteContextNodesInSource(
   graph: ReturnType<typeof graphLookupFromData>,
   node: GraphNode,
   sourceId: SourceId
@@ -168,594 +28,132 @@ function getConcreteContextNodesInSource(
     visited: Set<string>,
     nodes: List<GraphNode>
   ): List<GraphNode> => {
-    if (!currentParentID) {
-      return nodes;
-    }
+    if (!currentParentID) return nodes;
     const parentKey = `${sourceId}:${currentParentID}`;
-    if (visited.has(parentKey)) {
-      return nodes;
-    }
+    if (visited.has(parentKey)) return nodes;
     const parentNode = getNodeInSource(graph, {
       sourceId,
       id: currentParentID,
     })?.node;
-    if (!parentNode) {
-      return nodes;
-    }
-    return loop(
-      parentNode.parent,
-      visited.add(parentKey),
-      nodes.unshift(parentNode)
-    );
+    return parentNode
+      ? loop(
+          parentNode.parent,
+          visited.add(parentKey),
+          nodes.unshift(parentNode)
+        )
+      : nodes;
   };
 
-  return loop(node.parent, Set<string>([`${sourceId}:${node.id}`]), List());
+  return loop(node.parent, Set([`${sourceId}:${node.id}`]), List());
 }
 
-function resolveFileLinkRootInSource(
-  sourceItem: GraphNode,
-  graph: ReturnType<typeof graphLookupFromData>,
-  sourceId: SourceId,
-  documents: ImmutableMap<string, Document>,
-  documentByFilePath: ImmutableMap<string, Document>
-): { node: GraphNode; sourceId: SourceId } | undefined {
-  const linkPath = getBlockFileLinkPath(sourceItem);
-  if (!linkPath) return undefined;
-  const sourceRoot =
-    sourceItem.id === sourceItem.root
-      ? sourceItem
-      : getNodeInSource(graph, { sourceId, id: sourceItem.root })?.node;
-  const sourceFilePath = sourceRoot?.docId
-    ? documents.get(documentKeyOf(sourceId, sourceRoot.docId))?.filePath
-    : undefined;
-  const resolved = fileLinkIndexPath(linkPath, sourceFilePath);
-  const targetDoc =
-    documentByFilePath.get(resolved) ||
-    documents.get(documentKeyOf(sourceId, resolved));
-  const topNodeShortId = targetDoc?.topNodeShortIds[0];
-  if (!targetDoc || !topNodeShortId) return undefined;
-  const node = lookupNode(
-    graph,
-    topNodeShortId as ID,
-    targetDoc.sourceId
-  )?.node;
-  return node ? { node, sourceId: targetDoc.sourceId } : undefined;
-}
-
-function parseRefInSource(
+function parseRef(
   graph: ReturnType<typeof graphLookupFromData>,
   refId: ID,
-  data: Data,
   sourceId: SourceId
 ): ParsedRef | undefined {
   const source = lookupNode(graph, refId, sourceId);
-  if (!source) {
-    return undefined;
-  }
-  if (isBlockFileLink(source.node)) {
-    const fileLinkTarget = resolveFileLinkRootInSource(
-      source.node,
-      graph,
-      source.ref.sourceId,
-      data.documents,
-      data.documentByFilePath
-    );
-    if (!fileLinkTarget) return undefined;
-    return {
-      node: fileLinkTarget.node,
-      nodeSourceId: fileLinkTarget.sourceId,
-      contextNodes: getConcreteContextNodesInSource(
-        graph,
-        fileLinkTarget.node,
-        fileLinkTarget.sourceId
-      ),
-      sourceItem: source.node,
-      sourceItemSourceId: source.ref.sourceId,
-    };
-  }
-
-  const target = isBlockLink(source.node)
-    ? resolveBlockLinkTarget(graph, source)
-    : source;
-  if (!target) {
-    return undefined;
-  }
-  return {
-    node: target.node,
-    nodeSourceId: target.ref.sourceId,
-    contextNodes: getConcreteContextNodesInSource(
-      graph,
-      target.node,
-      target.ref.sourceId
-    ),
-    sourceItem: source.node,
-    sourceItemSourceId: source.ref.sourceId,
-  };
+  return source
+    ? {
+        node: source.node,
+        nodeSourceId: source.ref.sourceId,
+        contextNodes: getConcreteContextNodes(
+          graph,
+          source.node,
+          source.ref.sourceId
+        ),
+      }
+    : undefined;
 }
 
-function resolveLabels(
-  node: GraphNode,
-  contextNodes: List<GraphNode>
-): { contextLabels: string[]; targetLabel: string } {
-  const contextLabels = contextNodes.map((contextNode) =>
-    displayTextOf(nodeText(contextNode))
-  );
-  const targetLabel = displayTextOf(nodeText(node));
-  return { contextLabels: contextLabels.toArray(), targetLabel };
-}
-
-function buildReferenceFromParsed(
+function buildReference(
   refId: ID,
   ref: ParsedRef
 ): NonNullable<Row["reference"]> {
-  const { contextLabels, targetLabel } = resolveLabels(
-    ref.node,
-    ref.contextNodes
-  );
-  const contextPath = contextLabels.join(" / ");
-  const text = contextPath ? `${contextPath} / ${targetLabel}` : targetLabel;
-
-  return {
-    id: refId,
-    text,
-    contextLabels,
-    targetLabel,
-    sourceId: ref.nodeSourceId,
-  };
-}
-
-function nodesShareLineage(left: GraphNode, right: GraphNode): boolean {
-  return (
-    left.basedOn === right.id ||
-    right.basedOn === left.id ||
-    (left.basedOn !== undefined && left.basedOn === right.basedOn)
-  );
-}
-
-function buildDeletedReference(
-  refId: ID,
-  sourceId: SourceId,
-  linkText?: string
-): ReturnType<typeof buildReferenceFromParsed> | undefined {
-  if (!linkText) return undefined;
-
-  const parts = linkText.split(" / ");
-  const targetLabel = parts[parts.length - 1];
-  const contextLabels = parts.slice(0, -1);
-  return {
-    id: refId,
-    text: `(deleted) ${linkText}`,
-    contextLabels,
-    targetLabel,
-    sourceId,
-    deleted: true,
-  };
-}
-
-function buildSourceParentReference(
-  ref: ParsedRef,
-  knowledgeDBs: KnowledgeDBs
-): ReturnType<typeof buildReferenceFromParsed> | undefined {
-  const { sourceItem, sourceItemSourceId } = ref;
-  if (!sourceItem?.parent) {
-    return undefined;
-  }
-  const sourceParent = getNode(
-    knowledgeDBs,
-    sourceItem.parent,
-    sourceItemSourceId
-  );
-  if (!sourceParent) {
-    return undefined;
-  }
-  const contextNodes = getConcreteContextNodes(
-    knowledgeDBs,
-    sourceParent,
-    sourceItemSourceId
-  );
-  const { contextLabels, targetLabel } = resolveLabels(
-    sourceParent,
-    contextNodes
-  );
-  const contextPath = contextLabels.join(" / ");
-  const text = contextPath ? `${contextPath} / ${targetLabel}` : targetLabel;
-
-  return {
-    id: sourceParent.id,
-    text,
-    contextLabels,
-    targetLabel,
-    sourceId: sourceItemSourceId,
-  };
-}
-
-export function buildOutgoingReference(
-  refId: ID,
-  knowledgeDBs: KnowledgeDBs,
-  myself: SourceId,
-  documents?: ImmutableMap<string, Document>,
-  documentByFilePath?: ImmutableMap<string, Document>
-): ReturnType<typeof buildReferenceFromParsed> | undefined {
-  const ref = parseRef(
-    refId,
-    knowledgeDBs,
-    myself,
-    documents,
-    documentByFilePath
-  );
-  if (!ref) {
-    const sourceItem = getNode(knowledgeDBs, refId, myself);
-    return buildDeletedReference(
-      refId,
-      myself,
-      getBlockLinkText(sourceItem) ?? getBlockFileLinkText(sourceItem)
-    );
-  }
-
-  const { contextLabels, targetLabel } = resolveLabels(
-    ref.node,
-    ref.contextNodes
-  );
-  const contextPath = contextLabels.join(" / ");
-  const text = contextPath ? `${contextPath} / ${targetLabel}` : targetLabel;
-
-  return {
-    id: refId,
-    text,
-    contextLabels,
-    targetLabel,
-    sourceId: ref.nodeSourceId,
-  };
-}
-
-function effectiveIDs(
-  knowledgeDBs: KnowledgeDBs,
-  node: GraphNode,
-  sourceId: SourceId,
-  activeFilters: (
-    | Relevance
-    | "suggestions"
-    | "versions"
-    | "incoming"
-    | "contains"
-  )[]
-): List<string> {
-  return getChildNodes(knowledgeDBs, node, sourceId)
+  const targetLabel = displayTextOf(nodeText(ref.node));
+  const contextLabels = ref.contextNodes
+    .map((node) => displayTextOf(nodeText(node)))
+    .toArray()
     .filter(
-      (item) =>
-        itemPassesFilters(item, activeFilters) &&
-        item.relevance !== "not_relevant"
-    )
-    .map((item) => item.basedOn ?? item.id)
-    .toList();
-}
-
-function computeNodeDiff(
-  knowledgeDBs: KnowledgeDBs,
-  versionNode: GraphNode,
-  versionSourceId: SourceId,
-  parentNode: GraphNode | undefined,
-  parentSourceId: SourceId,
-  activeFilters: (
-    | Relevance
-    | "suggestions"
-    | "versions"
-    | "incoming"
-    | "contains"
-  )[]
-): { addCount: number; removeCount: number } {
-  const versionIDs = effectiveIDs(
-    knowledgeDBs,
-    versionNode,
-    versionSourceId,
-    activeFilters
-  ).toSet();
-  const parentIDs = parentNode
-    ? effectiveIDs(
-        knowledgeDBs,
-        parentNode,
-        parentSourceId,
-        activeFilters
-      ).toSet()
-    : List<string>().toSet();
+      (label, index, labels) =>
+        label !== targetLabel || index !== labels.length - 1
+    );
   return {
-    addCount: versionIDs.filter((id) => !parentIDs.has(id)).size,
-    removeCount: parentIDs.filter((id) => !versionIDs.has(id)).size,
+    id: refId,
+    text: [...contextLabels, targetLabel].join(" / "),
+    contextLabels,
+    targetLabel,
+    sourceId: ref.nodeSourceId,
   };
 }
 
-function computeVersionMeta(
-  graph: ReturnType<typeof graphLookupFromData>,
-  data: Data,
-  refId: ID,
-  sourceId: SourceId,
-  parentNode: GraphNode | undefined,
-  typeFilters: Pane["typeFilters"]
-): Row["versionMeta"] {
-  const source = lookupNode(graph, refId, sourceId);
-  const resolvedTarget = source
-    ? resolveBlockLinkTarget(graph, source) ?? source
-    : undefined;
-  if (!resolvedTarget) return { updated: 0, addCount: 0, removeCount: 0 };
+function sameRef(left: NodeRef, right: NodeRef): boolean {
+  return left.id === right.id && left.sourceId === right.sourceId;
+}
 
-  const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
-
-  const { addCount, removeCount } = computeNodeDiff(
-    data.knowledgeDBs,
-    resolvedTarget.node,
-    resolvedTarget.ref.sourceId,
-    parentNode,
-    sourceId,
-    activeFilters
+function incomingGraphRefs(data: Data, target: ResolvedNode): NodeRef[] {
+  return (
+    data.graphIndex.incomingCrefsByTarget.get(nodeRefKey(target.ref)) ??
+    data.graphIndex.incomingCrefs.get(target.node.id) ??
+    []
   );
-  return { updated: resolvedTarget.node.updated, addCount, removeCount };
 }
 
-function getReferenceSourceNodes(
-  ref: ParsedRef,
-  knowledgeDBs: KnowledgeDBs
-): GraphNode[] {
-  const parentNode = ref.node.parent
-    ? getNode(knowledgeDBs, ref.node.parent, ref.nodeSourceId)
-    : undefined;
-  return parentNode && parentNode.id !== ref.node.id
-    ? [ref.node, parentNode]
-    : [ref.node];
-}
-
-function uniqueNodes(nodes: GraphNode[]): GraphNode[] {
-  const seen = new globalThis.Set<ID>();
-  return nodes.filter((node) => {
-    if (seen.has(node.id)) return false;
-    seen.add(node.id);
-    return true;
-  });
-}
-
-function getDocumentTopSourceNodes(ref: ParsedRef, data: Data): GraphNode[] {
+function incomingFileRefs(data: Data, target: ResolvedNode): NodeRef[] {
   const document = getDocumentForNode(
-    data.knowledgeDBs,
-    data.documents,
-    ref.node,
-    ref.nodeSourceId
-  );
-  if (!document) return [];
-  return document.topNodeShortIds
-    .map((nodeID) =>
-      getNode(data.knowledgeDBs, nodeID as ID, document.sourceId)
-    )
-    .filter((node): node is GraphNode => node !== undefined);
-}
-
-function linkOwnerID(item: GraphNode): ID {
-  return (item.parent as ID | undefined) ?? item.id;
-}
-
-function findIndexedGraphLinkItem(
-  graph: ReturnType<typeof graphLookupFromData>,
-  data: Data,
-  target: ResolvedNode,
-  sourceNodes: GraphNode[]
-): GraphNode | undefined {
-  const sourceIDs = new globalThis.Set(sourceNodes.map((node) => node.id));
-  const itemRefs = data.graphIndex.incomingCrefsByTarget.get(
-    nodeRefKey(target.ref)
-  );
-  const items = itemRefs
-    ? itemRefs.map((ref) => getNodeInSource(graph, ref)?.node)
-    : (data.graphIndex.incomingCrefs.get(target.node.id) ?? []).map(
-        (ref) => getNodeInSource(graph, ref)?.node
-      );
-  return items
-    .filter((item): item is GraphNode => item !== undefined)
-    .find((item) => sourceIDs.has(linkOwnerID(item)));
-}
-
-function findIndexedFileLinkItem(
-  graph: ReturnType<typeof graphLookupFromData>,
-  data: Data,
-  target: ResolvedNode,
-  sourceNodes: GraphNode[]
-): GraphNode | undefined {
-  const targetDocument = getDocumentForNode(
     data.knowledgeDBs,
     data.documents,
     target.node,
     target.ref.sourceId
   );
-  if (
-    !targetDocument ||
-    !targetDocument.filePath ||
-    targetDocument.topNodeShortIds[0] !== target.node.id
-  ) {
-    return undefined;
-  }
-  const itemRefs = data.graphIndex.incomingFileLinks.get(
-    fileLinkIndexKey(targetDocument.sourceId, targetDocument.filePath)
-  );
-  if (!itemRefs) return undefined;
-  const sourceIDs = new globalThis.Set(sourceNodes.map((node) => node.id));
-  return itemRefs
-    .map((ref) => getNodeInSource(graph, ref)?.node)
-    .filter((item): item is GraphNode => item !== undefined)
-    .find((item) => sourceIDs.has(linkOwnerID(item)));
+  return document?.filePath && document.topNodeShortIds[0] === target.node.id
+    ? data.graphIndex.incomingFileLinks.get(
+        fileLinkIndexKey(document.sourceId, document.filePath)
+      ) ?? []
+    : [];
 }
 
-function findIndexedIncomingLinkItem(
+function findIncomingLinkItem(
   graph: ReturnType<typeof graphLookupFromData>,
-  ref: ParsedRef,
   data: Data,
-  target: ResolvedNode
+  source: NodeRef,
+  target: ResolvedNode | undefined
 ): GraphNode | undefined {
-  const sourceNodes = uniqueNodes([
-    ...getReferenceSourceNodes(ref, data.knowledgeDBs),
-    ...getDocumentTopSourceNodes(ref, data),
-  ]);
-  return (
-    findIndexedGraphLinkItem(graph, data, target, sourceNodes) ??
-    findIndexedFileLinkItem(graph, data, target, sourceNodes)
-  );
+  if (!target) return undefined;
+  const ref = [
+    ...incomingGraphRefs(data, target),
+    ...incomingFileRefs(data, target),
+  ].find((candidate) => sameRef(candidate, source));
+  return ref ? getNodeInSource(graph, ref)?.node : undefined;
 }
 
-function findIncomingCrefItem(
-  graph: ReturnType<typeof graphLookupFromData>,
-  ref: ParsedRef,
-  data: Data,
-  containing: ResolvedNode | undefined
-): GraphNode | undefined {
-  return containing
-    ? findIndexedIncomingLinkItem(graph, ref, data, containing)
-    : undefined;
-}
-
-// Builds the reference blob for LINK rows and INCOMING references only —
-// suggestion and version rows render straight from the row (node,
-// versionMeta, sourceId), no parallel presentation model.
 export function buildReferenceItem(
   graph: ReturnType<typeof graphLookupFromData>,
   refId: ID,
   data: Data,
   sourceId: SourceId,
   virtualType: Row["virtualType"],
-  parentNode: GraphNode | undefined,
-  containing: ResolvedNode | undefined,
-  typeFilters: Pane["typeFilters"]
+  containing: ResolvedNode | undefined
 ): Row["reference"] {
-  const ref = parseRefInSource(graph, refId, data, sourceId);
-  const resolvedOutgoing = ref
-    ? buildReferenceFromParsed(refId, ref)
-    : undefined;
-  if (!ref) {
-    const parentItem = parentNode
-      ? lookupNode(graph, refId, sourceId)?.node
-      : undefined;
-    const entityTarget = getBlockLinkTarget(parentItem);
-    if (entityTarget && isCanonicalId(entityTarget)) {
-      // A dangling canonical-id link: no home page is its ordinary state
-      // — never deletion (idea.md: "dangling allowed, no page").
-      const linkText = getBlockLinkText(parentItem) ?? entityTarget;
-      return {
-        id: refId,
-        text: linkText,
-        contextLabels: [],
-        targetLabel: linkText,
-        sourceId,
-      };
-    }
-    const deleted = buildDeletedReference(
-      refId,
-      sourceId,
-      getBlockLinkText(parentItem) ?? getBlockFileLinkText(parentItem)
-    );
-    return deleted;
-  }
-
-  if (virtualType === "incoming") {
-    const outgoing =
-      ref.sourceItem && isBlockFileLink(ref.sourceItem)
-        ? buildSourceParentReference(ref, data.knowledgeDBs) ?? resolvedOutgoing
-        : resolvedOutgoing;
-    if (!outgoing) {
-      return undefined;
-    }
-    const crefItem =
-      virtualType === "incoming"
-        ? findIncomingCrefItem(graph, ref, data, containing)
-        : undefined;
-    const incomingRelevance = crefItem?.relevance ?? ref.sourceItem?.relevance;
-    const incomingArgument = crefItem?.argument ?? ref.sourceItem?.argument;
-    const text = referenceToText({
-      displayAs: "incoming" as const,
+  if (virtualType !== "incoming") return undefined;
+  const parsed = parseRef(graph, refId, sourceId);
+  if (!parsed) return undefined;
+  const outgoing = buildReference(refId, parsed);
+  const sourceRef = { sourceId: parsed.nodeSourceId, id: parsed.node.id };
+  const incoming = findIncomingLinkItem(graph, data, sourceRef, containing);
+  const incomingRelevance = incoming?.relevance ?? parsed.node.relevance;
+  const incomingArgument = incoming?.argument ?? parsed.node.argument;
+  return {
+    ...outgoing,
+    text: referenceToText({
+      displayAs: "incoming",
       contextLabels: outgoing.contextLabels,
       targetLabel: outgoing.targetLabel,
       incomingRelevance,
       incomingArgument,
-    });
-    return {
-      ...outgoing,
-      text,
-      displayAs: "incoming" as const,
-      incomingRelevance,
-      incomingArgument,
-    };
-  }
-
-  const outgoing = resolvedOutgoing;
-  if (!outgoing) {
-    return undefined;
-  }
-
-  if (parentNode && nodesShareLineage(ref.node, parentNode)) {
-    const computedVersionMeta = computeVersionMeta(
-      graph,
-      data,
-      refId,
-      sourceId,
-      parentNode,
-      typeFilters
-    );
-    return {
-      ...outgoing,
-      text: outgoing.text,
-      versionMeta: computedVersionMeta,
-    };
-  }
-  if (!containing) {
-    return outgoing;
-  }
-
-  const storedItem = lookupNode(graph, refId, sourceId)?.node;
-  const isNotRelevant = storedItem?.relevance === "not_relevant";
-
-  const incomingCref = findIndexedIncomingLinkItem(
-    graph,
-    ref,
-    data,
-    containing
-  );
-  const hasActiveIncoming =
-    !!incomingCref && incomingCref.relevance !== "not_relevant";
-
-  const displayAs = (() => {
-    if (!hasActiveIncoming) return undefined;
-    return isNotRelevant ? "incoming" : "bidirectional";
-  })();
-
-  if (!displayAs) {
-    const argument = argumentPrefix(
-      storedItem?.argument ?? ref.sourceItem?.argument
-    );
-    if (!argument) {
-      return outgoing;
-    }
-    const targetLabel = `${argument} ${outgoing.targetLabel}`;
-    return {
-      ...outgoing,
-      targetLabel,
-      text: referenceToText({
-        contextLabels: outgoing.contextLabels,
-        targetLabel,
-      }),
-    };
-  }
-
-  if (!incomingCref) {
-    return outgoing;
-  }
-  const incomingRel = incomingCref.relevance;
-  const incomingArg = incomingCref.argument;
-  const text = referenceToText({
-    displayAs,
-    contextLabels: outgoing.contextLabels,
-    targetLabel: outgoing.targetLabel,
-    incomingRelevance: incomingRel,
-    incomingArgument: incomingArg,
-  });
-  return {
-    ...outgoing,
-    text,
-    displayAs,
-    incomingRelevance: incomingRel,
-    incomingArgument: incomingArg,
+    }),
+    displayAs: "incoming",
+    incomingRelevance,
+    incomingArgument,
   };
 }

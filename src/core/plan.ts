@@ -28,7 +28,7 @@ import { snapshotIdForContent } from "../nodesDocumentEvent";
 import { newGraphNode } from "./nodeFactory";
 import {
   fileLinkSpan,
-  getBlockLinkTarget,
+  getAllLinks,
   linkSpan,
   nodeText,
   plainSpans,
@@ -607,7 +607,9 @@ function materializeInsertIndex(
   const matchesAnchor = (childId: ID, anchor: ID): boolean => {
     if (childId === anchor) return true;
     const child = getWorkspaceNode(plan.knowledgeDBs, childId);
-    return getBlockLinkTarget(child) === anchor;
+    return child
+      ? getAllLinks(child).some((link) => link.targetID === anchor)
+      : false;
   };
   const children = parentNode.children.toArray();
   const found = precededBy
@@ -648,7 +650,9 @@ export function planMaterializeComputedRow<T extends GraphPlan>(
       return true;
     }
     const child = getWorkspaceNode(plan.knowledgeDBs, childId);
-    return getBlockLinkTarget(child) === row.node.id;
+    return child
+      ? getAllLinks(child).some((link) => link.targetID === row.node.id)
+      : false;
   });
   if (placedChildId !== undefined) {
     const already = getWorkspaceNode(plan.knowledgeDBs, placedChildId);
@@ -1021,25 +1025,29 @@ export function planAddTopTargetsToDocument<T extends GraphPlan>(
     ([accPlan, accIds], target) => {
       const documentLinkTarget =
         typeof target !== "string" && "docId" in target ? target : undefined;
-      if (!documentLinkTarget) {
+      const refTarget =
+        typeof target !== "string" && "targetID" in target ? target : undefined;
+      const topNodeSpans = documentLinkTarget
+        ? [
+            fileLinkSpan(
+              documentLinkHref(
+                documentLinkTarget.docId,
+                documentLinkTarget.filePath
+              ),
+              documentLinkTarget.linkText || ""
+            ),
+          ]
+        : refTarget
+        ? [linkSpan(refTarget.targetID, refTarget.linkText || "")]
+        : [];
+      if (topNodeSpans.length === 0) {
         return [accPlan, accIds];
       }
-      const topNode = newGraphNode(
-        [
-          fileLinkSpan(
-            documentLinkHref(
-              documentLinkTarget.docId,
-              documentLinkTarget.filePath
-            ),
-            documentLinkTarget.linkText || ""
-          ),
-        ],
-        {
-          docId: document.docId,
-          relevance,
-          argument,
-        }
-      );
+      const topNode = newGraphNode(topNodeSpans, {
+        docId: document.docId,
+        relevance,
+        argument,
+      });
       return [planUpsertNodes(accPlan, topNode), [...accIds, topNode.id]];
     },
     [plan, []]

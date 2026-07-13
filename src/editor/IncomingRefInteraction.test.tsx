@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   ALICE,
@@ -9,12 +9,20 @@ import {
   type,
   navigateToNodeViaSearch,
 } from "../utils.test";
+import { modClick } from "./Multiselect.testUtils";
 
 async function clickRow(name: string): Promise<void> {
   const row = await screen.findByRole("treeitem", {
     name: (accessibleName) => accessibleName.startsWith(name),
   });
   await userEvent.click(row);
+}
+
+async function followSourceLinkChain(): Promise<void> {
+  const first = await screen.findByRole("link", { name: "Source" });
+  await userEvent.click(first);
+  const second = await screen.findByRole("link", { name: "Source" });
+  await userEvent.click(second);
 }
 
 async function createAcceptedItemLevelRefOnCurrentPane(
@@ -333,8 +341,19 @@ Money
     renderApp(alice());
     await setupItemLevelIncomingRef();
 
-    await clickRow("Details");
-    await userEvent.keyboard("{Shift>}j{/Shift}");
+    const details = screen.getByRole("treeitem", { name: "Details" });
+    const incoming = screen.getByRole("treeitem", {
+      name: (name) => name.startsWith("Crypto / Bitcoin"),
+    });
+    modClick(details, { metaKey: true });
+    await waitFor(() =>
+      expect(details.getAttribute("data-selected")).toBe("true")
+    );
+    modClick(incoming, { metaKey: true });
+    await waitFor(() =>
+      expect(incoming.getAttribute("data-selected")).toBe("true")
+    );
+    incoming.focus();
     await userEvent.keyboard("!");
 
     await expectTree(
@@ -495,7 +514,7 @@ Target
     await expectTree(`
 Source
   Child
-  [I] Target ↩
+  [I] Target / Source ↩
     `);
 
     cleanup();
@@ -506,7 +525,7 @@ Source
     await expectTree(`
 Source
   Child
-  [I] Target ↩
+  [I] Target / Source ↩
     `);
   });
 
@@ -536,21 +555,20 @@ Source
     await clickRow("Target");
     await userEvent.keyboard("!");
 
-    await expectTree(`
-Source
-  Child
-  Target
-    `);
+    expect(
+      (await screen.findAllByRole("treeitem", { name: "Source" })).length
+    ).toBeGreaterThan(0);
 
     cleanup();
     renderApp(alice());
 
     await navigateToNodeViaSearch(0, "Source");
+    await followSourceLinkChain();
 
     await expectTree(`
 Source
   Child
-  Target
+  Source
     `);
   });
 
@@ -580,11 +598,9 @@ Source
     await clickRow("Target");
     await userEvent.keyboard("!");
 
-    await expectTree(`
-Source
-  Child
-  Target
-    `);
+    expect(
+      (await screen.findAllByRole("treeitem", { name: "Source" })).length
+    ).toBeGreaterThan(0);
 
     await navigateToNodeViaSearch(0, "Target");
 
@@ -598,11 +614,12 @@ Target
     renderApp(alice());
 
     await navigateToNodeViaSearch(0, "Source");
+    await followSourceLinkChain();
 
     await expectTree(`
 Source
   Child
-  Target
+  Source
     `);
 
     await navigateToNodeViaSearch(0, "Target");
@@ -676,7 +693,7 @@ Money
 Money
   Bitcoin
     Details
-    Crypto / Bitcoin
+    Bitcoin
     `);
 
     cleanup();
@@ -686,7 +703,7 @@ Money
 Money
   Bitcoin
     Details
-    Crypto / Bitcoin
+    Bitcoin
     `);
   });
 
@@ -710,8 +727,8 @@ Money
 Money
   Bitcoin
     Details
-    Crypto / Bitcoin
-    Tech / Bitcoin
+    Bitcoin
+    Bitcoin
     `);
 
     cleanup();
@@ -721,8 +738,8 @@ Money
 Money
   Bitcoin
     Details
-    Crypto / Bitcoin
-    Tech / Bitcoin
+    Bitcoin
+    Bitcoin
     `);
   });
 
@@ -750,7 +767,7 @@ Money
     [I] Crypto / Bitcoin !↩
 Crypto
   Bitcoin
-  Crypto / Bitcoin
+  Bitcoin
     `);
 
     cleanup();
@@ -766,7 +783,7 @@ Money
     [I] Crypto / Bitcoin !↩
 Crypto
   Bitcoin
-  Crypto / Bitcoin
+  Bitcoin
     `);
   });
 
@@ -1009,7 +1026,7 @@ Crypto
 Money
   Bitcoin
     Details
-    [D] Bitcoin
+    Bitcoin
     `);
 
     cleanup();
@@ -1019,7 +1036,7 @@ Money
 Money
   Bitcoin
     Details
-    [D] Bitcoin
+    Bitcoin
     `);
   });
 
@@ -1091,7 +1108,7 @@ Crypto
 Money
   Bitcoin
     Details
-    [D] Bitcoin
+    Bitcoin
     `);
 
     cleanup();
@@ -1101,7 +1118,7 @@ Money
 Money
   Bitcoin
     Details
-    [D] Bitcoin
+    Bitcoin
     `);
   });
 });

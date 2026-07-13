@@ -7,14 +7,12 @@ import {
   useCurrentNode,
   useDisplayText,
   useIsViewingOtherUserContent,
-  useCurrentEdge,
-  getCurrentReferenceForRow,
   useRow,
 } from "../rowModel";
 import { useData } from "../DataContext";
 import { isEmptyNodeID, nodePathLabel } from "../core/connections";
-import { getBlockLink } from "../core/blockLink";
-import { linkToInsertTarget } from "./linkOperations";
+import { calendarEntryTarget } from "../core/ical";
+import { searchInsertTarget } from "../localSearch";
 import { NOTE_TYPE, Node } from "./Node";
 import { useDroppable, clearDropIndent } from "./DroppableContainer";
 import {
@@ -88,9 +86,7 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
     const data = useData();
     const isNodeBeeingEdited = useIsEditingOn();
     const node = useCurrentNode();
-    const currentRow = useCurrentEdge();
     const { virtualType, viewKey } = row;
-    const currentReference = getCurrentReferenceForRow(data, row);
     const displayText = useDisplayText();
     const isEmptyNode = isEmptyNodeID(row.node.id);
     const disableDrag = isNodeBeeingEdited || isEmptyNode;
@@ -105,17 +101,8 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
               .filter((candidate) => selection.has(candidate.viewKey))
               .toArray()
           : [row];
-        const dragNode = node || currentRow;
-        const dragNodeId =
-          virtualType === "incoming" && currentReference
-            ? currentReference.id
-            : dragNode?.id;
-        const blockLink =
-          virtualType === "incoming"
-            ? undefined
-            : getBlockLink(currentRow, row.sourceId) ||
-              getBlockLink(dragNode, row.sourceId);
-        const insertTarget = linkToInsertTarget(data, blockLink);
+        const dragNode = node;
+        const dragNodeId = row.node.id;
         return {
           row,
           draggedRows,
@@ -124,8 +111,13 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
           virtualType,
           isCopyDrag: copyDrag || undefined,
           nodeId: dragNodeId,
+          targetId: calendarEntryTarget(row.node),
           linkText: nodePathText(data, dragNode, row.sourceId),
-          insertTarget,
+          insertTarget:
+            row.materialize?.take ??
+            (virtualType === "search"
+              ? searchInsertTarget(data, row.node, row.sourceId)
+              : undefined),
         };
       },
       collect: (monitor) => ({
@@ -219,10 +211,8 @@ function DraggableSuggestion({
   const paneIndex = usePaneIndex();
   const { viewKey } = row;
   const { selection } = useTemporaryView();
-  const currentRow = useCurrentEdge();
   const node = useCurrentNode();
   const displayText = useDisplayText();
-  const data = useData();
 
   const [{ isDragging }, drag, preview] = useDrag({
     type: NOTE_TYPE,
@@ -231,7 +221,6 @@ function DraggableSuggestion({
       const draggedRows = selection.has(viewKey)
         ? rows.filter((candidate) => selection.has(candidate.viewKey)).toArray()
         : [row];
-      const blockLink = getBlockLink(currentRow, row.sourceId);
       return {
         row,
         draggedRows,
@@ -240,7 +229,7 @@ function DraggableSuggestion({
         virtualType: row.virtualType,
         isSuggestion: true,
         nodeId: node?.id,
-        insertTarget: linkToInsertTarget(data, blockLink),
+        insertTarget: row.materialize?.take,
       };
     },
     collect: (monitor) => ({
@@ -282,7 +271,7 @@ function DraggableSuggestion({
       data-view-key={rowViewKey}
       data-row-index={rowIndex}
       data-row-depth={rowDepth}
-      data-node-id={currentRow?.id || node?.id}
+      data-node-id={row.node.id}
       data-node-text={displayText}
       data-node-mutable={isEditableNode(node) ? "true" : "false"}
       data-selected={isSelected ? "true" : undefined}

@@ -5,12 +5,11 @@ import {
   itemPassesFilters,
   getNodeContext,
   getNode,
-  resolveNode,
-  isRefNode,
   nodePathLabel,
 } from "./core/connections";
-import { getBlockLinkTarget } from "./core/nodeSpans";
+import { getAllLinks } from "./core/nodeSpans";
 import { fileLinkIndexKey } from "./core/linkPath";
+import { isCalendarEntryPlacement } from "./core/ical";
 import { suggestionSettings } from "./core/constants";
 import { LOG_ROOT_ROLE } from "./core/systemRoots";
 import { computeVersionDiff, VersionDiff } from "./core/snapshotBaseline";
@@ -21,7 +20,7 @@ import {
   getNodeInSource,
   lookupNode,
   lookupNodes,
-  resolveBlockLinkTarget,
+  parentOf,
 } from "./core/graphLookup";
 import { nodeRefKey } from "./core/nodeRef";
 
@@ -109,16 +108,12 @@ function getRefContextKey(
   return getContextKey(ref.context);
 }
 
-function contextKeyForCref(
+function contextKeyForTarget(
   knowledgeDBs: KnowledgeDBs,
-  crefID: ID,
+  targetID: ID,
   effectiveAuthor: SourceId
 ): string | undefined {
-  const targetNode = resolveNode(
-    knowledgeDBs,
-    getNode(knowledgeDBs, crefID, effectiveAuthor),
-    effectiveAuthor
-  );
+  const targetNode = getNode(knowledgeDBs, targetID, effectiveAuthor);
   if (!targetNode) {
     return undefined;
   }
@@ -129,11 +124,11 @@ function contextKeyForCref(
 
 function coveredContextKeys(
   knowledgeDBs: KnowledgeDBs,
-  crefIDs: List<ID>,
+  targetIDs: List<ID>,
   effectiveAuthor: SourceId
 ): ImmutableSet<string> {
-  return crefIDs.reduce((acc, crefID) => {
-    const key = contextKeyForCref(knowledgeDBs, crefID, effectiveAuthor);
+  return targetIDs.reduce((acc, targetID) => {
+    const key = contextKeyForTarget(knowledgeDBs, targetID, effectiveAuthor);
     return key !== undefined ? acc.add(key) : acc;
   }, ImmutableSet<string>());
 }
@@ -288,14 +283,7 @@ function getGraphLinkOwner(
   linkItemRef: NodeRef
 ): ResolvedNode | undefined {
   const resolvedItem = getNodeInSource(graph, linkItemRef);
-  const item = resolvedItem?.node;
-  if (!item || !resolvedItem) return undefined;
-  return item.parent
-    ? getNodeInSource(graph, {
-        sourceId: resolvedItem.ref.sourceId,
-        id: item.parent,
-      }) ?? resolvedItem
-    : resolvedItem;
+  return resolvedItem;
 }
 
 function uniqueNodes(nodes: ResolvedNode[]): ResolvedNode[] {
@@ -347,30 +335,29 @@ export function getIncomingCrefsForNode(
   const sourceNodes = List(
     uniqueNodes([...graphLinkSourceNodes, ...fileLinkSourceNodes])
   )
+    .filter(
+      (source) =>
+        !isCalendarEntryPlacement(source.node, parentOf(graph, source)?.node)
+    )
     .sortBy(({ ref, node }) => nodePathLabel(knowledgeDBs, node, ref.sourceId))
     .toArray();
   if (sourceNodes.length === 0) {
     return List<NodeRef>();
   }
 
-  const outgoingCrefIDs = current
-    .filter(isRefNode)
-    .map((item) => item.id)
+  const outgoingTargetIDs = current
+    .flatMap((item) => getAllLinks(item).map((link) => link.targetID))
     .toList();
   const covered = coveredContextKeys(
     knowledgeDBs,
-    outgoingCrefIDs,
+    outgoingTargetIDs,
     effectiveAuthor
   );
-  const outgoingTargetRelIDs = current.reduce((acc, item) => {
-    const targetNode = isRefNode(item)
-      ? resolveBlockLinkTarget(graph, {
-          ref: { sourceId: itemsSourceId, id: item.id },
-          node: item,
-        })?.node
-      : resolveNode(knowledgeDBs, item, itemsSourceId);
-    return targetNode ? acc.add(targetNode.id) : acc;
-  }, ImmutableSet<ID>());
+  const outgoingTargetRelIDs = current.reduce(
+    (acc, item) =>
+      acc.add(item.id).union(getAllLinks(item).map((link) => link.targetID)),
+    ImmutableSet<ID>()
+  );
   const subtreeRootIDs = ImmutableSet<ID>(current.map((item) => item.id)).union(
     currentNodeID ? [currentNodeID] : []
   );
@@ -436,7 +423,7 @@ function isVisibleVersion(
   resolved: ResolvedNode,
   visibleAuthors: ImmutableSet<SourceId>
 ): boolean {
-  return !isRefNode(resolved.node) && visibleAuthors.has(resolved.ref.sourceId);
+  return visibleAuthors.has(resolved.ref.sourceId);
 }
 
 function getPastVersions(
@@ -569,15 +556,11 @@ export function getAlternativeFooterData(
     .map((item) => (item.basedOn ?? item.id) as string)
     .toSet();
   const declinedTargetIDs = currentNodeChildren
-    .filter((item) => isRefNode(item) && item.relevance === "not_relevant")
-    .flatMap((item) => {
-      const t = getBlockLinkTarget(item);
-      return t ? [t] : [];
-    })
+    .filter((item) => item.relevance === "not_relevant")
+    .flatMap((item) => getAllLinks(item).map((link) => link.targetID))
     .toSet();
   const existingCrefTargetIDs = currentNodeChildren
-    .map((item) => getBlockLinkTarget(item))
-    .filter((id): id is ID => !!id)
+    .flatMap((item) => getAllLinks(item).map((link) => link.targetID))
     .toSet();
 
   const coveredTargetIDs = declinedTargetIDs.union(existingCrefTargetIDs);
@@ -585,8 +568,9 @@ export function getAlternativeFooterData(
     if (currentOriginKeys.has((item.basedOn ?? item.id) as string)) {
       return true;
     }
-    const itemTarget = getBlockLinkTarget(item);
-    return itemTarget !== undefined && coveredTargetIDs.has(itemTarget);
+    return getAllLinks(item).some((link) =>
+      coveredTargetIDs.has(link.targetID)
+    );
   };
 
   const versionNodes = getVersions(graph, visibleAuthors, current);

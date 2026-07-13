@@ -1324,7 +1324,7 @@ My Notes
 My Notes
   Source
     Child
-    [I] My Notes / Target ↩
+    [I] My Notes / Target / Source ↩
   Target
 Target
   Source
@@ -1874,7 +1874,7 @@ My Notes
     await expectTree(`
 My Notes
   Topic
-    [V] My Fork / Forked Copy
+    Forked Copy
     A1
     [S] B1
     [S] B2
@@ -1882,7 +1882,7 @@ My Notes
     [S] Topic Forked Copy
   [S] My Notes My Fork
 Topic
-  [V] My Fork / Forked Copy
+  Forked Copy
   A1
   [S] B1
   [S] B2
@@ -1939,7 +1939,7 @@ My Notes
     await expectTree(`
 My Notes
   Topic
-    [V] My Fork / Forked Copy
+    Forked Copy
     A1
     [S] B1
     [S] B2

@@ -78,6 +78,42 @@ test("bare and mixed links use one span-native editor", async () => {
   });
 });
 
+test("each link in a mixed row contributes its own backlink", async () => {
+  const { workspacePath, cantillonID, viennaID } =
+    await multipleLinkWorkspace();
+  await renderAppTree({ path: workspacePath, search: "Notes" });
+  await userEvent.click(await screen.findByRole("link", { name: "Cantillon" }));
+  expect(
+    screen
+      .getByRole("treeitem", { name: "Cantillon" })
+      .getAttribute("data-node-id")
+  ).toBe(cantillonID);
+  await userEvent.click(await screen.findByLabelText("expand Cantillon"));
+  await expectTree(`
+Topics
+  Cantillon
+    [I] Notes / Founder of Cantillon studied in Vienna ↩
+  Vienna
+  `);
+
+  cleanup();
+  await renderAppTree({ path: workspacePath, search: "Notes" });
+  await userEvent.click(await screen.findByRole("link", { name: "Vienna" }));
+  expect(
+    screen
+      .getByRole("treeitem", { name: "Vienna" })
+      .getAttribute("data-node-id")
+  ).toBe(viennaID);
+  await userEvent.click(await screen.findByLabelText("expand Vienna"));
+  await expectTree(`
+Topics
+  Cantillon
+    [I] Notes / Founder of Cantillon studied in Vienna ↩
+  Vienna
+    [I] Notes / Founder of Cantillon studied in Vienna ↩
+  `);
+});
+
 test("bare links expose an editable target-preserving mark", async () => {
   const { workspacePath } = await linkWorkspace();
   await renderAppTree({ path: workspacePath, search: "Notes" });

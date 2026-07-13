@@ -14,37 +14,22 @@ import {
 import {
   EMPTY_NODE_ID,
   computeEmptyNodeMetadata,
-  createDocumentLinkTarget,
   createRefTarget,
   isSearchId,
   itemPassesFilters,
   nodePathLabel as nodePathLabelOf,
 } from "./core/connections";
-import {
-  getBlockFileLinkText,
-  getBlockLinkTarget,
-  getBlockLinkText,
-  isBlockFileLink,
-  isBlockLink,
-  isBlockLinkAny,
-  linkSpan,
-  nodeText,
-  plainSpans,
-} from "./core/nodeSpans";
+import { getAllLinks, linkSpan, nodeText, plainSpans } from "./core/nodeSpans";
 import {
   IcalEntry,
+  calendarEntryTarget,
+  calendarFeedUrl,
   hiddenPastEntryCount,
+  isCalendarEntryId,
   icalEntryDisplayText,
-  icalFeedUrlOf,
   mergeProjectedEntries,
 } from "./core/ical";
-import { canonicalTargetOf } from "./core/entityRecognition";
-import {
-  documentKeyOf,
-  documentLinkPath,
-  getDocumentByIdOrFilePath,
-  type Document,
-} from "./core/Document";
+import { getDocumentByIdOrFilePath, type Document } from "./core/Document";
 import { DEFAULT_TYPE_FILTERS } from "./core/constants";
 import {
   getAlternativeFooterData,
@@ -58,7 +43,6 @@ import {
   getNodeInSource,
   graphLookupFromData,
   lookupNode,
-  resolveBlockLinkTarget,
 } from "./core/graphLookup";
 
 export type TreeResult = {
@@ -144,13 +128,8 @@ function createRow(
       ? { kind: rowVirtualType, sourceId }
       : undefined;
   const pane = data.panes[viewPath[0]];
-  // Suggestion and version rows render straight from the row (node,
-  // versionMeta, sourceId) — the reference blob is for link rows and
-  // incoming references only.
-  const wantsReference =
-    rowVirtualType !== "suggestion" && rowVirtualType !== "version";
   const reference =
-    wantsReference && isBlockLinkAny(node)
+    rowVirtualType === "incoming"
       ? (() => {
           const document = pane.documentId
             ? getDocumentByIdOrFilePath(
@@ -178,9 +157,7 @@ function createRow(
             data,
             sourceId,
             rowVirtualType,
-            parentNode,
-            containing,
-            pane.typeFilters
+            containing
           );
         })()
       : undefined;
@@ -382,36 +359,37 @@ function createVirtualRowNode(
     virtualType === "version"
       ? lookupNode(graph, sourceNodeID, graph.localSourceId)
       : undefined;
-  const sourceRowNode = sourceRow?.node;
-  const incomingRowNode = incomingRow?.node;
-  const suggestionTargetID = getBlockLinkTarget(sourceRowNode);
-  const targetID =
-    virtualType === "incoming" || virtualType === "version"
-      ? sourceNodeID
-      : suggestionTargetID;
   const resolvedSource = sourceRow ?? incomingRow ?? versionRow;
   const sourceNode = resolvedSource?.node;
+  if (virtualType !== "incoming") {
+    return {
+      node: sourceNode ?? {
+        children: List<ID>(),
+        id: sourceNodeID,
+        spans: plainSpans(""),
+        parent: input.parentID,
+        updated: input.parentUpdated,
+        root: input.parentRoot,
+        relevance: undefined,
+      },
+      sourceId: resolvedSource?.ref.sourceId ?? input.parentSourceId,
+    };
+  }
   return {
     node: {
-      children: targetID ? List<ID>() : sourceNode?.children ?? List<ID>(),
-      id: targetID || sourceNode?.id || sourceNodeID,
-      spans: targetID
-        ? [
-            linkSpan(
-              targetID,
-              getBlockLinkText(sourceRowNode) ??
-                getBlockFileLinkText(incomingRowNode) ??
-                nodePathLabel(data.knowledgeDBs, incomingRow) ??
-                nodePathLabel(data.knowledgeDBs, versionRow) ??
-                ""
-            ),
-          ]
-        : sourceNode?.spans ?? plainSpans(""),
+      children: List<ID>(),
+      id: sourceNodeID,
+      spans: [
+        linkSpan(
+          sourceNodeID,
+          nodePathLabel(data.knowledgeDBs, incomingRow) ?? ""
+        ),
+      ],
       parent: input.parentID,
       updated: sourceNode?.updated ?? input.parentUpdated,
       root: sourceNode?.root ?? input.parentRoot,
-      relevance: sourceNode?.relevance,
-      argument: sourceNode?.argument,
+      relevance: undefined,
+      argument: undefined,
     },
     sourceId: resolvedSource?.ref.sourceId ?? input.parentSourceId,
   };
@@ -421,52 +399,19 @@ function appendNodeToPath(path: ViewPath, nodeID: ID): ViewPath {
   return [path[0], ...path.slice(1), nodeID] as ViewPath;
 }
 
-// The prepared take for an incoming reference: the accepted row is a
-function sourceDocumentTakeTarget(
-  data: Data,
-  sourceRow: GraphNode
-): AddToParentTarget | undefined {
-  const graph = graphLookupFromData(data);
-  const sourceRoot =
-    sourceRow.id === sourceRow.root
-      ? sourceRow
-      : getNodeInSource(graph, { sourceId: LOCAL, id: sourceRow.root })?.node;
-  const sourceDocument = sourceRoot?.docId
-    ? data.documents.get(documentKeyOf(LOCAL, sourceRoot.docId))
-    : undefined;
-  return sourceDocument
-    ? createDocumentLinkTarget(
-        sourceDocument.sourceId,
-        sourceDocument.docId,
-        documentLinkPath(sourceDocument),
-        nodeText(sourceRoot as GraphNode) || sourceDocument.title
-      )
-    : undefined;
-}
-
-// reference (link row or document link), never an adoption — computed at
-// row build, carried as plain data (R3: incoming refs on the seam).
 function incomingTakeTarget(
-  data: Data,
-  node: GraphNode,
-  sourceNodeID: ID
+  graph: GraphLookup,
+  sourceNodeID: ID,
+  sourceId: SourceId
 ): AddToParentTarget {
-  const sourceID = getBlockLinkTarget(node) ?? node.id;
-  const sourceRow = getNodeInSource(graphLookupFromData(data), {
-    sourceId: LOCAL,
-    id: sourceID,
+  const sourceRow = getNodeInSource(graph, {
+    sourceId,
+    id: sourceNodeID,
   })?.node;
-  const documentTarget =
-    sourceRow && isBlockFileLink(sourceRow)
-      ? sourceDocumentTakeTarget(data, sourceRow)
-      : undefined;
-  if (documentTarget) {
-    return documentTarget;
-  }
-  const targetID = getBlockLinkTarget(node);
-  return targetID
-    ? createRefTarget(targetID, sourceRow ? nodeText(sourceRow) : undefined)
-    : sourceNodeID;
+  return createRefTarget(
+    sourceNodeID,
+    sourceRow ? nodeText(sourceRow) : undefined
+  );
 }
 
 function createVirtualRow(
@@ -515,27 +460,28 @@ function createVirtualRow(
     virtualType,
     versionMeta
   );
-  if (virtualType !== "incoming" || input.parentID === undefined) {
+  if (virtualType !== "incoming") {
     return row;
   }
   // Incoming references are unordered proposals: they take at the
   // boundary — the end of the parent's current children (idea.md,
   // Proposals take at commit) — as references, with the source's
   // judgment as default.
-  const parentChildren =
-    getNodeInSource(graph, {
-      sourceId: input.parentSourceId,
-      id: input.parentID,
-    })?.node.children.toArray() ?? [];
-  const targetID = getBlockLinkTarget(node);
-  const inherited = targetID
-    ? getNodeInSource(graph, { sourceId: LOCAL, id: targetID })?.node
-    : undefined;
+  const parentChildren = input.parentID
+    ? getNodeInSource(graph, {
+        sourceId: input.parentSourceId,
+        id: input.parentID,
+      })?.node.children.toArray() ?? []
+    : [];
+  const inherited = getNodeInSource(graph, {
+    sourceId,
+    id: sourceNodeID,
+  })?.node;
   return {
     ...row,
     materialize: {
       precededBy: [...priorAnchors, ...([...parentChildren].reverse() as ID[])],
-      take: incomingTakeTarget(data, node, sourceNodeID),
+      take: incomingTakeTarget(graph, sourceNodeID, sourceId),
       defaults: {
         relevance: inherited?.relevance,
         argument: inherited?.argument,
@@ -646,9 +592,7 @@ function interleaveProjectionRows(
   childRows: List<Row>,
   typeFilters: Pane["typeFilters"]
 ): { rows: List<Row>; actionRow?: Row } {
-  const feedUrl = isBlockLinkAny(parentNode)
-    ? undefined
-    : icalFeedUrlOf(nodeText(parentNode));
+  const feedUrl = calendarFeedUrl(parentNode);
   const entries = feedUrl ? data.calendarFeeds?.get(feedUrl) : undefined;
   if (!entries || entries.length === 0) {
     return { rows: childRows };
@@ -663,7 +607,11 @@ function interleaveProjectionRows(
         sourceId: parentSourceId,
         id: childId,
       })?.node;
-      const entryId = canonicalTargetOf(childNode) as ID | undefined;
+      const entryId =
+        calendarEntryTarget(childNode) ??
+        (childNode && isCalendarEntryId(childNode.id)
+          ? childNode.id
+          : undefined);
       const key =
         entryId !== undefined && !acc.childIdByKey.has(entryId)
           ? entryId
@@ -752,9 +700,6 @@ function appendVirtualFooterRows(
   input: VirtualFooterInput,
   initial: TreeResult = emptyTreeResult()
 ): TreeResult {
-  // Each incoming row anchors on its predecessors too (nearest-first):
-  // batch accepts land in display order — a fresh link row matches its
-  // proposal's id through the anchor target check.
   const incomingRows = input.incomingCrefs.reduce<{
     rows: Row[];
     priorAnchors: ID[];
@@ -853,12 +798,7 @@ function getEmbedChildren(
   graph: GraphLookup,
   parentRow: Row
 ): TreeResult {
-  const source = isBlockLink(parentRow.node)
-    ? resolveBlockLinkTarget(graph, {
-        ref: parentRow.ref,
-        node: parentRow.node,
-      })
-    : getNodeInSource(graph, parentRow.ref);
+  const source = getNodeInSource(graph, parentRow.ref);
   if (!source || source.node.children.size === 0) {
     return EMPTY_TREE_RESULT;
   }
@@ -1026,8 +966,6 @@ function getTreeChildrenForResolvedRow(
   typeFilters: Pane["typeFilters"],
   options?: TreeTraversalOptions
 ): TreeResult {
-  // Embeds expand to the target's subtree; every other row — link rows
-  // included — expands to its own children, file truth.
   if (isEmbedRow(parentRow)) {
     return getEmbedChildren(data, graph, parentRow);
   }
@@ -1077,21 +1015,18 @@ function hasHiddenPastEntries(
   node: GraphNode,
   sourceId: SourceId
 ): boolean {
-  const feedUrl = isBlockLinkAny(node)
-    ? undefined
-    : icalFeedUrlOf(nodeText(node));
+  const feedUrl = calendarFeedUrl(node);
   const entries = feedUrl ? data.calendarFeeds?.get(feedUrl) : undefined;
   if (!entries) {
     return false;
   }
-  const childKeys = node.children
-    .toArray()
-    .map(
-      (childId) =>
-        canonicalTargetOf(
-          getNodeInSource(graph, { sourceId, id: childId })?.node
-        ) ?? childId
+  const childKeys = node.children.toArray().map((childId) => {
+    const child = getNodeInSource(graph, { sourceId, id: childId })?.node;
+    return (
+      calendarEntryTarget(child) ??
+      (child && isCalendarEntryId(child.id) ? child.id : childId)
     );
+  });
   return hiddenPastEntryCount(childKeys, entries, Date.now()) > 0;
 }
 
@@ -1132,7 +1067,7 @@ function getNodesInRows(
       rows: result.rows.push(row),
     };
     const shouldRecurse = options?.isMarkdownExport
-      ? !isBlockLink(rootRow.node)
+      ? true
       : rootRow.view.expanded;
     if (!shouldRecurse) {
       return withRoot;
@@ -1222,6 +1157,9 @@ export function getNodesInDocument(
   }
 
   const visibleAuthors = ImmutableSet<SourceId>([LOCAL, document.sourceId]);
+  const outgoingTargets = ImmutableSet<ID>(
+    topNodes.flatMap((node) => getAllLinks(node).map((link) => link.targetID))
+  );
   const incomingCrefs = getIncomingCrefsForNode(
     graph,
     visibleAuthors,
@@ -1232,7 +1170,7 @@ export function getNodesInDocument(
     topNodes,
     document.filePath,
     data.documents
-  );
+  ).filter((ref) => !outgoingTargets.has(ref.id));
 
   const withFooter = appendVirtualFooterRows(
     data,

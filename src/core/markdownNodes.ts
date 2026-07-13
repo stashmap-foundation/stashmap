@@ -104,11 +104,6 @@ function materializeTreeNode(
 
   const [withVisible, childIDs] = treeNode.children.reduce(
     ([accCtx, accChildren], childNode) => {
-      // Link rows take the ordinary recursive path: they are nodes like
-      // any other and carry children (idea.md, Entity nodes). The tree
-      // parser already normalizes them to a single link span, so no
-      // special materialization is needed — the old special case here
-      // silently dropped everything nested under a link row.
       const [afterChild, materializedChild] = materializeTreeNode(
         accCtx,
         childNode,

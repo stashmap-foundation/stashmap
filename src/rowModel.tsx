@@ -7,17 +7,12 @@ import {
   parseSearchId,
   createSearchId,
   EMPTY_NODE_ID,
-  getRefLinkTargetInfo,
   getRefTargetInfo,
-  isRefNode,
 } from "./core/connections";
 import { useData } from "./DataContext";
 import { nodeText } from "./core/nodeSpans";
-import { getBlockLink } from "./core/blockLink";
-import {
-  EditorNavigationTarget,
-  linkToNavigationTarget,
-} from "./editor/linkOperations";
+import { EditorNavigationTarget } from "./editor/linkOperations";
+import { searchTargetID } from "./localSearch";
 
 export { newGraphNode } from "./core/nodeFactory";
 
@@ -47,8 +42,8 @@ export function isFileRow(row: Pick<Row, "virtualType">): boolean {
 // shows its own children, file truth. The suggestion preview is the one
 // embed in the system today; when an explicit embed affordance lands,
 // this predicate graduates to a producer-set row field.
-export function isEmbedRow(row: Pick<Row, "virtualType" | "node">): boolean {
-  return row.virtualType === "suggestion" && isRefNode(row.node);
+export function isEmbedRow(row: Pick<Row, "virtualType">): boolean {
+  return row.virtualType === "suggestion";
 }
 
 export function getIndependentRows(rows: Row[]): Row[] {
@@ -163,59 +158,21 @@ export function getViewForNode(data: Data, path: ViewPath, nodeID: ID): View {
 }
 
 export function buildPaneTarget(data: Data, row: Row): EditorNavigationTarget {
-  const { virtualType } = row;
-  const effectiveAuthor = row.sourceId;
-  const blockLink =
-    virtualType === "incoming"
-      ? undefined
-      : getBlockLink(row.node, row.sourceId);
-  const blockLinkTarget = blockLink
-    ? linkToNavigationTarget(
-        data,
-        blockLink,
-        virtualType === "version" ? "target" : "link"
-      )
+  const targetID =
+    row.virtualType === "search" ? searchTargetID(row.node) : row.reference?.id;
+  const refInfo = targetID
+    ? getRefTargetInfo(targetID, data.knowledgeDBs, row.sourceId)
     : undefined;
-  if (blockLinkTarget) {
-    return blockLinkTarget;
-  }
-
-  const currentReference = getCurrentReferenceForRow(data, row);
-  const refInfo = (() => {
-    if (!currentReference) {
-      if (isRefNode(row.node)) {
-        return getRefLinkTargetInfo(
-          row.node.id,
-          data.knowledgeDBs,
-          effectiveAuthor
-        );
+  return refInfo
+    ? {
+        sourceId: refInfo.sourceId,
+        rootNodeId: refInfo.rootNodeId,
+        scrollToId: refInfo.scrollToId,
       }
-      return getRefTargetInfo(row.node.id, data.knowledgeDBs, effectiveAuthor);
-    }
-    return virtualType === "version"
-      ? getRefTargetInfo(
-          currentReference.id,
-          data.knowledgeDBs,
-          effectiveAuthor
-        )
-      : getRefLinkTargetInfo(
-          currentReference.id,
-          data.knowledgeDBs,
-          effectiveAuthor
-        );
-  })();
-  if (refInfo) {
-    return {
-      sourceId: refInfo.sourceId,
-      rootNodeId: refInfo.rootNodeId,
-      scrollToId: refInfo.scrollToId,
-    };
-  }
-
-  return {
-    sourceId: row.sourceId,
-    rootNodeId: row.node.id,
-  };
+    : {
+        sourceId: row.sourceId,
+        rootNodeId: row.node.id,
+      };
 }
 
 export function useSearchDepth(): number | undefined {
@@ -231,13 +188,6 @@ export function useSearchDepth(): number | undefined {
 
 export function useIsInSearchView(): boolean {
   return useSearchDepth() !== undefined;
-}
-
-export function getCurrentReferenceForRow(
-  _data: Data,
-  row: Row
-): Row["reference"] {
-  return row.reference;
 }
 
 export function addNodesToLastElement(path: ViewPath, nodeID: ID): ViewPath {
@@ -288,7 +238,8 @@ export function useCurrentEdge(): GraphNode {
   return useRow().node;
 }
 
-export function getDisplayTextForRow(data: Data, row: Row): string {
+export function getDisplayTextForRow(row: Row): string {
+  const { versionMeta, reference } = row;
   if (row.renameSuggestion) {
     return `${row.renameSuggestion.mine} ${row.renameSuggestion.theirs}`;
   }
@@ -296,7 +247,6 @@ export function getDisplayTextForRow(data: Data, row: Row): string {
     return row.standsFor.liveText;
   }
   // A version row's text IS its meta: date, author mark, diff counts.
-  const versionMeta = row.versionMeta ?? row.reference?.versionMeta;
   if (row.virtualType === "version" && versionMeta) {
     const meta = versionMeta;
     return [
@@ -307,7 +257,6 @@ export function getDisplayTextForRow(data: Data, row: Row): string {
       ...(!meta.direct && meta.removeCount > 0 ? [`-${meta.removeCount}`] : []),
     ].join(" ");
   }
-  const reference = getCurrentReferenceForRow(data, row);
   if (
     row.virtualType === undefined &&
     row.node.spans.some((span) => span.kind === "link")
@@ -323,8 +272,7 @@ export function getDisplayTextForRow(data: Data, row: Row): string {
 }
 
 export function useDisplayText(): string {
-  const data = useData();
-  return getDisplayTextForRow(data, useRow());
+  return getDisplayTextForRow(useRow());
 }
 
 export function useIsExpanded(): boolean {

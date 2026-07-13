@@ -1,7 +1,12 @@
 import React from "react";
 import { Map, List } from "immutable";
 import { LOCAL } from "./core/nodeRef";
-import { getNodeText, isSearchId, parseSearchId } from "./core/connections";
+import {
+  getNodeText,
+  isSearchId,
+  nodePathLabel,
+  parseSearchId,
+} from "./core/connections";
 import { MergeKnowledgeDB, useData } from "./DataContext";
 import { findRefsToNode } from "./semanticProjection";
 import { useCurrentPane } from "./SplitPanesContext";
@@ -33,22 +38,21 @@ function SearchCrefBuilder({
 
   const searchNodeBase = {
     ...newGraphNode(plainSpans("")),
-    id: searchId as ID,
-    root: searchId as ID,
+    id: searchId,
+    root: searchId,
   };
   const childNodes = crefItems
     .toSet()
     .toList()
-    .map((nodeID): GraphNode => {
-      const target = lookupNode(graph, nodeID as ID, LOCAL);
+    .flatMap((nodeID): GraphNode[] => {
+      const target = lookupNode(graph, nodeID, LOCAL);
       const targetNode = target?.node;
+      if (!target || !targetNode) return [];
       const targetDocument =
-        target && targetNode?.docId && !targetNode.parent
+        targetNode.docId && !targetNode.parent
           ? documents.get(documentKeyOf(target.ref.sourceId, targetNode.docId))
           : undefined;
       const primaryTargetDocument =
-        target &&
-        targetNode &&
         target.ref.sourceId === LOCAL &&
         targetDocument?.topNodeShortIds[0] === targetNode.id
           ? targetDocument
@@ -62,26 +66,40 @@ function SearchCrefBuilder({
               ),
             ],
             {
-              root: searchId as ID,
-              parent: searchId as ID,
+              root: searchId,
+              parent: searchId,
             }
           )
-        : newGraphNode([linkSpan(nodeID as ID, "")], {
-            root: searchId as ID,
-            parent: searchId as ID,
-          });
-      return {
-        ...node,
-        updated: searchNodeBase.updated,
-      };
+        : newGraphNode(
+            [
+              linkSpan(
+                nodeID,
+                nodePathLabel(
+                  data.knowledgeDBs,
+                  target.node,
+                  target.ref.sourceId
+                )
+              ),
+            ],
+            {
+              root: searchId,
+              parent: searchId,
+            }
+          );
+      return [
+        {
+          ...node,
+          updated: searchNodeBase.updated,
+        },
+      ];
     });
   const searchNode = {
     ...searchNodeBase,
     children: childNodes.map((node) => node.id).toList(),
   };
   const syntheticEntries: [ID, GraphNode][] = [
-    [searchId, searchNode] as [ID, GraphNode],
-    ...childNodes.map((node) => [node.id, node] as [ID, GraphNode]).toArray(),
+    [searchId, searchNode],
+    ...childNodes.map((node): [ID, GraphNode] => [node.id, node]).toArray(),
   ];
 
   const syntheticDB: KnowledgeData = {

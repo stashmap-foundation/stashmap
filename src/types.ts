@@ -266,9 +266,7 @@ declare global {
           targetLabel: string;
           incomingRelevance?: Relevance;
           incomingArgument?: Argument;
-          displayAs?: "bidirectional" | "incoming";
-          versionMeta?: Row["versionMeta"];
-          deleted?: boolean;
+          displayAs?: "incoming";
         }
       | undefined;
   };

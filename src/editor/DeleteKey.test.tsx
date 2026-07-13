@@ -419,7 +419,7 @@ My links
 A
   B
 My links
-  [D] E
+  E
     `);
 
     cleanup();
@@ -429,7 +429,7 @@ My links
 A
   B
 My links
-  [D] E
+  E
     `);
   });
 
@@ -485,7 +485,7 @@ My links
 A
   B
 My links
-  [D] E
+  E
     `);
 
     cleanup();
@@ -495,7 +495,7 @@ My links
 A
   B
 My links
-  [D] E
+  E
     `);
   });
 });

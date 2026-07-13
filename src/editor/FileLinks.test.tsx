@@ -141,11 +141,11 @@ test("File link surfaces as incoming reference on target's root", async () => {
   await expectTree(`
 B
   B-child
-[I] A ↩
+[I] A / Open B ↩
   `);
 });
 
-test("Accepting a file-link incoming ref creates a document link back to the source file", async () => {
+test("Accepting a file-link incoming ref links back to the source row", async () => {
   const { path: workspacePath } = knowstrInit();
   write(workspacePath, "a.md", "# A\n\n- [Open B](./b.md)\n");
   write(workspacePath, "b.md", "# B\n\n- B-child\n");
@@ -156,20 +156,23 @@ test("Accepting a file-link incoming ref creates a document link back to the sou
   await expectTree(`
 B
   B-child
-[I] A ↩
+[I] A / Open B ↩
   `);
 
-  await userEvent.click(await screen.findByRole("treeitem", { name: "A ↩" }));
+  const incoming = await screen.findByRole("treeitem", {
+    name: "A / Open B ↩",
+  });
+  await userEvent.click(incoming);
   await userEvent.keyboard("!");
 
   await expectTree(`
 B
   B-child
-A
+Open B
   `);
 
-  const reverseLink = await screen.findByRole("link", { name: "A" });
-  expect(reverseLink.getAttribute("data-href")).toMatch(/a\.md$/u);
+  const reverseLink = await screen.findByRole("link", { name: "Open B" });
+  expect(reverseLink.getAttribute("data-href")).toMatch(/^#/u);
 
   await userEvent.click(reverseLink);
 
@@ -191,7 +194,7 @@ test("Deleted file link target renders as deleted reference", async () => {
 
   await expectTree(`
 A
-  [D] Open B
+  Open B
   `);
 });
 
@@ -300,7 +303,7 @@ test("File link with prefix markers preserves them on the incoming reference", a
     `
 B
   B-child
-[I] A !+↩
+[I] A / Open B !+↩
   `,
     { showGutter: true }
   );

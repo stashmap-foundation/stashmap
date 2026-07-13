@@ -321,13 +321,11 @@ Salon
   https://scholarium.at/salon.ics
     14.07.2030 Sommerfest
       Meine Notiz
-      [I] Salon / Studium / https://scholarium.at/salon.ics ↩
     ${dunbarText()}
   Studium
     https://scholarium.at/salon.ics
       14.07.2030 Sommerfest
         Andere Notiz
-        [I] Salon / https://scholarium.at/salon.ics ↩
       ${dunbarText()}
   `;
   await expectTree(expected);
@@ -415,9 +413,9 @@ test("judging a backlink under a projected entry takes the entry first", async (
     await screen.findByLabelText("expand 14.07.2030 Sommerfest")
   );
 
-  await clickRow("Salon ↩");
+  await clickRow("Salon / 14.07.2030 Sommerfest ↩");
   await userEvent.keyboard("!");
-  const expandEntry = await screen.findByLabelText(
+  const [expandEntry] = await screen.findAllByLabelText(
     /(?:expand|collapse) 14\.07\.2030 Sommerfest/u
   );
   if (expandEntry.getAttribute("aria-label")?.startsWith("expand")) {
@@ -429,11 +427,10 @@ test("judging a backlink under a projected entry takes the entry first", async (
 Salon
   https://scholarium.at/salon.ics
     14.07.2030 Sommerfest
-      {!} Salon
+      {!} 14.07.2030 Sommerfest
     ${dunbarText()}
   Was ist cool
   14.07.2030 Sommerfest
-  [I] 14.07.2030 Sommerfest
   `,
     { showGutter: true }
   );
@@ -445,11 +442,10 @@ Salon
 Salon
   https://scholarium.at/salon.ics
     14.07.2030 Sommerfest
-      {!} Salon
+      {!} 14.07.2030 Sommerfest
     ${dunbarText()}
   Was ist cool
   14.07.2030 Sommerfest
-  [I] 14.07.2030 Sommerfest
   `,
     { showGutter: true }
   );
@@ -483,9 +479,9 @@ Salon
   https://scholarium.at/salon.ics
     14.07.2030 Sommerfest
       Meine Notiz
-      [I] Salon ↩
+      [I] Salon / 14.07.2030 Sommerfest ↩
     ${dunbarText()}
-      [I] Salon ↩
+      [I] Salon / 21.09.2030 20:00 Seminar Robin Dunbar ↩
   Was ist cool
   ${dunbarText()}
   14.07.2030 Sommerfest

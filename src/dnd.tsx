@@ -4,15 +4,9 @@ import { DndProvider, useDragLayer, XYCoord } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { LOCAL } from "./core/nodeRef";
 import { moveNodes, createRefTarget, getNode } from "./core/connections";
-import {
-  getBlockLinkTarget,
-  getBlockLinkText,
-  isBlockLinkAny,
-  nodeText,
-} from "./core/nodeSpans";
+import { nodeText } from "./core/nodeSpans";
 import { isCanonicalId } from "./core/entityRecognition";
-import { getBlockLink } from "./core/blockLink";
-import { linkToInsertTarget } from "./editor/linkOperations";
+import { calendarEntryTarget } from "./core/ical";
 import { getIndependentRows, updateViewPathsAfterMoveNodes } from "./rowModel";
 import { getDocumentByIdOrFilePath } from "./core/Document";
 import {
@@ -50,19 +44,6 @@ function refsEqual(
     right !== undefined &&
     left.sourceId === right.sourceId &&
     left.id === right.id
-  );
-}
-
-// The one drag-target resolution, applied to every dragged row: block links
-// resolve to their node target, file links (the Imported Files rows) to the
-// imported document — exactly what the primary row's drag payload carries.
-function resolveDragLinkTarget(
-  plan: Plan,
-  sourceRow: Row
-): AddToParentTarget | undefined {
-  return linkToInsertTarget(
-    plan,
-    getBlockLink(sourceRow.node, sourceRow.sourceId)
   );
 }
 
@@ -408,11 +389,10 @@ export function dnd(
     }
     return planAddToParent(
       accPlan,
-      resolveDragLinkTarget(accPlan, sourceRow) ??
-        createRefTarget(
-          getBlockLinkTarget(sourceRow.node) || sourceRow.node.id,
-          getBlockLinkText(sourceRow.node)
-        ),
+      createRefTarget(
+        calendarEntryTarget(sourceRow.node) ?? sourceRow.node.id,
+        nodeText(sourceRow.node)
+      ),
       targetParentRow.node.id,
       insertAt
     )[0];
@@ -488,28 +468,17 @@ export function dnd(
     ? plan
     : planExpandNode(plan, targetParentRow.view, targetParentRow.viewPath);
 
-  const shouldCreateReference = (sourceNode: GraphNode): boolean => {
+  const shouldCreateReference = (): boolean => {
     if (sourceDrag.isSuggestion) {
       return invertCopyMode;
     }
-    if (sourceDrag.isCopyDrag) {
-      return true;
-    }
-    const sourceIsReference = isBlockLinkAny(sourceNode);
-    if (sourceIsReference) {
-      return true;
-    }
-    return invertCopyMode;
+    return sourceDrag.isCopyDrag || invertCopyMode;
   };
 
-  const toReferenceTarget = (
-    accPlan: Plan,
-    sourceRow: Row
-  ): AddToParentTarget =>
-    resolveDragLinkTarget(accPlan, sourceRow) ??
+  const toReferenceTarget = (sourceRow: Row): AddToParentTarget =>
     createRefTarget(
-      sourceRow.node.id,
-      getBlockLinkText(sourceRow.node) ?? nodeText(sourceRow.node)
+      calendarEntryTarget(sourceRow.node) ?? sourceRow.node.id,
+      nodeText(sourceRow.node)
     );
 
   const getSuggestionTargetID = (
@@ -519,7 +488,7 @@ export function dnd(
     if (isPrimarySource) {
       return sourceDrag.targetId || sourceDrag.nodeId;
     }
-    return getBlockLinkTarget(sourceNode) || sourceNode.id;
+    return sourceNode.id;
   };
 
   return independentRows.reduce((accPlan: Plan, sourceRow, idx) => {
@@ -529,11 +498,11 @@ export function dnd(
     const insertAt = dropIndex + idx;
     const isPrimarySource = sourceRow.viewKey === source;
     const targetNode = getCurrentPlanNode(accPlan, targetParentRow.node);
-    if (shouldCreateReference(sourceNode)) {
+    if (shouldCreateReference()) {
       if (sourceDrag.isSuggestion) {
-        const insertTarget = isPrimarySource
-          ? sourceDrag.insertTarget
-          : undefined;
+        const insertTarget =
+          sourceRow.materialize?.take ??
+          (isPrimarySource ? sourceDrag.insertTarget : undefined);
         if (insertTarget) {
           return planAddToParent(
             accPlan,
@@ -557,9 +526,9 @@ export function dnd(
           )[0];
         }
       }
-      const insertTarget = isPrimarySource
-        ? sourceDrag.insertTarget
-        : undefined;
+      const insertTarget =
+        sourceRow.materialize?.take ??
+        (isPrimarySource ? sourceDrag.insertTarget : undefined);
       const dragTargetID = isPrimarySource
         ? sourceDrag.targetId || sourceDrag.nodeId
         : undefined;
@@ -576,10 +545,7 @@ export function dnd(
       if (dragTargetID) {
         return planAddToParent(
           accPlan,
-          createRefTarget(
-            dragTargetID,
-            getBlockLinkText(sourceNode) ?? nodeText(sourceNode)
-          ),
+          createRefTarget(dragTargetID, nodeText(sourceNode)),
           targetNode.id,
           insertAt,
           sourceEdgeRelevance,
@@ -588,7 +554,7 @@ export function dnd(
       }
       return planAddToParent(
         accPlan,
-        toReferenceTarget(accPlan, sourceRow),
+        toReferenceTarget(sourceRow),
         targetNode.id,
         insertAt,
         sourceEdgeRelevance,

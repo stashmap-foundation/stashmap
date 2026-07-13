@@ -4,8 +4,7 @@ import { ConnectDropTarget, DropTargetMonitor, useDrop } from "react-dnd";
 import { NativeTypes } from "react-dnd-html5-backend";
 import { dnd, getDropDestinationFromRows } from "../dnd";
 import { planMaterializeComputedRow } from "../core/plan";
-import { icalFeedUrlOf } from "../core/ical";
-import { nodeText } from "../core/nodeSpans";
+import { calendarFeedUrl } from "../core/ical";
 import { getWorkspaceNode } from "../core/knowledge";
 import {
   Plan,
@@ -448,7 +447,7 @@ export function useDroppable({
         : [dragItem.row];
       const parentId = dropDestination.parentRow.node.id;
       const isProjectionReorder =
-        icalFeedUrlOf(nodeText(dropDestination.parentRow.node)) !== undefined &&
+        calendarFeedUrl(dropDestination.parentRow.node) !== undefined &&
         dragRows.some((dragged) => dragged.parentRef?.id === parentId);
       const [plan, dropIndex] = ((): [Plan, number] => {
         const base = createPlan();

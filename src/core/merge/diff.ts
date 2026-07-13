@@ -1,7 +1,7 @@
 /* eslint-disable functional/no-let, functional/immutable-data */
 import { MergeSuggestion } from "./types";
 import { parseDoc } from "./kernel";
-import { getBlockLinkTarget, isBlockLink, nodeText } from "../nodeSpans";
+import { getAllLinks, nodeText } from "../nodeSpans";
 
 // Display modes of the kernel: take (join by id, baseline present), fork
 // (join by basedOn, baseline present) and the entity surface (join by id,
@@ -41,9 +41,7 @@ export function diffVersions(input: DiffInput): DiffResult {
     mine.nodes
       .valueSeq()
       .toArray()
-      .filter((node) => isBlockLink(node))
-      .map((node) => getBlockLinkTarget(node))
-      .filter((target): target is ID => target !== undefined)
+      .flatMap((node) => getAllLinks(node).map((link) => link.targetID))
       .map(String)
   );
 

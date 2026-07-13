@@ -1,11 +1,6 @@
 import { CSSProperties } from "react";
 import { useIsViewingOtherUserContent, useRow } from "../rowModel";
-import { isRefNode } from "../core/connections";
-import {
-  getBlockLinkTarget,
-  isBlockFileLink,
-  nodeText,
-} from "../core/nodeSpans";
+import { nodeText } from "../core/nodeSpans";
 import { ENTITY_SCHEME_RE } from "../core/entityRecognition";
 import { TYPE_COLORS } from "../core/constants";
 import { isCalendarEntryId, isPastCalendarRowText } from "../core/ical";
@@ -106,22 +101,13 @@ export function useItemStyle(): ItemStyle {
   const argument = currentRow?.argument;
   const normalizedRelevance =
     relevance === ("" as string) ? undefined : relevance;
-  const isOutgoingRef =
-    (isRefNode(currentRow) || isBlockFileLink(currentRow)) &&
-    row.standsFor === undefined;
-  // Violet means entity — the row's own id or its link target carries a
-  // canonical entity id (the violet law); dangling included.
-  const isEntityNode =
-    !!currentRow &&
-    (ENTITY_SCHEME_RE.test(currentRow.id) ||
-      ENTITY_SCHEME_RE.test(getBlockLinkTarget(currentRow) ?? ""));
+  const isEntityNode = !!currentRow && ENTITY_SCHEME_RE.test(currentRow.id);
 
   return {
     cardStyle: {},
     textStyle: {
       ...getRelevanceTextStyle(normalizedRelevance),
       ...getArgumentTextStyle(argument),
-      ...(isOutgoingRef ? { fontStyle: "italic" as const } : {}),
       ...(isEntityNode ? { color: "var(--violet)" } : {}),
       ...(isPastCalendarRow ? { opacity: 0.55 } : {}),
     },

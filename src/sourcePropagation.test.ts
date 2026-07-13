@@ -138,7 +138,7 @@ test("tree rows and fullscreen targets stay in the pane source for duplicate ids
   ).toBe("child");
 });
 
-test("reference rows resolve duplicate bare ids in the current source", () => {
+test("incoming rows keep their source identity in the current source", () => {
   const data = duplicateSourceData();
   const parentNode = data.knowledgeDBs.get(SOURCE_B)?.nodes.get("root");
   if (!parentNode) {
@@ -149,13 +149,11 @@ test("reference rows resolve duplicate bare ids in the current source", () => {
     "link",
     data,
     SOURCE_B,
-    undefined,
-    parentNode,
-    { ref: { sourceId: SOURCE_B, id: parentNode.id }, node: parentNode },
-    undefined
+    "incoming",
+    { ref: { sourceId: SOURCE_B, id: parentNode.id }, node: parentNode }
   );
 
-  expect(reference?.targetLabel).toBe("Target B");
+  expect(reference?.targetLabel).toBe("");
   expect(reference?.sourceId).toBe(SOURCE_B);
 });
 
@@ -205,7 +203,7 @@ test("incoming refs for duplicate ids stay scoped to the target source", () => {
   );
 
   expect(incomingRows.rows.map((row) => row.viewPath).toArray()).toEqual([
-    [0, "target", "root-b"],
+    [0, "target", "link-b"],
   ]);
 });
 
@@ -254,6 +252,6 @@ test("incoming ref owner rows keep source identity when owner ids also collide",
     SOURCE_B,
   ]);
   expect(incomingRows.rows.map((row) => row.node.spans).toArray()).toEqual([
-    [linkSpan("root", "Root B")],
+    [linkSpan("link", "Root B")],
   ]);
 });

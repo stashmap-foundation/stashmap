@@ -29,7 +29,7 @@ import {
 } from "../markdownPlan";
 import { MarkdownTreeNode, parseMarkdown } from "../core/markdownTree";
 import {
-  getBlockFileLinkPath,
+  getAllFileLinks,
   nodeText,
   plainSpans,
   spansText,
@@ -340,12 +340,12 @@ test("Empty-root markdown file drop creates a wrapper document for multiple file
     "first",
     "second",
   ]);
-  expect(wrapperLinks.map((node) => getBlockFileLinkPath(node))).toEqual(
+  expect(wrapperLinks.map((node) => getAllFileLinks(node)[0]?.path)).toEqual(
     importedDocuments.map((document) => `doc:${document.docId}`)
   );
-  expect(parsedWrapperLinks.map((node) => getBlockFileLinkPath(node))).toEqual(
-    importedDocuments.map((document) => `doc:${document.docId}`)
-  );
+  expect(
+    parsedWrapperLinks.map((node) => getAllFileLinks(node)[0]?.path)
+  ).toEqual(importedDocuments.map((document) => `doc:${document.docId}`));
 });
 
 test("planCreateNodesFromMarkdownTrees creates only standalone nodes", () => {

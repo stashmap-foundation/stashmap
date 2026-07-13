@@ -10,58 +10,14 @@ export const nodeText = (node: GraphNode): string =>
 export const spansText = (spans: InlineSpan[]): string =>
   spans.map((span) => span.text).join("");
 
-type LinkSpan = Extract<InlineSpan, { kind: "link" }>;
-export type BlockLinkNode = GraphNode & { spans: [LinkSpan] };
-export type BlockFileLinkNode = GraphNode & { spans: [LinkSpan] };
+export const isFileLinkHref = (href: string): boolean =>
+  docLinkId(href) !== undefined || isMarkdownPath(href);
 
-function isBareLink(node: GraphNode | undefined): node is BlockLinkNode {
-  return !!node && node.spans.length === 1 && node.spans[0].kind === "link";
-}
+export const isInternalLinkHref = (href: string): boolean =>
+  href.startsWith("#") || isFileLinkHref(href);
 
-export const isBlockLink = (
-  node: GraphNode | undefined
-): node is BlockLinkNode =>
-  isBareLink(node) && node.spans[0].href.startsWith("#");
-
-export const isBlockFileLink = (
-  node: GraphNode | undefined
-): node is BlockFileLinkNode =>
-  isBareLink(node) &&
-  (docLinkId(node.spans[0].href) !== undefined ||
-    isMarkdownPath(node.spans[0].href));
-
-export const isBlockLinkAny = (
-  node: GraphNode | undefined
-): node is BlockLinkNode | BlockFileLinkNode =>
-  isBlockLink(node) || isBlockFileLink(node);
-
-export const getBlockLinkTarget = (
-  node: GraphNode | undefined
-): ID | undefined => {
-  if (!isBlockLink(node)) return undefined;
-  return node.spans[0].href.slice(1);
-};
-
-export const getBlockLinkText = (
-  node: GraphNode | undefined
-): string | undefined => {
-  if (!isBlockLink(node)) return undefined;
-  return node.spans[0].text;
-};
-
-export const getBlockFileLinkPath = (
-  node: GraphNode | undefined
-): string | undefined => {
-  if (!isBlockFileLink(node)) return undefined;
-  return node.spans[0].href;
-};
-
-export const getBlockFileLinkText = (
-  node: GraphNode | undefined
-): string | undefined => {
-  if (!isBlockFileLink(node)) return undefined;
-  return node.spans[0].text;
-};
+export const isWebsiteLinkHref = (href: string): boolean =>
+  /^https?:\/\//u.test(href) || /^feed:https?:\/\//u.test(href);
 
 export const getAllLinks = (
   node: GraphNode
@@ -76,8 +32,7 @@ export const getAllFileLinks = (
   node: GraphNode
 ): { path: string; text: string }[] =>
   node.spans.flatMap((span) =>
-    span.kind === "link" &&
-    (docLinkId(span.href) !== undefined || isMarkdownPath(span.href))
+    span.kind === "link" && isFileLinkHref(span.href)
       ? [{ path: span.href, text: span.text }]
       : []
   );

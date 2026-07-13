@@ -102,6 +102,8 @@ function supportedHref(href: string): boolean {
   const filePath = href.split("#")[0];
   return (
     (href.startsWith("#") && href.length > 1) ||
+    href.startsWith("feed:https://") ||
+    href.startsWith("feed:http://") ||
     docLinkId(filePath) !== undefined ||
     isMarkdownPath(filePath)
   );

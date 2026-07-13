@@ -1,5 +1,6 @@
 /* eslint-disable functional/no-let, functional/immutable-data */
 import { icalEntryId } from "./icalId";
+import { spansText } from "./nodeSpans";
 
 // Write-time recognition only: a pasted or typed bare feed URL gets
 // wrapped into the typed feed link. Read paths never sniff URLs.
@@ -7,6 +8,10 @@ const ICAL_URL_RE =
   /(webcal:\/\/[^\s\]()]+|https?:\/\/[^\s\]()]+\.ics(\?[^\s\]()]*)?)/iu;
 
 const ICAL_FEED_LINK_RE = /^\[([^\]]*)\]\(feed:([^\s()]+)\)$/u;
+
+export function isCalendarEntryId(id: string): boolean {
+  return id.startsWith("ical:");
+}
 
 // The feed-as-link form: `[any name](feed:<url>)`. The scheme declares the
 // row a calendar-feed node; readers dispatch on it, never on the URL shape.
@@ -22,6 +27,46 @@ export function icalFeedLinkPartsOf(
 
 export function icalFeedUrlOf(text: string): string | undefined {
   return icalFeedLinkPartsOf(text)?.url;
+}
+
+export function calendarFeedUrl(node: GraphNode): string | undefined {
+  if (node.spans.length !== 1) return undefined;
+  const span = node.spans[0];
+  return span.kind === "link" && span.href.startsWith("feed:")
+    ? span.href.slice("feed:".length)
+    : undefined;
+}
+
+export function calendarEntryTarget(
+  node: GraphNode | undefined
+): ID | undefined {
+  if (!node || node.spans.length !== 1) return undefined;
+  const span = node.spans[0];
+  if (span.kind !== "link" || !span.href.startsWith("#")) return undefined;
+  const target = span.href.slice(1);
+  return isCalendarEntryId(target) ? target : undefined;
+}
+
+export function isCalendarEntryPlacement(
+  node: GraphNode,
+  parent: GraphNode | undefined
+): boolean {
+  return (
+    calendarEntryTarget(node) !== undefined &&
+    !!parent &&
+    !!calendarFeedUrl(parent)
+  );
+}
+
+export function calendarEntryEditedSpans(
+  node: GraphNode,
+  editedID: ID,
+  spans: InlineSpan[]
+): InlineSpan[] {
+  const target = calendarEntryTarget(node);
+  return target && isCalendarEntryId(editedID) && node.id !== editedID
+    ? [{ kind: "link", href: `#${target}`, text: spansText(spans) }]
+    : spans;
 }
 
 export function isBareIcalFeedUrl(text: string): boolean {
@@ -306,13 +351,6 @@ export function icalEntryDisplayText(entry: IcalEntry): string {
     ? ""
     : ` ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
   return `${day}${time} ${entry.summary}`.trim();
-}
-
-// A calendar entry node is recognizable from file content alone: the
-// ical: id (canonical-id law) plus the date in the row text. Readers need
-// no feed fetch to render pastness — the wallet applies the same rule.
-export function isCalendarEntryId(id: string): boolean {
-  return id.startsWith("ical:");
 }
 
 const ICAL_ROW_DATE_RE = /^(\d{2})\.(\d{2})\.(\d{4})/u;

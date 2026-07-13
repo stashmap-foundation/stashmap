@@ -51,7 +51,7 @@ import {
   addNodeToPathWithNodes,
 } from "./rowModel";
 import { plainSpans, spansText, spansToMarkdown } from "./core/nodeSpans";
-import { isCalendarEntryId } from "./core/ical";
+import { calendarEntryEditedSpans } from "./core/ical";
 import { LOCAL } from "./core/nodeRef";
 import { entityIdForText } from "./core/entityRecognition";
 import { getWorkspaceNode, newDB } from "./core/knowledge";
@@ -604,13 +604,7 @@ export function planSaveNodeAndEnsureNodes(
     return { plan, viewPath, node: currentNode };
   }
 
-  const nextSpans =
-    isCalendarEntryId(nodeID) &&
-    currentNode.id !== nodeID &&
-    currentNode.spans.length === 1 &&
-    currentNode.spans[0].kind === "link"
-      ? [{ ...currentNode.spans[0], text: spansText(spans) }]
-      : spans;
+  const nextSpans = calendarEntryEditedSpans(currentNode, nodeID, spans);
 
   if (spansToMarkdown(nextSpans) === spansToMarkdown(currentNode.spans)) {
     return { plan, viewPath, node: currentNode };

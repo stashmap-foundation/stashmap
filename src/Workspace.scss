@@ -143,13 +143,6 @@ body {
   }
 }
 
-// Publish visual language: hollow ◌ = not published, filled ⦿ = published,
-// dashed frame = click to publish. Shared by the header button and the
-// per-row reach chip.
-
-// The reach chip: a link row's target isn't shared with this document's
-// readers. Inline after the link text; quiet dashed outline, violet on
-// hover like other affordances. Always visible — state, not a control.
 .publish-reach-chip {
   background: transparent;
   border: 1px dashed var(--base01);
@@ -558,22 +551,6 @@ body {
 // wallet's "Register as Shareholder" element, shared instead of
 // reinvented. Dressed like the footer rows it lives among (italic,
 // muted, node-size text); button-ness reveals on hover.
-// E2: the caret zone after a link row's text — fills the rest of the
-// line so a click right of the link lands here, not on the link.
-.link-cursor-zone {
-  flex: 1;
-  min-width: 10px;
-  min-height: var(--row-height, 22px);
-  // Cancel the wrapper's flex gap (8px): the caret must sit flush at the
-  // end of the link text, not a gap away. One space of padding gives the
-  // caret its natural after-the-text position.
-  margin-left: -8px;
-  padding-left: 4px;
-  outline: none;
-  cursor: text;
-  caret-color: var(--base0);
-}
-
 .action-row-btn {
   background: transparent;
   border: none;
@@ -701,19 +678,9 @@ body {
   }
 }
 
-// The link language (idea.md): inline links are dashed-underlined so
-// several links in one sentence stay individually visible — the dashes
-// break at the gaps. Violet (entities) comes via inline style.
 .inline-link {
   color: inherit;
-  text-decoration: underline dashed;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 3px;
   cursor: pointer;
-
-  &:hover {
-    text-decoration-style: solid;
-  }
 }
 
 // The incoming part: the other side's judgment chars plus the return

@@ -166,7 +166,7 @@ Root
     Source
       Child1
       Child2
-      [I] Root / Target ↩
+      [I] Root / Target / Source ↩
 Target
   Source
   `);
@@ -181,7 +181,7 @@ Target
 Source
   Child1
   Child2
-  [I] Root / Target ↩
+  [I] Root / Target / Source ↩
 Target
   Source
   `);
@@ -348,8 +348,7 @@ Search: Barcelona
   [R] My Notes / Holiday Destinations / Spain / Barcelona
   `);
 
-  await userEvent.click(await screen.findByLabelText("Navigate to Log"));
-  await userEvent.click(await screen.findByLabelText("Navigate to My Notes"));
+  await navigateToNodeViaSearch(0, "My Notes");
 
   const myNotesFullscreenButtons = screen.queryAllByLabelText(
     "open My Notes in fullscreen"

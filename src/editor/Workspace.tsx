@@ -52,7 +52,6 @@ import {
   planForkPane,
   planRetractDocument,
   planClearTemporarySelection,
-  planSetEmptyNodePosition,
   planSelectAllTemporaryRows,
   planShiftTemporarySelection,
   planToggleTemporarySelection,
@@ -88,7 +87,6 @@ import {
   isEditableElement,
 } from "./keyboardNavigation";
 import {
-  getVisibleParentRow,
   planBatchRelevance,
   planBatchArgument,
   planBatchIndent,
@@ -97,7 +95,7 @@ import {
 import { planDeleteNode } from "../treeMutations";
 import { IS_MOBILE } from "./responsive";
 import { MobileActionBar } from "./MobileActionBar";
-import { isBlockLinkAny, nodeText } from "../core/nodeSpans";
+import { nodeText } from "../core/nodeSpans";
 
 function BreadcrumbItem({
   label,
@@ -1211,7 +1209,6 @@ function usePaneKeyboardNavigation(paneIndex: number): {
   const [showShortcuts, setShowShortcuts] = useState(false);
   const { setActivePaneIndex } = useNavigationState();
   const { selection, anchor } = useTemporaryView();
-  const data = useData();
   const toggleFilter = useToggleFilter();
   const { createPlan, executePlan } = usePlanner();
   const treeResult = usePaneTreeResult();
@@ -1517,7 +1514,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       const minDepth = Math.min(...depths);
       const lines = selectedRows.map((row) => {
         const depth = row.depth - minDepth;
-        const text = getDisplayTextForRow(data, row);
+        const text = getDisplayTextForRow(row);
         return "\t".repeat(depth) + text;
       });
       navigator.clipboard.writeText(lines.join("\n"));
@@ -1745,29 +1742,6 @@ function usePaneKeyboardNavigation(paneIndex: number): {
         return;
       }
 
-      const activeRowKey = getRowKey(activeRow);
-      const activeRowData = rows.find((row) => row.viewKey === activeRowKey);
-      const activeGraphRow = activeRowData?.node;
-      const parentRow = activeRowData
-        ? getVisibleParentRow(rows, activeRowData)
-        : undefined;
-      const activeNodeIndex = activeRowData?.childIndex;
-      if (
-        isBlockLinkAny(activeGraphRow) &&
-        parentRow &&
-        activeNodeIndex !== undefined
-      ) {
-        executePlan(
-          planSetEmptyNodePosition(
-            createPlan(),
-            parentRow.node.id,
-            parentRow.view,
-            parentRow.viewPath,
-            paneIndex,
-            activeNodeIndex + 1
-          )
-        );
-      }
       return;
     }
 

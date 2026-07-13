@@ -74,25 +74,25 @@ export async function signEvents(
 
   return isUserLoggedInWithExtension(user)
     ? List<SignedEventWithConf>(
-      await Promise.all(
-        wireEvents.map(async ({ template, writeRelayConf }) => {
-          const signedEvent = await signEventWithExtension(template);
-          return {
-            event: signedEvent as VerifiedEvent,
-            writeRelayConf,
-          };
-        })
+        await Promise.all(
+          wireEvents.map(async ({ template, writeRelayConf }) => {
+            const signedEvent = await signEventWithExtension(template);
+            return {
+              event: signedEvent as VerifiedEvent,
+              writeRelayConf,
+            };
+          })
+        )
       )
-    )
     : List<SignedEventWithConf>(
-      wireEvents.map(({ template, writeRelayConf }) => {
-        const event = finalizeEvent(
-          template,
-          (user as KeyPair).privateKey
-        ) as VerifiedEvent;
-        return { event, writeRelayConf };
-      })
-    );
+        wireEvents.map(({ template, writeRelayConf }) => {
+          const event = finalizeEvent(
+            template,
+            (user as KeyPair).privateKey
+          ) as VerifiedEvent;
+          return { event, writeRelayConf };
+        })
+      );
 }
 
 // Signed events out to relays, each routed by its writeRelayConf. Shared by

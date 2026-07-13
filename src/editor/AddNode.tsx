@@ -10,13 +10,12 @@ export function preventEditorBlur(e: React.MouseEvent): void {
 }
 
 type MiniEditorProps = {
-  initialText?: string;
-  initialCursorPosition?: number;
-  onSave: (text: string, submitted?: boolean) => void;
+  initialSpans: InlineSpan[];
+  onSave: (spans: InlineSpan[], submitted?: boolean) => void;
   style?: React.CSSProperties;
   onClose?: () => void;
-  onTab?: (text: string, cursorPosition: number) => void;
-  onShiftTab?: (text: string, cursorPosition: number) => void;
+  onTab?: (spans: InlineSpan[]) => void;
+  onShiftTab?: (spans: InlineSpan[]) => void;
   autoFocus?: boolean;
   ariaLabel?: string;
   onEscape?: () => void;
@@ -26,12 +25,81 @@ type MiniEditorProps = {
     rowIndex?: number;
   }) => void;
   onDelete?: () => void;
-  onPasteMultiLine?: (children: ParsedLine[], currentText: string) => void;
+  onPasteMultiLine?: (
+    children: ParsedLine[],
+    currentSpans: InlineSpan[]
+  ) => void;
+  onActivateLink?: (href: string, spans: InlineSpan[]) => void;
 };
 
+function appendSpan(spans: InlineSpan[], span: InlineSpan): InlineSpan[] {
+  if (span.text === "") return spans;
+  const previous = spans[spans.length - 1];
+  if (previous?.kind === "text" && span.kind === "text") {
+    return [
+      ...spans.slice(0, -1),
+      { kind: "text", text: previous.text + span.text },
+    ];
+  }
+  return [...spans, span];
+}
+
+function spansFromDomNode(node: ChildNode): InlineSpan[] {
+  if (node.nodeType === Node.TEXT_NODE) {
+    return node.textContent ? [{ kind: "text", text: node.textContent }] : [];
+  }
+  if (!(node instanceof HTMLElement)) return [];
+  const href = node.getAttribute("data-href");
+  if (href !== null) {
+    const text = node.textContent ?? "";
+    return text === "" ? [] : [{ kind: "link", href, text }];
+  }
+  return Array.from(node.childNodes).reduce(
+    (spans, child) => spansFromDomNode(child).reduce(appendSpan, spans),
+    [] as InlineSpan[]
+  );
+}
+
+function trimSpans(spans: InlineSpan[]): InlineSpan[] {
+  if (spans.length === 0) return spans;
+  const trimText = (text: string, index: number): string => {
+    if (spans.length === 1) return text.trim();
+    if (index === 0) return text.trimStart();
+    if (index === spans.length - 1) return text.trimEnd();
+    return text;
+  };
+  return spans
+    .map((span, index) => ({ ...span, text: trimText(span.text, index) }))
+    .filter((span) => span.text !== "");
+}
+
+function spansFromEditor(editor: HTMLElement | null): InlineSpan[] {
+  return trimSpans(
+    Array.from(editor?.childNodes ?? []).reduce(
+      (spans, child) => spansFromDomNode(child).reduce(appendSpan, spans),
+      [] as InlineSpan[]
+    )
+  );
+}
+
+function spansEqual(left: InlineSpan[], right: InlineSpan[]): boolean {
+  return (
+    left.length === right.length &&
+    left.every((span, index) => {
+      const other = right[index];
+      return (
+        other !== undefined &&
+        span.kind === other.kind &&
+        span.text === other.text &&
+        (span.kind === "text" ||
+          (other.kind === "link" && span.href === other.href))
+      );
+    })
+  );
+}
+
 export function MiniEditor({
-  initialText,
-  initialCursorPosition,
+  initialSpans,
   onSave,
   style,
   onClose,
@@ -43,70 +111,58 @@ export function MiniEditor({
   onRequestRowFocus,
   onDelete,
   onPasteMultiLine,
+  onActivateLink,
 }: MiniEditorProps): JSX.Element {
   const editorRef = React.useRef<HTMLSpanElement>(null);
-  // Track last saved text to prevent duplicate saves when blur fires multiple times
-  // before React re-renders with updated initialText
-  const lastSavedTextRef = React.useRef(initialText);
-
-  // Reset when initialText prop changes (e.g., navigating to different node)
-  useEffect(() => {
-    // eslint-disable-next-line functional/immutable-data
-    lastSavedTextRef.current = initialText;
-  }, [initialText]);
-
-  useLayoutEffect(() => {
-    if (autoFocus && editorRef.current) {
-      editorRef.current.focus();
-      const range = document.createRange();
-      const textNode = editorRef.current.firstChild;
-      if (textNode && initialCursorPosition !== undefined) {
-        // Set cursor at specific position
-        const pos = Math.min(
-          initialCursorPosition,
-          textNode.textContent?.length || 0
-        );
-        range.setStart(textNode, pos);
-        range.setEnd(textNode, pos);
-      } else {
-        // Move cursor to end
-        range.selectNodeContents(editorRef.current);
-        range.collapse(false);
-      }
-      const sel = window.getSelection();
-      sel?.removeAllRanges();
-      sel?.addRange(range);
-    }
-  }, [autoFocus]);
-
-  const getText = (): string => {
-    return editorRef.current?.textContent || "";
-  };
-
+  const [lastSavedSpans, setLastSavedSpans] = React.useState(initialSpans);
   const editorTextContext = useEditorText();
 
-  const handleInput = (): void => {
-    editorTextContext?.setText(getText());
-  };
+  useEffect(() => {
+    setLastSavedSpans(initialSpans);
+  }, [initialSpans]);
+
+  useLayoutEffect(() => {
+    const editor = editorRef.current;
+    if (!editor || document.activeElement === editor) return;
+    if (spansEqual(spansFromEditor(editor), initialSpans)) return;
+    editor.replaceChildren(
+      ...initialSpans.map((span) => {
+        if (span.kind === "text") return document.createTextNode(span.text);
+        const mark = document.createElement("span");
+        mark.setAttribute("role", "link");
+        mark.setAttribute("class", "inline-link");
+        mark.setAttribute("data-href", span.href);
+        mark.setAttribute("data-target", span.href);
+        mark.replaceChildren(document.createTextNode(span.text));
+        return mark;
+      })
+    );
+  }, [initialSpans]);
+
+  useLayoutEffect(() => {
+    if (!autoFocus || !editorRef.current) return;
+    editorRef.current.focus();
+    const range = document.createRange();
+    range.selectNodeContents(editorRef.current);
+    range.collapse(false);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+  }, [autoFocus]);
+
+  const getSpans = (): InlineSpan[] => spansFromEditor(editorRef.current);
 
   const saveIfChanged = (): void => {
-    const text = getText().trim();
-    if (text && text !== lastSavedTextRef.current) {
-      // eslint-disable-next-line functional/immutable-data
-      lastSavedTextRef.current = text; // Update immediately to prevent duplicate saves
-      onSave(text);
-    }
+    const spans = getSpans();
+    if (spans.length === 0 || spansEqual(spans, lastSavedSpans)) return;
+    setLastSavedSpans(spans);
+    onSave(spans);
   };
 
-  const getCursorPosition = (): number => {
-    const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) return 0;
-    const range = sel.getRangeAt(0);
-    return range.startOffset;
+  const handleInput = (): void => {
+    editorTextContext?.setSpans(getSpans());
   };
 
-  // Track if we're handling a key event to prevent blur from re-triggering save
-  const handlingKeyRef = React.useRef(false);
   const handleKeyDown = (e: React.KeyboardEvent<HTMLSpanElement>): void => {
     if (e.key === "Escape") {
       e.preventDefault();
@@ -114,95 +170,79 @@ export function MiniEditor({
         '[data-row-focusable="true"]'
       );
       const rowElement = currentRow instanceof HTMLElement ? currentRow : null;
-      const rowKey = rowElement?.getAttribute("data-view-key") || null;
-      const rowIndex = rowElement?.getAttribute("data-row-index") || null;
-      const nodeId = rowElement?.getAttribute("data-node-id") || null;
-      // eslint-disable-next-line functional/immutable-data
-      handlingKeyRef.current = true;
+      const rowKey = rowElement?.getAttribute("data-view-key") ?? undefined;
+      const rowIndex = rowElement?.getAttribute("data-row-index");
+      const nodeId = rowElement?.getAttribute("data-node-id") ?? undefined;
       onEscape?.();
-      const text = getText().trim();
-      const hasChanges = Boolean(text && text !== lastSavedTextRef.current);
+      const spans = getSpans();
+      const hasChanges = spans.length > 0 && !spansEqual(spans, lastSavedSpans);
       if (hasChanges) {
-        // eslint-disable-next-line functional/immutable-data
-        lastSavedTextRef.current = text;
-        onSave(text);
-      } else if (!text && lastSavedTextRef.current && onDelete) {
+        setLastSavedSpans(spans);
+        onSave(spans);
+      } else if (spans.length === 0 && lastSavedSpans.length > 0 && onDelete) {
         onDelete();
       } else {
         onRequestRowFocus?.({
-          viewKey: rowKey || undefined,
-          nodeId: nodeId || undefined,
-          rowIndex: rowIndex !== null ? Number(rowIndex) : undefined,
+          viewKey: rowKey,
+          nodeId,
+          rowIndex: rowIndex === null ? undefined : Number(rowIndex),
         });
-        // No changes, just close
         onClose?.();
       }
       editorRef.current?.blur();
-      if (rowElement?.isConnected) {
-        rowElement.focus();
-      }
-      // eslint-disable-next-line functional/immutable-data
-      handlingKeyRef.current = false;
-    } else if (e.key === "Enter") {
+      if (rowElement?.isConnected) rowElement.focus();
+      return;
+    }
+    if (e.key === "Enter") {
       e.preventDefault();
-      const text = getText().trim();
-      if (!text) {
-        if (lastSavedTextRef.current && onDelete) {
+      const spans = getSpans();
+      if (spans.length === 0) {
+        if (lastSavedSpans.length > 0 && onDelete) {
           onDelete();
           return;
         }
         if (onShiftTab) {
-          onShiftTab(text, getCursorPosition());
+          onShiftTab(spans);
           return;
         }
         onClose?.();
         return;
       }
-      // eslint-disable-next-line functional/immutable-data
-      lastSavedTextRef.current = text; // Update immediately to prevent duplicate saves
-      onSave(text, true);
-    } else if (e.key === "Tab" && !e.shiftKey && onTab) {
+      setLastSavedSpans(spans);
+      onSave(spans, true);
+      return;
+    }
+    if (e.key === "Tab" && !e.shiftKey && onTab) {
       e.preventDefault();
-      onTab(getText().trim(), getCursorPosition());
-    } else if (e.key === "Tab" && e.shiftKey && onShiftTab) {
+      onTab(getSpans());
+      return;
+    }
+    if (e.key === "Tab" && e.shiftKey && onShiftTab) {
       e.preventDefault();
-      onShiftTab(getText().trim(), getCursorPosition());
+      onShiftTab(getSpans());
     }
   };
 
   const handleBlur = (e: React.FocusEvent): void => {
-    if (handlingKeyRef.current) {
-      return;
-    }
-
-    const { relatedTarget } = e;
-    if (!relatedTarget) {
-      return;
-    }
+    if (!e.relatedTarget) return;
     const currentRow = editorRef.current?.closest(
       '[data-row-focusable="true"]'
     );
     const sameRowTreeItem =
-      relatedTarget instanceof HTMLElement &&
-      relatedTarget.getAttribute("role") === "treeitem" &&
-      relatedTarget.closest('[data-row-focusable="true"]') === currentRow;
-    if (sameRowTreeItem) {
-      return;
-    }
+      e.relatedTarget instanceof HTMLElement &&
+      e.relatedTarget.getAttribute("role") === "treeitem" &&
+      e.relatedTarget.closest('[data-row-focusable="true"]') === currentRow;
+    if (sameRowTreeItem) return;
     if (
-      relatedTarget instanceof HTMLElement &&
-      relatedTarget.closest(".modal")
+      e.relatedTarget instanceof HTMLElement &&
+      e.relatedTarget.closest(".modal")
     ) {
       return;
     }
-
-    const text = getText().trim();
-    if (!text) {
-      if (lastSavedTextRef.current && onDelete) {
-        onDelete();
-      } else {
-        onClose?.();
-      }
+    const spans = getSpans();
+    if (spans.length === 0) {
+      if (lastSavedSpans.length > 0 && onDelete) onDelete();
+      else onClose?.();
       return;
     }
     saveIfChanged();
@@ -217,8 +257,7 @@ export function MiniEditor({
       return;
     }
     document.execCommand("insertText", false, children[0].text);
-    const currentText = editorRef.current?.textContent || "";
-    onPasteMultiLine(children.slice(1), currentText);
+    onPasteMultiLine(children.slice(1), getSpans());
   };
 
   const moveCursorToEnd = (): void => {
@@ -227,16 +266,28 @@ export function MiniEditor({
     const range = document.createRange();
     range.selectNodeContents(editorRef.current);
     range.collapse(false);
-    const sel = window.getSelection();
-    sel?.removeAllRanges();
-    sel?.addRange(range);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
   };
 
   const handleWrapperClick = (e: React.MouseEvent): void => {
-    // Only handle clicks on the wrapper itself, not the contenteditable
-    if (e.target === e.currentTarget) {
-      moveCursorToEnd();
+    if (e.target === e.currentTarget) moveCursorToEnd();
+  };
+
+  const handleEditorClick = (e: React.MouseEvent): void => {
+    if (!(e.target instanceof Element) || !onActivateLink) return;
+    const mark = e.target.closest("[data-href]");
+    if (!(mark instanceof HTMLElement) || !editorRef.current?.contains(mark)) {
+      return;
     }
+    const href = mark.getAttribute("data-href");
+    if (href === null) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const spans = getSpans();
+    if (!spansEqual(spans, lastSavedSpans)) setLastSavedSpans(spans);
+    onActivateLink(href, spans);
   };
 
   return (
@@ -258,10 +309,9 @@ export function MiniEditor({
         onBlur={handleBlur}
         onPaste={handlePaste}
         onInput={handleInput}
+        onClick={handleEditorClick}
         aria-label={ariaLabel || "note editor"}
-      >
-        {initialText}
-      </span>
+      />
     </span>
   );
 }

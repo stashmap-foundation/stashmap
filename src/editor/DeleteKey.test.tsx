@@ -409,7 +409,7 @@ A
       D
         E
 My links
-  [R] A / B / C / D / E
+  E
     `);
 
     await userEvent.click(screen.getAllByLabelText("edit C")[0]);
@@ -419,7 +419,7 @@ My links
 A
   B
 My links
-  [D] (deleted) A / B / C / D / E
+  [D] E
     `);
 
     cleanup();
@@ -429,7 +429,7 @@ My links
 A
   B
 My links
-  [D] (deleted) A / B / C / D / E
+  [D] E
     `);
   });
 
@@ -462,7 +462,7 @@ A
       D
         E
 My links
-  [R] A / B / C / D / E
+  E
     `);
 
     cleanup();
@@ -475,7 +475,7 @@ A
       D
         E
 My links
-  [R] A / B / C / D / E
+  E
     `);
 
     await userEvent.click(screen.getAllByLabelText("edit C")[0]);
@@ -485,7 +485,7 @@ My links
 A
   B
 My links
-  [D] (deleted) A / B / C / D / E
+  [D] E
     `);
 
     cleanup();
@@ -495,7 +495,7 @@ My links
 A
   B
 My links
-  [D] (deleted) A / B / C / D / E
+  [D] E
     `);
   });
 });

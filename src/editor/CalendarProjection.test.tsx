@@ -353,9 +353,7 @@ test("following a dangling entry link opens the carrying calendar at the entry",
   await altDragTextOnto(dunbarText(), "Notes");
 
   await userEvent.click(
-    await screen.findByLabelText(
-      `Navigate to Salon / https://scholarium.at/salon.ics / ${dunbarText()}`
-    )
+    await screen.findByRole("link", { name: dunbarText() })
   );
   await expectTree(`
 https://scholarium.at/salon.ics
@@ -395,7 +393,7 @@ Salon
     ${dunbarText()}
   Notes
 Notes
-  [R] ${dunbarText()}
+  ${dunbarText()}
   `);
 });
 
@@ -419,19 +417,22 @@ test("judging a backlink under a projected entry takes the entry first", async (
 
   await clickRow("Salon ↩");
   await userEvent.keyboard("!");
-  await userEvent.click(
-    await screen.findByLabelText("expand 14.07.2030 Sommerfest")
+  const expandEntry = await screen.findByLabelText(
+    /(?:expand|collapse) 14\.07\.2030 Sommerfest/u
   );
+  if (expandEntry.getAttribute("aria-label")?.startsWith("expand")) {
+    await userEvent.click(expandEntry);
+  }
 
   await expectTree(
     `
 Salon
   https://scholarium.at/salon.ics
     14.07.2030 Sommerfest
-      {!} [R] Salon
+      {!} Salon
     ${dunbarText()}
   Was ist cool
-  [R] Salon / https://scholarium.at/salon.ics / 14.07.2030 Sommerfest
+  14.07.2030 Sommerfest
   [I] 14.07.2030 Sommerfest
   `,
     { showGutter: true }
@@ -444,10 +445,10 @@ Salon
 Salon
   https://scholarium.at/salon.ics
     14.07.2030 Sommerfest
-      {!} [R] Salon
+      {!} Salon
     ${dunbarText()}
   Was ist cool
-  [R] Salon / https://scholarium.at/salon.ics / 14.07.2030 Sommerfest
+  14.07.2030 Sommerfest
   [I] 14.07.2030 Sommerfest
   `,
     { showGutter: true }
@@ -486,8 +487,8 @@ Salon
     ${dunbarText()}
       [I] Salon ↩
   Was ist cool
-  [R] Salon / https://scholarium.at/salon.ics / ${dunbarText()}
-  [R] 14.07.2030 Sommerfest
+  ${dunbarText()}
+  14.07.2030 Sommerfest
   `);
 });
 
@@ -526,7 +527,7 @@ Salon
     14.07.2030 Sommerfest
     ${dunbarText()}
   Notes
-  [R] Salon / Kalender Studium / ${dunbarText()}
+  ${dunbarText()}
   `);
 
   cleanup();
@@ -537,7 +538,7 @@ Salon
     14.07.2030 Sommerfest
     ${dunbarText()}
   Notes
-  [R] Salon / Kalender Studium / ${dunbarText()}
+  ${dunbarText()}
   `);
   expect(screen.queryByText(/deleted/)).toBeNull();
 });

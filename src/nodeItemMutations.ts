@@ -2,12 +2,8 @@ import { LOCAL } from "./core/nodeRef";
 import {
   createRefTarget,
   createDocumentLinkTarget,
-  isEmptySemanticID,
+  isEmptyNodeID,
   getNode,
-  getNodeContext,
-  getSemanticID,
-  resolveNode,
-  isRefNode,
 } from "./core/connections";
 import {
   getBlockLinkTarget,
@@ -15,6 +11,8 @@ import {
   isBlockFileLink,
   isBlockLink,
   nodeText,
+  spansText,
+  spansToMarkdown,
 } from "./core/nodeSpans";
 import {
   documentKeyOf,
@@ -53,26 +51,27 @@ function planUpdateDocumentTopNodeMetadata(
   plan: Plan,
   input: {
     node: GraphNode;
-    rowID: ID;
+    nodeID: ID;
     viewPath: ViewPath;
     paneIndex: number;
     documentId: string | undefined;
   },
   metadata: NodeItemMetadata,
-  editorText: string
+  editorSpans: InlineSpan[] | undefined
 ): Plan {
-  const { node, rowID, viewPath, paneIndex, documentId } = input;
+  const { node, nodeID, viewPath, paneIndex, documentId } = input;
   if (documentId === undefined || node.parent || !node.docId) {
     return plan;
   }
 
-  const trimmed = editorText.trim();
   const basePlan =
-    trimmed && trimmed !== nodeText(node)
+    editorSpans &&
+    spansText(editorSpans).trim() !== "" &&
+    spansToMarkdown(editorSpans) !== spansToMarkdown(node.spans)
       ? planSaveNodeAndEnsureNodes(
           plan,
-          editorText,
-          rowID,
+          editorSpans,
+          nodeID,
           node,
           viewPath,
           undefined,
@@ -164,41 +163,11 @@ function planAcceptDocumentTopIncoming(
     : undefined;
 }
 
-function resolveDeepCopySource(
-  plan: Plan,
-  rowID: ID,
-  node: GraphNode,
-  sourceId: SourceId
-): {
-  itemID: ID;
-  semanticContext: Context;
-  node: GraphNode;
-  sourceId: SourceId;
-} {
-  if (isRefNode(node)) {
-    const resolved = resolveNode(plan.knowledgeDBs, node, sourceId);
-    if (resolved) {
-      return {
-        itemID: getSemanticID(plan.knowledgeDBs, resolved, sourceId),
-        semanticContext: getNodeContext(plan.knowledgeDBs, resolved, sourceId),
-        node: resolved,
-        sourceId,
-      };
-    }
-  }
-  return {
-    itemID: rowID,
-    semanticContext: getNodeContext(plan.knowledgeDBs, node, sourceId),
-    node,
-    sourceId,
-  };
-}
-
 export function planUpdateViewItemMetadata(
   plan: Plan,
   input: {
     node: GraphNode;
-    rowID: ID;
+    nodeID: ID;
     sourceId: SourceId;
     viewPath: ViewPath;
     parentNode: GraphNode | undefined;
@@ -211,7 +180,7 @@ export function planUpdateViewItemMetadata(
     isDocumentTopLevel: boolean;
   },
   metadata: NodeItemMetadata,
-  editorText: string
+  editorSpans: InlineSpan[] | undefined
 ): Plan {
   const documentTopIncomingPlan = planAcceptDocumentTopIncoming(
     plan,
@@ -224,7 +193,7 @@ export function planUpdateViewItemMetadata(
 
   const {
     node,
-    rowID,
+    nodeID,
     viewPath,
     parentNode,
     parentViewPath,
@@ -237,19 +206,18 @@ export function planUpdateViewItemMetadata(
   if (!parentViewPath) {
     return planUpdateDocumentTopNodeMetadata(
       plan,
-      { node, rowID, viewPath, paneIndex, documentId },
+      { node, nodeID, viewPath, paneIndex, documentId },
       metadata,
-      editorText
+      editorSpans
     );
   }
 
-  if (isEmptySemanticID(rowID)) {
-    const trimmed = editorText.trim();
-    if (trimmed) {
+  if (isEmptyNodeID(nodeID)) {
+    if (editorSpans && spansText(editorSpans).trim() !== "") {
       return planSaveNodeAndEnsureNodes(
         plan,
-        trimmed,
-        rowID,
+        editorSpans,
+        nodeID,
         node,
         viewPath,
         parentNode,
@@ -269,11 +237,10 @@ export function planUpdateViewItemMetadata(
       return plan;
     }
     if (virtualType === "suggestion" && !isBlockLink(node)) {
-      const source = resolveDeepCopySource(plan, rowID, node, input.sourceId);
       return planDeepCopyNode(
         plan,
-        source.sourceId,
-        source.node,
+        input.sourceId,
+        node,
         parentNode.id,
         viewPath,
         parentViewPath,
@@ -286,7 +253,7 @@ export function planUpdateViewItemMetadata(
     // (planMaterializeComputedRow with their prepared take) before this
     // function is ever reached; what remains here serves versions and
     // block-link suggestions.
-    const targetItem = getBlockLinkInsertTarget(plan, node) ?? rowID;
+    const targetItem = getBlockLinkInsertTarget(plan, node) ?? nodeID;
     const targetID = getBlockLinkTarget(node);
     const inheritedSourceNode = targetID
       ? getNode(plan.knowledgeDBs, targetID, LOCAL)
@@ -301,13 +268,14 @@ export function planUpdateViewItemMetadata(
     )[0];
   }
 
-  const trimmed = editorText.trim();
   const basePlan =
-    trimmed && trimmed !== nodeText(node)
+    editorSpans &&
+    spansText(editorSpans).trim() !== "" &&
+    spansToMarkdown(editorSpans) !== spansToMarkdown(node.spans)
       ? planSaveNodeAndEnsureNodes(
           plan,
-          editorText,
-          rowID,
+          editorSpans,
+          nodeID,
           node,
           viewPath,
           parentNode,

@@ -210,6 +210,30 @@ export function inlineTargetToHref(
 
 // Violet means entity: the one use of color in the link language — the row
 // touches the shared world. Links themselves stay unmarked.
+export function inlineLinkToHref(
+  data: Data,
+  href: string,
+  source: GraphNode,
+  sourceId: SourceId
+): string | undefined {
+  if (href.startsWith("#")) {
+    return inlineTargetToHref(data, href.slice(1), sourceId);
+  }
+  const hashIndex = href.lastIndexOf("#");
+  const path = hashIndex < 0 ? href : href.slice(0, hashIndex);
+  const scrollToId = hashIndex < 0 ? undefined : href.slice(hashIndex + 1);
+  const target = linkToNavigationTarget(data, {
+    kind: "document",
+    source,
+    sourceId,
+    path,
+    text: "",
+  });
+  return target
+    ? navigationTargetToHref({ ...target, scrollToId: scrollToId || undefined })
+    : undefined;
+}
+
 export function linkStyle(link: Link): React.CSSProperties {
   if (link.kind === "document") {
     return { fontStyle: "italic" };

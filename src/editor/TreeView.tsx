@@ -184,9 +184,7 @@ function PlainTreeRows({
     if (handledScrollToIdRef.current === scrollToId) {
       return;
     }
-    const index = rows.findIndex(
-      (row) => row.node.id === scrollToId || row.rowID === scrollToId
-    );
+    const index = rows.findIndex((row) => row.node.id === scrollToId);
     if (index >= 0) {
       const row = containerRef.current?.querySelector(
         `[data-row-index="${index}"]`

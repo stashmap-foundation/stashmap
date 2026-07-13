@@ -5,7 +5,6 @@ import { ensureNodeNativeFields } from "./connections";
 import { newDB } from "./knowledge";
 import { MarkdownTreeNode } from "./markdownTree";
 import { newGraphNode } from "./nodeFactory";
-import { nodeText } from "./nodeSpans";
 
 export type WalkContext = {
   knowledgeDBs: KnowledgeDBs;
@@ -72,7 +71,7 @@ function materializeTreeNode(
   root: ID,
   parent: ID | undefined,
   mode: IdMaterializationMode
-): [WalkContext, ID, GraphNode] {
+): [WalkContext, GraphNode] {
   const baseNode = newMarkdownGraphNode(
     treeNode,
     treeNode.spans,
@@ -110,7 +109,7 @@ function materializeTreeNode(
       // parser already normalizes them to a single link span, so no
       // special materialization is needed — the old special case here
       // silently dropped everything nested under a link row.
-      const [afterChild, , materializedChild] = materializeTreeNode(
+      const [afterChild, materializedChild] = materializeTreeNode(
         accCtx,
         childNode,
         root,
@@ -139,7 +138,7 @@ function materializeTreeNode(
       ? { updated: withVisible.updated }
       : {}),
   };
-  return [walkUpsertNode(withVisible, node), nodeText(node) as ID, node];
+  return [walkUpsertNode(withVisible, node), node];
 }
 
 export type MaterializeOptions = {
@@ -149,7 +148,6 @@ export type MaterializeOptions = {
 
 export type MaterializeResult = {
   context: WalkContext;
-  topSemanticIds: ID[];
   topNodeIds: ID[];
 };
 
@@ -176,7 +174,7 @@ function materializeTreeWithMode(
       const treeWithUuid = hasExplicitRootId
         ? treeNode
         : { ...treeNode, uuid: rootUuid };
-      const [nextCtx, topSemanticID, topNodeID] = materializeTreeNode(
+      const [nextCtx, topNode] = materializeTreeNode(
         acc.context,
         treeWithUuid,
         rootNodeID,
@@ -185,11 +183,10 @@ function materializeTreeWithMode(
       );
       return {
         context: nextCtx,
-        topSemanticIds: [...acc.topSemanticIds, topSemanticID],
-        topNodeIds: [...acc.topNodeIds, topNodeID.id as ID],
+        topNodeIds: [...acc.topNodeIds, topNode.id],
       };
     },
-    { context: ctx, topSemanticIds: [], topNodeIds: [] }
+    { context: ctx, topNodeIds: [] }
   );
 }
 

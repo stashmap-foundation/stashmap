@@ -2,8 +2,6 @@ import React, { useState } from "react";
 import { OrderedSet, Set } from "immutable";
 import { useRow } from "../rowModel";
 import { useData } from "../DataContext";
-import { isRefNode } from "../core/connections";
-import { isBlockFileLink } from "../core/nodeSpans";
 import { deselectAllChildren } from "../core/selection";
 
 export { deselectAllChildren };
@@ -66,7 +64,7 @@ export function useIsEditingOn(): boolean {
 }
 
 export function isEditableNode(node: GraphNode | undefined): boolean {
-  return !!node && !isRefNode(node) && !isBlockFileLink(node);
+  return node !== undefined;
 }
 
 export function TemporaryViewProvider({

@@ -208,7 +208,7 @@ Barcelona
     await expectTree(`
 Other
   Target
-    [R] Notes / Level1 / Level2 / Level3 / Target
+    Target
     Child
     `);
 
@@ -227,7 +227,7 @@ Other
     // home page — the ordinary dangling state, not a deletion.
     await expectTree(`
 Places
-  [R] https://www.wikidata.org/wiki/Q131723
+  https://www.wikidata.org/wiki/Q131723
     `);
     expect(screen.queryByText(/deleted/)).toBeNull();
 
@@ -252,7 +252,7 @@ Places
 
     await expectTree(`
 ~Log
-  [R] My Notes
+  My Notes
     `);
 
     await userEvent.click(await screen.findByText("My Notes"));
@@ -269,7 +269,7 @@ My Notes
 
     await expectTree(`
 ~Log
-  [D] (deleted) My Notes
+  [D] My Notes
     `);
 
     cleanup();
@@ -279,7 +279,7 @@ My Notes
 
     await expectTree(`
 ~Log
-  [D] (deleted) My Notes
+  [D] My Notes
     `);
   });
 
@@ -293,7 +293,7 @@ My Notes
 
     await expectTree(`
 ~Log
-  [R] Investment
+  Investment
     `);
 
     await userEvent.click(await screen.findByText("Investment"));
@@ -311,7 +311,7 @@ Investment
 
     await expectTree(`
 ~Log
-  [D] (deleted) Investment
+  [D] Investment
     `);
 
     cleanup();
@@ -321,7 +321,7 @@ Investment
 
     await expectTree(`
 ~Log
-  [D] (deleted) Investment
+  [D] Investment
     `);
   });
 });

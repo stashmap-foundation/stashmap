@@ -12,11 +12,9 @@ import { Document, documentKeyOf } from "./Document";
 import { displayTextOf } from "./ical";
 import { resolveLinkPath } from "./linkPath";
 
-// Empty text remains the sentinel for an empty placeholder row
-export const EMPTY_SEMANTIC_ID = "" as ID;
+export const EMPTY_NODE_ID: ID = "";
 
 export type TextSeed = {
-  id: ID;
   text: string;
 };
 
@@ -82,7 +80,7 @@ export function isSearchId(id: ID): boolean {
 }
 
 export function createSearchId(query: string): ID {
-  return `${SEARCH_PREFIX}${query}` as ID;
+  return `${SEARCH_PREFIX}${query}`;
 }
 
 export function parseSearchId(id: ID): string | undefined {
@@ -118,25 +116,6 @@ function getNodeContextIndex(
   const index = new globalThis.Map<string, Context>();
   nodeContextCache.set(db, index);
   return index;
-}
-
-export function getNodeSemanticID(node: GraphNode): ID {
-  if (isSearchId(node.id)) {
-    return node.id;
-  }
-  return nodeText(node) as ID;
-}
-
-export function getSemanticID(
-  knowledgeDBs: KnowledgeDBs,
-  node: GraphNode,
-  sourceId: SourceId
-): ID {
-  const targetNode = getTargetNode(knowledgeDBs, node, sourceId);
-  if (targetNode) {
-    return getSemanticID(knowledgeDBs, targetNode, sourceId);
-  }
-  return getNodeSemanticID(node);
 }
 
 export function getNodeContext(
@@ -187,8 +166,7 @@ export function getNodeContext(
   }
 
   const derivedContext = parentChain.reduce(
-    (context, parentNode) =>
-      context.push(getSemanticID(knowledgeDBs, parentNode, sourceId)),
+    (context, parentNode) => context.push(parentNode.id),
     parentChain.length > 0
       ? getNodeContext(knowledgeDBs, parentChain[0] as GraphNode, sourceId)
       : List<ID>()
@@ -204,10 +182,7 @@ export function getNodeStack(
   node: GraphNode,
   sourceId: SourceId
 ): ID[] {
-  return [
-    ...getNodeContext(knowledgeDBs, node, sourceId).toArray(),
-    getSemanticID(knowledgeDBs, node, sourceId),
-  ];
+  return [...getNodeContext(knowledgeDBs, node, sourceId).toArray(), node.id];
 }
 
 export function nodePathLabel(
@@ -215,9 +190,11 @@ export function nodePathLabel(
   node: GraphNode,
   sourceId: SourceId
 ): string {
-  return getNodeStack(knowledgeDBs, node, sourceId)
-    .map((segment) => displayTextOf(segment))
-    .join(" / ");
+  const contextLabels = getNodeContext(knowledgeDBs, node, sourceId)
+    .map((nodeID) => getNode(knowledgeDBs, nodeID, sourceId))
+    .filter((pathNode): pathNode is GraphNode => pathNode !== undefined)
+    .map((pathNode) => displayTextOf(nodeText(pathNode)));
+  return contextLabels.push(displayTextOf(nodeText(node))).join(" / ");
 }
 
 export function getNodeDepth(
@@ -413,8 +390,8 @@ export function moveNodes(
   };
 }
 
-export function isEmptySemanticID(semanticID: ID): boolean {
-  return semanticID === EMPTY_SEMANTIC_ID;
+export function isEmptyNodeID(nodeID: ID): boolean {
+  return nodeID === EMPTY_NODE_ID;
 }
 
 export function itemPassesFilters(
@@ -427,7 +404,7 @@ export function itemPassesFilters(
     | "contains"
   )[]
 ): boolean {
-  if (isEmptySemanticID(item.id)) {
+  if (isEmptyNodeID(item.id)) {
     return true;
   }
 
@@ -495,7 +472,7 @@ export function injectEmptyNodesIntoKnowledgeDBs(
 
     // Check if empty node is already injected (from parent MergeKnowledgeDB)
     const alreadyHasEmpty = existingNodes.children.some(
-      (itemID) => itemID === EMPTY_SEMANTIC_ID
+      (itemID) => itemID === EMPTY_NODE_ID
     );
     if (alreadyHasEmpty) {
       return nodes;
@@ -504,7 +481,7 @@ export function injectEmptyNodesIntoKnowledgeDBs(
     // Insert empty node at the specified index with its metadata (relevance, argument)
     const updatedItems = existingNodes.children.insert(
       data.index,
-      EMPTY_SEMANTIC_ID
+      EMPTY_NODE_ID
     );
     return nodes.set(existingNodeID, {
       ...existingNodes,

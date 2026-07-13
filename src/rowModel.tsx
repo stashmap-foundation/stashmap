@@ -6,7 +6,7 @@ import {
   isSearchId,
   parseSearchId,
   createSearchId,
-  EMPTY_SEMANTIC_ID,
+  EMPTY_NODE_ID,
   getRefLinkTargetInfo,
   getRefTargetInfo,
   isRefNode,
@@ -152,13 +152,13 @@ export function getPaneRootItemID(pane: Pane): ID {
   return (
     pane.rootNodeId ||
     (pane.searchQuery ? createSearchId(pane.searchQuery) : undefined) ||
-    EMPTY_SEMANTIC_ID
+    EMPTY_NODE_ID
   );
 }
 
-export function getViewForRowID(data: Data, path: ViewPath, rowID: ID): View {
+export function getViewForNode(data: Data, path: ViewPath, nodeID: ID): View {
   return (
-    getViewExactMatch(data.views, path) || getDefaultView(rowID, isRoot(path))
+    getViewExactMatch(data.views, path) || getDefaultView(nodeID, isRoot(path))
   );
 }
 
@@ -190,7 +190,7 @@ export function buildPaneTarget(data: Data, row: Row): EditorNavigationTarget {
           effectiveAuthor
         );
       }
-      return getRefTargetInfo(row.rowID, data.knowledgeDBs, effectiveAuthor);
+      return getRefTargetInfo(row.node.id, data.knowledgeDBs, effectiveAuthor);
     }
     return virtualType === "version"
       ? getRefTargetInfo(
@@ -257,13 +257,13 @@ export function addNodeToPathWithNodes(
   nodes: GraphNode,
   index: number
 ): ViewPath {
-  const rowID = nodes.children.get(index);
-  if (rowID === undefined) {
+  const nodeID = nodes.children.get(index);
+  if (nodeID === undefined) {
     throw new Error("No child node found at index");
   }
   const pathWithNodes = addNodesToLastElement(path, nodes.id);
   const nextSegment =
-    rowID === EMPTY_SEMANTIC_ID ? createEmptyViewPathID(nodes.id) : rowID;
+    nodeID === EMPTY_NODE_ID ? createEmptyViewPathID(nodes.id) : nodeID;
   return [...pathWithNodes, nextSegment] as ViewPath;
 }
 
@@ -288,11 +288,6 @@ export function useCurrentEdge(): GraphNode {
   return useRow().node;
 }
 
-export function useCurrentRowID(): [ID, View] {
-  const row = useRow();
-  return [row.rowID, row.view];
-}
-
 export function getDisplayTextForRow(data: Data, row: Row): string {
   if (row.renameSuggestion) {
     return `${row.renameSuggestion.mine} ${row.renameSuggestion.theirs}`;
@@ -301,8 +296,9 @@ export function getDisplayTextForRow(data: Data, row: Row): string {
     return row.standsFor.liveText;
   }
   // A version row's text IS its meta: date, author mark, diff counts.
-  if (row.virtualType === "version" && row.versionMeta) {
-    const meta = row.versionMeta;
+  const versionMeta = row.versionMeta ?? row.reference?.versionMeta;
+  if (row.virtualType === "version" && versionMeta) {
+    const meta = versionMeta;
     return [
       new Date(meta.updated).toLocaleString(),
       ...(row.sourceId !== LOCAL ? ["\u{1F464}"] : []),
@@ -312,11 +308,15 @@ export function getDisplayTextForRow(data: Data, row: Row): string {
     ].join(" ");
   }
   const reference = getCurrentReferenceForRow(data, row);
-  if (reference) {
-    return reference.text;
+  if (
+    row.virtualType === undefined &&
+    row.node.spans.some((span) => span.kind === "link")
+  ) {
+    return nodeText(row.node);
   }
-  if (isSearchId(row.rowID)) {
-    const query = parseSearchId(row.rowID) || "";
+  if (reference) return reference.text;
+  if (isSearchId(row.node.id)) {
+    const query = parseSearchId(row.node.id) || "";
     return `Search: ${query}`;
   }
   return nodeText(row.node);
@@ -337,8 +337,8 @@ export function useIsRoot(): boolean {
 
 export function updateView(views: Views, path: ViewPath, view: View): Views {
   const key = viewPathToString(path);
-  const rowID = getLast(path);
-  const defaultView = getDefaultView(rowID, isRoot(path));
+  const nodeID = getLast(path);
+  const defaultView = getDefaultView(nodeID, isRoot(path));
   const isDefault =
     view.expanded === defaultView.expanded &&
     !view.typeFilters &&

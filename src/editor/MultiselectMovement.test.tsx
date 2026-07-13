@@ -119,8 +119,8 @@ Root
   B
   Target
 Target
-  [R] Root / A
-  [R] Root / B
+  A
+  B
     `);
   });
 
@@ -516,8 +516,8 @@ Root
   Shallow
   Target
 Target
-  [R] Root / Parent / Deep
-  [R] Root / Shallow
+  Deep
+  Shallow
     `);
   });
 

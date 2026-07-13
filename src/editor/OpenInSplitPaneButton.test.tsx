@@ -30,7 +30,7 @@ Root
   Target
   OtherParent
 Target
-  [R] Root / Source
+  Source
   `);
 }
 
@@ -99,7 +99,7 @@ test("clicking a head-level reference opens its parent node", async () => {
 
   await setupHeadLevelReferenceInSecondPane();
 
-  await userEvent.click(screen.getByLabelText("Navigate to Root / Source"));
+  await userEvent.click(screen.getByRole("link", { name: "Source" }));
 
   await expectTree(`
 Root
@@ -128,7 +128,7 @@ Root
   Target
   OtherParent
 Target
-  [R] Root / Source
+  Source
 Root
   Source
   Target

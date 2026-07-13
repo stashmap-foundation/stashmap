@@ -23,12 +23,11 @@ import {
 import { publishStateOf } from "./core/knowstrFrontmatter";
 import { newStorageKey } from "./storageEncryption";
 import {
-  EMPTY_SEMANTIC_ID,
-  isEmptySemanticID,
+  EMPTY_NODE_ID,
+  isEmptyNodeID,
   getNode,
   computeEmptyNodeMetadata,
   isSearchId,
-  isRefNode,
 } from "./core/connections";
 import type { TextSeed } from "./core/connections";
 import {
@@ -51,7 +50,8 @@ import {
   viewPathToString,
   addNodeToPathWithNodes,
 } from "./rowModel";
-import { nodeText, plainSpans } from "./core/nodeSpans";
+import { plainSpans, spansText, spansToMarkdown } from "./core/nodeSpans";
+import { isCalendarEntryId } from "./core/ical";
 import { LOCAL } from "./core/nodeRef";
 import { entityIdForText } from "./core/entityRecognition";
 import { getWorkspaceNode, newDB } from "./core/knowledge";
@@ -85,17 +85,27 @@ type WorkspacePlan = GraphPlan &
 
 export type Plan = WorkspacePlan;
 
-export function planUpdateNodeText(plan: Plan, nodeID: ID, text: string): Plan {
+export function planUpdateNodeSpans(
+  plan: Plan,
+  nodeID: ID,
+  spans: InlineSpan[]
+): Plan {
   const currentNode = getWorkspaceNode(plan.knowledgeDBs, nodeID);
-  if (!currentNode || nodeText(currentNode) === text) {
+  if (
+    !currentNode ||
+    spansToMarkdown(currentNode.spans) === spansToMarkdown(spans)
+  ) {
     return plan;
   }
-  const updatedNode = {
+  return planUpsertNodes(plan, {
     ...currentNode,
-    spans: plainSpans(text),
+    spans,
     updated: Date.now(),
-  };
-  return planUpsertNodes(plan, updatedNode);
+  });
+}
+
+export function planUpdateNodeText(plan: Plan, nodeID: ID, text: string): Plan {
+  return planUpdateNodeSpans(plan, nodeID, plainSpans(text));
 }
 
 function removeEmptyNodeFromKnowledgeDBs(
@@ -115,7 +125,7 @@ function removeEmptyNodeFromKnowledgeDBs(
   }
 
   const filteredItems = existingNodes.children.filter(
-    (itemID) => !isEmptySemanticID(itemID)
+    (itemID) => !isEmptyNodeID(itemID)
   );
   if (filteredItems.size === existingNodes.children.size) {
     return knowledgeDBs;
@@ -438,10 +448,7 @@ export function planDeepCopyNode(
  * Create a new node value for insertion into the current node tree.
  */
 export function planCreateNode(plan: Plan, text: string): [Plan, TextSeed] {
-  const node: TextSeed = {
-    id: text as ID,
-    text,
-  };
+  const node: TextSeed = { text };
   return [plan, node];
 }
 
@@ -540,8 +547,8 @@ export function planCreateNoteAtRoot(
  */
 export function planSaveNodeAndEnsureNodes(
   plan: Plan,
-  text: string,
-  rowID: ID,
+  spans: InlineSpan[],
+  nodeID: ID,
   currentNode: GraphNode,
   viewPath: ViewPath,
   parentNode: GraphNode | undefined,
@@ -550,9 +557,10 @@ export function planSaveNodeAndEnsureNodes(
   relevance?: Relevance,
   argument?: Argument
 ): SaveNodeResult {
+  const text = spansText(spans);
   const trimmedText = text.trim();
 
-  if (isEmptySemanticID(rowID)) {
+  if (isEmptyNodeID(nodeID)) {
     if (!parentViewPath) {
       if (!trimmedText) return { plan, viewPath, node: currentNode };
       return planCreateNoteAtRoot(plan, trimmedText, paneIndex);
@@ -592,19 +600,24 @@ export function planSaveNodeAndEnsureNodes(
     return { plan: resultPlan, viewPath, node: currentNode };
   }
 
-  const currentItem = getNode(plan.knowledgeDBs, rowID, LOCAL);
-  if ((currentItem && isRefNode(currentItem)) || isSearchId(rowID)) {
+  if (isSearchId(nodeID)) {
     return { plan, viewPath, node: currentNode };
   }
 
-  const displayText = nodeText(currentNode);
+  const nextSpans =
+    isCalendarEntryId(nodeID) &&
+    currentNode.id !== nodeID &&
+    currentNode.spans.length === 1 &&
+    currentNode.spans[0].kind === "link"
+      ? [{ ...currentNode.spans[0], text: spansText(spans) }]
+      : spans;
 
-  if (trimmedText === displayText) {
+  if (spansToMarkdown(nextSpans) === spansToMarkdown(currentNode.spans)) {
     return { plan, viewPath, node: currentNode };
   }
 
   return {
-    plan: planUpdateNodeText(plan, currentNode.id, trimmedText),
+    plan: planUpdateNodeSpans(plan, currentNode.id, nextSpans),
     viewPath,
     node: currentNode,
   };
@@ -1005,7 +1018,7 @@ export function planSetEmptyNodePosition(
       index: insertIndex,
       nodeItem: {
         children: List<ID>(),
-        id: EMPTY_SEMANTIC_ID,
+        id: EMPTY_NODE_ID,
         spans: plainSpans(""),
         parent: parentNode.id,
         updated: Date.now(),

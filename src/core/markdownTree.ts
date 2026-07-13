@@ -1,18 +1,14 @@
-/* eslint-disable functional/immutable-data, functional/no-let, no-continue */
 import MarkdownIt from "markdown-it";
 import markdownItFrontMatter from "markdown-it-front-matter";
 // eslint-disable-next-line import/no-unresolved
 import Token from "markdown-it/lib/token";
-import { fileLinkSpan, linkSpan, plainSpans, spansText } from "./nodeSpans";
+import { plainSpans, spansText } from "./nodeSpans";
 import { docLinkId, isMarkdownPath } from "./linkPath";
 import { parseFrontMatter } from "./knowstrFrontmatter";
 import { isSafeMarkdownNodeId } from "./graphLookup";
 
-const captured: { value?: string } = {};
 const markdown = new MarkdownIt({ html: true });
-markdown.use(markdownItFrontMatter, (raw: string) => {
-  captured.value = raw;
-});
+markdown.use(markdownItFrontMatter, () => undefined);
 
 const ID_COMMENT_RE = /^<!--\s+id:(\S+)(.*?)-->$/;
 const ATTR_RE = /(\w+)="([^"]*)"/g;
@@ -50,14 +46,19 @@ function parseIdComment(content: string): ParsedComment | undefined {
   }
   const rest = match[2];
 
-  const attrsMap: Record<string, string> = {};
-  const extraAttrs: Record<string, string> = {};
-  [...rest.matchAll(ATTR_RE)].forEach(([, key, value]) => {
-    attrsMap[key] = value;
-    if (key !== "basedOn" && key !== "snapshot") {
-      extraAttrs[key] = value;
-    }
-  });
+  const { attrsMap, extraAttrs } = [...rest.matchAll(ATTR_RE)].reduce<{
+    attrsMap: Record<string, string>;
+    extraAttrs: Record<string, string>;
+  }>(
+    (attrs, [, key, value]) => ({
+      attrsMap: { ...attrs.attrsMap, [key]: value },
+      extraAttrs:
+        key === "basedOn" || key === "snapshot"
+          ? attrs.extraAttrs
+          : { ...attrs.extraAttrs, [key]: value },
+    }),
+    { attrsMap: {}, extraAttrs: {} }
+  );
 
   const basedOn = attrsMap.basedOn || undefined;
   const snapshotId = attrsMap.snapshot || undefined;
@@ -68,19 +69,6 @@ function parseIdComment(content: string): ParsedComment | undefined {
     extraAttrs: Object.keys(extraAttrs).length > 0 ? extraAttrs : undefined,
     systemRole: undefined,
   };
-}
-
-function stripTrailingHtmlComment(
-  content: string,
-  comment: string | undefined
-): string {
-  if (!comment) {
-    return content;
-  }
-  const trimmed = content.trimEnd();
-  return trimmed.endsWith(comment)
-    ? trimmed.slice(0, -comment.length)
-    : content;
 }
 
 function isIdComment(token: Token): boolean {
@@ -110,51 +98,72 @@ function childrenToText(children: readonly Token[]): string {
     .join("");
 }
 
-type RefLinkTarget =
-  | { kind: "node"; targetID: string }
-  | { kind: "file"; path: string };
-
-function classifyHref(href: string): RefLinkTarget | undefined {
-  const hashIndex = href.indexOf("#");
-  if (hashIndex >= 0) {
-    const targetID = href.slice(hashIndex + 1);
-    return targetID ? { kind: "node", targetID } : undefined;
-  }
-  if (docLinkId(href) !== undefined || isMarkdownPath(href)) {
-    return { kind: "file", path: href };
-  }
-  return undefined;
+function supportedHref(href: string): boolean {
+  const filePath = href.split("#")[0];
+  return (
+    (href.startsWith("#") && href.length > 1) ||
+    docLinkId(filePath) !== undefined ||
+    isMarkdownPath(filePath)
+  );
 }
 
-function extractRefLink(
-  children: readonly Token[]
-): { prefixSource: string; text: string; target: RefLinkTarget } | undefined {
-  const tokens = children.filter((c) => !isIdComment(c));
-  const openIdx = tokens.findIndex((c) => c.type === "link_open");
-  if (openIdx < 0) return undefined;
-  const closeIdx = tokens.findIndex(
-    (c, i) => i > openIdx && c.type === "link_close"
-  );
-  if (closeIdx < 0) return undefined;
+function tokenSource(token: Token): string {
+  if (token.type === "softbreak" || token.type === "hardbreak") return " ";
+  if (token.type === "code_inline") {
+    return `${token.markup}${token.content}${token.markup}`;
+  }
+  if (token.type.endsWith("_open") || token.type.endsWith("_close")) {
+    return token.markup;
+  }
+  return token.content;
+}
 
-  const href = tokens[openIdx].attrGet("href");
-  if (!href) return undefined;
-  const target = classifyHref(href);
-  if (!target) return undefined;
+function appendSpan(spans: InlineSpan[], span: InlineSpan): InlineSpan[] {
+  if (span.text === "") return spans;
+  const previous = spans[spans.length - 1];
+  if (previous?.kind === "text" && span.kind === "text") {
+    return [
+      ...spans.slice(0, -1),
+      { kind: "text", text: previous.text + span.text },
+    ];
+  }
+  return [...spans, span];
+}
 
-  const trailing = tokens.slice(closeIdx + 1);
-  const trailingIsBlank = trailing.every(
-    (c) => c.type === "text" && c.content.trim() === ""
-  );
-  if (!trailingIsBlank) return undefined;
-
-  const leading = tokens.slice(0, openIdx);
-  const prefixSource = childrenToText(leading);
-  if (prefixSource.replace(PREFIX_RE, "").trim() !== "") return undefined;
-
-  const inner = tokens.slice(openIdx + 1, closeIdx);
-  const text = childrenToText(inner).replace(/\n/g, " ").trim();
-  return { prefixSource, text, target };
+function extractSpans(children: readonly Token[]): InlineSpan[] {
+  const tokens = children.filter((token) => !isIdComment(token));
+  const extractFrom = (index: number, spans: InlineSpan[]): InlineSpan[] => {
+    if (index >= tokens.length) return spans;
+    const token = tokens[index];
+    if (token.type !== "link_open") {
+      return extractFrom(
+        index + 1,
+        appendSpan(spans, { kind: "text", text: tokenSource(token) })
+      );
+    }
+    const relativeCloseIndex = tokens
+      .slice(index + 1)
+      .findIndex((candidate) => candidate.type === "link_close");
+    if (relativeCloseIndex < 0) {
+      return extractFrom(index + 1, spans);
+    }
+    const closeIndex = index + relativeCloseIndex + 1;
+    const href = token.attrGet("href") ?? "";
+    const title = token.attrGet("title");
+    const inner = tokens.slice(index + 1, closeIndex);
+    const text = childrenToText(inner).replace(/\n/g, " ").trim();
+    const span =
+      supportedHref(href) && title === null && text !== ""
+        ? { kind: "link" as const, href, text }
+        : {
+            kind: "text" as const,
+            text: `[${inner.map(tokenSource).join("")}](${href}${
+              title === null ? "" : ` "${title}"`
+            })`,
+          };
+    return extractFrom(closeIndex + 1, appendSpan(spans, span));
+  };
+  return extractFrom(0, []);
 }
 
 function extractPrefixMarkers(text: string): {
@@ -187,6 +196,20 @@ function extractPrefixMarkers(text: string): {
   return { cleanText, relevance, argument };
 }
 
+function trimParsedSpans(spans: InlineSpan[]): InlineSpan[] {
+  const lastIndex = spans.length - 1;
+  return spans
+    .map((span, index) => {
+      if (index === 0 && index === lastIndex) {
+        return { ...span, text: span.text.trim() };
+      }
+      if (index === 0) return { ...span, text: span.text.trimStart() };
+      if (index === lastIndex) return { ...span, text: span.text.trimEnd() };
+      return span;
+    })
+    .filter((span) => span.text !== "");
+}
+
 function extractInlineContent(inline: Token): {
   spans: InlineSpan[];
   relevance?: Relevance;
@@ -201,30 +224,20 @@ function extractInlineContent(inline: Token): {
       argument,
     };
   }
-  const refLink = extractRefLink(inline.children);
-  if (refLink) {
-    const { relevance, argument } = extractPrefixMarkers(refLink.prefixSource);
-    const span =
-      refLink.target.kind === "node"
-        ? linkSpan(refLink.target.targetID as ID, refLink.text)
-        : fileLinkSpan(refLink.target.path, refLink.text);
-    return {
-      spans: [span],
-      relevance,
-      argument,
-    };
-  }
-  const commentChild = inline.children.find(isIdComment);
-  const stripped = stripTrailingHtmlComment(
-    inline.content,
-    commentChild?.content
-  );
-  const raw = stripped.replace(/\n/g, " ").trim();
-  const { cleanText, relevance, argument } = extractPrefixMarkers(raw);
+  const parsedSpans = trimParsedSpans(extractSpans(inline.children));
+  const first = parsedSpans[0];
+  const prefix = extractPrefixMarkers(first?.kind === "text" ? first.text : "");
+  const spans =
+    first?.kind === "text"
+      ? [
+          ...(prefix.cleanText === "" ? [] : [plainSpans(prefix.cleanText)[0]]),
+          ...parsedSpans.slice(1),
+        ]
+      : parsedSpans;
   return {
-    spans: plainSpans(cleanText),
-    relevance,
-    argument,
+    spans,
+    relevance: prefix.relevance,
+    argument: prefix.argument,
   };
 }
 
@@ -245,28 +258,49 @@ export type MarkdownTreeNode = {
   systemRole?: RootSystemRole;
 };
 
-function appendNode(
-  roots: MarkdownTreeNode[],
-  parent: MarkdownTreeNode | undefined,
-  node: MarkdownTreeNode
-): void {
-  if (parent) {
-    parent.children.push(node);
-    return;
+type NodePath = readonly number[];
+
+type AppendResult = {
+  nodes: MarkdownTreeNode[];
+  path: NodePath;
+};
+
+function appendNodeAtPath(
+  nodes: MarkdownTreeNode[],
+  parentPath: NodePath,
+  node: MarkdownTreeNode,
+  pathPrefix: NodePath = []
+): AppendResult {
+  if (parentPath.length === 0) {
+    return {
+      nodes: [...nodes, node],
+      path: [...pathPrefix, nodes.length],
+    };
   }
-  roots.push(node);
+  const parentIndex = parentPath[0];
+  const parent = nodes[parentIndex];
+  if (!parent) {
+    throw new Error("Invalid markdown tree parent path");
+  }
+  const nested = appendNodeAtPath(parent.children, parentPath.slice(1), node, [
+    ...pathPrefix,
+    parentIndex,
+  ]);
+  return {
+    nodes: nodes.map((current, index) =>
+      index === parentIndex ? { ...current, children: nested.nodes } : current
+    ),
+    path: nested.path,
+  };
 }
 
-function getLastDefinedListItem(
-  listItemStack: Array<MarkdownTreeNode | undefined>
-): MarkdownTreeNode | undefined {
-  for (let i = listItemStack.length - 1; i >= 0; i -= 1) {
-    const listItem = listItemStack[i];
-    if (listItem) {
-      return listItem;
-    }
-  }
-  return undefined;
+function getLastDefinedPath(
+  pathStack: readonly (NodePath | undefined)[]
+): NodePath | undefined {
+  return pathStack.reduceRight<NodePath | undefined>(
+    (found, path) => found ?? path,
+    undefined
+  );
 }
 
 type ListKind = { ordered: boolean; start: number };
@@ -291,146 +325,158 @@ function commentNodeAttrs(
   };
 }
 
+type BuildTreeState = {
+  roots: MarkdownTreeNode[];
+  headingStack: readonly { level: number; path: NodePath }[];
+  listItemStack: readonly (NodePath | undefined)[];
+  listKindStack: readonly ListKind[];
+};
+
 function buildTreeFromTokens(tokens: Token[]): MarkdownTreeNode[] {
-  const roots: MarkdownTreeNode[] = [];
-  const headingStack: Array<{ level: number; node: MarkdownTreeNode }> = [];
-  const listItemStack: Array<MarkdownTreeNode | undefined> = [];
-  const listKindStack: ListKind[] = [];
-
-  for (let i = 0; i < tokens.length; i += 1) {
-    const token = tokens[i];
-    if (
-      token.type === "bullet_list_open" ||
-      token.type === "ordered_list_open"
-    ) {
-      const startAttr = token.attrGet("start");
-      listKindStack.push({
-        ordered: token.type === "ordered_list_open",
-        start: startAttr ? Number(startAttr) : 1,
-      });
-      continue;
-    }
-    if (
-      token.type === "bullet_list_close" ||
-      token.type === "ordered_list_close"
-    ) {
-      listKindStack.pop();
-      continue;
-    }
-    if (token.type === "heading_open") {
-      const headingLevel = Number(token.tag.replace("h", ""));
-      const inline = tokens[i + 1];
-      if (!inline || inline.type !== "inline") {
-        continue;
-      }
-      const { spans, relevance, argument } = extractInlineContent(inline);
-      if (spansText(spans) === "") {
-        continue;
-      }
-      const commentAttrs = extractCommentAttrs(inline);
-      while (
-        headingStack.length > 0 &&
-        headingStack[headingStack.length - 1].level >= headingLevel
+  return tokens.reduce<BuildTreeState>(
+    (state, token, index) => {
+      if (
+        token.type === "bullet_list_open" ||
+        token.type === "ordered_list_open"
       ) {
-        headingStack.pop();
+        const startAttr = token.attrGet("start");
+        return {
+          ...state,
+          listKindStack: [
+            ...state.listKindStack,
+            {
+              ordered: token.type === "ordered_list_open",
+              start: startAttr ? Number(startAttr) : 1,
+            },
+          ],
+        };
       }
-      const parent =
-        getLastDefinedListItem(listItemStack) ||
-        headingStack[headingStack.length - 1]?.node;
-      const node: MarkdownTreeNode = {
-        spans,
-        children: [],
-        blockKind: "heading",
-        headingLevel,
-        ...commentNodeAttrs(commentAttrs),
-        ...(relevance !== undefined && { relevance }),
-        ...(argument !== undefined && { argument }),
-      };
-      appendNode(roots, parent, node);
-      headingStack.push({ level: headingLevel, node });
-      continue;
-    }
-
-    if (token.type === "list_item_open") {
-      listItemStack.push(undefined);
-      continue;
-    }
-
-    if (token.type === "list_item_close") {
-      listItemStack.pop();
-      continue;
-    }
-
-    if (token.type !== "paragraph_open") {
-      continue;
-    }
-
-    const inline = tokens[i + 1];
-    if (!inline || inline.type !== "inline") {
-      continue;
-    }
-    const { spans, relevance, argument } = extractInlineContent(inline);
-    if (spansText(spans) === "") {
-      continue;
-    }
-    const commentAttrs = extractCommentAttrs(inline);
-
-    if (listItemStack.length > 0) {
-      const currentItemIndex = listItemStack.length - 1;
-      const currentListNode = listItemStack[currentItemIndex];
-      if (!currentListNode) {
-        const parent =
-          getLastDefinedListItem(listItemStack.slice(0, -1)) ||
-          headingStack[headingStack.length - 1]?.node;
-        const effectiveRelevance = relevance;
-        const effectiveArgument = argument;
-        const currentListKind = listKindStack[listKindStack.length - 1];
+      if (
+        token.type === "bullet_list_close" ||
+        token.type === "ordered_list_close"
+      ) {
+        return {
+          ...state,
+          listKindStack: state.listKindStack.slice(0, -1),
+        };
+      }
+      if (token.type === "heading_open") {
+        const headingLevel = Number(token.tag.replace("h", ""));
+        const inline = tokens[index + 1];
+        if (!inline || inline.type !== "inline") return state;
+        const { spans, relevance, argument } = extractInlineContent(inline);
+        if (spansText(spans) === "") return state;
+        const headingStack = state.headingStack.filter(
+          (heading) => heading.level < headingLevel
+        );
+        const parentPath =
+          getLastDefinedPath(state.listItemStack) ??
+          headingStack[headingStack.length - 1]?.path ??
+          [];
         const node: MarkdownTreeNode = {
           spans,
           children: [],
-          blockKind: "list_item",
-          ...(currentListKind?.ordered && {
-            listOrdered: true,
-            listStart: currentListKind.start,
-          }),
-          ...commentNodeAttrs(commentAttrs),
-          ...(effectiveRelevance !== undefined && {
-            relevance: effectiveRelevance,
-          }),
-          ...(effectiveArgument !== undefined && {
-            argument: effectiveArgument,
-          }),
+          blockKind: "heading",
+          headingLevel,
+          ...commentNodeAttrs(extractCommentAttrs(inline)),
+          ...(relevance !== undefined && { relevance }),
+          ...(argument !== undefined && { argument }),
         };
-        appendNode(roots, parent, node);
-        listItemStack[currentItemIndex] = node;
-        continue;
+        const appended = appendNodeAtPath(state.roots, parentPath, node);
+        return {
+          ...state,
+          roots: appended.nodes,
+          headingStack: [
+            ...headingStack,
+            { level: headingLevel, path: appended.path },
+          ],
+        };
       }
-      currentListNode.children.push({
+      if (token.type === "list_item_open") {
+        return {
+          ...state,
+          listItemStack: [...state.listItemStack, undefined],
+        };
+      }
+      if (token.type === "list_item_close") {
+        return {
+          ...state,
+          listItemStack: state.listItemStack.slice(0, -1),
+        };
+      }
+      if (token.type !== "paragraph_open") return state;
+      const inline = tokens[index + 1];
+      if (!inline || inline.type !== "inline") return state;
+      const { spans, relevance, argument } = extractInlineContent(inline);
+      if (spansText(spans) === "") return state;
+      const attrs = commentNodeAttrs(extractCommentAttrs(inline));
+      if (state.listItemStack.length > 0) {
+        const currentItemIndex = state.listItemStack.length - 1;
+        const currentItemPath = state.listItemStack[currentItemIndex];
+        if (!currentItemPath) {
+          const parentPath =
+            getLastDefinedPath(state.listItemStack.slice(0, -1)) ??
+            state.headingStack[state.headingStack.length - 1]?.path ??
+            [];
+          const currentListKind =
+            state.listKindStack[state.listKindStack.length - 1];
+          const node: MarkdownTreeNode = {
+            spans,
+            children: [],
+            blockKind: "list_item",
+            ...(currentListKind?.ordered && {
+              listOrdered: true,
+              listStart: currentListKind.start,
+            }),
+            ...attrs,
+            ...(relevance !== undefined && { relevance }),
+            ...(argument !== undefined && { argument }),
+          };
+          const appended = appendNodeAtPath(state.roots, parentPath, node);
+          return {
+            ...state,
+            roots: appended.nodes,
+            listItemStack: [...state.listItemStack.slice(0, -1), appended.path],
+          };
+        }
+        const paragraph: MarkdownTreeNode = {
+          spans,
+          children: [],
+          blockKind: "paragraph",
+          ...attrs,
+          ...(relevance !== undefined && { relevance }),
+          ...(argument !== undefined && { argument }),
+        };
+        return {
+          ...state,
+          roots: appendNodeAtPath(state.roots, currentItemPath, paragraph)
+            .nodes,
+        };
+      }
+      const paragraph: MarkdownTreeNode = {
         spans,
         children: [],
         blockKind: "paragraph",
-        ...commentNodeAttrs(commentAttrs),
+        ...attrs,
         ...(relevance !== undefined && { relevance }),
         ...(argument !== undefined && { argument }),
-      });
-      continue;
+      };
+      return {
+        ...state,
+        roots: appendNodeAtPath(
+          state.roots,
+          state.headingStack[state.headingStack.length - 1]?.path ?? [],
+          paragraph
+        ).nodes,
+      };
+    },
+    {
+      roots: [],
+      headingStack: [],
+      listItemStack: [],
+      listKindStack: [],
     }
-
-    const paragraphNode: MarkdownTreeNode = {
-      spans,
-      children: [],
-      blockKind: "paragraph",
-      ...commentNodeAttrs(commentAttrs),
-      ...(relevance !== undefined && { relevance }),
-      ...(argument !== undefined && { argument }),
-    };
-    appendNode(
-      roots,
-      headingStack[headingStack.length - 1]?.node,
-      paragraphNode
-    );
-  }
-  return roots;
+  ).roots;
 }
 
 export type ParsedMarkdown = {
@@ -439,9 +485,15 @@ export type ParsedMarkdown = {
 };
 
 export function parseMarkdown(markdownText: string): ParsedMarkdown {
-  captured.value = undefined;
-  const tree = buildTreeFromTokens(markdown.parse(markdownText, {}));
-  const innerYaml = captured.value as string | undefined;
+  const tokens = markdown.parse(markdownText, {});
+  const tree = buildTreeFromTokens(tokens);
+  const frontMatterToken = tokens.find(
+    (token) => token.type === "front_matter"
+  );
+  const innerYaml =
+    typeof frontMatterToken?.meta === "string"
+      ? frontMatterToken.meta
+      : undefined;
   const frontMatter =
     innerYaml !== undefined ? parseFrontMatter(innerYaml) : undefined;
   return {

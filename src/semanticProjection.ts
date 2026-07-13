@@ -1,16 +1,13 @@
 import { List, Map, OrderedMap, Set as ImmutableSet } from "immutable";
 import {
-  EMPTY_SEMANTIC_ID,
   getChildNodes,
   isSearchId,
-  parseSearchId,
   itemPassesFilters,
-  getSemanticID,
   getNodeContext,
-  getNodeText,
   getNode,
   resolveNode,
   isRefNode,
+  nodePathLabel,
 } from "./core/connections";
 import { getBlockLinkTarget } from "./core/nodeSpans";
 import { fileLinkIndexKey } from "./core/linkPath";
@@ -23,6 +20,7 @@ import {
   ResolvedNode,
   getNodeInSource,
   lookupNode,
+  lookupNodes,
   resolveBlockLinkTarget,
 } from "./core/graphLookup";
 import { nodeRefKey } from "./core/nodeRef";
@@ -42,90 +40,34 @@ type ReferencedByRef = {
   updated: number;
 };
 
-function getFallbackSemanticText(semanticID?: ID): string {
-  if (!semanticID) {
-    return "";
-  }
-  if (semanticID === EMPTY_SEMANTIC_ID) {
-    return "";
-  }
-  if (isSearchId(semanticID)) {
-    return parseSearchId(semanticID) || "";
-  }
-  return "";
-}
-
-export function getTextForSemanticID(
-  knowledgeDBs: KnowledgeDBs,
-  semanticID: ID,
-  author: SourceId
-): string | undefined {
-  if (isSearchId(semanticID)) {
-    return parseSearchId(semanticID) || "";
-  }
-
-  const directNode = getNode(knowledgeDBs, semanticID, author);
-  if (directNode) {
-    if (isRefNode(directNode)) {
-      return undefined;
-    }
-    return getNodeText(directNode);
-  }
-
-  const fallbackText = getFallbackSemanticText(semanticID);
-  return fallbackText !== "" || semanticID === EMPTY_SEMANTIC_ID
-    ? fallbackText
-    : undefined;
-}
-
 function getContextKey(context: Context): string {
   return context.join(":");
 }
 
-function contextsSemanticallyMatch(
-  leftContext: Context,
-  rightContext: Context
-): boolean {
+function contextsMatch(leftContext: Context, rightContext: Context): boolean {
   return getContextKey(leftContext) === getContextKey(rightContext);
 }
 
-function getSemanticCandidates(
-  graph: GraphLookup,
-  semanticKey: string
-): List<ResolvedNode> {
-  const refs = graph.graphIndex.semanticRefs.get(semanticKey);
-  const nodes = refs
-    ? refs.map((ref) => getNodeInSource(graph, ref))
-    : [...(graph.graphIndex.semantic.get(semanticKey) ?? [])].map((nodeID) =>
-        lookupNode(graph, nodeID, graph.localSourceId)
-      );
-
-  return List(
-    nodes
-      .filter((resolved): resolved is ResolvedNode => resolved !== undefined)
-      .sort((left, right) => right.node.updated - left.node.updated)
+function getNodeCandidates(graph: GraphLookup, nodeID: ID): List<ResolvedNode> {
+  return List(lookupNodes(graph, nodeID)).sortBy(
+    (resolved) => -resolved.node.updated
   );
 }
 
 export function findRefsToNode(
   graph: GraphLookup,
-  semanticID: ID,
+  nodeID: ID,
   filterContext?: Context,
   targetAuthor?: SourceId,
   targetRoot?: ID
 ): List<ReferencedByRef> {
   const { knowledgeDBs } = graph;
-  const targetSemanticKey = semanticID;
-  const resolvedRefs = getSemanticCandidates(graph, targetSemanticKey)
-    .filter(
-      ({ node, ref }) =>
-        !isSearchId(getSemanticID(knowledgeDBs, node, ref.sourceId))
-    )
-    .filter(
-      ({ node, ref }) =>
-        !getNodeContext(knowledgeDBs, node, ref.sourceId).some((id) =>
-          isSearchId(id as ID)
-        )
+  const resolvedRefs = getNodeCandidates(graph, nodeID)
+    .filter(({ node }) => !isSearchId(node.id))
+    .filter(({ node, ref }) =>
+      getNodeContext(knowledgeDBs, node, ref.sourceId).every(
+        (id) => !isSearchId(id)
+      )
     )
     .map(({ node, ref }) => ({
       ref: {
@@ -147,7 +89,7 @@ export function findRefsToNode(
           author === targetAuthor &&
           root === targetRoot
             ? ref.context.equals(filterContext)
-            : contextsSemanticallyMatch(ref.context, filterContext)
+            : contextsMatch(ref.context, filterContext)
         )
         .map(({ ref }) => ref)
         .toList()
@@ -402,10 +344,11 @@ export function getIncomingCrefsForNode(
   )
     .map((ref) => getNodeInSource(graph, ref))
     .filter((node): node is ResolvedNode => node !== undefined);
-  const sourceNodes = uniqueNodes([
-    ...graphLinkSourceNodes,
-    ...fileLinkSourceNodes,
-  ]);
+  const sourceNodes = List(
+    uniqueNodes([...graphLinkSourceNodes, ...fileLinkSourceNodes])
+  )
+    .sortBy(({ ref, node }) => nodePathLabel(knowledgeDBs, node, ref.sourceId))
+    .toArray();
   if (sourceNodes.length === 0) {
     return List<NodeRef>();
   }
@@ -465,7 +408,6 @@ export function getIncomingCrefsForNode(
   const deduped = deduplicateRefsByContext(refs, knowledgeDBs, effectiveAuthor);
   return deduped
     .filter((ref) => !covered.has(getRefContextKey(knowledgeDBs, ref)))
-    .sortBy((ref) => `${-ref.updated}:${ref.context.join(":")}`)
     .map((ref) => ({ sourceId: ref.sourceId, id: ref.nodeID }))
     .toList();
 }

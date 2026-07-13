@@ -209,9 +209,7 @@ function entityLinkedTrees(
       ...tree,
       ...(entityId
         ? {
-            spans: [
-              linkSpan(entityId as ID, home ? nodeText(home) : text.trim()),
-            ],
+            spans: [linkSpan(entityId, home ? nodeText(home) : text.trim())],
           }
         : feedWrap),
       children: entityLinkedTrees(plan, tree.children),

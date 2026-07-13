@@ -1,20 +1,7 @@
 import type { Map as ImmutableMap } from "immutable";
-import {
-  EMPTY_SEMANTIC_ID,
-  getNode,
-  getNodeText,
-  getSemanticID,
-} from "./core/connections";
+import { EMPTY_NODE_ID, getNode } from "./core/connections";
 import type { Document } from "./core/Document";
-import { buildOutgoingReference } from "./buildReferenceRow";
-import {
-  getBlockFileLinkPath,
-  getBlockFileLinkText,
-  getBlockLinkTarget,
-  getBlockLinkText,
-  isBlockFileLink,
-  isBlockLink,
-} from "./core/nodeSpans";
+import { spansToMarkdown } from "./core/nodeSpans";
 import {
   addBlankLinesAroundHeadings,
   formatBulletLine,
@@ -35,42 +22,14 @@ type RenderOptions = {
   snapshotIds?: ImmutableMap<ID, string>;
 };
 
-function getSerializableNodeText(
-  knowledgeDBs: KnowledgeDBs,
-  node: GraphNode,
-  sourceId: SourceId
-): string {
-  return getNodeText(node) || getSemanticID(knowledgeDBs, node, sourceId);
-}
-
 type SerializeReduceState = SerializeResult & {
   orderedCount: number;
   promoteToHeadingLevel?: number;
 };
 
-function getSerializableNodeBody(
-  knowledgeDBs: KnowledgeDBs,
-  node: GraphNode,
-  author: SourceId
-): string | undefined {
-  if (isBlockLink(node)) {
-    const targetNodeID = getBlockLinkTarget(node);
-    if (!targetNodeID) {
-      return undefined;
-    }
-    const explicitLinkText = getBlockLinkText(node);
-    const linkText =
-      explicitLinkText ||
-      buildOutgoingReference(node.id as ID, knowledgeDBs, author)?.text ||
-      "";
-    return `[${linkText}](#${targetNodeID})`;
-  }
-  if (isBlockFileLink(node)) {
-    const linkPath = getBlockFileLinkPath(node);
-    const linkText = getBlockFileLinkText(node) ?? "";
-    return linkPath ? `[${linkText}](${linkPath})` : undefined;
-  }
-  return getSerializableNodeText(knowledgeDBs, node, author);
+function getSerializableNodeBody(node: GraphNode): string | undefined {
+  const body = spansToMarkdown(node.spans);
+  return body === "" ? undefined : body;
 }
 
 function getSerializableNodeAttrs(
@@ -101,7 +60,7 @@ function serializeNodeSequence(
     next: SerializeResult
   ): SerializeResult => {
     const childNodes = children
-      .filter((childID) => childID !== EMPTY_SEMANTIC_ID)
+      .filter((childID) => childID !== EMPTY_NODE_ID)
       .map((childID) => {
         const child = getNode(knowledgeDBs, childID, author);
         if (!child) {
@@ -123,7 +82,7 @@ function serializeNodeSequence(
   const result = nodes.reduce<SerializeReduceState>(
     (acc, item) => {
       const resolvedChild = item;
-      const text = getSerializableNodeBody(knowledgeDBs, resolvedChild, author);
+      const text = getSerializableNodeBody(resolvedChild);
       if (text === undefined) {
         return acc;
       }

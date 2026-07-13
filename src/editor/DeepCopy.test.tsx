@@ -14,7 +14,6 @@ import {
   renderApp,
   renderTree,
   setup,
-  textContent,
   type,
   type UpdateState,
   requireUser,
@@ -1286,7 +1285,7 @@ My Notes
   [S] BobItem
   [S] My Notes My Fork
 Target
-  [R] My Fork / BobItem
+  BobItem
     `);
   });
 });
@@ -1328,7 +1327,7 @@ My Notes
     [I] My Notes / Target ↩
   Target
 Target
-  [R] My Notes / Source
+  Source
     `);
   });
 
@@ -1361,14 +1360,14 @@ My Notes
   Target
   Target2
 Target
-  [R] My Notes / Source
+  Source
     `);
 
     const targetInPane0 = screen.getAllByRole("treeitem", {
       name: "Target",
     })[0];
     await userEvent.keyboard("{Alt>}");
-    fireEvent.dragStart(getPane(1).getByText(textContent("My Notes / Source")));
+    fireEvent.dragStart(getPane(1).getByRole("treeitem", { name: "Source" }));
     fireEvent.dragOver(targetInPane0, { altKey: true });
     fireEvent.drop(targetInPane0, { altKey: true });
     await userEvent.keyboard("{/Alt}");
@@ -1377,10 +1376,10 @@ Target
 My Notes
   Source
   Target
-  [R] My Notes / Source
+  Source
   Target2
 Target
-  [R] My Notes / Source
+  Source
     `);
   });
 });
@@ -1875,7 +1874,7 @@ My Notes
     await expectTree(`
 My Notes
   Topic
-    [V] +4 -1
+    [V] My Fork / Forked Copy
     A1
     [S] B1
     [S] B2
@@ -1883,7 +1882,7 @@ My Notes
     [S] Topic Forked Copy
   [S] My Notes My Fork
 Topic
-  [V] +4 -1
+  [V] My Fork / Forked Copy
   A1
   [S] B1
   [S] B2
@@ -1940,7 +1939,7 @@ My Notes
     await expectTree(`
 My Notes
   Topic
-    [V] +4 -1
+    [V] My Fork / Forked Copy
     A1
     [S] B1
     [S] B2

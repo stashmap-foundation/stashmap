@@ -1,6 +1,14 @@
 import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { ALICE, BOB, expectTree, renderApp, setup, type } from "../utils.test";
+import {
+  ALICE,
+  BOB,
+  copySecretLinkViaChip,
+  expectTree,
+  renderApp,
+  setup,
+  type,
+} from "../utils.test";
 
 describe("Search Results", () => {
   test("Search shows results as tree with search query as root", async () => {
@@ -42,17 +50,19 @@ Search: Apple
     `);
   });
 
-  test("Search results deduplicate by context across users", async () => {
+  test("Unrelated same-text nodes across sources remain separate search targets", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
 
     renderApp(bob());
     await type("Notes{Enter}Shared Topic{Escape}");
+    const sharedUrl = await copySecretLinkViaChip(bob(), "Notes");
 
-    cleanup();
     renderApp(alice());
-
     await type("Notes{Enter}Shared Topic{Escape}");
+    cleanup();
 
+    renderApp({ ...alice(), initialRoute: sharedUrl });
+    await screen.findByRole("treeitem", { name: "Notes" });
     await userEvent.click(
       await screen.findByLabelText("Search to change pane 0 content")
     );
@@ -61,10 +71,11 @@ Search: Apple
       "Shared Topic{Enter}"
     );
 
-    await expectTree(`
-Search: Shared Topic
-  [R] Notes / Shared Topic
-    `);
+    expect(
+      await screen.findAllByRole("treeitem", {
+        name: "Notes / Shared Topic",
+      })
+    ).toHaveLength(2);
   });
 
   test("Search deduplication prefers effective author even with older timestamp", async () => {

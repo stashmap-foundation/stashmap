@@ -262,11 +262,7 @@ test("marker created under a parent becomes a link row, never a duplicate", () =
   expect(linkRow?.parent).toBe(rootId);
 
   // Typed children take the same path.
-  const [typed] = planAddToParent(
-    pasted,
-    { id: CONTRACT_ID as ID, text: CONTRACT_ID },
-    rootId
-  );
+  const [typed] = planAddToParent(pasted, { text: CONTRACT_ID }, rootId);
   const links = typed.knowledgeDBs
     .get(LOCAL)
     ?.nodes.valueSeq()

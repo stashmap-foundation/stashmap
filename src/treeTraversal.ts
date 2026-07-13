@@ -5,19 +5,17 @@ import {
   addNodeToPathWithNodes,
   addNodesToLastElement,
   getParentView,
-  getViewForRowID,
+  getViewForNode,
   isEmbedRow,
   isEmptyViewPathID,
   isFileRow,
   viewPathToString,
 } from "./rowModel";
 import {
-  EMPTY_SEMANTIC_ID,
+  EMPTY_NODE_ID,
   computeEmptyNodeMetadata,
   createDocumentLinkTarget,
   createRefTarget,
-  getNodeSemanticID,
-  isRefNode,
   isSearchId,
   itemPassesFilters,
   nodePathLabel as nodePathLabelOf,
@@ -117,13 +115,6 @@ function nodePathLabel(
   return nodePathLabelOf(knowledgeDBs, resolved.node, resolved.ref.sourceId);
 }
 
-function rowIDForNode(node: GraphNode): ID {
-  if (node.id === EMPTY_SEMANTIC_ID) {
-    return EMPTY_SEMANTIC_ID;
-  }
-  return isRefNode(node) ? node.id : getNodeSemanticID(node);
-}
-
 function createRow(
   data: Data,
   graph: GraphLookup,
@@ -138,14 +129,14 @@ function createRow(
   virtualType: Row["virtualType"] | undefined,
   versionMeta: Row["versionMeta"] | undefined
 ): Row {
-  const rowID = rowIDForNode(node);
+  const nodeID = node.id;
   const inheritedVirtualType =
     parentRow?.virtualType === "search" ||
     parentRow?.virtualType === "suggestion"
       ? parentRow.virtualType
       : undefined;
   const rowVirtualType =
-    virtualType ?? (isSearchId(rowID) ? "search" : inheritedVirtualType);
+    virtualType ?? (isSearchId(nodeID) ? "search" : inheritedVirtualType);
   const provenance =
     rowVirtualType === "suggestion" ||
     rowVirtualType === "incoming" ||
@@ -201,8 +192,7 @@ function createRow(
     node,
     sourceId,
     ref: { sourceId, id: node.id },
-    rowID,
-    view: getViewForRowID(data, viewPath, rowID),
+    view: getViewForNode(data, viewPath, nodeID),
     parentViewPath: parentRow?.viewPath ?? getParentView(viewPath),
     parentRef,
     parentNode,
@@ -237,14 +227,14 @@ function getEmptyNodeItem(
   )?.nodeItem;
 }
 
-function getNodeIndexForRowID(
+function getNodeIndexForPath(
   parentNode: GraphNode,
-  rowID: ID
+  pathID: ID
 ): number | undefined {
   const index = parentNode.children.findIndex(
     (childID) =>
-      childID === rowID ||
-      (childID === EMPTY_SEMANTIC_ID && isEmptyViewPathID(rowID))
+      childID === pathID ||
+      (childID === EMPTY_NODE_ID && isEmptyViewPathID(pathID))
   );
   return index >= 0 ? index : undefined;
 }
@@ -252,10 +242,10 @@ function getNodeIndexForRowID(
 function emptyRootNode(): GraphNode {
   return {
     children: List<ID>(),
-    id: EMPTY_SEMANTIC_ID,
+    id: EMPTY_NODE_ID,
     spans: plainSpans(""),
     updated: Date.now(),
-    root: EMPTY_SEMANTIC_ID,
+    root: EMPTY_NODE_ID,
     relevance: undefined,
   };
 }
@@ -271,13 +261,13 @@ function resolveRowForPath(
   if (segments.length === 0) {
     return undefined;
   }
-  const rowID = segments[segments.length - 1];
+  const pathID = segments[segments.length - 1];
   const parentPath = getParentView(viewPath);
   const resolvedParentRow =
     parentRow ??
     (parentPath ? resolveRowForPath(data, graph, parentPath) : undefined);
   const childIndex = resolvedParentRow
-    ? getNodeIndexForRowID(resolvedParentRow.node, rowID)
+    ? getNodeIndexForPath(resolvedParentRow.node, pathID)
     : undefined;
   const childID =
     childIndex === undefined
@@ -287,7 +277,7 @@ function resolveRowForPath(
     if (!resolvedParentRow || childID === undefined) {
       return undefined;
     }
-    if (childID === EMPTY_SEMANTIC_ID) {
+    if (childID === EMPTY_NODE_ID) {
       return getEmptyNodeItem(data, resolvedParentRow.node);
     }
     return getNodeInSource(graph, {
@@ -295,11 +285,11 @@ function resolveRowForPath(
       id: childID,
     })?.node;
   })();
-  const resolved = lookupNode(graph, rowID, paneSourceId);
+  const resolved = lookupNode(graph, pathID, paneSourceId);
   const node =
     edgeNode ??
     resolved?.node ??
-    (rowID === EMPTY_SEMANTIC_ID ? emptyRootNode() : undefined);
+    (pathID === EMPTY_NODE_ID ? emptyRootNode() : undefined);
   if (!node) {
     return undefined;
   }
@@ -333,7 +323,7 @@ function createChildRow(
     parentNode,
     childIndex
   );
-  if (childID === EMPTY_SEMANTIC_ID) {
+  if (childID === EMPTY_NODE_ID) {
     const emptyNode = getEmptyNodeItem(data, parentNode);
     return emptyNode
       ? createRow(
@@ -381,30 +371,30 @@ function createVirtualRowNode(
   rowRef: NodeRef,
   virtualType: Row["virtualType"]
 ): { node: GraphNode; sourceId: SourceId } {
-  const rowID = rowRef.id;
+  const sourceNodeID = rowRef.id;
   const sourceRow =
     virtualType === "suggestion"
-      ? lookupNode(graph, rowID, graph.localSourceId)
+      ? lookupNode(graph, sourceNodeID, graph.localSourceId)
       : undefined;
   const incomingRow =
     virtualType === "incoming" ? getNodeInSource(graph, rowRef) : undefined;
   const versionRow =
     virtualType === "version"
-      ? lookupNode(graph, rowID, graph.localSourceId)
+      ? lookupNode(graph, sourceNodeID, graph.localSourceId)
       : undefined;
   const sourceRowNode = sourceRow?.node;
   const incomingRowNode = incomingRow?.node;
   const suggestionTargetID = getBlockLinkTarget(sourceRowNode);
   const targetID =
     virtualType === "incoming" || virtualType === "version"
-      ? (rowID as ID)
+      ? sourceNodeID
       : suggestionTargetID;
   const resolvedSource = sourceRow ?? incomingRow ?? versionRow;
   const sourceNode = resolvedSource?.node;
   return {
     node: {
       children: targetID ? List<ID>() : sourceNode?.children ?? List<ID>(),
-      id: (targetID || sourceNode?.id || rowID) as ID,
+      id: targetID || sourceNode?.id || sourceNodeID,
       spans: targetID
         ? [
             linkSpan(
@@ -459,7 +449,7 @@ function sourceDocumentTakeTarget(
 function incomingTakeTarget(
   data: Data,
   node: GraphNode,
-  rowID: ID
+  sourceNodeID: ID
 ): AddToParentTarget {
   const sourceID = getBlockLinkTarget(node) ?? node.id;
   const sourceRow = getNodeInSource(graphLookupFromData(data), {
@@ -475,8 +465,8 @@ function incomingTakeTarget(
   }
   const targetID = getBlockLinkTarget(node);
   return targetID
-    ? createRefTarget(targetID, getBlockLinkText(node))
-    : (rowID as AddToParentTarget);
+    ? createRefTarget(targetID, sourceRow ? nodeText(sourceRow) : undefined)
+    : sourceNodeID;
 }
 
 function createVirtualRow(
@@ -488,7 +478,7 @@ function createVirtualRow(
   isFirstVirtual: boolean,
   priorAnchors: ID[] = []
 ): Row {
-  const rowID = rowRef.id;
+  const sourceNodeID = rowRef.id;
   const { node, sourceId } = createVirtualRowNode(
     data,
     graph,
@@ -508,7 +498,9 @@ function createVirtualRow(
     ? { sourceId: input.parentSourceId, id: input.parentID }
     : undefined;
   const versionMeta =
-    virtualType === "version" ? input.versionMetas.get(rowID as ID) : undefined;
+    virtualType === "version"
+      ? input.versionMetas.get(sourceNodeID)
+      : undefined;
   const row = createRow(
     data,
     graph,
@@ -543,7 +535,7 @@ function createVirtualRow(
     ...row,
     materialize: {
       precededBy: [...priorAnchors, ...([...parentChildren].reverse() as ID[])],
-      take: incomingTakeTarget(data, node, rowID as ID),
+      take: incomingTakeTarget(data, node, sourceNodeID),
       defaults: {
         relevance: inherited?.relevance,
         argument: inherited?.argument,
@@ -785,12 +777,12 @@ function appendVirtualFooterRows(
     { rows: [], priorAnchors: [] }
   ).rows;
   const suggestionOffset = incomingRows.length;
-  const suggestionRows = input.suggestions.map((rowID, index) =>
+  const suggestionRows = input.suggestions.map((nodeID, index) =>
     createVirtualRow(
       data,
       graph,
       input,
-      { sourceId: graph.localSourceId, id: rowID },
+      { sourceId: graph.localSourceId, id: nodeID },
       "suggestion",
       suggestionOffset + index === 0
     )
@@ -799,12 +791,12 @@ function appendVirtualFooterRows(
   const versionRows = input.versionMetas
     .keySeq()
     .toList()
-    .map((rowID, index) =>
+    .map((nodeID, index) =>
       createVirtualRow(
         data,
         graph,
         input,
-        { sourceId: graph.localSourceId, id: rowID },
+        { sourceId: graph.localSourceId, id: nodeID },
         "version",
         versionOffset + index === 0
       )
@@ -904,7 +896,7 @@ function getChildrenForRegularNode(
 
   const allChildNodes = nodes.children
     .map((childID) =>
-      childID === EMPTY_SEMANTIC_ID
+      childID === EMPTY_NODE_ID
         ? undefined
         : getNodeInSource(graph, {
             sourceId: directNode.ref.sourceId,
@@ -929,8 +921,8 @@ function getChildrenForRegularNode(
     }))
     .filter(({ childID, row }) =>
       options?.isMarkdownExport
-        ? row !== undefined && childID !== EMPTY_SEMANTIC_ID
-        : childID === EMPTY_SEMANTIC_ID ||
+        ? row !== undefined && childID !== EMPTY_NODE_ID
+        : childID === EMPTY_NODE_ID ||
           (row !== undefined && itemPassesFilters(row.node, activeFilters))
     )
     .filter((pair): pair is { childID: ID; row: Row } => pair.row !== undefined)
@@ -1248,7 +1240,7 @@ export function getNodesInDocument(
     {
       parentPath: documentRootPath,
       parentSourceId: document.sourceId,
-      parentRoot: topNodes.first()?.root ?? EMPTY_SEMANTIC_ID,
+      parentRoot: topNodes.first()?.root ?? EMPTY_NODE_ID,
       parentUpdated: document.updatedMs,
       incomingCrefs,
       suggestions: List<ID>(),

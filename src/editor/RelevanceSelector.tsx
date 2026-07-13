@@ -13,7 +13,7 @@ import { useEditorText } from "./EditorTextContext";
 import { useTemporaryView } from "./temporaryViewState";
 import { planBatchRelevance, EditorInfo } from "./batchOperations";
 import { planTakeRenameSuggestion } from "../core/plan";
-import { nodeText } from "../core/nodeSpans";
+import { nodeText, spansText } from "../core/nodeSpans";
 import { usePaneTreeResult } from "./TreeView";
 
 type RelevanceSelectorProps = {
@@ -77,7 +77,8 @@ export function RelevanceSelector({
   const isVirtual = virtualType !== undefined;
   const versionedDisplayText = useDisplayText();
   const editorTextContext = useEditorText();
-  const editorText = editorTextContext?.text ?? "";
+  const editorSpans = editorTextContext?.spans;
+  const editorText = spansText(editorSpans ?? []);
 
   if (isVirtual) {
     if (!parentPath) return null;
@@ -102,7 +103,7 @@ export function RelevanceSelector({
       : [row];
 
   const getEditorInfo = (): EditorInfo | undefined =>
-    editorText ? { text: editorText, viewKey } : undefined;
+    editorSpans ? { spans: editorSpans, viewKey } : undefined;
 
   const handleSetLevel = (level: number): void => {
     const relevance = levelToRelevance(level === currentLevel ? -1 : level);

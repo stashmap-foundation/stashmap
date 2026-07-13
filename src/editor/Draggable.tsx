@@ -4,7 +4,6 @@ import { ConnectableElement, useDrag } from "react-dnd";
 import { getEmptyImage } from "react-dnd-html5-backend";
 import {
   useIsInSearchView,
-  useCurrentRowID,
   useCurrentNode,
   useDisplayText,
   useIsViewingOtherUserContent,
@@ -13,7 +12,7 @@ import {
   useRow,
 } from "../rowModel";
 import { useData } from "../DataContext";
-import { isEmptySemanticID, nodePathLabel } from "../core/connections";
+import { isEmptyNodeID, nodePathLabel } from "../core/connections";
 import { getBlockLink } from "../core/blockLink";
 import { linkToInsertTarget } from "./linkOperations";
 import { NOTE_TYPE, Node } from "./Node";
@@ -88,13 +87,12 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
     const { selection } = useTemporaryView();
     const data = useData();
     const isNodeBeeingEdited = useIsEditingOn();
-    const [rowID] = useCurrentRowID();
     const node = useCurrentNode();
     const currentRow = useCurrentEdge();
     const { virtualType, viewKey } = row;
     const currentReference = getCurrentReferenceForRow(data, row);
     const displayText = useDisplayText();
-    const isEmptyNode = isEmptySemanticID(rowID);
+    const isEmptyNode = isEmptyNodeID(row.node.id);
     const disableDrag = isNodeBeeingEdited || isEmptyNode;
 
     const [{ isDragging }, drag, preview] = useDrag({
@@ -171,7 +169,7 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
         data-view-key={rowViewKey}
         data-row-index={rowIndex}
         data-row-depth={rowDepth}
-        data-node-id={rowID}
+        data-node-id={row.node.id}
         data-node-text={displayText}
         data-node-mutable={isEditableNode(node) ? "true" : "false"}
         data-selected={isSelected ? "true" : undefined}
@@ -324,7 +322,6 @@ export function ListItem({
 }): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
   const { viewKey, virtualType } = row;
-  const [rowID] = useCurrentRowID();
   const isSuggestion = virtualType === "suggestion";
   const isCopyDrag =
     virtualType === "incoming" ||
@@ -336,7 +333,7 @@ export function ListItem({
   const rowDepth = row.depth;
   const paneIndex = usePaneIndex();
   const isActiveRow = activeRowKey === viewKey;
-  const isEmptyNode = isEmptySemanticID(rowID);
+  const isEmptyNode = isEmptyNodeID(row.node.id);
 
   const isReadonly = isInSearchView || isViewingOtherUserContent;
 

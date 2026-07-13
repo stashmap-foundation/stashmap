@@ -1,4 +1,4 @@
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import fs from "fs";
 import path from "path";
@@ -12,6 +12,15 @@ import {
 } from "../testFixtures/workspace";
 
 afterEach(cleanup);
+
+function placeCursorAtEnd(element: HTMLElement): void {
+  const range = document.createRange();
+  range.selectNodeContents(element);
+  range.collapse(false);
+  const selection = window.getSelection();
+  selection?.removeAllRanges();
+  selection?.addRange(range);
+}
 
 async function linkWorkspace(): Promise<{ workspacePath: string }> {
   const { path: workspacePath } = knowstrInit();
@@ -27,54 +36,107 @@ async function linkWorkspace(): Promise<{ workspacePath: string }> {
   return { workspacePath };
 }
 
-test("cursor after a link: Enter opens the editor in the next row", async () => {
+async function multipleLinkWorkspace(): Promise<{
+  workspacePath: string;
+  cantillonID: string;
+  viennaID: string;
+}> {
+  const { path: workspacePath } = knowstrInit();
+  write(workspacePath, "topics.md", "# Topics\n\n- Cantillon\n- Vienna\n");
+  await knowstrSave(workspacePath);
+  const cantillonID = readNodeId(workspacePath, "topics.md", "Cantillon");
+  const viennaID = readNodeId(workspacePath, "topics.md", "Vienna");
+  write(
+    workspacePath,
+    "notes.md",
+    `# Notes\n\n- Founder of [Cantillon](#${cantillonID}) studied in [Vienna](#${viennaID})\n`
+  );
+  await knowstrSave(workspacePath);
+  return { workspacePath, cantillonID, viennaID };
+}
+
+test("bare and mixed links use one span-native editor", async () => {
+  const { workspacePath, cantillonID, viennaID } =
+    await multipleLinkWorkspace();
+  await renderAppTree({ path: workspacePath, search: "Notes" });
+  const mixedEditor = await screen.findByRole("textbox", {
+    name: "edit Founder of Cantillon studied in Vienna",
+  });
+  const marks = within(mixedEditor).getAllByRole("link");
+  expect(marks.map((mark) => mark.getAttribute("data-href"))).toEqual([
+    `#${cantillonID}`,
+    `#${viennaID}`,
+  ]);
+  mixedEditor.focus();
+  placeCursorAtEnd(mixedEditor);
+  await userEvent.keyboard("!{Escape}");
+  await waitFor(() => {
+    const notes = fs.readFileSync(path.join(workspacePath, "notes.md"), "utf8");
+    expect(notes).toContain(
+      `Founder of [Cantillon](#${cantillonID}) studied in [Vienna](#${viennaID})!`
+    );
+  });
+});
+
+test("bare links expose an editable target-preserving mark", async () => {
   const { workspacePath } = await linkWorkspace();
   await renderAppTree({ path: workspacePath, search: "Notes" });
+  const editor = await screen.findByRole("textbox", {
+    name: "edit Cantillon",
+  });
+  const mark = within(editor).getByRole("link");
+  expect(mark.textContent).toBe("Cantillon");
+  expect(mark.getAttribute("data-href")).toMatch(/^#/u);
+  editor.focus();
+  placeCursorAtEnd(mark);
+  await userEvent.keyboard("!{Escape}");
+  await waitFor(() => {
+    const notes = fs.readFileSync(path.join(workspacePath, "notes.md"), "utf8");
+    expect(notes).toMatch(/\[Cantillon!\]\(#[^)]+\)/u);
+  });
+});
 
-  // Click right of the link text: the caret zone. Enter opens the editor
-  // below; the note lands as a sibling after the link row.
-  await userEvent.click(
-    await screen.findByLabelText("cursor after Topics / Cantillon")
-  );
+test("Enter after a link creates the next sibling", async () => {
+  const { workspacePath } = await linkWorkspace();
+  await renderAppTree({ path: workspacePath, search: "Notes" });
+  const linkEditor = await screen.findByRole("textbox", {
+    name: "edit Cantillon",
+  });
+  linkEditor.focus();
+  placeCursorAtEnd(linkEditor);
   await userEvent.keyboard("{Enter}");
   await userEvent.type(await findNewNodeEditor(), "My note{Escape}");
-
   await expectTree(`
 Notes
-  [R] Topics / Cantillon
+  Cantillon
   My note
   After
   `);
 });
 
-test("Tab indents onto the link: a placement note, file truth", async () => {
+test("Tab indents a new row onto a link row", async () => {
   const { workspacePath } = await linkWorkspace();
   await renderAppTree({ path: workspacePath, search: "Notes" });
-
-  await userEvent.click(
-    await screen.findByLabelText("cursor after Topics / Cantillon")
-  );
+  const linkEditor = await screen.findByRole("textbox", {
+    name: "edit Cantillon",
+  });
+  linkEditor.focus();
+  placeCursorAtEnd(linkEditor);
   await userEvent.keyboard("{Enter}");
   const editor = await findNewNodeEditor();
   await userEvent.type(editor, "Placement note");
-  await userEvent.keyboard("{Tab}");
-  await userEvent.keyboard("{Escape}");
-
-  // The link row expands to its OWN children — never the target's
-  // subtree (that is embed territory; today only suggestion previews).
+  await userEvent.keyboard("{Tab}{Escape}");
   await expectTree(`
 Notes
-  [R] Topics / Cantillon
+  Cantillon
     Placement note
   After
   `);
-
-  // And it is file truth: the note nests under the link row on disk.
-  const notes = fs.readFileSync(path.join(workspacePath, "notes.md"), "utf8");
-  expect(notes).toMatch(
-    /- \[Cantillon\]\(#[^)]+\)[^\n]*\n {2}- Placement note/u
-  );
-
-  // The triangle appears now that the link row has own children.
-  await screen.findByLabelText("collapse Topics / Cantillon");
+  await waitFor(() => {
+    const notes = fs.readFileSync(path.join(workspacePath, "notes.md"), "utf8");
+    expect(notes).toMatch(
+      /- \[Cantillon\]\(#[^)]+\)[^\n]*\n {2}- Placement note/u
+    );
+  });
+  await screen.findByLabelText("collapse Cantillon");
 });

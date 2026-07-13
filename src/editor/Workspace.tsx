@@ -58,7 +58,7 @@ import {
   planToggleTemporarySelection,
 } from "../planner";
 import { parseTextToTrees, planPasteMarkdownTrees } from "./FileDropZone";
-import { getNodeText, getSemanticID } from "../core/connections";
+import { getNodeText } from "../core/connections";
 import { getOwnLogRoot } from "../core/systemRoots";
 import {
   addressForSource,
@@ -165,14 +165,8 @@ type BreadcrumbEntry = {
   disabled?: boolean;
 };
 
-function getBreadcrumbLabel(
-  knowledgeDBs: KnowledgeDBs,
-  node: GraphNode,
-  sourceId: SourceId
-): string {
-  return (
-    getNodeText(node) || getSemanticID(knowledgeDBs, node, sourceId) || "..."
-  );
+function getBreadcrumbLabel(node: GraphNode): string {
+  return getNodeText(node) || node.id;
 }
 
 function createDocumentBreadcrumbEntry(document: Document): BreadcrumbEntry {
@@ -203,13 +197,12 @@ function breadcrumbEntriesWithDocument(
 }
 
 function createNodeBreadcrumbEntry(
-  knowledgeDBs: KnowledgeDBs,
   node: GraphNode,
   sourceId: SourceId
 ): BreadcrumbEntry {
   return {
     key: `node:${sourceId}:${node.id}`,
-    label: getBreadcrumbLabel(knowledgeDBs, node, sourceId),
+    label: getBreadcrumbLabel(node),
     target: {
       sourceId,
       rootNodeId: node.id,
@@ -226,7 +219,7 @@ function buildAnchoredLineageEntries(
 ): BreadcrumbEntry[] {
   const seenKey = `${sourceId}:${node.id}`;
   if (seen.has(seenKey)) {
-    return [createNodeBreadcrumbEntry(data.knowledgeDBs, node, sourceId)];
+    return [createNodeBreadcrumbEntry(node, sourceId)];
   }
 
   const nextSeen = new Set(seen).add(seenKey);
@@ -244,12 +237,12 @@ function buildAnchoredLineageEntries(
           sourceId,
           nextSeen
         ),
-        createNodeBreadcrumbEntry(data.knowledgeDBs, node, sourceId),
+        createNodeBreadcrumbEntry(node, sourceId),
       ];
     }
   }
 
-  return [createNodeBreadcrumbEntry(data.knowledgeDBs, node, sourceId)];
+  return [createNodeBreadcrumbEntry(node, sourceId)];
 }
 
 function Breadcrumbs(): JSX.Element {
@@ -1788,13 +1781,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       const result = planClearTemporarySelection(
         targetRows.reduce(
           (acc, row) =>
-            planDeleteNode(
-              acc,
-              row.node.id,
-              row.rowID,
-              row.parentNode?.id,
-              paneIndex
-            ),
+            planDeleteNode(acc, row.node.id, row.parentNode?.id, paneIndex),
           createPlan()
         )
       );

@@ -1,8 +1,9 @@
 import { List, Map as ImmutableMap } from "immutable";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { LOCAL } from "../core/nodeRef";
 import { createPlan, buildDocumentEvents } from "../planner";
-import { getChildNodes, getNode, getSemanticID } from "../core/connections";
+import { getChildNodes, getNode } from "../core/connections";
 import { isStandaloneRoot } from "../core/systemRoots";
 import { newDB } from "../core/knowledge";
 import {
@@ -382,9 +383,7 @@ test("planCreateNodesFromMarkdownTrees creates only standalone nodes", () => {
   expect(childNode && nodeText(childNode)).toBe("Child");
   expect(grandchildNode && nodeText(grandchildNode)).toBe("Grandchild");
 
-  expect(parentItemID).toEqual(
-    getSemanticID(plan.knowledgeDBs, parentNode!, LOCAL)
-  );
+  expect(parentItemID).toEqual(parentNode?.id);
   expect(
     nodeChildren(plan.knowledgeDBs, parentNode, LOCAL).first()?.id
   ).toEqual(childNode?.id);
@@ -404,16 +403,9 @@ test("Planning multiple markdown files returns top nodes in import order", () =>
     { name: "two.md", markdown: "# Two" },
   ]);
 
-  const topTexts = topNodeIDs.map((semanticID) => {
-    const found = plan.knowledgeDBs
-      .get(LOCAL)
-      ?.nodes.valueSeq()
-      .find(
-        (node) =>
-          isStandaloneRoot(node) &&
-          getSemanticID(plan.knowledgeDBs, node, LOCAL) === semanticID
-      );
-    return found ? nodeText(found) : undefined;
+  const topTexts = topNodeIDs.map((nodeID) => {
+    const found = getNode(plan.knowledgeDBs, nodeID, LOCAL);
+    return found && isStandaloneRoot(found) ? nodeText(found) : undefined;
   });
 
   expect(topTexts).toEqual(["One", "Two"]);
@@ -427,16 +419,9 @@ test("Planning one markdown file with multiple roots returns top nodes in source
     { name: "multi.md", markdown: "# One\n\n# Two" },
   ]);
 
-  const topTexts = topNodeIDs.map((semanticID) => {
-    const found = plan.knowledgeDBs
-      .get(LOCAL)
-      ?.nodes.valueSeq()
-      .find(
-        (node) =>
-          isStandaloneRoot(node) &&
-          getSemanticID(plan.knowledgeDBs, node, LOCAL) === semanticID
-      );
-    return found ? nodeText(found) : undefined;
+  const topTexts = topNodeIDs.map((nodeID) => {
+    const found = getNode(plan.knowledgeDBs, nodeID, LOCAL);
+    return found && isStandaloneRoot(found) ? nodeText(found) : undefined;
   });
 
   expect(topTexts).toEqual(["One", "Two"]);
@@ -488,6 +473,24 @@ Money
   Bitcoin
     Is Cool
   `);
+
+  const duplicateRows = screen.getAllByRole("treeitem", { name: "Bitcoin" });
+  const nodeIDs = duplicateRows.map((row) => row.getAttribute("data-node-id"));
+  expect(new Set(nodeIDs).size).toBe(3);
+  expect(nodeIDs).not.toContain("Bitcoin");
+
+  const renamedNodeID = nodeIDs[1];
+  const editor = screen.getAllByLabelText("edit Bitcoin")[1];
+  await userEvent.click(editor);
+  await userEvent.clear(editor);
+  await userEvent.type(editor, "Renamed{Escape}");
+
+  expect(
+    screen
+      .getByRole("treeitem", { name: "Renamed" })
+      .getAttribute("data-node-id")
+  ).toBe(renamedNodeID);
+  await screen.findByText("Is Awesome");
 });
 
 test("parseTextToTrees detects markdown headers", () => {
@@ -611,13 +614,27 @@ test("parseTextToTrees falls back to indentation parser", () => {
   ]);
 });
 
-test("parseMarkdownHierarchy parses .md path link as fileLink span", () => {
+test("parseMarkdownHierarchy preserves multiple links and prose", () => {
+  const trees = parseTree(
+    "# Root\n- Before [one](#first) between [two](./two.md) after\n"
+  );
+  const rows = trees.flatMap(({ children }) => children);
+  expect(rows[0].spans).toEqual([
+    { kind: "text", text: "Before " },
+    { kind: "link", href: "#first", text: "one" },
+    { kind: "text", text: " between " },
+    { kind: "link", href: "./two.md", text: "two" },
+    { kind: "text", text: " after" },
+  ]);
+});
+
+test("parseMarkdownHierarchy parses .md path as a link span", () => {
   const trees = parseTree("# Root\n- [Open B](../foo/b.md)\n");
   expect(trees).toEqual([
     expect.objectContaining({
       children: [
         expect.objectContaining({
-          spans: [{ kind: "fileLink", path: "../foo/b.md", text: "Open B" }],
+          spans: [{ kind: "link", href: "../foo/b.md", text: "Open B" }],
           blockKind: "list_item",
         }),
       ],
@@ -625,14 +642,14 @@ test("parseMarkdownHierarchy parses .md path link as fileLink span", () => {
   ]);
 });
 
-test("parseMarkdownHierarchy parses doc: links as fileLink spans; bare ids are text", () => {
+test("parseMarkdownHierarchy parses doc: links; bare ids are text", () => {
   const docId = "123e4567-e89b-12d3-a456-426614174000";
   const trees = parseTree(`# Root\n- [Imported](doc:${docId})\n`);
   expect(trees).toEqual([
     expect.objectContaining({
       children: [
         expect.objectContaining({
-          spans: [{ kind: "fileLink", path: `doc:${docId}`, text: "Imported" }],
+          spans: [{ kind: "link", href: `doc:${docId}`, text: "Imported" }],
           blockKind: "list_item",
         }),
       ],
@@ -652,26 +669,26 @@ test("parseMarkdownHierarchy parses doc: links as fileLink spans; bare ids are t
   ]);
 });
 
-test("parseMarkdownHierarchy still parses #anchor links as node link spans", () => {
+test("parseMarkdownHierarchy parses #anchor links", () => {
   const trees = parseTree("# Root\n- [Bitcoin](#abc)\n");
   expect(trees).toEqual([
     expect.objectContaining({
       children: [
         expect.objectContaining({
-          spans: [{ kind: "link", targetID: "abc", text: "Bitcoin" }],
+          spans: [{ kind: "link", href: "#abc", text: "Bitcoin" }],
         }),
       ],
     }),
   ]);
 });
 
-test("parseMarkdownHierarchy parses file path with #anchor as node link span", () => {
+test("parseMarkdownHierarchy preserves file paths with anchors", () => {
   const trees = parseTree("# Root\n- [Bitcoin](./notes.md#abc)\n");
   expect(trees).toEqual([
     expect.objectContaining({
       children: [
         expect.objectContaining({
-          spans: [{ kind: "link", targetID: "abc", text: "Bitcoin" }],
+          spans: [{ kind: "link", href: "./notes.md#abc", text: "Bitcoin" }],
         }),
       ],
     }),
@@ -704,13 +721,13 @@ test("parseMarkdownHierarchy ignores non-md path links (no fileLink span)", () =
   ]);
 });
 
-test("parseMarkdownHierarchy preserves prefix markers on file-link bullet", () => {
+test("parseMarkdownHierarchy preserves prefix markers on link bullets", () => {
   const trees = parseTree("# Root\n- (!+)[Open B](./b.md)\n");
   expect(trees).toEqual([
     expect.objectContaining({
       children: [
         expect.objectContaining({
-          spans: [{ kind: "fileLink", path: "./b.md", text: "Open B" }],
+          spans: [{ kind: "link", href: "./b.md", text: "Open B" }],
           relevance: "relevant",
           argument: "confirms",
         }),
@@ -719,11 +736,11 @@ test("parseMarkdownHierarchy preserves prefix markers on file-link bullet", () =
   ]);
 });
 
-test("parseMarkdownHierarchy preserves prefix markers on file-link heading", () => {
+test("parseMarkdownHierarchy preserves prefix markers on link headings", () => {
   const trees = parseTree("# (!+)[Open B](./b.md)\n");
   expect(trees).toEqual([
     expect.objectContaining({
-      spans: [{ kind: "fileLink", path: "./b.md", text: "Open B" }],
+      spans: [{ kind: "link", href: "./b.md", text: "Open B" }],
       blockKind: "heading",
       headingLevel: 1,
       relevance: "relevant",

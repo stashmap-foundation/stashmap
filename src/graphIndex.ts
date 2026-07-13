@@ -1,7 +1,7 @@
 import { Map as ImmutableMap } from "immutable";
 import { LOCAL, nodeRefKey } from "./core/nodeRef";
-import { EMPTY_SEMANTIC_ID } from "./core/connections";
-import { getAllFileLinks, getAllLinks, nodeText } from "./core/nodeSpans";
+import { EMPTY_NODE_ID } from "./core/connections";
+import { getAllFileLinks, getAllLinks } from "./core/nodeSpans";
 import { fileLinkIndexKey, fileLinkIndexPath } from "./core/linkPath";
 
 export function createEmptyGraphIndex(): GraphIndex {
@@ -12,26 +12,11 @@ export function createEmptyGraphIndex(): GraphIndex {
       globalThis.Map<ID, GraphNode>
     >(),
     sourceCandidatesById: new globalThis.Map<ID, NodeRef[]>(),
-    semantic: new globalThis.Map<string, globalThis.Set<ID>>(),
-    semanticRefs: new globalThis.Map<string, NodeRef[]>(),
     incomingCrefs: new globalThis.Map<ID, NodeRef[]>(),
     incomingCrefsByTarget: new globalThis.Map<string, NodeRef[]>(),
     incomingFileLinks: new globalThis.Map<string, NodeRef[]>(),
     basedOnIndex: new globalThis.Map<ID, globalThis.Set<ID>>(),
   };
-}
-
-function addToSetMap(
-  map: globalThis.Map<string, globalThis.Set<ID>>,
-  key: string,
-  value: ID
-): void {
-  const existing = map.get(key);
-  if (existing) {
-    existing.add(value);
-    return;
-  }
-  map.set(key, new globalThis.Set<ID>([value]));
 }
 
 function addToNodeMap(
@@ -45,21 +30,6 @@ function addToNodeMap(
     return;
   }
   map.set(targetNodeID, new globalThis.Set<ID>([sourceNodeID]));
-}
-
-function removeFromSetMap(
-  map: globalThis.Map<string, globalThis.Set<ID>>,
-  key: string,
-  value: ID
-): void {
-  const existing = map.get(key);
-  if (!existing) {
-    return;
-  }
-  existing.delete(value);
-  if (existing.size === 0) {
-    map.delete(key);
-  }
 }
 
 function removeFromNodeMap(
@@ -269,18 +239,12 @@ function removeNodeLinkEntries(
   });
 }
 
-function addNodeSemanticEntries(
+function addNodeIndexEntries(
   graphIndex: GraphIndex,
   node: GraphNode,
   sourceId: SourceId,
   sourceFilePath: string | undefined
 ): void {
-  const semanticKey = nodeText(node);
-  addToSetMap(graphIndex.semantic, semanticKey, node.id);
-  addRefToMap(graphIndex.semanticRefs, semanticKey, {
-    sourceId,
-    id: node.id,
-  });
   if (node.basedOn) {
     addToNodeMap(graphIndex.basedOnIndex, node.basedOn, node.id);
   }
@@ -290,7 +254,7 @@ function addNodeSemanticEntries(
   }
 
   node.children.forEach((childID) => {
-    if (childID === EMPTY_SEMANTIC_ID) {
+    if (childID === EMPTY_NODE_ID) {
       return;
     }
     const childNode = getNodeInIndexedSource(graphIndex, sourceId, childID);
@@ -307,18 +271,12 @@ function addNodeSemanticEntries(
   });
 }
 
-function removeNodeSemanticEntries(
+function removeNodeIndexEntries(
   graphIndex: GraphIndex,
   node: GraphNode,
   sourceId: SourceId,
   sourceFilePath: string | undefined
 ): void {
-  const semanticKey = nodeText(node);
-  removeFromSetMap(graphIndex.semantic, semanticKey, node.id);
-  removeRefFromMap(graphIndex.semanticRefs, semanticKey, {
-    sourceId,
-    id: node.id,
-  });
   if (node.basedOn) {
     removeFromNodeMap(graphIndex.basedOnIndex, node.basedOn, node.id);
   }
@@ -328,7 +286,7 @@ function removeNodeSemanticEntries(
   }
 
   node.children.forEach((childID) => {
-    if (childID === EMPTY_SEMANTIC_ID) {
+    if (childID === EMPTY_NODE_ID) {
       return;
     }
     const childNode = getNodeInIndexedSource(graphIndex, sourceId, childID);
@@ -358,18 +316,6 @@ function cloneIndex(graphIndex: GraphIndex): GraphIndex {
       [...graphIndex.sourceCandidatesById.entries()].map(
         ([key, candidates]) => [key, [...candidates]]
       )
-    ),
-    semantic: new globalThis.Map<string, globalThis.Set<ID>>(
-      [...graphIndex.semantic.entries()].map(([key, ids]) => [
-        key,
-        new globalThis.Set<ID>(ids),
-      ])
-    ),
-    semanticRefs: new globalThis.Map<string, NodeRef[]>(
-      [...graphIndex.semanticRefs.entries()].map(([key, refs]) => [
-        key,
-        [...refs],
-      ])
     ),
     incomingCrefs: new globalThis.Map<ID, NodeRef[]>(
       [...graphIndex.incomingCrefs.entries()].map(([key, refs]) => [
@@ -415,7 +361,7 @@ export function addNodesToGraphIndex(
   });
 
   nodes.valueSeq().forEach((node) => {
-    addNodeSemanticEntries(nextIndex, node, sourceId, sourceFilePath);
+    addNodeIndexEntries(nextIndex, node, sourceId, sourceFilePath);
   });
   return nextIndex;
 }
@@ -433,7 +379,7 @@ export function removeNodesFromGraphIndex(
   const nextIndex = cloneIndex(graphIndex);
 
   nodes.valueSeq().forEach((node) => {
-    removeNodeSemanticEntries(nextIndex, node, sourceId, sourceFilePath);
+    removeNodeIndexEntries(nextIndex, node, sourceId, sourceFilePath);
   });
   nodes.valueSeq().forEach((node) => {
     removeNodeSourceEntries(nextIndex, node, sourceId);

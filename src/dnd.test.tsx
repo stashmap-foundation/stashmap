@@ -118,7 +118,7 @@ Root
   Target
   OtherParent
 Target
-  [R] Root / Source
+  Source
   `);
 
   cleanup();
@@ -130,7 +130,7 @@ Root
   Target
   OtherParent
 Target
-  [R] Root / Source
+  Source
   `);
 
   const source = screen.getAllByRole("treeitem", { name: "Source" })[0];
@@ -148,10 +148,11 @@ Root
   OtherParent
     Source
 Target
-  [R] Root / OtherParent / Source
+  Source
   `);
 
-  await userEvent.click(await screen.findByLabelText("edit Source"));
+  const sourceEditors = await screen.findAllByLabelText("edit Source");
+  sourceEditors[0].focus();
   await userEvent.keyboard("{Enter}");
   await userEvent.type(
     await findNewNodeEditor(),
@@ -167,24 +168,21 @@ Root
       Child2
       [I] Root / Target ↩
 Target
-  [R] Root / OtherParent / Source
+  Source
   `);
 
   await userEvent.click(
-    await screen.findByLabelText(
-      "open Root / OtherParent / Source in fullscreen"
-    )
+    (
+      await screen.findAllByLabelText("open Source in fullscreen")
+    )[0]
   );
 
   await expectTree(`
-Root
-  Target
-  OtherParent
-    Source
-      Child1
-      Child2
-      [I] Root / Target ↩
-OtherParent
+Source
+  Child1
+  Child2
+  [I] Root / Target ↩
+Target
   Source
   `);
 });
@@ -427,7 +425,7 @@ Search: Source
 Search: Source
   [R] My Notes / Source
 Target
-  [R] My Notes / Source
+  My Notes / Source
   `);
 });
 

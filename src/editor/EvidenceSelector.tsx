@@ -7,7 +7,7 @@ import { preventEditorBlur } from "./AddNode";
 import { useEditorText } from "./EditorTextContext";
 import { useTemporaryView } from "./temporaryViewState";
 import { planBatchArgument, EditorInfo } from "./batchOperations";
-import { nodeText } from "../core/nodeSpans";
+import { nodeText, spansText } from "../core/nodeSpans";
 import { usePaneTreeResult } from "./TreeView";
 
 function getArgumentColor(argument: Argument): string {
@@ -49,7 +49,8 @@ export function EvidenceSelector(): JSX.Element | null {
   const currentNode = useCurrentNode();
   const versionedDisplayText = useDisplayText();
   const editorTextContext = useEditorText();
-  const editorText = editorTextContext?.text ?? "";
+  const editorSpans = editorTextContext?.spans;
+  const editorText = spansText(editorSpans ?? []);
   const { createPlan, executePlan } = usePlanner();
   const { selection } = useTemporaryView();
   const rows = usePaneTreeResult()?.rows.toArray() ?? [row];
@@ -70,7 +71,7 @@ export function EvidenceSelector(): JSX.Element | null {
       : [row];
 
   const getEditorInfo = (): EditorInfo | undefined =>
-    editorText ? { text: editorText, viewKey } : undefined;
+    editorSpans ? { spans: editorSpans, viewKey } : undefined;
 
   const handleClick = (): void => {
     const nextArgument = getNextArgument(currentArgument);

@@ -3,15 +3,7 @@ import { List } from "immutable";
 import { DndProvider, useDragLayer, XYCoord } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { LOCAL } from "./core/nodeRef";
-import {
-  moveNodes,
-  createRefTarget,
-  getNode,
-  getNodeContext,
-  getSemanticID,
-  isRefNode,
-  resolveNode,
-} from "./core/connections";
+import { moveNodes, createRefTarget, getNode } from "./core/connections";
 import {
   getBlockLinkTarget,
   getBlockLinkText,
@@ -302,36 +294,11 @@ export function getDropDestinationFromRows(
   return getDropBeforeParentDestination(rows, dropBefore);
 }
 
-function resolveDeepCopySource(
-  plan: Plan,
-  row: Row
-): {
-  itemID: ID;
-  semanticContext: Context;
+function resolveDeepCopySource(row: Row): {
   node: GraphNode;
   sourceId: SourceId;
 } {
-  if (isRefNode(row.node)) {
-    const resolved = resolveNode(plan.knowledgeDBs, row.node, row.sourceId);
-    if (resolved) {
-      return {
-        itemID: getSemanticID(plan.knowledgeDBs, resolved, row.sourceId),
-        semanticContext: getNodeContext(
-          plan.knowledgeDBs,
-          resolved,
-          row.sourceId
-        ),
-        node: resolved,
-        sourceId: row.sourceId,
-      };
-    }
-  }
-  return {
-    itemID: row.rowID,
-    semanticContext: getNodeContext(plan.knowledgeDBs, row.node, row.sourceId),
-    node: row.node,
-    sourceId: row.sourceId,
-  };
+  return { node: row.node, sourceId: row.sourceId };
 }
 
 export function dnd(
@@ -443,7 +410,7 @@ export function dnd(
       accPlan,
       resolveDragLinkTarget(accPlan, sourceRow) ??
         createRefTarget(
-          getBlockLinkTarget(sourceRow.node) || sourceRow.rowID,
+          getBlockLinkTarget(sourceRow.node) || sourceRow.node.id,
           getBlockLinkText(sourceRow.node)
         ),
       targetParentRow.node.id,
@@ -542,10 +509,7 @@ export function dnd(
     resolveDragLinkTarget(accPlan, sourceRow) ??
     createRefTarget(
       sourceRow.node.id,
-      getBlockLinkText(sourceRow.node) ??
-        (sourceRow.materialize && !sourceRow.virtualType
-          ? nodeText(sourceRow.node)
-          : undefined)
+      getBlockLinkText(sourceRow.node) ?? nodeText(sourceRow.node)
     );
 
   const getSuggestionTargetID = (
@@ -612,7 +576,10 @@ export function dnd(
       if (dragTargetID) {
         return planAddToParent(
           accPlan,
-          createRefTarget(dragTargetID, sourceDrag.linkText ?? sourceDrag.text),
+          createRefTarget(
+            dragTargetID,
+            getBlockLinkText(sourceNode) ?? nodeText(sourceNode)
+          ),
           targetNode.id,
           insertAt,
           sourceEdgeRelevance,
@@ -629,7 +596,7 @@ export function dnd(
       )[0];
     }
 
-    const deepCopySource = resolveDeepCopySource(accPlan, sourceRow);
+    const deepCopySource = resolveDeepCopySource(sourceRow);
     if (isCanonicalId(deepCopySource.node.id)) {
       return planAddToParent(
         accPlan,

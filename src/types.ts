@@ -205,7 +205,6 @@ declare global {
     node: GraphNode;
     sourceId: SourceId;
     ref: NodeRef;
-    rowID: ID;
     view: View;
     parentViewPath: readonly [number, ...ID[]] | undefined;
     parentRef: NodeRef | undefined;
@@ -304,8 +303,7 @@ declare global {
 
   type InlineSpan =
     | { kind: "text"; text: string }
-    | { kind: "link"; targetID: ID; text: string }
-    | { kind: "fileLink"; path: string; text: string };
+    | { kind: "link"; href: string; text: string };
 
   type GraphNode = {
     children: List<ID>;
@@ -344,8 +342,6 @@ declare global {
     nodeByID: globalThis.Map<ID, GraphNode>;
     nodesBySource: globalThis.Map<SourceId, globalThis.Map<ID, GraphNode>>;
     sourceCandidatesById: globalThis.Map<ID, NodeRef[]>;
-    semantic: globalThis.Map<string, globalThis.Set<ID>>;
-    semanticRefs: globalThis.Map<string, NodeRef[]>;
     incomingCrefs: globalThis.Map<ID, NodeRef[]>;
     incomingCrefsByTarget: globalThis.Map<string, NodeRef[]>;
     incomingFileLinks: globalThis.Map<string, NodeRef[]>;

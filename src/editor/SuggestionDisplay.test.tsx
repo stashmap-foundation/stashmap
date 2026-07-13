@@ -347,7 +347,7 @@ Recipes
 
     await expectTree(`
 ~Log
-  [R] Alice Root
+  Alice Root
     `);
 
     expect(screen.queryByText("Error: Node not found")).toBeNull();
@@ -358,7 +358,7 @@ Recipes
 
     await expectTree(`
 ~Log
-  [R] Alice Root
+  Alice Root
     `);
 
     expect(screen.queryByText("Error: Node not found")).toBeNull();
@@ -730,7 +730,7 @@ describe("Cref suggestions", () => {
 
     await expectTree(`
 My Fork
-  [R] Source
+  Source
   Items
     `);
     cleanup();

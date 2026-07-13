@@ -77,7 +77,7 @@ test("Cross-file link round-trips through save and renders in tree", async () =>
 
   await expectTree(`
 A
-  [R] B
+  Open B
   `);
 });
 
@@ -89,7 +89,7 @@ test("Cross-directory link resolves and is clickable to target root", async () =
   await knowstrSave(workspacePath);
   await renderAppTree({ path: workspacePath, search: "A" });
 
-  const navigateLink = await screen.findByLabelText("Navigate to B");
+  const navigateLink = await screen.findByRole("link", { name: "Open B" });
   await userEvent.click(navigateLink);
 
   await screen.findByLabelText(/^edit B(\s|$)/);
@@ -114,12 +114,12 @@ test("DnD copy of a file-link bullet between panes preserves resolution to origi
   );
   await navigateToNodeViaSearch(1, "C");
 
-  const sourceLink = getPane(0).getByText("B");
+  const sourceLink = getPane(0).getByText("Open B");
   const targetC = getPane(1).getByRole("treeitem", { name: "C" });
 
   await userEvent.keyboard("{Alt>}");
   fireEvent.dragStart(sourceLink);
-  setDropIndentLevel("B", "C", 2);
+  setDropIndentLevel("Open B", "C", 2);
   fireEvent.dragOver(targetC, { altKey: true });
   fireEvent.drop(targetC, { altKey: true });
   await userEvent.keyboard("{/Alt}");
@@ -159,23 +159,23 @@ B
 [I] A ↩
   `);
 
-  await userEvent.click(await screen.findByLabelText("A ↩"));
+  await userEvent.click(await screen.findByRole("treeitem", { name: "A ↩" }));
   await userEvent.keyboard("!");
 
   await expectTree(`
 B
   B-child
-[R] A ↩
+A
   `);
 
-  const reverseLink = await screen.findByLabelText("Navigate to A ↩");
-  expect(reverseLink.getAttribute("href")).toMatch(/^\/d\//u);
+  const reverseLink = await screen.findByRole("link", { name: "A" });
+  expect(reverseLink.getAttribute("data-href")).toMatch(/a\.md$/u);
 
   await userEvent.click(reverseLink);
 
   await expectTree(`
 A
-  [R] B !↩
+  Open B
   `);
 });
 
@@ -191,7 +191,7 @@ test("Deleted file link target renders as deleted reference", async () => {
 
   await expectTree(`
 A
-  [D] (deleted) Open B
+  [D] Open B
   `);
 });
 
@@ -218,9 +218,9 @@ test("Mixed node-links and file-links all render", async () => {
 
   await expectTree(`
 Links
-  [R] Holiday Destinations / France
-  [R] Hello Doc
-  [R] Hello Doc
+  Holiday / France
+  Hello Doc
+  Hello
   `);
 });
 
@@ -272,8 +272,8 @@ test("Cross-document node links survive an app reload", async () => {
   await renderAppTree({ path: workspacePath, search: "Links" });
   await expectTree(`
 Links
-  [R] Holiday Destinations / France
-  [R] Hello Doc
+  Holiday / France
+  Hello
   `);
 
   cleanup();
@@ -281,8 +281,8 @@ Links
 
   await expectTree(`
 Links
-  [R] Holiday Destinations / France
-  [R] Hello Doc
+  Holiday / France
+  Hello
   `);
 });
 
@@ -294,7 +294,7 @@ test("File link with prefix markers preserves them on the incoming reference", a
   await knowstrSave(workspacePath);
   await renderAppTree({ path: workspacePath, search: "B" });
 
-  // The incoming row wears ↩, never a borrowed judgment mark — nobody
+  // The incoming row wears, never a borrowed judgment mark — nobody
   // judged anything (the !+ in the text are the SOURCE row's markers).
   await expectTree(
     `
@@ -328,10 +328,10 @@ test("Multiselect DnD of file links targets every document, not the source rows"
   );
   await navigateToNodeViaSearch(1, "C");
 
-  modClick(getPane(0).getByLabelText("B"), { metaKey: true });
-  modClick(getPane(0).getByLabelText("D"), { metaKey: true });
+  modClick(getPane(0).getByLabelText("Open B"), { metaKey: true });
+  modClick(getPane(0).getByLabelText("Open D"), { metaKey: true });
 
-  fireEvent.dragStart(getPane(0).getByText("B"));
+  fireEvent.dragStart(getPane(0).getByText("Open B"));
   fireEvent.drop(getPane(1).getByRole("treeitem", { name: "C" }));
 
   // Every dragged link points at its document; the non-primary rows must

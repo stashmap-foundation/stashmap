@@ -62,7 +62,6 @@ export function planDisconnectFromParent(
 export function planDeleteNode(
   plan: Plan,
   nodeID: ID,
-  rowID: ID,
   parentID: ID | undefined,
   paneIndex: number
 ): Plan {
@@ -70,7 +69,7 @@ export function planDeleteNode(
     return planDisconnectFromParent(plan, parentID, nodeID);
   }
 
-  if (isSearchId(rowID)) {
+  if (isSearchId(nodeID)) {
     return plan;
   }
 

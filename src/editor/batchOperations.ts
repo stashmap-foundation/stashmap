@@ -5,7 +5,7 @@ import {
   addNodesToLastElement,
   viewPathToString,
 } from "../rowModel";
-import { Plan, planExpandNode, planUpdateNodeText } from "../planner";
+import { Plan, planExpandNode, planUpdateNodeSpans } from "../planner";
 import {
   planUpdateViewItemMetadata,
   NodeItemMetadata,
@@ -16,10 +16,10 @@ import {
   planMaterializeComputedRow,
   planResolveRenameSuggestion,
 } from "../core/plan";
-import { nodeText } from "../core/nodeSpans";
+import { spansToMarkdown } from "../core/nodeSpans";
 
 export type EditorInfo = {
-  text: string;
+  spans: InlineSpan[];
   viewKey: string;
 };
 
@@ -34,24 +34,19 @@ function planClearSelection(plan: Plan): Plan {
   };
 }
 
-function getEditorTextForRow(
+function getEditorSpansForRow(
   editorInfo: EditorInfo | undefined,
   row: Row
-): string {
-  if (!editorInfo) return "";
-  if (editorInfo.viewKey !== row.viewKey) return "";
-  return editorInfo.text;
-}
-
-function getNodeText(row: Row): string {
-  return nodeText(row.node);
+): InlineSpan[] | undefined {
+  if (!editorInfo || editorInfo.viewKey !== row.viewKey) return undefined;
+  return editorInfo.spans;
 }
 
 function planUpdateOneMetadata(
   acc: Plan,
   row: Row,
   metadata: NodeItemMetadata,
-  editorText: string
+  editorSpans: InlineSpan[] | undefined
 ): Plan {
   // Rename suggestions resolve, never materialize: x dismisses the
   // version's text, any other judgment takes it.
@@ -75,7 +70,7 @@ function planUpdateOneMetadata(
     acc,
     {
       node: row.node,
-      rowID: row.rowID,
+      nodeID: row.node.id,
       sourceId: row.sourceId,
       viewPath: row.viewPath,
       parentNode: row.parentNode,
@@ -88,7 +83,7 @@ function planUpdateOneMetadata(
       isDocumentTopLevel: pane.documentId !== undefined && !row.parentViewPath,
     },
     metadata,
-    editorText
+    editorSpans
   );
 }
 
@@ -104,7 +99,7 @@ export function planBatchRelevance(
         acc,
         row,
         { relevance },
-        getEditorTextForRow(editorInfo, row)
+        getEditorSpansForRow(editorInfo, row)
       ),
     plan
   );
@@ -123,7 +118,7 @@ export function planBatchArgument(
         acc,
         row,
         { argument },
-        getEditorTextForRow(editorInfo, row)
+        getEditorSpansForRow(editorInfo, row)
       ),
     plan
   );
@@ -293,17 +288,16 @@ export function planBatchIndent(
             },
           ]
         : state.remappedKeys;
-      const editorText = getEditorTextForRow(editorInfo, row);
-      if (!editorText) {
-        return { plan: moved, remappedKeys: nextRemappedKeys };
-      }
-      const currentText = getNodeText(row);
-      if (editorText === currentText) {
+      const editorSpans = getEditorSpansForRow(editorInfo, row);
+      if (
+        !editorSpans ||
+        spansToMarkdown(editorSpans) === spansToMarkdown(row.node.spans)
+      ) {
         return { plan: moved, remappedKeys: nextRemappedKeys };
       }
       return {
         plan: updatedViewPath
-          ? planUpdateNodeText(moved, row.node.id, editorText)
+          ? planUpdateNodeSpans(moved, row.node.id, editorSpans)
           : moved,
         remappedKeys: nextRemappedKeys,
       };
@@ -370,17 +364,16 @@ export function planBatchOutdent(
             },
           ]
         : state.remappedKeys;
-      const editorText = getEditorTextForRow(editorInfo, row);
-      if (!editorText) {
-        return { plan: moved, remappedKeys: nextRemappedKeys };
-      }
-      const currentText = getNodeText(row);
-      if (editorText === currentText) {
+      const editorSpans = getEditorSpansForRow(editorInfo, row);
+      if (
+        !editorSpans ||
+        spansToMarkdown(editorSpans) === spansToMarkdown(row.node.spans)
+      ) {
         return { plan: moved, remappedKeys: nextRemappedKeys };
       }
       return {
         plan: updatedViewPath
-          ? planUpdateNodeText(moved, row.node.id, editorText)
+          ? planUpdateNodeSpans(moved, row.node.id, editorSpans)
           : moved,
         remappedKeys: nextRemappedKeys,
       };

@@ -216,10 +216,14 @@ export function upsertNodesCore<T extends GraphPlan>(
 
 function addCrefToLog<T extends GraphPlan>(plan: T, nodeID: ID): T {
   const [planWithLog, nodes] = planEnsureSystemRoot(plan, LOG_ROOT_ROLE);
-  const crefNode = newGraphNode([linkSpan(nodeID, "")], {
-    root: nodes.root as ID,
-    parent: nodes.id as ID,
-  });
+  const targetNode = getWorkspaceNode(planWithLog.knowledgeDBs, nodeID);
+  const crefNode = newGraphNode(
+    [linkSpan(nodeID, targetNode ? nodeText(targetNode) : "")],
+    {
+      root: nodes.root as ID,
+      parent: nodes.id as ID,
+    }
+  );
   const planWithCref = upsertNodesCore(planWithLog, crefNode);
   return upsertNodesCore(planWithCref, {
     ...nodes,
@@ -862,16 +866,16 @@ export function planAddTargetsToNode<T extends GraphPlan>(
       const objectID =
         typeof objectOrID === "string"
           ? objectOrID
-          : "id" in objectOrID
-          ? objectOrID.id
           : "targetID" in objectOrID
           ? objectOrID.targetID
-          : objectOrID.docId;
+          : "docId" in objectOrID
+          ? objectOrID.docId
+          : undefined;
       const objectText =
         typeof objectOrID !== "string" && "text" in objectOrID
           ? objectOrID.text
           : undefined;
-      if (refTarget || isSearchId(objectID as ID)) {
+      if (refTarget || (objectID !== undefined && isSearchId(objectID))) {
         const childNode = refTarget
           ? newGraphNode(
               [linkSpan(refTarget.targetID, refTarget.linkText || "")],
@@ -910,7 +914,9 @@ export function planAddTargetsToNode<T extends GraphPlan>(
         ];
       }
 
-      const existingNode = getWorkspaceNode(accPlan.knowledgeDBs, objectID);
+      const existingNode = objectID
+        ? getWorkspaceNode(accPlan.knowledgeDBs, objectID)
+        : undefined;
       if (existingNode && existingNode.id === objectID) {
         const updatedChild = {
           ...existingNode,

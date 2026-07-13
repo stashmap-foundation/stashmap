@@ -1,5 +1,6 @@
 import { List, Set } from "immutable";
-import { getNodeSemanticID, getNodeText, isRefNode } from "./core/connections";
+import { getNodeText, isRefNode } from "./core/connections";
+import { getBlockLinkTarget, getBlockLinkText } from "./core/nodeSpans";
 
 function normalizeSearchText(input: string): string {
   return input.toLowerCase().replace(/\n/g, "");
@@ -14,16 +15,16 @@ export function getLocalSearchResultIDs(
   }
 
   const searchStr = normalizeSearchText(query);
-  const allNodes = knowledgeDBs
-    .valueSeq()
-    .flatMap((db) => db.nodes.valueSeq())
-    .filter((node) => !isRefNode(node));
+  const allNodes = knowledgeDBs.valueSeq().flatMap((db) => db.nodes.valueSeq());
   const resultIDs = allNodes.reduce((results, node) => {
-    const text = getNodeText(node) || "";
+    const text = isRefNode(node)
+      ? getBlockLinkText(node) ?? ""
+      : getNodeText(node) ?? "";
     if (normalizeSearchText(text).indexOf(searchStr) === -1) {
       return results;
     }
-    return results.add(getNodeSemanticID(node));
+    const targetID = isRefNode(node) ? getBlockLinkTarget(node) : undefined;
+    return results.add(targetID ?? node.id);
   }, Set<ID>());
 
   return resultIDs.toList();

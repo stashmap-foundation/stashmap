@@ -16,7 +16,7 @@ import {
 } from "./planner";
 import { planUpsertRootDocument, withDocumentRoot } from "./core/plan";
 import { newGraphNode } from "./core/nodeFactory";
-import { nodeText, plainSpans } from "./core/nodeSpans";
+import { plainSpans } from "./core/nodeSpans";
 
 export function planCreateNodesFromMarkdownTrees<T extends GraphPlan>(
   plan: T,
@@ -44,14 +44,14 @@ export function planCreateNodesFromMarkdownTrees<T extends GraphPlan>(
     affectedDocuments: result.context.affectedDocuments,
   };
   if (!createDocuments) {
-    return [planWithNodes, result.topSemanticIds, result.topNodeIds];
+    return [planWithNodes, result.topNodeIds, result.topNodeIds];
   }
   const userNodes = result.context.knowledgeDBs.get(LOCAL)?.nodes;
   const planWithDocs = result.topNodeIds.reduce<T>((acc, longId) => {
     const rootNode = userNodes?.get(longId);
     return rootNode ? planUpsertRootDocument(acc, rootNode) : acc;
   }, planWithNodes);
-  return [planWithDocs, result.topSemanticIds, result.topNodeIds];
+  return [planWithDocs, result.topNodeIds, result.topNodeIds];
 }
 
 export function planCreateNodesFromMarkdownFiles<T extends GraphPlan>(
@@ -77,10 +77,7 @@ export function planCreateNodesFromMarkdown<T extends GraphPlan>(
 
   const fallbackText = "Imported Markdown";
   const fallbackNode = withDocumentRoot(newGraphNode(plainSpans(fallbackText)));
-  return [
-    planUpsertNodes(nextPlan, fallbackNode),
-    nodeText(fallbackNode) as ID,
-  ];
+  return [planUpsertNodes(nextPlan, fallbackNode), fallbackNode.id];
 }
 
 function moveCreatedTreesToParent<T extends GraphPlan>(

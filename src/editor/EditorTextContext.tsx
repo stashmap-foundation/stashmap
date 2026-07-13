@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useCallback, useState } from "react";
 
 type EditorTextContextType = {
-  text: string;
-  setText: (text: string) => void;
+  spans: InlineSpan[];
+  setSpans: (spans: InlineSpan[]) => void;
 };
 
 const EditorTextContext = createContext<EditorTextContextType | null>(null);
@@ -12,14 +12,13 @@ export function EditorTextProvider({
 }: {
   children: React.ReactNode;
 }): JSX.Element {
-  const [text, setTextState] = useState("");
-
-  const setText = useCallback((newText: string) => {
-    setTextState(newText);
+  const [spans, setSpansState] = useState<InlineSpan[]>([]);
+  const setSpans = useCallback((nextSpans: InlineSpan[]) => {
+    setSpansState(nextSpans);
   }, []);
 
   return (
-    <EditorTextContext.Provider value={{ text, setText }}>
+    <EditorTextContext.Provider value={{ spans, setSpans }}>
       {children}
     </EditorTextContext.Provider>
   );

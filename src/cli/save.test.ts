@@ -812,12 +812,15 @@ test("save treats ref-style link with bracketed text as ref node", async () => {
     path.join(workspaceDir, "bracketed-ref.md"),
     "utf8"
   );
+  const serializedLinkedText = linkedText.replace(/([\\[\]])/gu, "\\$1");
   const linkedLine = second
     .split("\n")
-    .find((l) => l.includes(`- [${linkedText}](#${targetId})`)) as string;
+    .find((line) =>
+      line.includes(`- [${serializedLinkedText}](#${targetId})`)
+    ) as string;
   expect(linkedLine).toMatch(
     new RegExp(
-      `^- \\[${linkedText.replace(
+      `^- \\[${serializedLinkedText.replace(
         /[.*+?^${}()|[\]\\]/gu,
         "\\$&"
       )}\\]\\(#${targetId}\\) <!-- id:[^>]+ -->$`,

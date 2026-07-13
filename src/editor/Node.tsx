@@ -8,7 +8,6 @@ import {
   useIsExpanded,
   useIsRoot,
   useNodeIndex,
-  useCurrentRowID,
   useDisplayText,
   useIsViewingOtherUserContent,
   viewPathToString,
@@ -16,7 +15,7 @@ import {
   getCurrentReferenceForRow,
   useRow,
   updateView,
-  getViewForRowID,
+  getViewForNode,
   getLast,
   addNodesToLastElement,
 } from "../rowModel";
@@ -32,12 +31,16 @@ import {
   getNodeText,
   getNode,
   getNodeContext,
-  getSemanticID,
-  isEmptySemanticID,
+  isEmptyNodeID,
   computeEmptyNodeMetadata,
   isRefNode,
 } from "../core/connections";
-import { isBlockLinkAny, nodeText } from "../core/nodeSpans";
+import {
+  nodeText,
+  plainSpans,
+  spansText,
+  spansToMarkdown,
+} from "../core/nodeSpans";
 import { getBlockLink } from "../core/blockLink";
 import { ENTITY_SCHEME_RE, canonicalTargetOf } from "../core/entityRecognition";
 import {
@@ -49,7 +52,7 @@ import {
   isBareIcalFeedUrl,
 } from "../core/ical";
 import { useCalendarFeeds } from "../CalendarFeedContext";
-import { inlineTargetToHref, linkStyle, linkToHref } from "./linkOperations";
+import { inlineLinkToHref, linkStyle, linkToHref } from "./linkOperations";
 import { ReferenceDisplay } from "./referenceDisplay";
 import { MiniEditor, preventEditorBlur } from "./AddNode";
 import { useOnToggleExpanded } from "./SelectNodes";
@@ -92,14 +95,14 @@ function getLevels(viewPath: ViewPath): number {
 }
 
 function ExpandCollapseToggle(): JSX.Element | null {
-  const [rowID] = useCurrentRowID();
+  const row = useRow();
   const rawDisplayText = useDisplayText();
   // Feed-as-link rows read by their label; the raw text (with the URL)
   // belongs to edit mode.
   const displayText = displayTextOf(rawDisplayText);
   const onToggleExpanded = useOnToggleExpanded();
   const isExpanded = useIsExpanded();
-  const isEmptyNode = isEmptySemanticID(rowID);
+  const isEmptyNode = isEmptyNodeID(row.node.id);
   const onToggle = (): void => {
     if (isEmptyNode) return;
     onToggleExpanded(!isExpanded);
@@ -218,7 +221,7 @@ function LinkCursorZone(): JSX.Element | null {
       planSetEmptyNodePosition(
         createPlan(),
         row.parentNode.id,
-        getViewForRowID(data, parentViewPath, getLast(parentViewPath)),
+        getViewForNode(data, parentViewPath, getLast(parentViewPath)),
         parentViewPath,
         paneIndex,
         row.childIndex + 1
@@ -263,12 +266,12 @@ const nodeNotFoundCounts = new Map<string, number>();
 function logNodeNotFoundDebug({
   data,
   viewPath,
-  rowID,
+  nodeID,
   displayText,
 }: {
   data: Data;
   viewPath: ViewPath;
-  rowID: ID;
+  nodeID: ID;
   displayText: string;
 }): void {
   if (process.env.DEBUG_NODE_NOT_FOUND !== "1") {
@@ -285,7 +288,7 @@ function logNodeNotFoundDebug({
     .toArray();
   const totalNodeCount = dbs.reduce((sum, db) => sum + db.nodeCount, 0);
   const shouldLog =
-    (rowID !== "My Notes" && (count === 1 || count === 5)) ||
+    count === 1 ||
     (totalNodeCount > 0 && count % 5 === 0) ||
     count === 30 ||
     count === 100;
@@ -304,8 +307,8 @@ function logNodeNotFoundDebug({
         }))
     )
     .toArray();
-  const userNode = getNode(data.knowledgeDBs, rowID, LOCAL);
-  const paneNode = getNode(data.knowledgeDBs, rowID, pane?.sourceId);
+  const userNode = getNode(data.knowledgeDBs, nodeID, LOCAL);
+  const paneNode = getNode(data.knowledgeDBs, nodeID, pane?.sourceId);
   const rootNode = getNode(data.knowledgeDBs, pane?.rootNodeId, pane?.sourceId);
   const nodeSummary = (
     node: typeof userNode,
@@ -317,7 +320,6 @@ function logNodeNotFoundDebug({
           root: node.root,
           parent: node.parent,
           text: getNodeText(node),
-          semanticID: getSemanticID(data.knowledgeDBs, node, sourceId),
           context: getNodeContext(data.knowledgeDBs, node, sourceId).toArray(),
           children: node.children.toArray(),
         }
@@ -333,7 +335,7 @@ function logNodeNotFoundDebug({
     historyPanes: historyState?.panes,
     viewPath,
     viewKey,
-    rowID,
+    nodeID,
     displayText,
     pane,
     user: LOCAL,
@@ -418,20 +420,29 @@ function ReferenceContent({
 
 function InlineLinkSpan({
   span,
+  node,
   sourceId,
 }: {
   span: Extract<InlineSpan, { kind: "link" }>;
+  node: GraphNode;
   sourceId: SourceId;
 }): JSX.Element {
   const data = useData();
   const navigatePane = useNavigatePane();
-  const href = inlineTargetToHref(data, span.targetID, sourceId);
-  const style = ENTITY_SCHEME_RE.test(span.targetID)
+  const targetID = span.href.startsWith("#") ? span.href.slice(1) : "";
+  const href = inlineLinkToHref(data, span.href, node, sourceId);
+  const style = ENTITY_SCHEME_RE.test(targetID)
     ? { color: "var(--violet)" }
     : undefined;
   if (!href) {
     return (
-      <span className="inline-link" style={style}>
+      <span
+        role="link"
+        className="inline-link"
+        style={style}
+        data-href={span.href}
+        data-target={span.href}
+      >
         {span.text}
       </span>
     );
@@ -441,6 +452,8 @@ function InlineLinkSpan({
       href={href}
       className="inline-link"
       style={style}
+      data-href={span.href}
+      data-target={span.href}
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -468,7 +481,14 @@ function InlineSpans({
       {node.spans.map((span, index) => {
         const key = `${index}-${span.kind}-${span.text}`;
         if (span.kind === "link") {
-          return <InlineLinkSpan key={key} span={span} sourceId={sourceId} />;
+          return (
+            <InlineLinkSpan
+              key={key}
+              span={span}
+              node={node}
+              sourceId={sourceId}
+            />
+          );
         }
         return <React.Fragment key={key}>{span.text}</React.Fragment>;
       })}
@@ -477,11 +497,7 @@ function InlineSpans({
 }
 
 function hasInlineLinks(node: GraphNode | undefined): node is GraphNode {
-  return (
-    !!node &&
-    !isBlockLinkAny(node) &&
-    node.spans.some((span) => span.kind === "link")
-  );
+  return !!node && node.spans.some((span) => span.kind === "link");
 }
 
 function NodeContent(): JSX.Element {
@@ -514,7 +530,16 @@ function NodeContent(): JSX.Element {
     );
   }
   if (row.virtualType === "version") {
-    return <VersionContent sourceId={row.sourceId} meta={row.versionMeta} />;
+    return (
+      <VersionContent
+        sourceId={row.sourceId}
+        meta={row.versionMeta ?? reference?.versionMeta}
+      />
+    );
+  }
+
+  if (row.virtualType === undefined && hasInlineLinks(row.node)) {
+    return <InlineSpans node={row.node} sourceId={row.sourceId} />;
   }
 
   if (reference) {
@@ -557,15 +582,16 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
   const data = useData();
   const { textStyle } = useItemStyle();
   const { createPlan, executePlan } = usePlanner();
+  const navigatePane = useNavigatePane();
+  const { feeds: calendarFeeds } = useCalendarFeeds();
   const currentNode = useCurrentNode();
-  const [rowID] = useCurrentRowID();
   const displayText = useDisplayText();
   const prevSibling = getPreviousSiblingFromRows(rows, row);
   const parentPath = row.parentViewPath;
   const viewIsExpanded = useIsExpanded();
   const nodeIsRoot = useIsRoot();
   const nodeIndex = useNodeIndex();
-  const isEmptyNode = isEmptySemanticID(rowID);
+  const isEmptyNode = isEmptyNodeID(row.node.id);
   const nodeIsExpanded = viewIsExpanded && row.hasChildren;
 
   const emptyNodeMetadata = computeEmptyNodeMetadata(
@@ -589,17 +615,29 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
   // entity link's target. Saving re-wraps the new label around the known
   // URL; typing a bare feed URL (re)wraps into the link form.
   const feedLink = icalFeedLinkPartsOf(displayText);
-  const withFeedUrl = (text: string): string => {
-    if (isBareIcalFeedUrl(text)) {
-      return icalFeedLinkText(text.trim());
+  const editorSpans: InlineSpan[] = feedLink
+    ? [{ kind: "link", href: `feed:${feedLink.url}`, text: feedLink.label }]
+    : currentNode.spans;
+  const persistedSpans = (spans: InlineSpan[]): InlineSpan[] => {
+    const text = spansText(spans);
+    if (feedLink) {
+      return plainSpans(icalFeedLinkText(feedLink.url, text));
     }
-    if (feedLink && text.trim() !== "" && !icalFeedUrlOf(text)) {
-      return icalFeedLinkText(feedLink.url, text.trim());
+    if (spans.length === 1 && spans[0].kind === "link") {
+      const feedUrl = spans[0].href.startsWith("feed:")
+        ? spans[0].href.slice("feed:".length)
+        : undefined;
+      return feedUrl
+        ? plainSpans(icalFeedLinkText(feedUrl, spans[0].text))
+        : spans;
     }
-    return text;
+    return isBareIcalFeedUrl(text)
+      ? plainSpans(icalFeedLinkText(text.trim()))
+      : spans;
   };
 
-  const handleSave = (text: string, submitted?: boolean): void => {
+  const handleSave = (spans: InlineSpan[], submitted?: boolean): void => {
+    const nextSpans = persistedSpans(spans);
     // Write gestures take first; read gestures read. A computed row's
     // save materializes the row before the text lands — and an unchanged
     // text writes nothing at all (blur/Escape must not take).
@@ -612,7 +650,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       // unchanged text reads only.
       if (
         !submitted &&
-        withFeedUrl(text).trim() === nodeText(row.node).trim()
+        spansToMarkdown(nextSpans) === spansToMarkdown(row.node.spans)
       ) {
         return undefined;
       }
@@ -633,8 +671,8 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       node: savedNode,
     } = planSaveNodeAndEnsureNodes(
       materializedStart,
-      withFeedUrl(text),
-      takenNode === currentNode ? rowID : takenNode.id,
+      nextSpans,
+      row.materialize ? row.node.id : takenNode.id,
       takenNode,
       takenViewPath,
       parentNode,
@@ -647,7 +685,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
     // eslint-disable-next-line functional/immutable-data
     escapeFocusPendingRef.current = false;
 
-    if (!submitted || !text.trim()) {
+    if (!submitted || spansText(spans).trim() === "") {
       executePlan(planWithEscFocus);
       return;
     }
@@ -700,13 +738,11 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
     executePlan(plan);
   };
 
-  const handleTab = (text: string): void => {
-    if (!isEmptyNode && !isEditableNode(currentNode)) {
-      return;
-    }
+  const handleTab = (spans: InlineSpan[]): void => {
+    if (!isEmptyNode && !isEditableNode(currentNode)) return;
 
     const basePlan = createPlan();
-    const trimmedText = text.trim();
+    const trimmedText = spansText(spans).trim();
 
     if (isEmptyNode) {
       if (!prevSibling || !parentPath) return;
@@ -752,15 +788,15 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
     }
 
     const result = planBatchIndent(basePlan, [row], rows, {
-      text: trimmedText,
+      spans: persistedSpans(spans),
       viewKey,
     });
     if (result) executePlan(result);
   };
 
-  const handleShiftTab = (text: string): void => {
+  const handleShiftTab = (spans: InlineSpan[]): void => {
     const basePlan = createPlan();
-    const trimmedText = text.trim();
+    const trimmedText = spansText(spans).trim();
 
     if (isEmptyNode) {
       if (!parentPath) return;
@@ -807,7 +843,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
     if (!isEditableNode(currentNode)) return;
 
     const result = planBatchOutdent(basePlan, [row], rows, {
-      text: trimmedText,
+      spans: persistedSpans(spans),
       viewKey,
     });
     if (result) executePlan(result);
@@ -823,7 +859,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
     rowIndex?: number;
   }): void => {
     const focusTargetNodeId =
-      nodeId && !isEmptySemanticID(nodeId as ID) ? nodeId : undefined;
+      nodeId && !isEmptyNodeID(nodeId) ? nodeId : undefined;
     if (
       targetViewKey === undefined &&
       focusTargetNodeId === undefined &&
@@ -842,12 +878,12 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
 
   const handlePasteMultiLine = (
     children: ParsedLine[],
-    currentText: string
+    currentSpans: InlineSpan[]
   ): void => {
     const { plan: basePlan, node: savedNode } = planSaveNodeAndEnsureNodes(
       createPlan(),
-      currentText,
-      rowID,
+      persistedSpans(currentSpans),
+      row.node.id,
       currentNode,
       viewPath,
       parentNode,
@@ -893,10 +929,21 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
     return <NodeContent />;
   }
 
+  const handleActivateLink = (href: string, spans: InlineSpan[]): void => {
+    handleSave(spans);
+    const targetHref = inlineLinkToHref(
+      { ...data, calendarFeeds },
+      href,
+      row.node,
+      row.sourceId
+    );
+    if (targetHref) navigatePane(targetHref);
+  };
+
   return (
     <MiniEditor
       key={`${viewPathToString(viewPath)}:${nodeIndex}`}
-      initialText={feedLink ? feedLink.label : displayText}
+      initialSpans={editorSpans}
       style={textStyle}
       onSave={handleSave}
       onTab={handleTab}
@@ -904,14 +951,13 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       onClose={isEmptyNode ? handleClose : undefined}
       autoFocus={shouldAutoFocus}
       ariaLabel={
-        isEmptyNode
-          ? "new node editor"
-          : `edit ${feedLink ? feedLink.label : displayText}`
+        isEmptyNode ? "new node editor" : `edit ${spansText(editorSpans)}`
       }
       onEscape={handleEscapeRequest}
       onRequestRowFocus={handleRequestRowFocus}
       onDelete={isEmptyNode ? undefined : handleDelete}
       onPasteMultiLine={handlePasteMultiLine}
+      onActivateLink={handleActivateLink}
     />
   );
 }
@@ -921,12 +967,11 @@ function InteractiveNodeContent({ rows }: { rows: List<Row> }): JSX.Element {
   const row = useRow();
   const { viewPath } = row;
   const currentNode = useCurrentNode();
-  const [rowID] = useCurrentRowID();
   const isLoading = useNodeIsLoading();
   const isInSearchView = useIsInSearchView();
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
   const { virtualType } = row;
-  const isEmptyNode = isEmptySemanticID(rowID);
+  const isEmptyNode = isEmptyNodeID(row.node.id);
   const displayText = useDisplayText();
   const reference = getCurrentReferenceForRow(data, row);
 
@@ -946,7 +991,7 @@ function InteractiveNodeContent({ rows }: { rows: List<Row> }): JSX.Element {
     logNodeNotFoundDebug({
       data,
       viewPath,
-      rowID,
+      nodeID: row.node.id,
       displayText,
     });
     return <ErrorContent />;

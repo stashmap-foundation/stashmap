@@ -4,7 +4,6 @@ import {
   getNode,
   resolveNode,
   itemPassesFilters,
-  getSemanticID,
 } from "./core/connections";
 import { isCanonicalId } from "./core/entityRecognition";
 import { displayTextOf } from "./core/ical";
@@ -427,7 +426,7 @@ function effectiveIDs(
         itemPassesFilters(item, activeFilters) &&
         item.relevance !== "not_relevant"
     )
-    .map((item) => getSemanticID(knowledgeDBs, item, sourceId))
+    .map((item) => item.basedOn ?? item.id)
     .toList();
 }
 

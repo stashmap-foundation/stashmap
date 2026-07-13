@@ -3,11 +3,10 @@ import {
   useIsRoot,
   useIsInSearchView,
   useIsViewingOtherUserContent,
-  useCurrentRowID,
   useCurrentNode,
   useRow,
 } from "../rowModel";
-import { isEmptySemanticID } from "../core/connections";
+import { isEmptyNodeID } from "../core/connections";
 import { useCurrentPane } from "../SplitPanesContext";
 import { useData } from "../DataContext";
 import { usePlanner } from "../planner";
@@ -117,7 +116,6 @@ export function RightMenu(): JSX.Element {
   const currentNode = useCurrentNode();
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
   const isInSearchView = useIsInSearchView();
-  const [rowID] = useCurrentRowID();
   const isDocumentTopLevel =
     isRoot && pane.documentId !== undefined && !isVirtualItem && !!currentNode;
 
@@ -134,7 +132,7 @@ export function RightMenu(): JSX.Element {
       <div className="evidence-slot">
         {!isReadonly && virtualType !== "suggestion" && <EvidenceSelector />}
       </div>
-      {!isEmptySemanticID(rowID) && (
+      {!isEmptyNodeID(currentNode.id) && (
         <div className="action-slot">
           <FullscreenButton />
           <OpenInSplitPaneButton />

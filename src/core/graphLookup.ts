@@ -108,6 +108,12 @@ function sourceCandidatesForID(graph: GraphLookup, id: ID): NodeRef[] {
   );
 }
 
+export function lookupNodes(graph: GraphLookup, id: ID): ResolvedNode[] {
+  return sourceCandidatesForID(graph, id)
+    .map((ref) => getNodeInSource(graph, ref))
+    .filter((node): node is ResolvedNode => node !== undefined);
+}
+
 export function lookupNode(
   graph: GraphLookup,
   id: ID,

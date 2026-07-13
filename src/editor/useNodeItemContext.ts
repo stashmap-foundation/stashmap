@@ -1,11 +1,10 @@
 import {
   useIsInSearchView,
   useCurrentNode,
-  useCurrentRowID,
   ViewPath,
   useRow,
 } from "../rowModel";
-import { isEmptySemanticID } from "../core/connections";
+import { isEmptyNodeID } from "../core/connections";
 import {
   planMaterializeComputedRow,
   planResolveRenameSuggestion,
@@ -57,8 +56,7 @@ export function useNodeItemContext(): NodeItemContext {
   const isDocumentTopLevel =
     pane.documentId !== undefined && parentView === undefined && !!currentNode;
 
-  const [rowID] = useCurrentRowID();
-  const isEmptyNode = isEmptySemanticID(rowID);
+  const isEmptyNode = isEmptyNodeID(row.node.id);
   const nodeID = (() => {
     if (parentView) {
       return row.parentNode?.id;
@@ -91,7 +89,7 @@ export function useNodeItemContext(): NodeItemContext {
   })();
 
   const updateMetadata = (metadata: NodeItemMetadata): void => {
-    const editorText = editorTextContext?.text ?? "";
+    const editorSpans = editorTextContext?.spans;
     if (isEmptyNode && !nodeID) return;
     // Rename suggestions resolve, never materialize: x dismisses that
     // version's text, any other judgment takes it.
@@ -132,7 +130,7 @@ export function useNodeItemContext(): NodeItemContext {
         createPlan(),
         {
           node: row.node,
-          rowID,
+          nodeID: row.node.id,
           sourceId: row.sourceId,
           viewPath,
           parentNode: row.parentNode,
@@ -145,7 +143,7 @@ export function useNodeItemContext(): NodeItemContext {
           isDocumentTopLevel,
         },
         metadata,
-        editorText
+        editorSpans
       )
     );
   };

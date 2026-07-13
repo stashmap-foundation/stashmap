@@ -3,7 +3,7 @@ import { Map, List } from "immutable";
 import { LOCAL } from "./core/nodeRef";
 import { getNodeText, isSearchId, parseSearchId } from "./core/connections";
 import { MergeKnowledgeDB, useData } from "./DataContext";
-import { deduplicateRefsByContext, findRefsToNode } from "./semanticProjection";
+import { findRefsToNode } from "./semanticProjection";
 import { useCurrentPane } from "./SplitPanesContext";
 import { newDB } from "./core/knowledge";
 import { getLocalSearchResultIDs } from "./localSearch";
@@ -15,31 +15,21 @@ import { graphLookupFromData, lookupNode } from "./core/graphLookup";
 function SearchCrefBuilder({
   children,
   searchId,
-  foundSemanticIDs,
+  foundNodeIDs,
 }: {
   children: React.ReactNode;
   searchId: ID;
-  foundSemanticIDs: List<ID>;
+  foundNodeIDs: List<ID>;
 }): JSX.Element {
   const data = useData();
-  const { documents, knowledgeDBs } = data;
+  const { documents } = data;
   const graph = graphLookupFromData(data);
-  const pane = useCurrentPane();
-  const effectiveAuthor = pane.sourceId;
 
-  const uniqueSemanticIDs = foundSemanticIDs.toSet().toList();
-  const crefItems = uniqueSemanticIDs.flatMap((semanticID) => {
-    const refs = findRefsToNode(graph, semanticID);
-    const deduped = deduplicateRefsByContext(
-      refs,
-      knowledgeDBs,
-      effectiveAuthor
-    );
-    if (deduped.size === 0) {
-      return List<ID>();
-    }
-    return deduped.map((ref) => ref.nodeID as ID);
-  });
+  const uniqueNodeIDs = foundNodeIDs.toSet().toList();
+  const crefItems = uniqueNodeIDs
+    .flatMap((nodeID) => findRefsToNode(graph, nodeID))
+    .sortBy((ref) => -ref.updated)
+    .map((ref) => ref.nodeID);
 
   const searchNodeBase = {
     ...newGraphNode(plainSpans("")),
@@ -131,13 +121,13 @@ export function LoadSearchData({
   }
 
   const searchId = firstSearch.id as ID;
-  const foundSemanticIDs =
+  const foundNodeIDs =
     pane.searchQuery === query && pane.searchResultIDs
       ? List(pane.searchResultIDs)
       : getLocalSearchResultIDs(knowledgeDBs, query);
 
   return (
-    <SearchCrefBuilder searchId={searchId} foundSemanticIDs={foundSemanticIDs}>
+    <SearchCrefBuilder searchId={searchId} foundNodeIDs={foundNodeIDs}>
       {children}
     </SearchCrefBuilder>
   );

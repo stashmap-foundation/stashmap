@@ -12,19 +12,12 @@ import {
   navigateToNodeViaSearch,
   type,
 } from "../utils.test";
-import { focusRow } from "./keyboardNavigation";
 
 function focusReferenceItem(index: number): void {
-  const reference = screen.getAllByTestId("reference-row")[index];
-  /* eslint-disable testing-library/no-node-access */
-  const row = reference.closest('[data-row-focusable="true"]');
-  /* eslint-enable testing-library/no-node-access */
-  if (!(row instanceof HTMLElement)) {
-    throw new Error("Reference row is not focusable");
-  }
-  act(() => {
-    focusRow(row);
-  });
+  const editor = screen.getAllByRole("textbox", {
+    name: /edit (First|Second) Note/u,
+  })[index];
+  act(() => editor.focus());
 }
 
 describe("Tree Editor - Comprehensive Tests", () => {
@@ -319,8 +312,8 @@ My Notes
 
       await expectTree(`
 ~Log
-  [R] Second Note
-  [R] First Note
+  Second Note
+  First Note
       `);
     }
 
@@ -333,9 +326,9 @@ My Notes
 
       await expectTree(`
 ~Log
-  [R] Second Note
+  Second Note
   [NEW NODE: Log note]
-  [R] First Note
+  First Note
       `);
     });
 
@@ -354,9 +347,9 @@ My Notes
 
       await expectTree(`
 ~Log
-  [R] Second Note
+  Second Note
     Log note
-  [R] First Note
+  First Note
       `);
     });
 
@@ -372,9 +365,9 @@ My Notes
 
       await expectTree(`
 ~Log
-  [R] Second Note
+  Second Note
     Log note
-  [R] First Note
+  First Note
       `);
     });
   });

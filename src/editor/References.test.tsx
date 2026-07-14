@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import {
   ALICE,
   BOB,
+  copySecretLinkViaChip,
   expectTree,
   forkOwnRoot,
   forkReadonlyRoot,
@@ -246,7 +247,36 @@ Places
     });
   });
 
-  test("Deleted node shows (deleted) indicator in ~Log", async () => {
+  test("unavailable foreign links are not marked dead", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+    renderApp(bob());
+    await type("Remote Notes{Escape}");
+    Reflect.defineProperty(navigator, "clipboard", {
+      value: {
+        readText: jest.fn(() =>
+          Promise.resolve(
+            "[Remote target](#33333333-3333-4333-8333-333333333333)"
+          )
+        ),
+      },
+      configurable: true,
+    });
+    await userEvent.keyboard("{Meta>}v{/Meta}");
+    await screen.findByRole("link", {
+      name: "Remote target. Target no longer exists",
+    });
+
+    const shared = await copySecretLinkViaChip(bob(), "Remote Notes");
+    cleanup();
+    renderApp({ ...alice(), initialRoute: shared });
+
+    expect(
+      await screen.findByRole("link", { name: "Navigate to Remote target" })
+    ).toBeDefined();
+    expect(screen.queryByText("†")).toBeNull();
+  });
+
+  test("Deleted node shows per-link dead furniture in ~Log", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
 
@@ -273,7 +303,7 @@ My Notes
 
     await expectTree(`
 ~Log
-  My Notes
+  My Notes†
     `);
 
     cleanup();
@@ -283,11 +313,17 @@ My Notes
 
     await expectTree(`
 ~Log
-  My Notes
+  My Notes†
     `);
+    expect(
+      screen.getByRole("link", {
+        name: "My Notes. Target no longer exists",
+      })
+    ).toBeDefined();
+    expect(screen.getByText("†")).toBeDefined();
   });
 
-  test("Deleted nested node shows context path in ~Log", async () => {
+  test("Deleted nested node shows per-link dead furniture in ~Log", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
 
@@ -315,7 +351,7 @@ Investment
 
     await expectTree(`
 ~Log
-  Investment
+  Investment†
     `);
 
     cleanup();
@@ -325,7 +361,13 @@ Investment
 
     await expectTree(`
 ~Log
-  Investment
+  Investment†
     `);
+    expect(
+      screen.getByRole("link", {
+        name: "Investment. Target no longer exists",
+      })
+    ).toBeDefined();
+    expect(screen.getByText("†")).toBeDefined();
   });
 });

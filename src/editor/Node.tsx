@@ -39,7 +39,11 @@ import {
   isBareIcalFeedUrl,
 } from "../core/ical";
 import { useCalendarFeeds } from "../CalendarFeedContext";
-import { inlineLinkToHref, resolveDocumentTarget } from "./linkOperations";
+import {
+  inlineLinkToHref,
+  isDeadLinkTarget,
+  resolveDocumentTarget,
+} from "./linkOperations";
 import { IncomingPart, ReferenceDisplay } from "./referenceDisplay";
 import { MiniEditor, ReciprocalLink, preventEditorBlur } from "./AddNode";
 import { linkStyleForHref } from "./editorDom";
@@ -484,12 +488,15 @@ function InlineLinkSpan({
   const data = useData();
   const navigatePane = useNavigatePane();
   const externalUrl = externalLinkUrl(span.href);
-  const internalHref = inlineLinkToHref(data, span.href, node, sourceId);
+  const dead = isDeadLinkTarget(data, span.href, node, sourceId);
+  const internalHref = dead
+    ? undefined
+    : inlineLinkToHref(data, span.href, node, sourceId);
   const href = externalUrl ?? internalHref;
   const isSearchResult = useRow().virtualType === "search";
   const style: React.CSSProperties = isSearchResult
     ? { fontStyle: "italic", textDecoration: "none" }
-    : linkStyleForHref(span.href);
+    : linkStyleForHref(span.href, dead);
   const externalPart =
     !isSearchResult && externalUrl ? (
       <sup
@@ -500,6 +507,15 @@ function InlineLinkSpan({
         ↗
       </sup>
     ) : null;
+  const deadPart = dead ? (
+    <sup
+      className="incoming-part dead-link-part"
+      data-link-furniture="dead"
+      aria-hidden="true"
+    >
+      †
+    </sup>
+  ) : null;
   if (!href) {
     return (
       <>
@@ -509,10 +525,16 @@ function InlineLinkSpan({
           style={style}
           data-href={span.href}
           data-target={span.href}
+          data-link-dead={dead ? "true" : undefined}
+          aria-disabled={dead || undefined}
+          aria-label={
+            dead ? `${span.text}. Target no longer exists` : undefined
+          }
         >
           {span.text}
         </span>
         {externalPart}
+        {deadPart}
         {reciprocal && (
           <IncomingPart
             relevance={reciprocal.relevance}
@@ -725,6 +747,12 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
 
   const editorSpans = currentNode.spans;
   const reciprocals = reciprocalLinks(data, row.node, row.sourceId);
+  const deadLinkIndexes = editorSpans.flatMap((span, index) =>
+    span.kind === "link" &&
+    isDeadLinkTarget(data, span.href, row.node, row.sourceId)
+      ? [index]
+      : []
+  );
   const persistedSpans = (spans: InlineSpan[]): InlineSpan[] => {
     const text = spansText(spans).trim();
     const feedUrl = calendarFeedUrl(currentNode);
@@ -1052,6 +1080,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
         key={`${viewPathToString(viewPath)}:${nodeIndex}`}
         initialSpans={editorSpans}
         reciprocalLinks={reciprocals}
+        deadLinkIndexes={deadLinkIndexes}
         style={textStyle}
         onSave={handleSave}
         onTab={handleTab}

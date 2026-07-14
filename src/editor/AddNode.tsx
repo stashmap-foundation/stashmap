@@ -30,6 +30,7 @@ export type ReciprocalLink = {
 type MiniEditorProps = {
   initialSpans: InlineSpan[];
   reciprocalLinks: ReciprocalLink[];
+  deadLinkIndexes: number[];
   onSave: (spans: InlineSpan[], submitted?: boolean) => void;
   style?: React.CSSProperties;
   onClose?: () => void;
@@ -83,6 +84,16 @@ function recoverRewrittenLink(
   return [...before, recovered, ...after];
 }
 
+function createDeadFurniture(): HTMLElement {
+  const furniture = document.createElement("sup");
+  furniture.setAttribute("class", "incoming-part dead-link-part");
+  furniture.setAttribute("data-link-furniture", "dead");
+  furniture.setAttribute("contenteditable", "false");
+  furniture.setAttribute("aria-hidden", "true");
+  furniture.replaceChildren(document.createTextNode("†"));
+  return furniture;
+}
+
 function createExternalFurniture(): HTMLElement {
   const furniture = document.createElement("sup");
   furniture.setAttribute("class", "incoming-part external-link-part");
@@ -112,6 +123,7 @@ function spansEqual(left: InlineSpan[], right: InlineSpan[]): boolean {
 export function MiniEditor({
   initialSpans,
   reciprocalLinks,
+  deadLinkIndexes,
   onSave,
   style,
   onClose,
@@ -145,15 +157,17 @@ export function MiniEditor({
         if (span.kind === "text") {
           return [...children, document.createTextNode(span.text)];
         }
-        const mark = createEditableLinkMark(span);
+        const dead = deadLinkIndexes.includes(index);
+        const mark = createEditableLinkMark(span, dead);
         const externalFurniture = externalLinkUrl(span.href)
           ? [createExternalFurniture()]
           : [];
+        const deadFurniture = dead ? [createDeadFurniture()] : [];
         const reciprocal = reciprocalLinks.find(
           (candidate) => candidate.spanIndex === index
         );
         if (!reciprocal) {
-          return [...children, mark, ...externalFurniture];
+          return [...children, mark, ...externalFurniture, ...deadFurniture];
         }
         const furniture = document.createElement("sup");
         furniture.setAttribute("class", "incoming-part");
@@ -179,12 +193,19 @@ export function MiniEditor({
           ...relationParts,
           document.createTextNode(INCOMING_ARROW)
         );
-        return [...children, mark, ...externalFurniture, furniture];
+        return [
+          ...children,
+          mark,
+          ...externalFurniture,
+          ...deadFurniture,
+          furniture,
+        ];
       }, noChildren),
       ...continuation
     );
   }, [
     initialSpans,
+    deadLinkIndexes.join(","),
     reciprocalLinks
       .map(
         ({ spanIndex, relevance, argument }) =>
@@ -361,7 +382,9 @@ export function MiniEditor({
       return;
     }
     const href = mark.getAttribute("data-href");
-    if (href === null) return;
+    if (href === null || mark.getAttribute("data-link-dead") === "true") {
+      return;
+    }
     e.preventDefault();
     e.stopPropagation();
     const spans = getSpans();

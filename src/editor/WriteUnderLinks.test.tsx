@@ -116,6 +116,61 @@ test("bare and mixed links use one span-native editor", async () => {
   });
 });
 
+test("missing local targets stay editable and carry per-link dead furniture", async () => {
+  const { path: workspacePath } = knowstrInit();
+  const liveID = "11111111-1111-4111-8111-111111111111";
+  const missingID = "22222222-2222-4222-8222-222222222222";
+  write(
+    workspacePath,
+    "notes.md",
+    `# Notes\n\n- [Live](#${liveID}), [Missing](#${missingID}), [Missing file](./gone.md), [Missing document](doc:missing-document), [Barcelona](#wd:Q1492)\n- Live <!-- id:${liveID} -->\n`
+  );
+  await knowstrSave(workspacePath);
+
+  await renderAppTree({ path: workspacePath, search: "Notes" });
+  const editor = await screen.findByRole("textbox", {
+    name: "edit Live, Missing, Missing file, Missing document, Barcelona",
+  });
+  const live = within(editor).getByRole("link", { name: "Live" });
+  const missing = within(editor).getByRole("link", {
+    name: "Missing. Target no longer exists",
+  });
+  const missingFile = within(editor).getByRole("link", {
+    name: "Missing file. Target no longer exists",
+  });
+  const missingDocument = within(editor).getByRole("link", {
+    name: "Missing document. Target no longer exists",
+  });
+  const entity = within(editor).getByRole("link", { name: "Barcelona" });
+
+  expect(within(editor).getAllByText("†")).toHaveLength(3);
+  expect(missing.style.cursor).toBe("default");
+  expect(missingFile.style.cursor).toBe("default");
+  expect(missingDocument.style.cursor).toBe("default");
+  expect(live.style.cursor).not.toBe("default");
+  expect(entity.style.color).toBe("var(--violet)");
+
+  selectContents(missing);
+  const copied = jest.fn();
+  fireEvent.copy(editor, { clipboardData: { setData: copied } });
+  expect(copied).toHaveBeenCalledWith("text/plain", `[Missing](#${missingID})`);
+
+  const pathBeforeClick = window.location.pathname;
+  await userEvent.click(missing);
+  expect(window.location.pathname).toBe(pathBeforeClick);
+  selectContents(missing);
+  await userEvent.keyboard("Missing renamed{Escape}");
+
+  await waitFor(() => {
+    const markdown = fs.readFileSync(
+      path.join(workspacePath, "notes.md"),
+      "utf8"
+    );
+    expect(markdown).toContain(`[Missing renamed](#${missingID})`);
+    expect(markdown).not.toContain("†");
+  });
+});
+
 test("mixed external and entity links keep independent presentation and activation", async () => {
   const { path: workspacePath } = knowstrInit();
   const website = "https://example.com/articles/one#details";

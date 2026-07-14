@@ -21,6 +21,7 @@ describe("MiniEditor", () => {
       <MiniEditor
         initialSpans={plain("Original")}
         reciprocalLinks={[]}
+        deadLinkIndexes={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -41,6 +42,7 @@ describe("MiniEditor", () => {
       <MiniEditor
         initialSpans={plain("Original")}
         reciprocalLinks={[]}
+        deadLinkIndexes={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -57,6 +59,7 @@ describe("MiniEditor", () => {
       <MiniEditor
         initialSpans={plain("Original")}
         reciprocalLinks={[]}
+        deadLinkIndexes={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -75,6 +78,7 @@ describe("MiniEditor", () => {
       <MiniEditor
         initialSpans={plain("Original")}
         reciprocalLinks={[]}
+        deadLinkIndexes={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -93,6 +97,7 @@ describe("MiniEditor", () => {
       <MiniEditor
         initialSpans={plain("Original")}
         reciprocalLinks={[]}
+        deadLinkIndexes={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -113,6 +118,7 @@ describe("MiniEditor", () => {
       <MiniEditor
         initialSpans={[]}
         reciprocalLinks={[]}
+        deadLinkIndexes={[]}
         onSave={onSave}
         onClose={onClose}
         onShiftTab={onShiftTab}
@@ -133,6 +139,7 @@ describe("MiniEditor", () => {
       <MiniEditor
         initialSpans={plain("First")}
         reciprocalLinks={[]}
+        deadLinkIndexes={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -146,6 +153,7 @@ describe("MiniEditor", () => {
       <MiniEditor
         initialSpans={plain("Changed")}
         reciprocalLinks={[]}
+        deadLinkIndexes={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -163,6 +171,7 @@ describe("MiniEditor", () => {
       <MiniEditor
         initialSpans={plain("Original")}
         reciprocalLinks={[]}
+        deadLinkIndexes={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -171,6 +180,7 @@ describe("MiniEditor", () => {
       <MiniEditor
         initialSpans={plain("Updated")}
         reciprocalLinks={[]}
+        deadLinkIndexes={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -194,6 +204,7 @@ describe("MiniEditor", () => {
             argument: "confirms",
           },
         ]}
+        deadLinkIndexes={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -220,6 +231,7 @@ describe("MiniEditor", () => {
           { kind: "text", text: " now" },
         ]}
         reciprocalLinks={[]}
+        deadLinkIndexes={[]}
         onSave={onSave}
         autoFocus={false}
       />

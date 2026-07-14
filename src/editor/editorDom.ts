@@ -99,19 +99,21 @@ export function selectionMarkdown(editor: HTMLElement): string | null {
   return spansToMarkdown(spansFromDomNode(range.cloneContents(), null));
 }
 
-export function linkStyleForHref(href: string): CSSProperties {
+export function linkStyleForHref(href: string, dead: boolean): CSSProperties {
   const targetClass = classifyLinkHref(href);
-  if (targetClass === "entity") return { color: "var(--violet)" };
+  const cursor = dead ? { cursor: "default" } : {};
+  if (targetClass === "entity") return { color: "var(--violet)", ...cursor };
   if (targetClass === "website" || targetClass === "feed") {
-    return { textDecoration: "underline" };
+    return { textDecoration: "underline", ...cursor };
   }
-  if (targetClass === "unsupported") return {};
+  if (targetClass === "unsupported") return cursor;
   return {
     textDecorationLine: "underline",
     textDecorationStyle: "dotted",
     textDecorationThickness: "1px",
     textUnderlineOffset: "3px",
     textDecorationColor: "var(--base01)",
+    ...cursor,
   };
 }
 
@@ -128,17 +130,22 @@ function styleAttribute(style: CSSProperties): string {
 }
 
 export function createEditableLinkMark(
-  span: Extract<InlineSpan, { kind: "link" }>
+  span: Extract<InlineSpan, { kind: "link" }>,
+  dead: boolean
 ): HTMLSpanElement {
   const mark = document.createElement("span");
   mark.setAttribute("role", "link");
   mark.setAttribute("class", "inline-link");
   mark.setAttribute("data-href", span.href);
   mark.setAttribute("data-target", span.href);
-  if (externalLinkUrl(span.href)) {
+  if (dead) {
+    mark.setAttribute("data-link-dead", "true");
+    mark.setAttribute("aria-disabled", "true");
+    mark.setAttribute("aria-label", `${span.text}. Target no longer exists`);
+  } else if (externalLinkUrl(span.href)) {
     mark.setAttribute("aria-label", `${span.text} (opens externally)`);
   }
-  const style = styleAttribute(linkStyleForHref(span.href));
+  const style = styleAttribute(linkStyleForHref(span.href, dead));
   if (style) mark.setAttribute("style", style);
   mark.replaceChildren(document.createTextNode(span.text));
   return mark;
@@ -150,7 +157,7 @@ function htmlForSpans(spans: InlineSpan[]): string {
     ...spans.map((span) =>
       span.kind === "text"
         ? document.createTextNode(span.text)
-        : createEditableLinkMark(span)
+        : createEditableLinkMark(span, false)
     )
   );
   return container.innerHTML;

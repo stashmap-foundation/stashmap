@@ -115,6 +115,28 @@ export function inlineTargetToHref(
   );
 }
 
+export function isDeadLinkTarget(
+  data: Data,
+  href: string,
+  source: GraphNode,
+  sourceId: SourceId
+): boolean {
+  if (sourceId !== LOCAL) return false;
+  const targetClass = classifyLinkHref(href);
+  if (targetClass === "node") {
+    return (
+      getNodeInSource(graphLookupFromData(data), {
+        sourceId,
+        id: href.slice(1),
+      }) === undefined
+    );
+  }
+  if (targetClass !== "document" && targetClass !== "file") return false;
+  const hashIndex = href.lastIndexOf("#");
+  const path = hashIndex < 0 ? href : href.slice(0, hashIndex);
+  return resolveDocumentTarget(data, source, sourceId, path) === undefined;
+}
+
 export function inlineLinkToHref(
   data: Data,
   href: string,
@@ -130,7 +152,12 @@ export function inlineLinkToHref(
     );
   }
   if (targetClass === "node" || targetClass === "calendar") {
-    return inlineTargetToHref(data, href.slice(1), sourceId);
+    return (
+      inlineTargetToHref(data, href.slice(1), sourceId) ??
+      (sourceId === LOCAL
+        ? undefined
+        : buildNodeRouteUrl(href.slice(1), sourceId))
+    );
   }
   if (targetClass !== "document" && targetClass !== "file") {
     return undefined;

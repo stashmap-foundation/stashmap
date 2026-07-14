@@ -182,7 +182,7 @@ A
   `);
 });
 
-test("Deleted file link target renders as deleted reference", async () => {
+test("Deleted file link target renders per-link dead furniture", async () => {
   const { path: workspacePath } = knowstrInit();
   write(workspacePath, "a.md", "# A\n\n- [Open B](./b.md)\n");
   write(workspacePath, "b.md", "# B\n\n- B-child\n");
@@ -194,8 +194,13 @@ test("Deleted file link target renders as deleted reference", async () => {
 
   await expectTree(`
 A
-  Open B
+  Open B†
   `);
+  expect(
+    screen.getByRole("link", {
+      name: "Open B. Target no longer exists",
+    }).style.cursor
+  ).toBe("default");
 });
 
 test("Mixed node-links and file-links all render", async () => {

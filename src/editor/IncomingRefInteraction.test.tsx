@@ -1002,7 +1002,7 @@ Crypto
 describe("Multi-user incoming refs", () => {});
 
 describe("Tombstone / deleted ref interactions", () => {
-  test("accept incoming ref, delete source node, outgoing cref shows [D]", async () => {
+  test("accept incoming ref then delete source shows dead-link furniture", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
     await setupItemLevelIncomingRef();
@@ -1035,7 +1035,7 @@ Crypto
 Money
   Bitcoin
     Details
-    Bitcoin
+    Bitcoin†
     `);
 
     cleanup();
@@ -1045,7 +1045,7 @@ Money
 Money
   Bitcoin
     Details
-    Bitcoin
+    Bitcoin†
     `);
   });
 
@@ -1084,7 +1084,7 @@ Money
     `);
   });
 
-  test("bidirectional, delete one side, remaining shows [D] on both sides", async () => {
+  test("bidirectional deletion leaves dead-link furniture", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
     await setupItemLevelIncomingRef();
@@ -1117,7 +1117,7 @@ Crypto
 Money
   Bitcoin
     Details
-    Bitcoin
+    Bitcoin†
     `);
 
     cleanup();
@@ -1127,7 +1127,7 @@ Money
 Money
   Bitcoin
     Details
-    Bitcoin
+    Bitcoin†
     `);
   });
 });

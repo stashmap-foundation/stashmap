@@ -1,7 +1,7 @@
 import { CSSProperties } from "react";
 import { useIsViewingOtherUserContent, useRow } from "../rowModel";
 import { nodeText } from "../core/nodeSpans";
-import { ENTITY_SCHEME_RE } from "../core/entityRecognition";
+import { ENTITY_SCHEME_RE } from "../core/linkPath";
 import { TYPE_COLORS } from "../core/constants";
 import { isCalendarEntryId, isPastCalendarRowText } from "../core/ical";
 

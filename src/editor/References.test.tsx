@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   ALICE,
@@ -238,6 +238,12 @@ Places
       name: "https://www.wikidata.org/wiki/Q131723",
     });
     expect(entityLink.style.color).toBe("var(--violet)");
+    await userEvent.click(entityLink);
+    await waitFor(() => {
+      expect(decodeURIComponent(window.location.pathname)).toBe(
+        "/r/wd:Q131723"
+      );
+    });
   });
 
   test("Deleted node shows (deleted) indicator in ~Log", async () => {

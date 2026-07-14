@@ -866,6 +866,33 @@ B
   cleanup();
 });
 
+test("Relative file links keep fragments when navigating", async () => {
+  const { path: workspacePath } = knowstrInit();
+  const childID = "22222222-2222-4222-8222-222222222222";
+  write(
+    workspacePath,
+    "docs/a.md",
+    `# A\n\n- [Open B child](./b.md#${childID})\n`
+  );
+  write(
+    workspacePath,
+    "docs/b.md",
+    `# B\n\n- B-child <!-- id:${childID} -->\n`
+  );
+
+  await renderDocumentRoute(workspacePath, "docs/a.md");
+  const link = await screen.findByRole("link", { name: "Open B child" });
+  expect(link.getAttribute("data-href")).toBe(`./b.md#${childID}`);
+  await userEvent.click(link);
+
+  await expectTree(`
+B
+  B-child
+  `);
+
+  cleanup();
+});
+
 test("Graph links under the second top-level root resolve and show incoming refs", async () => {
   const { path: workspacePath } = knowstrInit();
   const targetId = "22222222-2222-4222-8222-222222222222";

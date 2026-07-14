@@ -1,4 +1,4 @@
-import { docLinkId, isMarkdownPath } from "./linkPath";
+import { classifyLinkHref } from "./linkPath";
 
 export const plainSpans = (text: string): InlineSpan[] => [
   { kind: "text", text },
@@ -10,23 +10,39 @@ export const nodeText = (node: GraphNode): string =>
 export const spansText = (spans: InlineSpan[]): string =>
   spans.map((span) => span.text).join("");
 
-export const isFileLinkHref = (href: string): boolean =>
-  docLinkId(href) !== undefined || isMarkdownPath(href);
+export const isFileLinkHref = (href: string): boolean => {
+  const targetClass = classifyLinkHref(href);
+  return targetClass === "document" || targetClass === "file";
+};
 
-export const isInternalLinkHref = (href: string): boolean =>
-  href.startsWith("#") || isFileLinkHref(href);
+export const isInternalLinkHref = (href: string): boolean => {
+  const targetClass = classifyLinkHref(href);
+  return (
+    targetClass === "entity" ||
+    targetClass === "node" ||
+    targetClass === "calendar" ||
+    targetClass === "document" ||
+    targetClass === "file"
+  );
+};
 
-export const isWebsiteLinkHref = (href: string): boolean =>
-  /^https?:\/\//u.test(href) || /^feed:https?:\/\//u.test(href);
+export const isWebsiteLinkHref = (href: string): boolean => {
+  const targetClass = classifyLinkHref(href);
+  return targetClass === "website" || targetClass === "feed";
+};
 
 export const getAllLinks = (
   node: GraphNode
 ): { targetID: ID; text: string }[] =>
-  node.spans.flatMap((span) =>
-    span.kind === "link" && span.href.startsWith("#")
+  node.spans.flatMap((span) => {
+    if (span.kind !== "link") return [];
+    const targetClass = classifyLinkHref(span.href);
+    return targetClass === "entity" ||
+      targetClass === "node" ||
+      targetClass === "calendar"
       ? [{ targetID: span.href.slice(1), text: span.text }]
-      : []
-  );
+      : [];
+  });
 
 export const getAllFileLinks = (
   node: GraphNode

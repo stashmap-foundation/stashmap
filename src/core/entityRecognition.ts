@@ -5,21 +5,15 @@
 // on the per-scheme normalization questions the model leaves open.
 
 import { isCalendarEntryId } from "./ical";
+import { isEntityId } from "./linkPath";
 // Real ids look like rgb:cdtFZh2Q-YTY1rYW-… (deedsats wallet config).
 export const RGB_CONTRACT_ID_RE = /^rgb:[A-Za-z0-9_~-]{20,}$/u;
 
 const WIKIDATA_URL_RE =
   /^https?:\/\/(?:www\.)?wikidata\.org\/wiki\/(Q\d+)(?:[#?].*)?$/u;
 
-// Ids of these schemes are canonical entity ids wherever they appear
-// (node ids, link targets).
-export const ENTITY_SCHEME_RE = /^(asset:|wd:|isbn:|doi:)/u;
-
-export const isEntityLinkHref = (href: string): boolean =>
-  href.startsWith("#") && ENTITY_SCHEME_RE.test(href.slice(1));
-
 export function isCanonicalId(id: string): boolean {
-  return ENTITY_SCHEME_RE.test(id) || isCalendarEntryId(id);
+  return isEntityId(id) || isCalendarEntryId(id);
 }
 
 export function entityIdForText(text: string): string | undefined {

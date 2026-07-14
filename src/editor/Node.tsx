@@ -29,14 +29,8 @@ import {
   isEmptyNodeID,
   computeEmptyNodeMetadata,
 } from "../core/connections";
-import { isEntityLinkHref } from "../core/entityRecognition";
-import {
-  isFileLinkHref,
-  isInternalLinkHref,
-  isWebsiteLinkHref,
-  spansText,
-  spansToMarkdown,
-} from "../core/nodeSpans";
+import { isFileLinkHref, spansText, spansToMarkdown } from "../core/nodeSpans";
+import { classifyLinkHref, externalLinkUrl } from "../core/linkPath";
 import {
   calendarEntryTarget,
   calendarFeedUrl,
@@ -48,6 +42,7 @@ import { useCalendarFeeds } from "../CalendarFeedContext";
 import { inlineLinkToHref, resolveDocumentTarget } from "./linkOperations";
 import { IncomingPart, ReferenceDisplay } from "./referenceDisplay";
 import { MiniEditor, ReciprocalLink, preventEditorBlur } from "./AddNode";
+import { linkStyleForHref } from "./editorDom";
 import { useOnToggleExpanded } from "./SelectNodes";
 import { useData } from "../DataContext";
 import {
@@ -421,7 +416,12 @@ function reciprocalTarget(
   href: string
 ): ResolvedNode | undefined {
   const graph = graphLookupFromData(data);
-  if (href.startsWith("#")) {
+  const targetClass = classifyLinkHref(href);
+  if (
+    targetClass === "entity" ||
+    targetClass === "node" ||
+    targetClass === "calendar"
+  ) {
     return getNodeInSource(graph, { sourceId, id: href.slice(1) });
   }
   if (!isFileLinkHref(href)) {
@@ -483,26 +483,23 @@ function InlineLinkSpan({
 }): JSX.Element {
   const data = useData();
   const navigatePane = useNavigatePane();
-  const href = inlineLinkToHref(data, span.href, node, sourceId);
-  const isEntity = isEntityLinkHref(span.href);
+  const externalUrl = externalLinkUrl(span.href);
+  const internalHref = inlineLinkToHref(data, span.href, node, sourceId);
+  const href = externalUrl ?? internalHref;
   const isSearchResult = useRow().virtualType === "search";
   const style: React.CSSProperties = isSearchResult
     ? { fontStyle: "italic", textDecoration: "none" }
-    : {
-        ...(isInternalLinkHref(span.href) && !isEntity
-          ? {
-              textDecorationLine: "underline",
-              textDecorationStyle: "dotted",
-              textDecorationThickness: "1px",
-              textUnderlineOffset: "3px",
-              textDecorationColor: "var(--base01)",
-            }
-          : {}),
-        ...(isWebsiteLinkHref(span.href)
-          ? { textDecoration: "underline" }
-          : {}),
-        ...(isEntity ? { color: "var(--violet)" } : {}),
-      };
+    : linkStyleForHref(span.href);
+  const externalPart =
+    !isSearchResult && externalUrl ? (
+      <sup
+        className="incoming-part external-link-part"
+        data-link-furniture="external"
+        aria-hidden="true"
+      >
+        ↗
+      </sup>
+    ) : null;
   if (!href) {
     return (
       <>
@@ -515,6 +512,7 @@ function InlineLinkSpan({
         >
           {span.text}
         </span>
+        {externalPart}
         {reciprocal && (
           <IncomingPart
             relevance={reciprocal.relevance}
@@ -523,6 +521,25 @@ function InlineLinkSpan({
           />
         )}
         <LinkReachChip span={span} node={node} sourceId={sourceId} />
+      </>
+    );
+  }
+  if (externalUrl) {
+    return (
+      <>
+        <a
+          href={externalUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-link"
+          style={style}
+          data-href={span.href}
+          data-target={span.href}
+          aria-label={`${span.text} (opens externally)`}
+        >
+          {span.text}
+        </a>
+        {externalPart}
       </>
     );
   }
@@ -1015,6 +1032,11 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
 
   const handleActivateLink = (href: string, spans: InlineSpan[]): void => {
     handleSave(spans);
+    const externalUrl = externalLinkUrl(href);
+    if (externalUrl) {
+      window.open(externalUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
     const targetHref = inlineLinkToHref(
       { ...data, calendarFeeds },
       href,

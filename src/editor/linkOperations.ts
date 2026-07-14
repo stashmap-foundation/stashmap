@@ -6,7 +6,7 @@ import {
   graphLookupFromData,
   lookupNode,
 } from "../core/graphLookup";
-import { docLinkId, resolveLinkPath } from "../core/linkPath";
+import { classifyLinkHref, docLinkId, resolveLinkPath } from "../core/linkPath";
 import { buildDocumentRouteUrl, buildNodeRouteUrl } from "../navigationUrl";
 
 export type EditorNavigationTarget = {
@@ -115,16 +115,25 @@ export function inlineTargetToHref(
   );
 }
 
-// Violet means entity: the one use of color in the link language — the row
-// touches the shared world. Links themselves stay unmarked.
 export function inlineLinkToHref(
   data: Data,
   href: string,
   source: GraphNode,
   sourceId: SourceId
 ): string | undefined {
-  if (href.startsWith("#")) {
+  const targetClass = classifyLinkHref(href);
+  if (targetClass === "entity") {
+    const targetID = href.slice(1);
+    return (
+      inlineTargetToHref(data, targetID, sourceId) ??
+      buildNodeRouteUrl(targetID, sourceId)
+    );
+  }
+  if (targetClass === "node" || targetClass === "calendar") {
     return inlineTargetToHref(data, href.slice(1), sourceId);
+  }
+  if (targetClass !== "document" && targetClass !== "file") {
+    return undefined;
   }
   const hashIndex = href.lastIndexOf("#");
   const path = hashIndex < 0 ? href : href.slice(0, hashIndex);

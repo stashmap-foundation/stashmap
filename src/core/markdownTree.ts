@@ -2,8 +2,8 @@ import MarkdownIt from "markdown-it";
 import markdownItFrontMatter from "markdown-it-front-matter";
 // eslint-disable-next-line import/no-unresolved
 import Token from "markdown-it/lib/token";
-import { isWebsiteLinkHref, plainSpans, spansText } from "./nodeSpans";
-import { docLinkId, isMarkdownPath } from "./linkPath";
+import { plainSpans, spansText } from "./nodeSpans";
+import { classifyLinkHref } from "./linkPath";
 import { parseFrontMatter } from "./knowstrFrontmatter";
 import { isSafeMarkdownNodeId } from "./graphLookup";
 
@@ -99,13 +99,7 @@ function childrenToText(children: readonly Token[]): string {
 }
 
 function supportedHref(href: string): boolean {
-  const filePath = href.split("#")[0];
-  return (
-    (href.startsWith("#") && href.length > 1) ||
-    isWebsiteLinkHref(href) ||
-    docLinkId(filePath) !== undefined ||
-    isMarkdownPath(filePath)
-  );
+  return classifyLinkHref(href) !== "unsupported";
 }
 
 function tokenSource(token: Token): string {

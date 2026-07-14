@@ -21,7 +21,10 @@ import {
   write,
 } from "../testFixtures/workspace";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  jest.restoreAllMocks();
+});
 
 function placeCursorAtEnd(element: HTMLElement): void {
   const range = document.createRange();
@@ -110,6 +113,71 @@ test("bare and mixed links use one span-native editor", async () => {
     expect(notes).toContain(
       `Founder of [Cantillon](#${cantillonID}) studied in [Vienna](#${viennaID}) !`
     );
+  });
+});
+
+test("mixed external and entity links keep independent presentation and activation", async () => {
+  const { path: workspacePath } = knowstrInit();
+  const website = "https://example.com/articles/one#details";
+  const feed = "feed:https://example.com/calendar.ics?team=one#events";
+  write(
+    workspacePath,
+    "notes.md",
+    `# Notes\n\n- Visit [Website](${website}) and [Feed](${feed}) near [Barcelona](#wd:Q1492)\n`
+  );
+  await knowstrSave(workspacePath);
+  const open = jest.spyOn(window, "open").mockImplementation(() => null);
+
+  await renderAppTree({ path: workspacePath, search: "Notes" });
+  const editor = await screen.findByRole("textbox", {
+    name: "edit Visit Website and Feed near Barcelona",
+  });
+  const websiteLink = within(editor).getByRole("link", {
+    name: "Website (opens externally)",
+  });
+  const feedLink = within(editor).getByRole("link", {
+    name: "Feed (opens externally)",
+  });
+  const entityLink = within(editor).getByRole("link", { name: "Barcelona" });
+
+  expect(websiteLink.style.textDecoration).toBe("underline");
+  expect(feedLink.style.textDecoration).toBe("underline");
+  expect(entityLink.style.color).toBe("var(--violet)");
+  expect(entityLink.style.textDecoration).toBe("");
+  expect(editor.style.textDecoration).toBe("");
+  expect(within(editor).getAllByText("↗")).toHaveLength(2);
+
+  const copied = jest.fn();
+  const range = document.createRange();
+  range.setStart(textNodeOf(websiteLink), 0);
+  range.setEnd(textNodeOf(feedLink), "Feed".length);
+  const selection = window.getSelection();
+  selection?.removeAllRanges();
+  selection?.addRange(range);
+  fireEvent.copy(editor, { clipboardData: { setData: copied } });
+  expect(copied).toHaveBeenCalledWith(
+    "text/plain",
+    `[Website](${website}) and [Feed](${feed})`
+  );
+
+  await userEvent.click(feedLink);
+  expect(open).toHaveBeenLastCalledWith(
+    "https://example.com/calendar.ics?team=one#events",
+    "_blank",
+    "noopener,noreferrer"
+  );
+
+  placeCursorAtEnd(editor);
+  await userEvent.keyboard("!");
+  await userEvent.click(websiteLink);
+  expect(open).toHaveBeenLastCalledWith(
+    website,
+    "_blank",
+    "noopener,noreferrer"
+  );
+  await waitFor(() => {
+    const notes = fs.readFileSync(path.join(workspacePath, "notes.md"), "utf8");
+    expect(notes).toContain(`[Barcelona](#wd:Q1492) ! <!-- id:`);
   });
 });
 

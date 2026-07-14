@@ -6,6 +6,7 @@ import {
 } from "./core/connections";
 import { getDocumentByIdOrFilePath } from "./core/Document";
 import { AddToParentTarget } from "./planner";
+import { classifyLinkHref } from "./core/linkPath";
 
 function normalizeSearchText(input: string): string {
   return input.toLowerCase().replace(/\n/g, "");
@@ -20,7 +21,13 @@ function searchLink(
 
 export function searchTargetID(node: GraphNode): ID | undefined {
   const span = searchLink(node);
-  return span?.href.startsWith("#") ? span.href.slice(1) : undefined;
+  if (!span) return undefined;
+  const targetClass = classifyLinkHref(span.href);
+  return targetClass === "entity" ||
+    targetClass === "node" ||
+    targetClass === "calendar"
+    ? span.href.slice(1)
+    : undefined;
 }
 
 export function searchInsertTarget(
@@ -30,14 +37,24 @@ export function searchInsertTarget(
 ): AddToParentTarget | undefined {
   const span = searchLink(node);
   if (!span) return undefined;
-  if (span.href.startsWith("#")) {
+  const targetClass = classifyLinkHref(span.href);
+  if (
+    targetClass === "entity" ||
+    targetClass === "node" ||
+    targetClass === "calendar"
+  ) {
     return createRefTarget(span.href.slice(1), span.text);
   }
+  if (targetClass !== "document" && targetClass !== "file") {
+    return undefined;
+  }
+  const hashIndex = span.href.lastIndexOf("#");
+  const path = hashIndex < 0 ? span.href : span.href.slice(0, hashIndex);
   const document = getDocumentByIdOrFilePath(
     data.documents,
     data.documentByFilePath,
     sourceId,
-    span.href
+    path
   );
   return document
     ? createDocumentLinkTarget(

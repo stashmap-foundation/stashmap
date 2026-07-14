@@ -4,6 +4,7 @@ import { isEditableElement } from "./keyboardNavigation";
 import { ParsedLine, parseClipboardText } from "../planner";
 import { spansText } from "../core/nodeSpans";
 import { parseInlineSpans } from "../core/markdownTree";
+import { externalLinkUrl } from "../core/linkPath";
 import { argumentColor, relevanceColor } from "./referenceDisplay";
 import { INCOMING_ARROW, argumentChar, relevanceChar } from "./referenceText";
 import {
@@ -82,6 +83,16 @@ function recoverRewrittenLink(
   return [...before, recovered, ...after];
 }
 
+function createExternalFurniture(): HTMLElement {
+  const furniture = document.createElement("sup");
+  furniture.setAttribute("class", "incoming-part external-link-part");
+  furniture.setAttribute("data-link-furniture", "external");
+  furniture.setAttribute("contenteditable", "false");
+  furniture.setAttribute("aria-hidden", "true");
+  furniture.replaceChildren(document.createTextNode("↗"));
+  return furniture;
+}
+
 function spansEqual(left: InlineSpan[], right: InlineSpan[]): boolean {
   return (
     left.length === right.length &&
@@ -135,11 +146,14 @@ export function MiniEditor({
           return [...children, document.createTextNode(span.text)];
         }
         const mark = createEditableLinkMark(span);
+        const externalFurniture = externalLinkUrl(span.href)
+          ? [createExternalFurniture()]
+          : [];
         const reciprocal = reciprocalLinks.find(
           (candidate) => candidate.spanIndex === index
         );
         if (!reciprocal) {
-          return [...children, mark];
+          return [...children, mark, ...externalFurniture];
         }
         const furniture = document.createElement("sup");
         furniture.setAttribute("class", "incoming-part");
@@ -165,7 +179,7 @@ export function MiniEditor({
           ...relationParts,
           document.createTextNode(INCOMING_ARROW)
         );
-        return [...children, mark, furniture];
+        return [...children, mark, ...externalFurniture, furniture];
       }, noChildren),
       ...continuation
     );

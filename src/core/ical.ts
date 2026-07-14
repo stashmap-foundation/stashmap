@@ -1,6 +1,7 @@
 /* eslint-disable functional/no-let, functional/immutable-data */
 import { icalEntryId } from "./icalId";
 import { spansText } from "./nodeSpans";
+import { classifyLinkHref } from "./linkPath";
 
 // Write-time recognition only: a pasted or typed bare feed URL gets
 // wrapped into the typed feed link. Read paths never sniff URLs.
@@ -32,7 +33,7 @@ export function icalFeedUrlOf(text: string): string | undefined {
 export function calendarFeedUrl(node: GraphNode): string | undefined {
   if (node.spans.length !== 1) return undefined;
   const span = node.spans[0];
-  return span.kind === "link" && span.href.startsWith("feed:")
+  return span.kind === "link" && classifyLinkHref(span.href) === "feed"
     ? span.href.slice("feed:".length)
     : undefined;
 }
@@ -42,9 +43,9 @@ export function calendarEntryTarget(
 ): ID | undefined {
   if (!node || node.spans.length !== 1) return undefined;
   const span = node.spans[0];
-  if (span.kind !== "link" || !span.href.startsWith("#")) return undefined;
-  const target = span.href.slice(1);
-  return isCalendarEntryId(target) ? target : undefined;
+  return span.kind === "link" && classifyLinkHref(span.href) === "calendar"
+    ? span.href.slice(1)
+    : undefined;
 }
 
 export function isCalendarEntryPlacement(

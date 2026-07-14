@@ -1,9 +1,6 @@
-import { isEntityLinkHref } from "../core/entityRecognition";
-import {
-  isInternalLinkHref,
-  isWebsiteLinkHref,
-  spansToMarkdown,
-} from "../core/nodeSpans";
+import type { CSSProperties } from "react";
+import { classifyLinkHref, externalLinkUrl } from "../core/linkPath";
+import { spansToMarkdown } from "../core/nodeSpans";
 
 function appendSpan(spans: InlineSpan[], span: InlineSpan): InlineSpan[] {
   if (span.text === "") return spans;
@@ -102,6 +99,34 @@ export function selectionMarkdown(editor: HTMLElement): string | null {
   return spansToMarkdown(spansFromDomNode(range.cloneContents(), null));
 }
 
+export function linkStyleForHref(href: string): CSSProperties {
+  const targetClass = classifyLinkHref(href);
+  if (targetClass === "entity") return { color: "var(--violet)" };
+  if (targetClass === "website" || targetClass === "feed") {
+    return { textDecoration: "underline" };
+  }
+  if (targetClass === "unsupported") return {};
+  return {
+    textDecorationLine: "underline",
+    textDecorationStyle: "dotted",
+    textDecorationThickness: "1px",
+    textUnderlineOffset: "3px",
+    textDecorationColor: "var(--base01)",
+  };
+}
+
+function styleAttribute(style: CSSProperties): string {
+  return Object.entries(style)
+    .map(
+      ([property, value]) =>
+        `${property.replace(
+          /[A-Z]/gu,
+          (letter) => `-${letter.toLowerCase()}`
+        )}: ${String(value)}`
+    )
+    .join("; ");
+}
+
 export function createEditableLinkMark(
   span: Extract<InlineSpan, { kind: "link" }>
 ): HTMLSpanElement {
@@ -110,16 +135,10 @@ export function createEditableLinkMark(
   mark.setAttribute("class", "inline-link");
   mark.setAttribute("data-href", span.href);
   mark.setAttribute("data-target", span.href);
-  const isEntity = isEntityLinkHref(span.href);
-  const style = [
-    isEntity ? "color: var(--violet)" : "",
-    isInternalLinkHref(span.href) && !isEntity
-      ? "text-decoration-line: underline; text-decoration-style: dotted; text-decoration-thickness: 1px; text-underline-offset: 3px; text-decoration-color: var(--base01)"
-      : "",
-    isWebsiteLinkHref(span.href) ? "text-decoration: underline" : "",
-  ]
-    .filter(Boolean)
-    .join("; ");
+  if (externalLinkUrl(span.href)) {
+    mark.setAttribute("aria-label", `${span.text} (opens externally)`);
+  }
+  const style = styleAttribute(linkStyleForHref(span.href));
   if (style) mark.setAttribute("style", style);
   mark.replaceChildren(document.createTextNode(span.text));
   return mark;

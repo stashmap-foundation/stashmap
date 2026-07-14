@@ -1,6 +1,6 @@
 import { Map as ImmutableMap } from "immutable";
 import { LOCAL } from "../core/nodeRef";
-import { ENTITY_SCHEME_RE } from "../core/entityRecognition";
+import { classifyLinkHref, ENTITY_SCHEME_RE } from "../core/linkPath";
 import { getAllLinks } from "../core/nodeSpans";
 import { Document, getDocumentForNode } from "../core/Document";
 import { getNode } from "../core/connections";
@@ -52,19 +52,30 @@ export function unpublishedLinkTargetForHref(
   if (!paneDocument || !publishStateOf(paneDocument.frontMatter)) {
     return undefined;
   }
-  const target = href.startsWith("#")
-    ? (() => {
-        const targetNode = getNode(knowledgeDBs, href.slice(1), sourceId);
-        return targetNode
-          ? getDocumentForNode(knowledgeDBs, documents, targetNode, sourceId)
-          : undefined;
-      })()
-    : resolveDocumentTarget(
-        { knowledgeDBs, documents, documentByFilePath },
-        source,
-        sourceId,
-        href
-      );
+  const targetClass = classifyLinkHref(href);
+  const target = (() => {
+    if (
+      targetClass === "entity" ||
+      targetClass === "node" ||
+      targetClass === "calendar"
+    ) {
+      const targetNode = getNode(knowledgeDBs, href.slice(1), sourceId);
+      return targetNode
+        ? getDocumentForNode(knowledgeDBs, documents, targetNode, sourceId)
+        : undefined;
+    }
+    if (targetClass !== "document" && targetClass !== "file") {
+      return undefined;
+    }
+    const hashIndex = href.lastIndexOf("#");
+    const path = hashIndex < 0 ? href : href.slice(0, hashIndex);
+    return resolveDocumentTarget(
+      { knowledgeDBs, documents, documentByFilePath },
+      source,
+      sourceId,
+      path
+    );
+  })();
   if (!target || target.docId === paneDocument.docId) {
     return undefined;
   }

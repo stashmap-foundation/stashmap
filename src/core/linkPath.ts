@@ -1,3 +1,13 @@
+export const ENTITY_SCHEME_RE = /^(asset:|wd:|isbn:|doi:)/u;
+
+export function isEntityId(id: string): boolean {
+  return ENTITY_SCHEME_RE.test(id);
+}
+
+export function isEntityLinkHref(href: string): boolean {
+  return href.startsWith("#") && isEntityId(href.slice(1));
+}
+
 export function isMarkdownPath(href: string): boolean {
   if (href.startsWith("#")) return false;
   if (/^[a-z][a-z0-9+.-]*:/i.test(href)) return false;
@@ -8,6 +18,25 @@ export function isMarkdownPath(href: string): boolean {
 // is opaque; readers dispatch on the scheme, never on id shape.
 export function docLinkId(href: string): string | undefined {
   return href.startsWith("doc:") ? href.slice("doc:".length) : undefined;
+}
+
+export function classifyLinkHref(href: string) {
+  if (isEntityLinkHref(href)) return "entity";
+  if (href.startsWith("#ical:")) return "calendar";
+  if (href.startsWith("#") && href.length > 1) return "node";
+  if (/^feed:https?:\/\//u.test(href)) return "feed";
+  if (/^https?:\/\//u.test(href)) return "website";
+  const fragmentIndex = href.indexOf("#");
+  const path = fragmentIndex < 0 ? href : href.slice(0, fragmentIndex);
+  if (docLinkId(path)) return "document";
+  if (isMarkdownPath(path)) return "file";
+  return "unsupported";
+}
+
+export function externalLinkUrl(href: string): string | undefined {
+  const targetClass = classifyLinkHref(href);
+  if (targetClass === "website") return href;
+  return targetClass === "feed" ? href.slice("feed:".length) : undefined;
 }
 
 export function documentLinkHref(

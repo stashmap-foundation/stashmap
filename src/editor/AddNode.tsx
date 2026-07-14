@@ -196,7 +196,7 @@ export function MiniEditor({
         const markStyle = [
           isEntity ? "color: var(--violet)" : "",
           isInternalLinkHref(span.href) && !isEntity
-            ? "font-style: italic"
+            ? "text-decoration-line: underline; text-decoration-style: dotted; text-decoration-thickness: 1px; text-underline-offset: 3px; text-decoration-color: var(--base01)"
             : "",
           isWebsiteLinkHref(span.href) ? "text-decoration: underline" : "",
         ]

@@ -486,13 +486,24 @@ function InlineLinkSpan({
   const navigatePane = useNavigatePane();
   const href = inlineLinkToHref(data, span.href, node, sourceId);
   const isEntity = isEntityLinkHref(span.href);
-  const style = {
-    ...(isInternalLinkHref(span.href) && !isEntity
-      ? { fontStyle: "italic" }
-      : {}),
-    ...(isWebsiteLinkHref(span.href) ? { textDecoration: "underline" } : {}),
-    ...(isEntity ? { color: "var(--violet)" } : {}),
-  };
+  const isSearchResult = useRow().virtualType === "search";
+  const style: React.CSSProperties = isSearchResult
+    ? { fontStyle: "italic", textDecoration: "none" }
+    : {
+        ...(isInternalLinkHref(span.href) && !isEntity
+          ? {
+              textDecorationLine: "underline",
+              textDecorationStyle: "dotted",
+              textDecorationThickness: "1px",
+              textUnderlineOffset: "3px",
+              textDecorationColor: "var(--base01)",
+            }
+          : {}),
+        ...(isWebsiteLinkHref(span.href)
+          ? { textDecoration: "underline" }
+          : {}),
+        ...(isEntity ? { color: "var(--violet)" } : {}),
+      };
   if (!href) {
     return (
       <>
@@ -619,7 +630,10 @@ function NodeContent(): JSX.Element {
 
   if (row.virtualType === "search" && hasInlineLinks(row.node)) {
     return (
-      <span data-testid="reference-row">
+      <span
+        data-testid="reference-row"
+        style={{ fontStyle: "italic", textDecoration: "none" }}
+      >
         <InlineSpans node={row.node} sourceId={row.sourceId} />
       </span>
     );

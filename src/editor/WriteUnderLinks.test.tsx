@@ -577,6 +577,12 @@ test("bare links expose an editable target-preserving mark", async () => {
   const mark = within(editor).getByRole("link");
   expect(mark.textContent).toBe("Cantillon");
   expect(mark.getAttribute("data-href")).toMatch(/^#/u);
+  expect(mark.style.fontStyle).toBe("");
+  expect(mark.style.textDecorationLine).toBe("underline");
+  expect(mark.style.textDecorationStyle).toBe("dotted");
+  expect(mark.style.textDecorationThickness).toBe("1px");
+  expect(mark.style.textUnderlineOffset).toBe("3px");
+  expect(mark.style.textDecorationColor).toBe("var(--base01)");
   editor.focus();
   placeCursorAtEnd(mark);
   await userEvent.keyboard("!{Escape}");

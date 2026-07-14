@@ -673,8 +673,11 @@ body {
   cursor: pointer;
   text-align: inherit;
 
-  &:hover .reference-row {
-    text-decoration: underline;
+  &:hover,
+  &:focus,
+  &:active,
+  &:visited {
+    text-decoration: none;
   }
 }
 

@@ -39,6 +39,9 @@ Search: Apple
   [R] Notes / Apple pie recipe
   [R] Notes / Apple cider
     `);
+    const [result] = screen.getAllByTestId("reference-row");
+    expect(window.getComputedStyle(result).fontStyle).toBe("italic");
+    expect(window.getComputedStyle(result).textDecoration).toBe("none");
 
     cleanup();
     renderApp(alice());

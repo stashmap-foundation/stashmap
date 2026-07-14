@@ -1219,7 +1219,7 @@ test("Dragging a document search result creates a document link", async () => {
   cleanup();
 });
 
-test("Document file links are italic and incoming refs render at document level", async () => {
+test("Document file links are dotted-underlined and incoming refs render at document level", async () => {
   const { path: workspacePath } = knowstrInit();
   write(
     workspacePath,
@@ -1240,7 +1240,12 @@ Links
   const holidaysEditor = await screen.findByRole("textbox", {
     name: "edit Holidays",
   });
-  expect(window.getComputedStyle(holidaysLink).fontStyle).toBe("italic");
+  expect(window.getComputedStyle(holidaysLink).fontStyle).toBe("");
+  expect(holidaysLink.style.textDecorationLine).toBe("underline");
+  expect(holidaysLink.style.textDecorationStyle).toBe("dotted");
+  expect(holidaysLink.style.textDecorationThickness).toBe("1px");
+  expect(holidaysLink.style.textUnderlineOffset).toBe("3px");
+  expect(holidaysLink.style.textDecorationColor).toBe("var(--base01)");
   expect(window.getComputedStyle(holidaysEditor).fontStyle).toBe("");
 
   await userEvent.click(holidaysLink);

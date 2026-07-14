@@ -695,13 +695,13 @@ test("parseMarkdownHierarchy preserves file paths with anchors", () => {
   ]);
 });
 
-test("parseMarkdownHierarchy ignores http(s) links (no fileLink span)", () => {
+test("parseMarkdownHierarchy preserves website links", () => {
   const trees = parseTree("# Root\n- [Web](https://example.com)\n");
   expect(trees).toEqual([
     expect.objectContaining({
       children: [
         expect.objectContaining({
-          spans: plainSpans("[Web](https://example.com)"),
+          spans: [{ kind: "link", href: "https://example.com", text: "Web" }],
         }),
       ],
     }),

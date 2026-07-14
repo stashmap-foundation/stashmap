@@ -7,7 +7,11 @@ import {
   planUpdatePanes,
   planUpsertNodes,
 } from "../planner";
-import { MarkdownTreeNode, parseMarkdown } from "../core/markdownTree";
+import {
+  MarkdownTreeNode,
+  parseInlineSpans,
+  parseMarkdown,
+} from "../core/markdownTree";
 import { planInsertMarkdownTrees } from "../markdownPlan";
 import { linkSpan, nodeText, plainSpans, spansText } from "../core/nodeSpans";
 import { icalFeedLinkText, isBareIcalFeedUrl } from "../core/ical";
@@ -36,7 +40,7 @@ export function parsedLinesToTrees(children: ParsedLine[]): MarkdownTreeNode[] {
   children.forEach((item) => {
     const depth = item.depth - minDepth;
     const node: MarkdownTreeNode = {
-      spans: plainSpans(item.text),
+      spans: parseInlineSpans(item.text),
       children: [],
     };
     stack.length = Math.min(depth, stack.length);

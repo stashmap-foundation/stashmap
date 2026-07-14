@@ -1,12 +1,17 @@
 import { LOCAL } from "./core/nodeRef";
 import { documentEntityTags } from "./editor/publishReach";
-import { getAllLinks } from "./core/nodeSpans";
+import { getAllLinks, plainSpans } from "./core/nodeSpans";
+import { EMPTY_NODE_ID } from "./core/connections";
+import { parseInlineSpans } from "./core/markdownTree";
+import { renderDocumentMarkdown } from "./documentRenderer";
+import { newGraphNode } from "./rowModel";
 import {
   createPlan,
   buildDocumentEvents,
   Plan,
   planCreateNoteAtRoot,
   planAddToParent,
+  planSaveNodeAndEnsureNodes,
 } from "./planner";
 import { planCreateNodesFromMarkdown } from "./markdownPlan";
 import {
@@ -141,13 +146,42 @@ test("entity recognizers: rgb markers and wikidata urls", () => {
   expect(entityIdForText("rgb:short")).toBeUndefined();
 });
 
+test("clipboard Markdown survives empty-row materialization and document rendering", () => {
+  const { plan, docId, rootId } = planWithEssay();
+  const root = plan.knowledgeDBs.get(LOCAL)?.nodes.get(rootId);
+  if (!root) throw new Error("Missing root");
+  const emptyNode = {
+    ...newGraphNode(plainSpans(""), { root: rootId, parent: rootId }),
+    id: EMPTY_NODE_ID,
+  };
+  const markdown = `[A fork of Hello](#e834645e-8bb5-44f7-89b2-41d5054746af)`;
+  const result = planSaveNodeAndEnsureNodes(
+    plan,
+    parseInlineSpans(markdown),
+    EMPTY_NODE_ID,
+    emptyNode,
+    [0, rootId, EMPTY_NODE_ID],
+    root,
+    [0, rootId],
+    0
+  );
+  const document = result.plan.documents.find(
+    (candidate) => candidate.docId === docId
+  );
+  if (!document) throw new Error("Missing document");
+
+  expect(renderDocumentMarkdown(result.plan.knowledgeDBs, document)).toContain(
+    `- ${markdown}`
+  );
+});
+
 test("marker as new document root mints the entity node, idempotently", () => {
   const { plan } = planWithEssay();
-  const first = planCreateNoteAtRoot(plan, CONTRACT_ID, 0);
+  const first = planCreateNoteAtRoot(plan, plainSpans(CONTRACT_ID), 0);
   expect(first.node.id).toBe(`asset:${CONTRACT_ID}`);
   const countAfterFirst = first.plan.knowledgeDBs.get(LOCAL)?.nodes.size;
 
-  const second = planCreateNoteAtRoot(first.plan, CONTRACT_ID, 0);
+  const second = planCreateNoteAtRoot(first.plan, plainSpans(CONTRACT_ID), 0);
   expect(second.node.id).toBe(`asset:${CONTRACT_ID}`);
   expect(second.plan.knowledgeDBs.get(LOCAL)?.nodes.size).toBe(countAfterFirst);
   expect(second.plan.panes[0].rootNodeId).toBe(`asset:${CONTRACT_ID}`);

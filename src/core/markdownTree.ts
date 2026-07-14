@@ -2,7 +2,7 @@ import MarkdownIt from "markdown-it";
 import markdownItFrontMatter from "markdown-it-front-matter";
 // eslint-disable-next-line import/no-unresolved
 import Token from "markdown-it/lib/token";
-import { plainSpans, spansText } from "./nodeSpans";
+import { isWebsiteLinkHref, plainSpans, spansText } from "./nodeSpans";
 import { docLinkId, isMarkdownPath } from "./linkPath";
 import { parseFrontMatter } from "./knowstrFrontmatter";
 import { isSafeMarkdownNodeId } from "./graphLookup";
@@ -102,8 +102,7 @@ function supportedHref(href: string): boolean {
   const filePath = href.split("#")[0];
   return (
     (href.startsWith("#") && href.length > 1) ||
-    href.startsWith("feed:https://") ||
-    href.startsWith("feed:http://") ||
+    isWebsiteLinkHref(href) ||
     docLinkId(filePath) !== undefined ||
     isMarkdownPath(filePath)
   );
@@ -166,6 +165,14 @@ function extractSpans(children: readonly Token[]): InlineSpan[] {
     return extractFrom(closeIndex + 1, appendSpan(spans, span));
   };
   return extractFrom(0, []);
+}
+
+export function parseInlineSpans(text: string): InlineSpan[] {
+  const inline = markdown
+    .parseInline(text, {})
+    .find((token) => token.type === "inline");
+  if (!inline?.children) return plainSpans(text);
+  return extractSpans(inline.children);
 }
 
 function extractPrefixMarkers(text: string): {

@@ -2,14 +2,17 @@ import React, { useEffect, useLayoutEffect } from "react";
 import { useEditorText } from "./EditorTextContext";
 import { isEditableElement } from "./keyboardNavigation";
 import { ParsedLine, parseClipboardText } from "../planner";
-import { isEntityLinkHref } from "../core/entityRecognition";
-import {
-  isInternalLinkHref,
-  isWebsiteLinkHref,
-  spansText,
-} from "../core/nodeSpans";
+import { spansText } from "../core/nodeSpans";
+import { parseInlineSpans } from "../core/markdownTree";
 import { argumentColor, relevanceColor } from "./referenceDisplay";
 import { INCOMING_ARROW, argumentChar, relevanceChar } from "./referenceText";
+import {
+  createEditableLinkMark,
+  deleteSelection,
+  replaceSelectionWithSpans,
+  selectionMarkdown,
+  spansFromEditor,
+} from "./editorDom";
 
 export function preventEditorBlur(e: React.MouseEvent): void {
   if (isEditableElement(document.activeElement)) {
@@ -46,62 +49,6 @@ type MiniEditorProps = {
   ) => void;
   onActivateLink?: (href: string, spans: InlineSpan[]) => void;
 };
-
-function appendSpan(spans: InlineSpan[], span: InlineSpan): InlineSpan[] {
-  if (span.text === "") return spans;
-  const previous = spans[spans.length - 1];
-  if (previous?.kind === "text" && span.kind === "text") {
-    return [
-      ...spans.slice(0, -1),
-      { kind: "text", text: previous.text + span.text },
-    ];
-  }
-  return [...spans, span];
-}
-
-function domText(node: ChildNode): string {
-  return (node.textContent ?? "").replace(/\u00a0/gu, " ");
-}
-
-function spansFromDomNode(node: ChildNode): InlineSpan[] {
-  if (node.nodeType === Node.TEXT_NODE) {
-    const text = domText(node);
-    return text === "" ? [] : [{ kind: "text", text }];
-  }
-  if (!(node instanceof HTMLElement)) return [];
-  if (node.hasAttribute("data-link-furniture")) return [];
-  const href = node.getAttribute("data-href");
-  if (href !== null) {
-    const text = domText(node);
-    return text === "" ? [] : [{ kind: "link", href, text }];
-  }
-  return Array.from(node.childNodes).reduce(
-    (spans, child) => spansFromDomNode(child).reduce(appendSpan, spans),
-    [] as InlineSpan[]
-  );
-}
-
-function trimSpans(spans: InlineSpan[]): InlineSpan[] {
-  if (spans.length === 0) return spans;
-  const trimText = (text: string, index: number): string => {
-    const withoutLeading = index === 0 ? text.trimStart() : text;
-    return index === spans.length - 1
-      ? withoutLeading.trimEnd()
-      : withoutLeading;
-  };
-  return spans
-    .map((span, index) => ({ ...span, text: trimText(span.text, index) }))
-    .filter((span) => span.text !== "");
-}
-
-function spansFromEditor(editor: HTMLElement | null): InlineSpan[] {
-  return trimSpans(
-    Array.from(editor?.childNodes ?? []).reduce(
-      (spans, child) => spansFromDomNode(child).reduce(appendSpan, spans),
-      [] as InlineSpan[]
-    )
-  );
-}
 
 function recoverRewrittenLink(
   initialSpans: InlineSpan[],
@@ -187,23 +134,7 @@ export function MiniEditor({
         if (span.kind === "text") {
           return [...children, document.createTextNode(span.text)];
         }
-        const mark = document.createElement("span");
-        mark.setAttribute("role", "link");
-        mark.setAttribute("class", "inline-link");
-        mark.setAttribute("data-href", span.href);
-        mark.setAttribute("data-target", span.href);
-        const isEntity = isEntityLinkHref(span.href);
-        const markStyle = [
-          isEntity ? "color: var(--violet)" : "",
-          isInternalLinkHref(span.href) && !isEntity
-            ? "text-decoration-line: underline; text-decoration-style: dotted; text-decoration-thickness: 1px; text-underline-offset: 3px; text-decoration-color: var(--base01)"
-            : "",
-          isWebsiteLinkHref(span.href) ? "text-decoration: underline" : "",
-        ]
-          .filter(Boolean)
-          .join("; ");
-        if (markStyle) mark.setAttribute("style", markStyle);
-        mark.replaceChildren(document.createTextNode(span.text));
+        const mark = createEditableLinkMark(span);
         const reciprocal = reciprocalLinks.find(
           (candidate) => candidate.spanIndex === index
         );
@@ -269,7 +200,10 @@ export function MiniEditor({
     onSave(spans);
   };
 
-  const handleInput = (): void => {
+  const handleInput = (e: React.FormEvent<HTMLSpanElement>): void => {
+    const inputType =
+      e.nativeEvent instanceof InputEvent ? e.nativeEvent.inputType : "";
+    if (inputType === "historyUndo" || inputType === "historyRedo") return;
     editorTextContext?.setSpans(getSpans());
   };
 
@@ -358,16 +292,37 @@ export function MiniEditor({
     saveIfChanged();
   };
 
+  const handleCopy = (e: React.ClipboardEvent): void => {
+    if (!editorRef.current) return;
+    const markdown = selectionMarkdown(editorRef.current);
+    if (markdown === null) return;
+    e.preventDefault();
+    e.clipboardData.setData("text/plain", markdown);
+  };
+
+  const handleCut = (e: React.ClipboardEvent): void => {
+    if (!editorRef.current) return;
+    const markdown = selectionMarkdown(editorRef.current);
+    if (markdown === null) return;
+    e.preventDefault();
+    e.clipboardData.setData("text/plain", markdown);
+    deleteSelection(editorRef.current);
+  };
+
   const handlePaste = (e: React.ClipboardEvent): void => {
+    if (!editorRef.current) return;
     e.preventDefault();
     const text = e.clipboardData.getData("text/plain");
     const children = parseClipboardText(text);
     if (children.length <= 1 || !onPasteMultiLine) {
-      document.execCommand("insertText", false, text);
+      replaceSelectionWithSpans(editorRef.current, parseInlineSpans(text));
       return;
     }
-    document.execCommand("insertText", false, children[0].text);
-    onPasteMultiLine(children.slice(1), getSpans());
+    const inserted = replaceSelectionWithSpans(
+      editorRef.current,
+      parseInlineSpans(children[0].text)
+    );
+    if (inserted) onPasteMultiLine(children.slice(1), getSpans());
   };
 
   const moveCursorToEnd = (): void => {
@@ -417,6 +372,8 @@ export function MiniEditor({
         suppressContentEditableWarning
         onKeyDown={handleKeyDown}
         onBlur={handleBlur}
+        onCopy={handleCopy}
+        onCut={handleCut}
         onPaste={handlePaste}
         onInput={handleInput}
         onClick={handleEditorClick}

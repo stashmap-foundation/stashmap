@@ -49,6 +49,14 @@ function placeCursorAfter(element: HTMLElement): void {
   selection?.addRange(range);
 }
 
+function textNodeOf(element: HTMLElement): Text {
+  const text = document
+    .createTreeWalker(element, NodeFilter.SHOW_TEXT)
+    .nextNode();
+  if (!(text instanceof Text)) throw new Error("Expected text node");
+  return text;
+}
+
 async function linkWorkspace(): Promise<{ workspacePath: string }> {
   const { path: workspacePath } = knowstrInit();
   write(workspacePath, "topics.md", "# Topics\n\n- Cantillon\n");
@@ -103,6 +111,47 @@ test("bare and mixed links use one span-native editor", async () => {
       `Founder of [Cantillon](#${cantillonID}) studied in [Vienna](#${viennaID}) !`
     );
   });
+});
+
+test("copy serializes complete, partial, and cross-boundary links", async () => {
+  const { workspacePath, cantillonID, viennaID } =
+    await multipleLinkWorkspace();
+  await renderAppTree({ path: workspacePath, search: "Notes" });
+  const editor = await screen.findByRole("textbox", {
+    name: "edit Founder of Cantillon studied in Vienna",
+  });
+  const [cantillon, vienna] = within(editor).getAllByRole("link");
+  const setData = jest.fn();
+
+  selectContents(cantillon);
+  fireEvent.copy(editor, { clipboardData: { setData } });
+  expect(setData).toHaveBeenLastCalledWith(
+    "text/plain",
+    `[Cantillon](#${cantillonID})`
+  );
+
+  const partial = document.createRange();
+  partial.setStart(textNodeOf(cantillon), 1);
+  partial.setEnd(textNodeOf(cantillon), 4);
+  const selection = window.getSelection();
+  selection?.removeAllRanges();
+  selection?.addRange(partial);
+  fireEvent.copy(editor, { clipboardData: { setData } });
+  expect(setData).toHaveBeenLastCalledWith(
+    "text/plain",
+    `[ant](#${cantillonID})`
+  );
+
+  const crossing = document.createRange();
+  crossing.setStart(textNodeOf(cantillon), 3);
+  crossing.setEnd(textNodeOf(vienna), 3);
+  selection?.removeAllRanges();
+  selection?.addRange(crossing);
+  fireEvent.copy(editor, { clipboardData: { setData } });
+  expect(setData).toHaveBeenLastCalledWith(
+    "text/plain",
+    `[tillon](#${cantillonID}) studied in [Vie](#${viennaID})`
+  );
 });
 
 test("each link in a mixed row contributes its own backlink", async () => {

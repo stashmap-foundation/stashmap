@@ -64,8 +64,7 @@ import {
   planExpandNode,
   planUpdateViews,
   planRemoveEmptyNodePosition,
-  planCreateNode,
-  planAddToParent,
+  planAddSpansToParent,
   planSetRowFocusIntent,
   ParsedLine,
 } from "../planner";
@@ -849,12 +848,15 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       );
 
       if (trimmedText) {
-        const [planWithNode, newNode] = planCreateNode(
-          planWithExpand,
-          trimmedText
-        );
         executePlan(
-          planAddToParent(planWithNode, newNode, takenPrevSibling.id)[0]
+          planAddSpansToParent(
+            planWithExpand,
+            persistedSpans(spans),
+            takenPrevSibling,
+            undefined,
+            undefined,
+            undefined
+          )
         );
       } else {
         executePlan(
@@ -909,17 +911,15 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
         return;
       }
 
-      const [planWithNode, newNode] = planCreateNode(
-        planWithoutEmpty,
-        trimmedText
-      );
       executePlan(
-        planAddToParent(
-          planWithNode,
-          newNode,
-          parentRow.parentNode.id,
-          parentNodeIndex + 1
-        )[0]
+        planAddSpansToParent(
+          planWithoutEmpty,
+          persistedSpans(spans),
+          parentRow.parentNode,
+          parentNodeIndex + 1,
+          undefined,
+          undefined
+        )
       );
       return;
     }

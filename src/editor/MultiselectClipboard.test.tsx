@@ -302,6 +302,45 @@ Root
     `);
   });
 
+  test("Cmd+V preserves Markdown links on every pasted row", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}Target{Escape}");
+    const targetRow = await screen.findByRole("treeitem", { name: "Target" });
+    const targetID = targetRow.getAttribute("data-node-id");
+    if (!targetID) throw new Error("Expected target ID");
+    await clickRow("Root");
+    mockReadText.mockResolvedValueOnce(
+      `[Alias](#${targetID})\n[Second alias](#${targetID})`
+    );
+    await userEvent.keyboard("{Meta>}v{/Meta}");
+
+    const links = await Promise.all([
+      screen.findByRole("link", { name: "Alias" }),
+      screen.findByRole("link", { name: "Second alias" }),
+    ]);
+    expect(links.map((link) => link.getAttribute("data-target"))).toEqual([
+      `#${targetID}`,
+      `#${targetID}`,
+    ]);
+  });
+
+  test("Cmd+V keeps unsupported Markdown literal", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Escape}");
+    await clickRow("Root");
+    mockReadText.mockResolvedValueOnce("[Image](./image.png) and **bold**");
+    await userEvent.keyboard("{Meta>}v{/Meta}");
+
+    await screen.findByRole("treeitem", {
+      name: "[Image](./image.png) and **bold**",
+    });
+    expect(screen.queryByRole("link", { name: "Image" })).toBeNull();
+  });
+
   test("Cmd+V does nothing with empty clipboard", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());

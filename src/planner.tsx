@@ -315,6 +315,41 @@ export function planAddToParent(
   return [planUpdateViews(updatedNodesPlan, updatedViews), actualItemIDs];
 }
 
+export function planAddSpansToParent(
+  plan: Plan,
+  spans: InlineSpan[],
+  parentNode: GraphNode,
+  insertAtIndex: number | undefined,
+  relevance: Relevance,
+  argument: Argument
+): Plan {
+  if (spans.every((span) => span.kind === "text")) {
+    const [planWithNode, node] = planCreateNode(plan, spansText(spans));
+    return planAddToParent(
+      planWithNode,
+      node,
+      parentNode.id,
+      insertAtIndex,
+      relevance,
+      argument
+    )[0];
+  }
+  const node = newGraphNode(spans, {
+    root: parentNode.root,
+    parent: parentNode.id,
+    relevance,
+    argument,
+  });
+  return planAddToParent(
+    planUpsertNodes(plan, node),
+    node.id,
+    parentNode.id,
+    insertAtIndex,
+    relevance,
+    argument
+  )[0];
+}
+
 type NodesIdMapping = Map<ID, ID>;
 
 function updateViewsWithNodesMapping(
@@ -481,13 +516,16 @@ type SaveNodeResult = {
 
 export function planCreateNoteAtRoot(
   plan: Plan,
-  text: string,
+  spans: InlineSpan[],
   paneIndex: number
 ): SaveNodeResult {
+  const text = spansText(spans);
   // Mint or link, root case: recognized entity text as a new document's
   // root mints the entity node — idempotently. If the entity already has
   // a home, nothing is created: the pane opens the existing document.
-  const entityId = entityIdForText(text);
+  const entityId = spans.every((span) => span.kind === "text")
+    ? entityIdForText(text)
+    : undefined;
   const existingHome = entityId
     ? getWorkspaceNode(plan.knowledgeDBs, entityId as ID)
     : undefined;
@@ -512,14 +550,10 @@ export function planCreateNoteAtRoot(
     };
   }
 
-  const [planWithSeed, createdSeed] = planCreateNode(plan, text);
   const createdNode = withDocumentRoot(
-    newGraphNode(
-      plainSpans(createdSeed.text),
-      entityId ? { uuid: entityId } : {}
-    )
+    newGraphNode(spans, entityId ? { uuid: entityId } : {})
   );
-  const planWithNode = planUpsertNodes(planWithSeed, createdNode);
+  const planWithNode = planUpsertNodes(plan, createdNode);
 
   const newPanes = planWithNode.panes.map((p, i) =>
     i === paneIndex
@@ -563,7 +597,7 @@ export function planSaveNodeAndEnsureNodes(
   if (isEmptyNodeID(nodeID)) {
     if (!parentViewPath) {
       if (!trimmedText) return { plan, viewPath, node: currentNode };
-      return planCreateNoteAtRoot(plan, trimmedText, paneIndex);
+      return planCreateNoteAtRoot(plan, spans, paneIndex);
     }
 
     if (!trimmedText) {
@@ -572,8 +606,6 @@ export function planSaveNodeAndEnsureNodes(
         : plan;
       return { plan: resultPlan, viewPath, node: currentNode };
     }
-
-    const [planWithNode, createdNode] = planCreateNode(plan, trimmedText);
 
     const emptyNodeMetadata = computeEmptyNodeMetadata(
       plan.publishEventsStatus.temporaryEvents
@@ -584,19 +616,19 @@ export function planSaveNodeAndEnsureNodes(
     const emptyNodeIndex = metadata?.index ?? 0;
 
     const planWithoutEmpty = parentNode
-      ? planRemoveEmptyNodePosition(planWithNode, parentNode.id)
-      : planWithNode;
+      ? planRemoveEmptyNodePosition(plan, parentNode.id)
+      : plan;
 
-    const [resultPlan] = parentNode
-      ? planAddToParent(
+    const resultPlan = parentNode
+      ? planAddSpansToParent(
           planWithoutEmpty,
-          createdNode,
-          parentNode.id,
+          spans,
+          parentNode,
           emptyNodeIndex,
           relevance ?? metadata?.nodeItem.relevance,
           argument ?? metadata?.nodeItem.argument
         )
-      : [planWithoutEmpty, []];
+      : planWithoutEmpty;
     return { plan: resultPlan, viewPath, node: currentNode };
   }
 

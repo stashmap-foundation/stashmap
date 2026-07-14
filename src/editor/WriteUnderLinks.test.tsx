@@ -100,7 +100,7 @@ test("bare and mixed links use one span-native editor", async () => {
   await waitFor(() => {
     const notes = fs.readFileSync(path.join(workspacePath, "notes.md"), "utf8");
     expect(notes).toContain(
-      `Founder of [Cantillon](#${cantillonID}) studied in [Vienna](#${viennaID})!`
+      `Founder of [Cantillon](#${cantillonID}) studied in [Vienna](#${viennaID}) !`
     );
   });
 });
@@ -531,6 +531,40 @@ test("a link label left empty loses its target", async () => {
       "utf8"
     );
     expect(markdown).not.toContain(`#${targetID}`);
+  });
+});
+
+test("terminal links provide a plain continuation slot", async () => {
+  const { workspacePath } = await linkWorkspace();
+  await renderAppTree({ path: workspacePath, search: "Notes" });
+  const editor = await screen.findByRole("textbox", {
+    name: "edit Cantillon",
+  });
+  expect(editor.textContent).toBe("Cantillon\u00a0");
+  editor.focus();
+  placeCursorAtEnd(editor);
+  await userEvent.keyboard("notes{Escape}");
+
+  await waitFor(() => {
+    const notes = fs.readFileSync(path.join(workspacePath, "notes.md"), "utf8");
+    expect(notes).toMatch(/\[Cantillon\]\(#[^)]+\) notes/u);
+  });
+});
+
+test("an untouched continuation slot never reaches Markdown", async () => {
+  const { workspacePath } = await linkWorkspace();
+  const before = fs.readFileSync(path.join(workspacePath, "notes.md"), "utf8");
+  await renderAppTree({ path: workspacePath, search: "Notes" });
+  const editor = await screen.findByRole("textbox", {
+    name: "edit Cantillon",
+  });
+  editor.focus();
+  await userEvent.keyboard("{Escape}");
+
+  await waitFor(() => {
+    expect(fs.readFileSync(path.join(workspacePath, "notes.md"), "utf8")).toBe(
+      before
+    );
   });
 });
 

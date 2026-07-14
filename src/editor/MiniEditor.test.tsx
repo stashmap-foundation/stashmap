@@ -199,7 +199,7 @@ describe("MiniEditor", () => {
       />
     );
     const editor = screen.getByRole("textbox");
-    expect(editor.textContent).toBe("Target!+↩");
+    expect(editor.textContent).toBe("Target!+↩\u00a0");
     const mark = screen.getByRole("link");
     await userEvent.click(editor);
     selectContents(mark);

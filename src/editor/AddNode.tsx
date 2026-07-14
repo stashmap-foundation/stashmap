@@ -59,15 +59,20 @@ function appendSpan(spans: InlineSpan[], span: InlineSpan): InlineSpan[] {
   return [...spans, span];
 }
 
+function domText(node: ChildNode): string {
+  return (node.textContent ?? "").replace(/\u00a0/gu, " ");
+}
+
 function spansFromDomNode(node: ChildNode): InlineSpan[] {
   if (node.nodeType === Node.TEXT_NODE) {
-    return node.textContent ? [{ kind: "text", text: node.textContent }] : [];
+    const text = domText(node);
+    return text === "" ? [] : [{ kind: "text", text }];
   }
   if (!(node instanceof HTMLElement)) return [];
   if (node.hasAttribute("data-link-furniture")) return [];
   const href = node.getAttribute("data-href");
   if (href !== null) {
-    const text = node.textContent ?? "";
+    const text = domText(node);
     return text === "" ? [] : [{ kind: "link", href, text }];
   }
   return Array.from(node.childNodes).reduce(
@@ -174,6 +179,9 @@ export function MiniEditor({
     const editor = editorRef.current;
     if (!editor || document.activeElement === editor) return;
     const noChildren: Node[] = [];
+    const lastSpan = initialSpans[initialSpans.length - 1];
+    const continuation =
+      lastSpan?.kind === "link" ? [document.createTextNode("\u00a0")] : [];
     editor.replaceChildren(
       ...initialSpans.reduce((children, span, index) => {
         if (span.kind === "text") {
@@ -227,7 +235,8 @@ export function MiniEditor({
           document.createTextNode(INCOMING_ARROW)
         );
         return [...children, mark, furniture];
-      }, noChildren)
+      }, noChildren),
+      ...continuation
     );
   }, [
     initialSpans,

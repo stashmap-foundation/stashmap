@@ -120,6 +120,9 @@ Root
 Target
   Source
   `);
+  expect(
+    getPane(1).getByRole("textbox", { name: "edit Source" }).textContent
+  ).toBe("Source\u00a0");
 
   cleanup();
   renderApp(alice());

@@ -13,11 +13,13 @@ import { isCalendarEntryPlacement } from "./core/ical";
 import { suggestionSettings } from "./core/constants";
 import { LOG_ROOT_ROLE } from "./core/systemRoots";
 import { computeVersionDiff, VersionDiff } from "./core/snapshotBaseline";
-import { documentKeyOf, type Document } from "./core/Document";
+import { findReciprocalLinkItem } from "./buildReferenceRow";
 import {
   GraphLookup,
   ResolvedNode,
   getNodeInSource,
+  graphLookupFromData,
+  linkSpeaker,
   lookupNode,
   lookupNodes,
   parentOf,
@@ -101,137 +103,6 @@ export function findRefsToNode(
     .toList();
 }
 
-function getRefContextKey(
-  _knowledgeDBs: KnowledgeDBs,
-  ref: ReferencedByRef
-): string {
-  return getContextKey(ref.context);
-}
-
-function contextKeyForTarget(
-  knowledgeDBs: KnowledgeDBs,
-  targetID: ID,
-  effectiveAuthor: SourceId
-): string | undefined {
-  const targetNode = getNode(knowledgeDBs, targetID, effectiveAuthor);
-  if (!targetNode) {
-    return undefined;
-  }
-  return getContextKey(
-    getNodeContext(knowledgeDBs, targetNode, effectiveAuthor)
-  );
-}
-
-function coveredContextKeys(
-  knowledgeDBs: KnowledgeDBs,
-  targetIDs: List<ID>,
-  effectiveAuthor: SourceId
-): ImmutableSet<string> {
-  return targetIDs.reduce((acc, targetID) => {
-    const key = contextKeyForTarget(knowledgeDBs, targetID, effectiveAuthor);
-    return key !== undefined ? acc.add(key) : acc;
-  }, ImmutableSet<string>());
-}
-
-function sourceDocumentKey(
-  knowledgeDBs: KnowledgeDBs,
-  documents: Map<string, Document> | undefined,
-  node: GraphNode,
-  sourceId: SourceId
-): string | undefined {
-  const rootNode =
-    node.id === node.root ? node : getNode(knowledgeDBs, node.root, sourceId);
-  if (!rootNode?.docId) {
-    return undefined;
-  }
-  const key = documentKeyOf(sourceId, rootNode.docId);
-  return documents?.has(key) ? key : undefined;
-}
-
-function documentLinkerRefs(
-  graphIndex: GraphIndex,
-  effectiveAuthor: SourceId,
-  candidateDocument: Document
-): NodeRef[] {
-  const lookupPaths = ImmutableSet<string>([
-    ...(candidateDocument.filePath ? [candidateDocument.filePath] : []),
-    candidateDocument.docId,
-  ]);
-  return lookupPaths
-    .toArray()
-    .flatMap(
-      (path) =>
-        graphIndex.incomingFileLinks.get(
-          fileLinkIndexKey(effectiveAuthor, path)
-        ) ?? []
-    );
-}
-
-function isWithinSubtree(
-  knowledgeDBs: KnowledgeDBs,
-  nodeID: ID,
-  author: SourceId,
-  subtreeRootIDs: ImmutableSet<ID>,
-  visited: ImmutableSet<ID>
-): boolean {
-  if (subtreeRootIDs.has(nodeID)) {
-    return true;
-  }
-  if (visited.has(nodeID)) {
-    return false;
-  }
-  const node = getNode(knowledgeDBs, nodeID, author);
-  if (!node?.parent) {
-    return false;
-  }
-  return isWithinSubtree(
-    knowledgeDBs,
-    node.parent,
-    author,
-    subtreeRootIDs,
-    visited.add(nodeID)
-  );
-}
-
-function subtreeLinksToDocument(
-  graph: GraphLookup,
-  documents: Map<string, Document> | undefined,
-  candidate: ResolvedNode,
-  currentNodeID: ID | undefined,
-  effectiveAuthor: SourceId,
-  subtreeRootIDs: ImmutableSet<ID>
-): boolean {
-  const { graphIndex, knowledgeDBs } = graph;
-  const key = sourceDocumentKey(
-    knowledgeDBs,
-    documents,
-    candidate.node,
-    candidate.ref.sourceId
-  );
-  const candidateDocument = key === undefined ? undefined : documents?.get(key);
-  if (!candidateDocument) {
-    return false;
-  }
-  return documentLinkerRefs(
-    graphIndex,
-    effectiveAuthor,
-    candidateDocument
-  ).some((ref) => {
-    const linker = getNodeInSource(graph, ref);
-    return (
-      linker !== undefined &&
-      linker.node.id !== currentNodeID &&
-      isWithinSubtree(
-        knowledgeDBs,
-        linker.node.id,
-        linker.ref.sourceId,
-        subtreeRootIDs,
-        ImmutableSet<ID>()
-      )
-    );
-  });
-}
-
 function isInSystemRoot(
   knowledgeDBs: KnowledgeDBs,
   node: GraphNode | undefined,
@@ -245,29 +116,6 @@ function isInSystemRoot(
   return rootNode?.systemRole === systemRole;
 }
 
-export function deduplicateRefsByContext(
-  refs: List<ReferencedByRef>,
-  knowledgeDBs: KnowledgeDBs,
-  preferAuthor?: SourceId
-): List<ReferencedByRef> {
-  return refs
-    .groupBy((ref) => getRefContextKey(knowledgeDBs, ref))
-    .map(
-      (group) =>
-        group
-          .sortBy((ref) => {
-            const node = preferAuthor
-              ? getNode(knowledgeDBs, ref.nodeID, preferAuthor)
-              : undefined;
-            const isOther = preferAuthor && !node ? 1 : 0;
-            return [isOther, -ref.updated];
-          })
-          .first()!
-    )
-    .valueSeq()
-    .toList();
-}
-
 function incomingFileLinkSourceRefs(
   graphIndex: GraphIndex,
   rootFilePath: string | undefined,
@@ -276,14 +124,6 @@ function incomingFileLinkSourceRefs(
   if (!rootFilePath || !rootAuthor) return [];
   const key = fileLinkIndexKey(rootAuthor, rootFilePath);
   return graphIndex.incomingFileLinks.get(key) ?? [];
-}
-
-function getGraphLinkOwner(
-  graph: GraphLookup,
-  linkItemRef: NodeRef
-): ResolvedNode | undefined {
-  const resolvedItem = getNodeInSource(graph, linkItemRef);
-  return resolvedItem;
 }
 
 function uniqueNodes(nodes: ResolvedNode[]): ResolvedNode[] {
@@ -297,18 +137,31 @@ function uniqueNodes(nodes: ResolvedNode[]): ResolvedNode[] {
 }
 
 export function getIncomingCrefsForNode(
-  graph: GraphLookup,
+  data: Data,
   visibleAuthors: ImmutableSet<SourceId>,
-  parentNodeID: ID | undefined,
   currentNodeID: ID | undefined,
-  effectiveAuthor: SourceId,
   itemsSourceId: SourceId,
   currentItems?: List<GraphNode>,
-  currentNodeFilePath?: string,
-  documents?: Map<string, Document>
+  currentNodeFilePath?: string
 ): List<NodeRef> {
+  const graph = graphLookupFromData(data);
   const { graphIndex, knowledgeDBs } = graph;
   const current = currentItems || List<GraphNode>();
+  const firstCurrent = current.first();
+  const target = (() => {
+    if (currentNodeID) {
+      return getNodeInSource(graph, {
+        sourceId: itemsSourceId,
+        id: currentNodeID,
+      });
+    }
+    return firstCurrent
+      ? {
+          ref: { sourceId: itemsSourceId, id: firstCurrent.id },
+          node: firstCurrent,
+        }
+      : undefined;
+  })();
 
   const graphLinkRefs = (() => {
     if (!currentNodeID) {
@@ -323,7 +176,7 @@ export function getIncomingCrefsForNode(
       : graphIndex.incomingCrefs.get(currentNodeID) ?? [];
   })();
   const graphLinkSourceNodes = graphLinkRefs
-    .map((ref) => getGraphLinkOwner(graph, ref))
+    .map((ref) => getNodeInSource(graph, ref))
     .filter((node): node is ResolvedNode => node !== undefined);
   const fileLinkSourceNodes = incomingFileLinkSourceRefs(
     graphIndex,
@@ -332,71 +185,45 @@ export function getIncomingCrefsForNode(
   )
     .map((ref) => getNodeInSource(graph, ref))
     .filter((node): node is ResolvedNode => node !== undefined);
-  const sourceNodes = List(
-    uniqueNodes([...graphLinkSourceNodes, ...fileLinkSourceNodes])
-  )
+  const sourceNodes = uniqueNodes([
+    ...graphLinkSourceNodes,
+    ...fileLinkSourceNodes,
+  ])
     .filter(
       (source) =>
         !isCalendarEntryPlacement(source.node, parentOf(graph, source)?.node)
     )
-    .sortBy(({ ref, node }) => nodePathLabel(knowledgeDBs, node, ref.sourceId))
-    .toArray();
-  if (sourceNodes.length === 0) {
-    return List<NodeRef>();
-  }
-
-  const outgoingTargetIDs = current
-    .flatMap((item) => getAllLinks(item).map((link) => link.targetID))
-    .toList();
-  const covered = coveredContextKeys(
-    knowledgeDBs,
-    outgoingTargetIDs,
-    effectiveAuthor
-  );
-  const outgoingTargetRelIDs = current.reduce(
-    (acc, item) =>
-      acc.add(item.id).union(getAllLinks(item).map((link) => link.targetID)),
-    ImmutableSet<ID>()
-  );
-  const subtreeRootIDs = ImmutableSet<ID>(current.map((item) => item.id)).union(
-    currentNodeID ? [currentNodeID] : []
-  );
-
-  const refs = List(
-    sourceNodes
-      .filter(({ ref }) => visibleAuthors.has(ref.sourceId))
-      .filter(({ node }) => node.id !== parentNodeID)
-      .filter(({ node }) => node.id !== currentNodeID)
-      .filter(
-        (resolved) =>
-          !subtreeLinksToDocument(
-            graph,
-            documents,
-            resolved,
-            currentNodeID,
-            effectiveAuthor,
-            subtreeRootIDs
-          )
+    .filter(
+      (source) =>
+        target === undefined ||
+        findReciprocalLinkItem(graph, data, source, target) === undefined
+    )
+    .map((source) => linkSpeaker(graph, source));
+  const visibleSourceNodes = uniqueNodes(sourceNodes)
+    .filter(({ ref }) => visibleAuthors.has(ref.sourceId))
+    .filter(
+      ({ ref }) =>
+        target === undefined ||
+        ref.sourceId !== target.ref.sourceId ||
+        ref.id !== target.ref.id
+    )
+    .filter(
+      ({ ref, node }) =>
+        node.systemRole !== LOG_ROOT_ROLE &&
+        !isInSystemRoot(knowledgeDBs, node, ref.sourceId, LOG_ROOT_ROLE)
+    )
+    .sort((left, right) =>
+      nodePathLabel(knowledgeDBs, left.node, left.ref.sourceId).localeCompare(
+        nodePathLabel(knowledgeDBs, right.node, right.ref.sourceId)
       )
-      .filter(
-        ({ ref, node }) =>
-          node.systemRole !== LOG_ROOT_ROLE &&
-          !isInSystemRoot(knowledgeDBs, node, ref.sourceId, LOG_ROOT_ROLE)
-      )
-      .filter(({ node }) => !outgoingTargetRelIDs.has(node.id))
-      .map(({ ref, node }) => ({
-        nodeID: node.id,
-        sourceId: ref.sourceId,
-        context: getNodeContext(knowledgeDBs, node, ref.sourceId),
-        updated: node.updated,
-      }))
-  );
+    );
 
-  const deduped = deduplicateRefsByContext(refs, knowledgeDBs, effectiveAuthor);
-  return deduped
-    .filter((ref) => !covered.has(getRefContextKey(knowledgeDBs, ref)))
-    .map((ref) => ({ sourceId: ref.sourceId, id: ref.nodeID }))
-    .toList();
+  return List(
+    visibleSourceNodes.map(({ ref }) => ({
+      sourceId: ref.sourceId,
+      id: ref.id,
+    }))
+  );
 }
 
 export type RenameSuggestion = {

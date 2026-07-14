@@ -141,7 +141,7 @@ test("File link surfaces as incoming reference on target's root", async () => {
   await expectTree(`
 B
   B-child
-[I] A / Open B ↩
+  [I] A ↩
   `);
 });
 
@@ -156,11 +156,11 @@ test("Accepting a file-link incoming ref links back to the source row", async ()
   await expectTree(`
 B
   B-child
-[I] A / Open B ↩
+  [I] A ↩
   `);
 
   const incoming = await screen.findByRole("treeitem", {
-    name: "A / Open B ↩",
+    name: "A ↩",
   });
   await userEvent.click(incoming);
   await userEvent.keyboard("!");
@@ -168,17 +168,17 @@ B
   await expectTree(`
 B
   B-child
-Open B
+  A↩
   `);
 
-  const reverseLink = await screen.findByRole("link", { name: "Open B" });
+  const reverseLink = await screen.findByRole("link", { name: "A" });
   expect(reverseLink.getAttribute("data-href")).toMatch(/^#/u);
 
   await userEvent.click(reverseLink);
 
   await expectTree(`
 A
-  Open B
+  Open B!↩
   `);
 });
 
@@ -297,13 +297,32 @@ test("File link with prefix markers preserves them on the incoming reference", a
   await knowstrSave(workspacePath);
   await renderAppTree({ path: workspacePath, search: "B" });
 
-  // The incoming row wears, never a borrowed judgment mark — nobody
-  // judged anything (the !+ in the text are the SOURCE row's markers).
   await expectTree(
     `
 B
   B-child
-[I] A / Open B !+↩
+  [I] A !+↩
+  `,
+    { showGutter: true }
+  );
+
+  await userEvent.click(screen.getByRole("treeitem", { name: "A !+↩" }));
+  await userEvent.keyboard("?");
+  await expectTree(
+    `
+B
+  B-child
+  {?} A!+↩
+  `,
+    { showGutter: true }
+  );
+
+  cleanup();
+  await renderAppTree({ path: workspacePath, search: "A" });
+  await expectTree(
+    `
+A
+  {!+} Open B?↩
   `,
     { showGutter: true }
   );

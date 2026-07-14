@@ -1,4 +1,5 @@
 import { LOCAL } from "./nodeRef";
+import { isInternalLinkHref } from "./nodeSpans";
 
 export type ResolvedNode = {
   ref: NodeRef;
@@ -136,6 +137,18 @@ export function parentOf(
         id: node.node.parent,
       })
     : undefined;
+}
+
+export function linkSpeaker(
+  graph: GraphLookup,
+  occurrence: ResolvedNode
+): ResolvedNode {
+  const onlySpan =
+    occurrence.node.spans.length === 1 ? occurrence.node.spans[0] : undefined;
+  if (onlySpan?.kind !== "link" || !isInternalLinkHref(onlySpan.href)) {
+    return occurrence;
+  }
+  return parentOf(graph, occurrence) ?? occurrence;
 }
 
 export function childrenOf(

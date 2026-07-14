@@ -9,6 +9,7 @@ import {
   ResolvedNode,
   getNodeInSource,
   graphLookupFromData,
+  linkSpeaker,
   lookupNode,
 } from "./core/graphLookup";
 
@@ -120,11 +121,31 @@ function findIncomingLinkItem(
   target: ResolvedNode | undefined
 ): GraphNode | undefined {
   if (!target) return undefined;
-  const ref = [
-    ...incomingGraphRefs(data, target),
-    ...incomingFileRefs(data, target),
-  ].find((candidate) => sameRef(candidate, source));
-  return ref ? getNodeInSource(graph, ref)?.node : undefined;
+  return [...incomingGraphRefs(data, target), ...incomingFileRefs(data, target)]
+    .map((candidate) => getNodeInSource(graph, candidate))
+    .filter((candidate): candidate is ResolvedNode => candidate !== undefined)
+    .find((candidate) => sameRef(linkSpeaker(graph, candidate).ref, source))
+    ?.node;
+}
+
+export function findReciprocalLinkItem(
+  graph: ReturnType<typeof graphLookupFromData>,
+  data: Data,
+  sourceOccurrence: ResolvedNode,
+  target: ResolvedNode
+): GraphNode | undefined {
+  const source = linkSpeaker(graph, sourceOccurrence);
+  const refs = [
+    ...(data.graphIndex.incomingCrefsByTarget.get(nodeRefKey(source.ref)) ??
+      []),
+    ...incomingFileRefs(data, source),
+  ];
+  return refs
+    .filter((candidate) => !sameRef(candidate, sourceOccurrence.ref))
+    .map((candidate) => getNodeInSource(graph, candidate))
+    .filter((candidate): candidate is ResolvedNode => candidate !== undefined)
+    .find((candidate) => sameRef(linkSpeaker(graph, candidate).ref, target.ref))
+    ?.node;
 }
 
 export function buildReferenceItem(

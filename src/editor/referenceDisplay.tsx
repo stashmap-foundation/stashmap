@@ -12,36 +12,50 @@ import {
 
 export { referenceToText } from "./referenceText";
 
-function relevanceColor(relevance?: Relevance): string | undefined {
+export function relevanceColor(relevance?: Relevance): string | undefined {
   if (relevance === "relevant") return TYPE_COLORS.relevant;
   if (relevance === "maybe_relevant") return TYPE_COLORS.maybe_relevant;
   if (relevance === "little_relevant") return TYPE_COLORS.little_relevant;
   return undefined;
 }
 
-function argumentColor(argument?: Argument): string | undefined {
+export function argumentColor(argument?: Argument): string | undefined {
   if (argument === "confirms") return TYPE_COLORS.confirms;
   if (argument === "contra") return TYPE_COLORS.contra;
   return undefined;
 }
 
+export function IncomingPart({
+  relevance,
+  argument,
+  ariaHidden,
+}: {
+  relevance?: Relevance;
+  argument?: Argument;
+  ariaHidden?: boolean;
+}): JSX.Element {
+  const relChar = relevanceChar(relevance);
+  const argChar = argumentChar(argument);
+  return (
+    <sup
+      className="incoming-part"
+      title="Points back here"
+      aria-hidden={ariaHidden}
+    >
+      {relChar && (
+        <span style={{ color: relevanceColor(relevance) }}>{relChar}</span>
+      )}
+      {argChar && (
+        <span style={{ color: argumentColor(argument) }}>{argChar}</span>
+      )}
+      {INCOMING_ARROW}
+    </sup>
+  );
+}
+
 function RenderPart({ part }: { part: ReferencePart }): JSX.Element {
   if (part.type === "incoming") {
-    const relChar = relevanceChar(part.relevance);
-    const argChar = argumentChar(part.argument);
-    return (
-      <sup className="incoming-part" title="Points back here">
-        {relChar && (
-          <span style={{ color: relevanceColor(part.relevance) }}>
-            {relChar}
-          </span>
-        )}
-        {argChar && (
-          <span style={{ color: argumentColor(part.argument) }}>{argChar}</span>
-        )}
-        {INCOMING_ARROW}
-      </sup>
-    );
+    return <IncomingPart relevance={part.relevance} argument={part.argument} />;
   }
   return <>{part.value}</>;
 }

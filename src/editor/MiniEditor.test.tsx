@@ -20,6 +20,7 @@ describe("MiniEditor", () => {
     render(
       <MiniEditor
         initialSpans={plain("Original")}
+        reciprocalLinks={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -39,6 +40,7 @@ describe("MiniEditor", () => {
     render(
       <MiniEditor
         initialSpans={plain("Original")}
+        reciprocalLinks={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -54,6 +56,7 @@ describe("MiniEditor", () => {
     render(
       <MiniEditor
         initialSpans={plain("Original")}
+        reciprocalLinks={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -71,6 +74,7 @@ describe("MiniEditor", () => {
     render(
       <MiniEditor
         initialSpans={plain("Original")}
+        reciprocalLinks={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -88,6 +92,7 @@ describe("MiniEditor", () => {
     render(
       <MiniEditor
         initialSpans={plain("Original")}
+        reciprocalLinks={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -107,6 +112,7 @@ describe("MiniEditor", () => {
     render(
       <MiniEditor
         initialSpans={[]}
+        reciprocalLinks={[]}
         onSave={onSave}
         onClose={onClose}
         onShiftTab={onShiftTab}
@@ -126,6 +132,7 @@ describe("MiniEditor", () => {
     const { rerender } = render(
       <MiniEditor
         initialSpans={plain("First")}
+        reciprocalLinks={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -138,6 +145,7 @@ describe("MiniEditor", () => {
     rerender(
       <MiniEditor
         initialSpans={plain("Changed")}
+        reciprocalLinks={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -154,6 +162,7 @@ describe("MiniEditor", () => {
     const { rerender } = render(
       <MiniEditor
         initialSpans={plain("Original")}
+        reciprocalLinks={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -161,6 +170,7 @@ describe("MiniEditor", () => {
     rerender(
       <MiniEditor
         initialSpans={plain("Updated")}
+        reciprocalLinks={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -172,6 +182,34 @@ describe("MiniEditor", () => {
     await waitFor(() => expect(onSave).not.toHaveBeenCalled());
   });
 
+  test("reciprocal relation furniture is visible but never saved", async () => {
+    const onSave = jest.fn();
+    render(
+      <MiniEditor
+        initialSpans={[{ kind: "link", href: "#target", text: "Target" }]}
+        reciprocalLinks={[
+          {
+            spanIndex: 0,
+            relevance: "relevant",
+            argument: "confirms",
+          },
+        ]}
+        onSave={onSave}
+        autoFocus={false}
+      />
+    );
+    const editor = screen.getByRole("textbox");
+    expect(editor.textContent).toBe("Target!+↩");
+    const mark = screen.getByRole("link");
+    await userEvent.click(editor);
+    selectContents(mark);
+    await userEvent.keyboard("Renamed");
+    fireEvent.blur(editor, { relatedTarget: document.body });
+    expect(onSave).toHaveBeenCalledWith([
+      { kind: "link", href: "#target", text: "Renamed" },
+    ]);
+  });
+
   test("edits link labels without losing targets", async () => {
     const onSave = jest.fn();
     render(
@@ -181,6 +219,7 @@ describe("MiniEditor", () => {
           { kind: "link", href: "#target", text: "old" },
           { kind: "text", text: " now" },
         ]}
+        reciprocalLinks={[]}
         onSave={onSave}
         autoFocus={false}
       />

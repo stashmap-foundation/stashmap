@@ -203,7 +203,7 @@ test("incoming refs for duplicate ids stay scoped to the target source", () => {
   );
 
   expect(incomingRows.rows.map((row) => row.viewPath).toArray()).toEqual([
-    [0, "target", "link-b"],
+    [0, "target", "root-b"],
   ]);
 });
 
@@ -252,6 +252,6 @@ test("incoming ref owner rows keep source identity when owner ids also collide",
     SOURCE_B,
   ]);
   expect(incomingRows.rows.map((row) => row.node.spans).toArray()).toEqual([
-    [linkSpan("link", "Root B")],
+    [linkSpan("root", "Root B")],
   ]);
 });

@@ -3,7 +3,13 @@ import { useEditorText } from "./EditorTextContext";
 import { isEditableElement } from "./keyboardNavigation";
 import { ParsedLine, parseClipboardText } from "../planner";
 import { isEntityLinkHref } from "../core/entityRecognition";
-import { isInternalLinkHref, isWebsiteLinkHref } from "../core/nodeSpans";
+import {
+  isInternalLinkHref,
+  isWebsiteLinkHref,
+  spansText,
+} from "../core/nodeSpans";
+import { argumentColor, relevanceColor } from "./referenceDisplay";
+import { INCOMING_ARROW, argumentChar, relevanceChar } from "./referenceText";
 
 export function preventEditorBlur(e: React.MouseEvent): void {
   if (isEditableElement(document.activeElement)) {
@@ -11,8 +17,15 @@ export function preventEditorBlur(e: React.MouseEvent): void {
   }
 }
 
+export type ReciprocalLink = {
+  spanIndex: number;
+  relevance?: Relevance;
+  argument?: Argument;
+};
+
 type MiniEditorProps = {
   initialSpans: InlineSpan[];
+  reciprocalLinks: ReciprocalLink[];
   onSave: (spans: InlineSpan[], submitted?: boolean) => void;
   style?: React.CSSProperties;
   onClose?: () => void;
@@ -51,6 +64,7 @@ function spansFromDomNode(node: ChildNode): InlineSpan[] {
     return node.textContent ? [{ kind: "text", text: node.textContent }] : [];
   }
   if (!(node instanceof HTMLElement)) return [];
+  if (node.hasAttribute("data-link-furniture")) return [];
   const href = node.getAttribute("data-href");
   if (href !== null) {
     const text = node.textContent ?? "";
@@ -84,6 +98,38 @@ function spansFromEditor(editor: HTMLElement | null): InlineSpan[] {
   );
 }
 
+function recoverRewrittenLink(
+  initialSpans: InlineSpan[],
+  currentSpans: InlineSpan[]
+): InlineSpan[] {
+  const linkIndex = initialSpans.findIndex((span) => span.kind === "link");
+  const link = initialSpans[linkIndex];
+  const current = currentSpans[0];
+  if (
+    link?.kind !== "link" ||
+    initialSpans.filter((span) => span.kind === "link").length !== 1 ||
+    currentSpans.length !== 1 ||
+    current?.kind !== "text"
+  ) {
+    return currentSpans;
+  }
+  const prefix = spansText(initialSpans.slice(0, linkIndex));
+  const suffix = spansText(initialSpans.slice(linkIndex + 1));
+  const comparable = current.text.replace(/\u00a0/gu, " ");
+  if (!comparable.startsWith(prefix) || !comparable.endsWith(suffix)) {
+    return currentSpans;
+  }
+  const end = comparable.length - suffix.length;
+  const text = current.text.slice(prefix.length, end);
+  if (text === "") return currentSpans;
+  const before: InlineSpan[] =
+    prefix === "" ? [] : [{ kind: "text", text: prefix }];
+  const recovered: InlineSpan = { kind: "link", href: link.href, text };
+  const after: InlineSpan[] =
+    suffix === "" ? [] : [{ kind: "text", text: suffix }];
+  return [...before, recovered, ...after];
+}
+
 function spansEqual(left: InlineSpan[], right: InlineSpan[]): boolean {
   return (
     left.length === right.length &&
@@ -102,6 +148,7 @@ function spansEqual(left: InlineSpan[], right: InlineSpan[]): boolean {
 
 export function MiniEditor({
   initialSpans,
+  reciprocalLinks,
   onSave,
   style,
   onClose,
@@ -126,10 +173,12 @@ export function MiniEditor({
   useLayoutEffect(() => {
     const editor = editorRef.current;
     if (!editor || document.activeElement === editor) return;
-    if (spansEqual(spansFromEditor(editor), initialSpans)) return;
+    const noChildren: Node[] = [];
     editor.replaceChildren(
-      ...initialSpans.map((span) => {
-        if (span.kind === "text") return document.createTextNode(span.text);
+      ...initialSpans.reduce((children, span, index) => {
+        if (span.kind === "text") {
+          return [...children, document.createTextNode(span.text)];
+        }
         const mark = document.createElement("span");
         mark.setAttribute("role", "link");
         mark.setAttribute("class", "inline-link");
@@ -147,10 +196,48 @@ export function MiniEditor({
           .join("; ");
         if (markStyle) mark.setAttribute("style", markStyle);
         mark.replaceChildren(document.createTextNode(span.text));
-        return mark;
-      })
+        const reciprocal = reciprocalLinks.find(
+          (candidate) => candidate.spanIndex === index
+        );
+        if (!reciprocal) {
+          return [...children, mark];
+        }
+        const furniture = document.createElement("sup");
+        furniture.setAttribute("class", "incoming-part");
+        furniture.setAttribute("data-link-furniture", "reciprocal");
+        furniture.setAttribute("contenteditable", "false");
+        furniture.setAttribute("aria-hidden", "true");
+        const relChar = relevanceChar(reciprocal.relevance);
+        const argChar = argumentChar(reciprocal.argument);
+        const relationParts = [
+          ...(relChar
+            ? [{ text: relChar, color: relevanceColor(reciprocal.relevance) }]
+            : []),
+          ...(argChar
+            ? [{ text: argChar, color: argumentColor(reciprocal.argument) }]
+            : []),
+        ].map(({ text, color }) => {
+          const part = document.createElement("span");
+          if (color) part.setAttribute("style", `color: ${color}`);
+          part.replaceChildren(document.createTextNode(text));
+          return part;
+        });
+        furniture.replaceChildren(
+          ...relationParts,
+          document.createTextNode(INCOMING_ARROW)
+        );
+        return [...children, mark, furniture];
+      }, noChildren)
     );
-  }, [initialSpans]);
+  }, [
+    initialSpans,
+    reciprocalLinks
+      .map(
+        ({ spanIndex, relevance, argument }) =>
+          `${spanIndex}:${relevance ?? ""}:${argument ?? ""}`
+      )
+      .join(","),
+  ]);
 
   useLayoutEffect(() => {
     if (!autoFocus || !editorRef.current) return;
@@ -163,7 +250,8 @@ export function MiniEditor({
     selection?.addRange(range);
   }, [autoFocus]);
 
-  const getSpans = (): InlineSpan[] => spansFromEditor(editorRef.current);
+  const getSpans = (): InlineSpan[] =>
+    recoverRewrittenLink(lastSavedSpans, spansFromEditor(editorRef.current));
 
   const saveIfChanged = (): void => {
     const spans = getSpans();

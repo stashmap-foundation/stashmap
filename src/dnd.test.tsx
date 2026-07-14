@@ -166,7 +166,7 @@ Root
     Source
       Child1
       Child2
-      [I] Root / Target / Source ↩
+      [I] Root / Target ↩
 Target
   Source
   `);
@@ -181,7 +181,7 @@ Target
 Source
   Child1
   Child2
-  [I] Root / Target / Source ↩
+  [I] Root / Target ↩
 Target
   Source
   `);

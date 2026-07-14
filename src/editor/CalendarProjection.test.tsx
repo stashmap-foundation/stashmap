@@ -413,7 +413,7 @@ test("judging a backlink under a projected entry takes the entry first", async (
     await screen.findByLabelText("expand 14.07.2030 Sommerfest")
   );
 
-  await clickRow("Salon / 14.07.2030 Sommerfest ↩");
+  await clickRow("Salon ↩");
   await userEvent.keyboard("!");
   const [expandEntry] = await screen.findAllByLabelText(
     /(?:expand|collapse) 14\.07\.2030 Sommerfest/u
@@ -427,10 +427,12 @@ test("judging a backlink under a projected entry takes the entry first", async (
 Salon
   https://scholarium.at/salon.ics
     14.07.2030 Sommerfest
-      {!} 14.07.2030 Sommerfest
+      {!} Salon
+      [I] Salon ↩
     ${dunbarText()}
   Was ist cool
   14.07.2030 Sommerfest
+  [I] Salon / https://scholarium.at/salon.ics / 14.07.2030 Sommerfest !↩
   `,
     { showGutter: true }
   );
@@ -442,10 +444,12 @@ Salon
 Salon
   https://scholarium.at/salon.ics
     14.07.2030 Sommerfest
-      {!} 14.07.2030 Sommerfest
+      {!} Salon
+      [I] Salon ↩
     ${dunbarText()}
   Was ist cool
   14.07.2030 Sommerfest
+  [I] Salon / https://scholarium.at/salon.ics / 14.07.2030 Sommerfest !↩
   `,
     { showGutter: true }
   );
@@ -479,9 +483,9 @@ Salon
   https://scholarium.at/salon.ics
     14.07.2030 Sommerfest
       Meine Notiz
-      [I] Salon / 14.07.2030 Sommerfest ↩
+      [I] Salon ↩
     ${dunbarText()}
-      [I] Salon / 21.09.2030 20:00 Seminar Robin Dunbar ↩
+      [I] Salon ↩
   Was ist cool
   ${dunbarText()}
   14.07.2030 Sommerfest

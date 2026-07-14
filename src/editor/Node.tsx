@@ -1,6 +1,6 @@
 import React from "react";
 import { List } from "immutable";
-import { LOCAL } from "../core/nodeRef";
+import { LOCAL, nodeRefKey } from "../core/nodeRef";
 import {
   ViewPath,
   useSearchDepth,
@@ -31,6 +31,7 @@ import {
 } from "../core/connections";
 import { isEntityLinkHref } from "../core/entityRecognition";
 import {
+  isFileLinkHref,
   isInternalLinkHref,
   isWebsiteLinkHref,
   spansText,
@@ -44,9 +45,9 @@ import {
   isBareIcalFeedUrl,
 } from "../core/ical";
 import { useCalendarFeeds } from "../CalendarFeedContext";
-import { inlineLinkToHref } from "./linkOperations";
-import { ReferenceDisplay } from "./referenceDisplay";
-import { MiniEditor, preventEditorBlur } from "./AddNode";
+import { inlineLinkToHref, resolveDocumentTarget } from "./linkOperations";
+import { IncomingPart, ReferenceDisplay } from "./referenceDisplay";
+import { MiniEditor, ReciprocalLink, preventEditorBlur } from "./AddNode";
 import { useOnToggleExpanded } from "./SelectNodes";
 import { useData } from "../DataContext";
 import {
@@ -77,6 +78,12 @@ import { RightMenu, usePublishedPaneDocument } from "./RightMenu";
 import { unpublishedLinkTargetForHref } from "./publishReach";
 import { useItemStyle } from "./useItemStyle";
 import { EditorTextProvider } from "./EditorTextContext";
+import {
+  ResolvedNode,
+  getNodeInSource,
+  graphLookupFromData,
+} from "../core/graphLookup";
+import { findReciprocalLinkItem } from "../buildReferenceRow";
 
 export { getNodesInTree } from "../treeTraversal";
 
@@ -408,14 +415,72 @@ function LinkReachChip({
   );
 }
 
+function reciprocalTarget(
+  data: Data,
+  node: GraphNode,
+  sourceId: SourceId,
+  href: string
+): ResolvedNode | undefined {
+  const graph = graphLookupFromData(data);
+  if (href.startsWith("#")) {
+    return getNodeInSource(graph, { sourceId, id: href.slice(1) });
+  }
+  if (!isFileLinkHref(href)) {
+    return undefined;
+  }
+  const hashIndex = href.lastIndexOf("#");
+  const path = hashIndex < 0 ? href : href.slice(0, hashIndex);
+  const document = resolveDocumentTarget(data, node, sourceId, path);
+  const rootID = document?.topNodeShortIds[0];
+  return rootID && document
+    ? getNodeInSource(graph, { sourceId: document.sourceId, id: rootID })
+    : undefined;
+}
+
+function reciprocalLinks(
+  data: Data,
+  node: GraphNode,
+  sourceId: SourceId
+): ReciprocalLink[] {
+  const graph = graphLookupFromData(data);
+  const source = getNodeInSource(graph, { sourceId, id: node.id });
+  if (!source) return [];
+  const initial: { links: ReciprocalLink[]; targets: string[] } = {
+    links: [],
+    targets: [],
+  };
+  return node.spans.reduce((result, span, index) => {
+    if (span.kind !== "link") return result;
+    const target = reciprocalTarget(data, node, sourceId, span.href);
+    if (!target) return result;
+    const key = nodeRefKey(target.ref);
+    if (result.targets.includes(key)) return result;
+    const reciprocal = findReciprocalLinkItem(graph, data, source, target);
+    if (!reciprocal) return result;
+    return {
+      links: [
+        ...result.links,
+        {
+          spanIndex: index,
+          relevance: reciprocal.relevance,
+          argument: reciprocal.argument,
+        },
+      ],
+      targets: [...result.targets, key],
+    };
+  }, initial).links;
+}
+
 function InlineLinkSpan({
   span,
   node,
   sourceId,
+  reciprocal,
 }: {
   span: Extract<InlineSpan, { kind: "link" }>;
   node: GraphNode;
   sourceId: SourceId;
+  reciprocal?: ReciprocalLink;
 }): JSX.Element {
   const data = useData();
   const navigatePane = useNavigatePane();
@@ -440,6 +505,13 @@ function InlineLinkSpan({
         >
           {span.text}
         </span>
+        {reciprocal && (
+          <IncomingPart
+            relevance={reciprocal.relevance}
+            argument={reciprocal.argument}
+            ariaHidden
+          />
+        )}
         <LinkReachChip span={span} node={node} sourceId={sourceId} />
       </>
     );
@@ -461,6 +533,13 @@ function InlineLinkSpan({
       >
         {span.text}
       </a>
+      {reciprocal && (
+        <IncomingPart
+          relevance={reciprocal.relevance}
+          argument={reciprocal.argument}
+          ariaHidden
+        />
+      )}
       <LinkReachChip span={span} node={node} sourceId={sourceId} />
     </>
   );
@@ -473,6 +552,8 @@ function InlineSpans({
   node: GraphNode;
   sourceId: SourceId;
 }): JSX.Element {
+  const data = useData();
+  const reciprocals = reciprocalLinks(data, node, sourceId);
   return (
     <span className="break-word">
       {node.spans.map((span, index) => {
@@ -484,6 +565,9 @@ function InlineSpans({
               span={span}
               node={node}
               sourceId={sourceId}
+              reciprocal={reciprocals.find(
+                (candidate) => candidate.spanIndex === index
+              )}
             />
           );
         }
@@ -610,6 +694,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
     });
 
   const editorSpans = currentNode.spans;
+  const reciprocals = reciprocalLinks(data, row.node, row.sourceId);
   const persistedSpans = (spans: InlineSpan[]): InlineSpan[] => {
     const text = spansText(spans).trim();
     const feedUrl = calendarFeedUrl(currentNode);
@@ -930,6 +1015,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       <MiniEditor
         key={`${viewPathToString(viewPath)}:${nodeIndex}`}
         initialSpans={editorSpans}
+        reciprocalLinks={reciprocals}
         style={textStyle}
         onSave={handleSave}
         onTab={handleTab}

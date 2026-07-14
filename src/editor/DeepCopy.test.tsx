@@ -1324,7 +1324,7 @@ My Notes
 My Notes
   Source
     Child
-    [I] My Notes / Target / Source ↩
+    [I] My Notes / Target ↩
   Target
 Target
   Source

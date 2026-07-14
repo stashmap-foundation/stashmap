@@ -19,7 +19,7 @@ import {
   itemPassesFilters,
   nodePathLabel as nodePathLabelOf,
 } from "./core/connections";
-import { getAllLinks, linkSpan, nodeText, plainSpans } from "./core/nodeSpans";
+import { linkSpan, nodeText, plainSpans } from "./core/nodeSpans";
 import {
   IcalEntry,
   calendarEntryTarget,
@@ -895,19 +895,15 @@ function getChildrenForRegularNode(
     typeFilters
   );
 
-  const containingNodeID = parentRow.parentNode?.id;
   const visibleAuthors = ImmutableSet<SourceId>([LOCAL, author, nodeSourceId]);
 
   const incomingCrefs = getIncomingCrefsForNode(
-    graph,
+    data,
     visibleAuthors,
-    containingNodeID,
     parentRow.standsFor?.id ?? nodes.id,
-    author,
     nodeSourceId,
     allChildNodes,
-    undefined,
-    data.documents
+    undefined
   ).filter((ref) => ref.id !== nodes.id);
 
   const visibleIncomingCrefs = activeFilters.includes("incoming")
@@ -1157,44 +1153,43 @@ export function getNodesInDocument(
   }
 
   const visibleAuthors = ImmutableSet<SourceId>([LOCAL, document.sourceId]);
-  const outgoingTargets = ImmutableSet<ID>(
-    topNodes.flatMap((node) => getAllLinks(node).map((link) => link.targetID))
-  );
   const incomingCrefs = getIncomingCrefsForNode(
-    graph,
+    data,
     visibleAuthors,
     undefined,
-    undefined,
-    document.sourceId,
     document.sourceId,
     topNodes,
-    document.filePath,
-    data.documents
-  ).filter((ref) => !outgoingTargets.has(ref.id));
-
-  const withFooter = appendVirtualFooterRows(
-    data,
-    graph,
-    {
-      parentPath: documentRootPath,
-      parentSourceId: document.sourceId,
-      parentRoot: topNodes.first()?.root ?? EMPTY_NODE_ID,
-      parentUpdated: document.updatedMs,
-      incomingCrefs,
-      suggestions: List<ID>(),
-      versionMetas: Map<
-        ID,
-        { updated: number; addCount: number; removeCount: number }
-      >(),
-      renames: List<{
-        versionId: ID;
-        theirs: string;
-        sourceId: SourceId;
-        snapshotId: string;
-        baselineNodeId: ID;
-      }>(),
-    },
-    treeResult
+    document.filePath
   );
-  return { rows: reindexRows(withFooter.rows) };
+
+  const footer = appendVirtualFooterRows(data, graph, {
+    parentPath: documentRootPath,
+    parentRow: topRows.first(),
+    parentID: topNodes.first()?.id,
+    parentSourceId: document.sourceId,
+    parentRoot: topNodes.first()?.root ?? EMPTY_NODE_ID,
+    parentUpdated: document.updatedMs,
+    incomingCrefs,
+    suggestions: List<ID>(),
+    versionMetas: Map<
+      ID,
+      { updated: number; addCount: number; removeCount: number }
+    >(),
+    renames: List<{
+      versionId: ID;
+      theirs: string;
+      sourceId: SourceId;
+      snapshotId: string;
+      baselineNodeId: ID;
+    }>(),
+  });
+  const secondTopRow = topRows.get(1);
+  const footerIndex = secondTopRow
+    ? treeResult.rows.findIndex((row) => row.viewKey === secondTopRow.viewKey)
+    : treeResult.rows.size;
+  return {
+    rows: reindexRows(
+      treeResult.rows.splice(footerIndex, 0, ...footer.rows.toArray())
+    ),
+  };
 }

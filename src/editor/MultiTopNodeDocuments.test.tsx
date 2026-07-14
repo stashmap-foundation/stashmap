@@ -253,7 +253,7 @@ Packlist
   Charger
 Source
   Child
-  [I] Holiday Destinations / Spain / Source ↩
+  [I] Holiday Destinations / Spain ↩
   `);
 
   cleanup();
@@ -684,7 +684,7 @@ Target
   await expectTree(`
 Holiday Destinations
   Spain
-  [I] Target / Holiday Destinations ↩
+  [I] Target ↩
 Packlist
   Charger
 Target
@@ -697,10 +697,10 @@ Target
   await expectTree(`
 Holiday Destinations
   Spain
-  [I] Target / Holiday Destinations ↩
+  [I] Target ↩
 Packlist
   Charger
-  [I] Target / Packlist ↩
+  [I] Target ↩
 Target
   Packlist
   Holiday Destinations
@@ -785,7 +785,7 @@ test("Deep-copying a node with graph refs keeps the copied ref live in markdown"
 Source
   Target
 Target
-  [I] Source / Target ↩
+  [I] Source ↩
 Copy Here
 Source
   Target
@@ -805,8 +805,8 @@ Source
 Source
   Target
 Target
-  [I] Copy Here / Source / Target ↩
-  [I] Source / Target ↩
+  [I] Copy Here / Source ↩
+  [I] Source ↩
 Copy Here
   Source
 Copy Here
@@ -860,7 +860,7 @@ Second
   await expectTree(`
 B
   B-child
-[I] Second / Open B ↩
+  [I] Second ↩
   `);
 
   cleanup();
@@ -896,7 +896,7 @@ Second
   await expectTree(`
 Target
   Target child
-  [I] Second / Target ↩
+  [I] Second ↩
   `);
 
   cleanup();
@@ -920,7 +920,7 @@ Holidays
   await expectTree(`
 Holiday Destinations
   Spain
-[I] Holidays ↩
+  [I] Holidays ↩
   `);
 
   cleanup();
@@ -968,7 +968,7 @@ test("Mutual file links show outgoing from both sides without duplicate incoming
 
   await expectTree(`
 Holiday Destinations
-  Files
+  Files↩
   `);
 
   cleanup();
@@ -976,7 +976,7 @@ Holiday Destinations
 
   await expectTree(`
 Links
-  Holidays
+  Holidays↩
   `);
 
   cleanup();
@@ -993,8 +993,7 @@ test("Mutual graph links show each source row and its incoming edge", async () =
 
   await expectTree(`
 A
-  B
-  [I] B / A ↩
+  B↩
   `);
 
   cleanup();
@@ -1002,8 +1001,7 @@ A
 
   await expectTree(`
 B
-  A
-  [I] A / B ↩
+  A↩
   `);
 
   cleanup();
@@ -1024,25 +1022,23 @@ test("Graph incoming refs can become bidirectional from both sides", async () =>
   await expectTree(`
 Target
   Target child
-  [I] Source / Target ↩
+  [I] Source ↩
   `);
 
-  await userEvent.click(
-    getPane(0).getByRole("treeitem", { name: "Source / Target ↩" })
-  );
+  await userEvent.click(getPane(0).getByRole("treeitem", { name: "Source ↩" }));
   await userEvent.keyboard("!");
 
   await expectTree(`
 Target
   Target child
-  Target
+  Source↩
   `);
 
-  await userEvent.click(await screen.findByRole("link", { name: "Target" }));
+  await userEvent.click(await screen.findByRole("link", { name: "Source" }));
 
   await expectTree(`
 Source
-  Target
+  Target!↩
   `);
 
   cleanup();
@@ -1077,12 +1073,12 @@ Southern European Countries
 Holiday Destinations
   Spain
     Barcelona
-    [I] Southern European Countries / Spain ↩
+    [I] Southern European Countries ↩
   `);
 
   await userEvent.click(
     getPane(0).getByRole("treeitem", {
-      name: "Southern European Countries / Spain ↩",
+      name: "Southern European Countries ↩",
     })
   );
   await userEvent.keyboard("!");
@@ -1092,7 +1088,7 @@ Holiday Destinations
 Holiday Destinations
   Spain
     Barcelona
-    {!} Spain
+    {!} Southern European Countries↩
   `,
     { showGutter: true }
   );
@@ -1102,7 +1098,7 @@ Holiday Destinations
 
   await expectTree(`
 Southern European Countries
-  Spain
+  Spain!↩
   `);
 
   cleanup();
@@ -1168,8 +1164,8 @@ My Links
   await expectTree(`
 B
   B-child
-[I] A / Open B ↩
-[I] My Links / Open B ↩
+  [I] A ↩
+  [I] My Links ↩
   `);
 
   cleanup();
@@ -1252,14 +1248,12 @@ Links
   await expectTree(`
 Holiday Destinations
   Spain
+  [I] Links ↩
 Pack List
   Charger
-[I] Links / Holidays ↩
   `);
 
-  await userEvent.click(
-    await screen.findByLabelText("Navigate to Links / Holidays ↩")
-  );
+  await userEvent.click(await screen.findByLabelText("Navigate to Links ↩"));
 
   await expectTree(`
 Links
@@ -1321,33 +1315,33 @@ test("Document heading file link incoming refs can become bidirectional", async 
   await expectTree(`
 Holiday Destinations
   Spain
+  [I] Links ↩
 Pack List
   Charger
-[I] Links / Holidays ↩
   `);
 
   const incomingRow = getPane(0).getByRole("treeitem", {
-    name: "Links / Holidays ↩",
+    name: "Links ↩",
   });
   const sourceRowId = incomingRow.getAttribute("data-node-id");
   if (!sourceRowId) throw new Error("Incoming source id missing");
   await userEvent.click(incomingRow);
   await userEvent.keyboard("!");
 
-  await userEvent.click(await screen.findByRole("link", { name: "Holidays" }));
+  await userEvent.click(await screen.findByRole("link", { name: "Links" }));
 
   await expectTree(`
 Links
-  Holidays
+  Holidays!↩
   `);
 
   await expectMarkdown(
     workspacePath,
     "files.md",
     `
-# Links
+# Links <!-- id:... -->
 
-[Holidays](./holidays.md)
+[Holidays](./holidays.md) <!-- id:... -->
 `
   );
 
@@ -1359,17 +1353,17 @@ Links
 
 Spain <!-- id:... -->
 
+- (!) [Links](#${sourceRowId}) <!-- id:... -->
+
 # Pack List <!-- id:... -->
 
 - Charger <!-- id:... -->
-
-# (!) [Holidays](#${sourceRowId}) <!-- id:... -->
 `
   );
 
   cleanup();
   await renderDocumentRoute(workspacePath, "holidays.md");
-  await screen.findByRole("link", { name: "Holidays" });
+  await screen.findByRole("link", { name: "Links" });
 
   cleanup();
 });
@@ -1388,32 +1382,32 @@ test("Document list file link incoming refs can become bidirectional", async () 
   await expectTree(`
 Holiday Destinations
   Spain
+  [I] Links ↩
 Pack List
   Charger
-[I] Links / Holidays ↩
   `);
 
   const incomingRow = getPane(0).getByRole("treeitem", {
-    name: "Links / Holidays ↩",
+    name: "Links ↩",
   });
   const sourceRowId = incomingRow.getAttribute("data-node-id");
   if (!sourceRowId) throw new Error("Incoming source id missing");
   await userEvent.click(incomingRow);
   await userEvent.keyboard("!");
 
-  await userEvent.click(await screen.findByRole("link", { name: "Holidays" }));
+  await userEvent.click(await screen.findByRole("link", { name: "Links" }));
 
   await expectTree(`
 Links
-  Holidays
+  Holidays!↩
   `);
 
   await expectMarkdown(
     workspacePath,
     "files.md",
     `
-- Links
-  - [Holidays](./holidays.md)
+- Links <!-- id:... -->
+  - [Holidays](./holidays.md) <!-- id:... -->
 `
   );
 
@@ -1423,15 +1417,15 @@ Links
     `
 - Holiday Destinations <!-- id:... -->
   - Spain <!-- id:... -->
+  - (!) [Links](#${sourceRowId}) <!-- id:... -->
 - Pack List <!-- id:... -->
   - Charger <!-- id:... -->
-- (!) [Holidays](#${sourceRowId}) <!-- id:... -->
 `
   );
 
   cleanup();
   await renderDocumentRoute(workspacePath, "holidays.md");
-  await screen.findByRole("link", { name: "Holidays" });
+  await screen.findByRole("link", { name: "Links" });
 
   cleanup();
 });

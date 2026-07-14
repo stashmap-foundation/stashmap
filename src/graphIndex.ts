@@ -249,7 +249,7 @@ function addNodeIndexEntries(
     addToNodeMap(graphIndex.basedOnIndex, node.basedOn, node.id);
   }
 
-  if (!node.parent && node.relevance !== "not_relevant") {
+  if (!node.parent) {
     addNodeLinkEntries(graphIndex, node, sourceId, sourceFilePath, node.id);
   }
 
@@ -258,7 +258,7 @@ function addNodeIndexEntries(
       return;
     }
     const childNode = getNodeInIndexedSource(graphIndex, sourceId, childID);
-    if (!childNode || childNode.relevance === "not_relevant") {
+    if (!childNode) {
       return;
     }
     addNodeLinkEntries(
@@ -281,7 +281,7 @@ function removeNodeIndexEntries(
     removeFromNodeMap(graphIndex.basedOnIndex, node.basedOn, node.id);
   }
 
-  if (!node.parent && node.relevance !== "not_relevant") {
+  if (!node.parent) {
     removeNodeLinkEntries(graphIndex, node, sourceId, sourceFilePath, node.id);
   }
 
@@ -290,7 +290,7 @@ function removeNodeIndexEntries(
       return;
     }
     const childNode = getNodeInIndexedSource(graphIndex, sourceId, childID);
-    if (!childNode || childNode.relevance === "not_relevant") {
+    if (!childNode) {
       return;
     }
     removeNodeLinkEntries(

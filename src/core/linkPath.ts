@@ -20,7 +20,17 @@ export function docLinkId(href: string): string | undefined {
   return href.startsWith("doc:") ? href.slice("doc:".length) : undefined;
 }
 
-export function classifyLinkHref(href: string) {
+export function classifyLinkHref(
+  href: string
+):
+  | "entity"
+  | "calendar"
+  | "node"
+  | "feed"
+  | "website"
+  | "document"
+  | "file"
+  | "unsupported" {
   if (isEntityLinkHref(href)) return "entity";
   if (href.startsWith("#ical:")) return "calendar";
   if (href.startsWith("#") && href.length > 1) return "node";

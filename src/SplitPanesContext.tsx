@@ -4,6 +4,7 @@ import { planUpdatePanes, usePlanner } from "./planner";
 import { useData } from "./DataContext";
 import {
   parseDocumentRouteUrl,
+  parseFallbackLabelFromSearch,
   parseNodeRouteUrl,
   parseSourceFromSearch,
   resolveAddress,
@@ -51,7 +52,8 @@ type PaneOperations = {
     sourceId: SourceId,
     rootNodeId?: ID,
     scrollToId?: string,
-    documentId?: string
+    documentId?: string,
+    fallbackLabel?: string
   ) => void;
   removePane: (paneId: string) => void;
   setPane: (pane: Pane) => void;
@@ -67,7 +69,8 @@ export function useSplitPanes(): PaneOperations {
     sourceId: SourceId,
     rootNodeId?: ID,
     scrollToId?: string,
-    documentId?: string
+    documentId?: string,
+    fallbackLabel?: string
   ): void => {
     const newPane: Pane = {
       id: generatePaneId(),
@@ -75,6 +78,7 @@ export function useSplitPanes(): PaneOperations {
       documentId,
       rootNodeId,
       scrollToId,
+      fallbackLabel,
     };
     const newPanes = [...panes.slice(0, index), newPane, ...panes.slice(index)];
     const plan = createPlan();
@@ -126,6 +130,7 @@ export function useNavigatePane(): (url: string) => void {
       parseSourceFromSearch(search),
       user?.publicKey
     );
+    const fallbackLabel = parseFallbackLabelFromSearch(search);
     const documentRoute = parseDocumentRouteUrl(pathname);
     if (documentRoute) {
       const docSource = resolveAddress(documentRoute.address, user?.publicKey);
@@ -134,6 +139,7 @@ export function useNavigatePane(): (url: string) => void {
         sourceId: docSource,
         documentId: documentRoute.docId,
         scrollToId,
+        fallbackLabel: undefined,
       });
       return;
     }
@@ -144,11 +150,13 @@ export function useNavigatePane(): (url: string) => void {
         sourceId,
         rootNodeId: nodeID,
         scrollToId,
+        fallbackLabel,
       });
     } else {
       setPane({
         id: pane.id,
         sourceId: sourceId || LOCAL,
+        fallbackLabel: undefined,
       });
     }
   };

@@ -216,34 +216,252 @@ Other
     expect(screen.queryByText(/Loading/)).toBeNull();
   });
 
-  test("Dangling entity link renders plainly, never as (deleted)", async () => {
+  test("Dangling entity link opens a transient surface with its label", async () => {
     const [alice] = setup([ALICE]);
-    renderApp(alice());
+    const fetchEntityMetadata = jest.fn(() =>
+      Promise.resolve(new Response("", { status: 503 }))
+    );
+    renderApp({ ...alice(), fetchEntityMetadata });
 
     await type(
       "Places{Enter}{Tab}https://www.wikidata.org/wiki/Q131723{Escape}"
     );
 
-    // The pasted marker became a link row targeting wd:Q131723 with no
-    // home page — the ordinary dangling state, not a deletion.
     await expectTree(`
 Places
   https://www.wikidata.org/wiki/Q131723
     `);
     expect(screen.queryByText(/deleted/)).toBeNull();
 
-    // Violet means entity — the link target carries the canonical id, so
-    // recognition feedback fires with or without a home page (the violet
-    // law: node id or link target).
     const entityLink = screen.getByRole("link", {
       name: "https://www.wikidata.org/wiki/Q131723",
     });
     expect(entityLink.style.color).toBe("var(--violet)");
     await userEvent.click(entityLink);
+
+    await expectTree(`
+https://www.wikidata.org/wiki/Q131723
+  [I] Places ↩
+    `);
+    expect(
+      new URLSearchParams(window.location.search).get("fallbackLabel")
+    ).toBe("https://www.wikidata.org/wiki/Q131723");
+    await waitFor(() => expect(fetchEntityMetadata).toHaveBeenCalledTimes(1));
+  });
+
+  test("Id-only dangling entity route stays read-only with a default title", async () => {
+    const [alice] = setup([ALICE]);
+    const fetchEntityMetadata = jest.fn(() =>
+      Promise.resolve(new Response("", { status: 503 }))
+    );
+    const { relayPool } = renderApp({
+      ...alice(),
+      fetchEntityMetadata,
+      initialRoute: "/r/wd%3AQ999?source=local",
+    });
+
+    await screen.findByRole("treeitem", { name: "Entity wd:Q999" });
+    expect(relayPool.getDecryptedEvents()).toHaveLength(0);
+    await waitFor(() => expect(fetchEntityMetadata).toHaveBeenCalledTimes(1));
+  });
+
+  test("Existing local entity home opens without label request", async () => {
+    const [alice] = setup([ALICE]);
+    const fetchEntityMetadata = jest.fn(() =>
+      Promise.resolve(new Response("", { status: 503 }))
+    );
+    renderApp({ ...alice(), fetchEntityMetadata });
+
+    await type("https://www.wikidata.org/wiki/Q1492{Escape}");
+    await expectTree(`
+https://www.wikidata.org/wiki/Q1492
+    `);
+
+    await userEvent.click(await screen.findByLabelText("Create new note"));
+    await type("Trip{Escape}");
+    Reflect.defineProperty(navigator, "clipboard", {
+      value: {
+        readText: jest.fn(() => Promise.resolve("[Barcelona](#wd:Q1492)")),
+      },
+      configurable: true,
+    });
+    await userEvent.click(screen.getByRole("treeitem", { name: "Trip" }));
+    await userEvent.keyboard("{Meta>}v{/Meta}");
+
+    await userEvent.click(screen.getByRole("link", { name: "Barcelona" }));
+    await expectTree(`
+https://www.wikidata.org/wiki/Q1492
+  [I] Trip ↩
+    `);
+    expect(fetchEntityMetadata).not.toHaveBeenCalled();
+  });
+
+  test("Differently labelled entity links keep their own route titles", async () => {
+    const [alice] = setup([ALICE]);
+    const fetchEntityMetadata = jest.fn(() =>
+      Promise.resolve(new Response("", { status: 503 }))
+    );
+    renderApp({ ...alice(), fetchEntityMetadata });
+
+    await type("Trip{Escape}");
+    Reflect.defineProperty(navigator, "clipboard", {
+      value: {
+        readText: jest.fn(() =>
+          Promise.resolve("[Barcelona](#wd:Q1492)\n[Barna](#wd:Q1492)")
+        ),
+      },
+      configurable: true,
+    });
+    await userEvent.click(screen.getByRole("treeitem", { name: "Trip" }));
+    await userEvent.keyboard("{Meta>}v{/Meta}");
+
+    await expectTree(`
+Trip
+  Barcelona
+  Barna
+    `);
+
+    await userEvent.click(screen.getByRole("link", { name: "Barcelona" }));
+    await expectTree(`
+Barcelona
+  [I] Trip ↩
+    `);
+    expect(
+      new URLSearchParams(window.location.search).get("fallbackLabel")
+    ).toBe("Barcelona");
+    await waitFor(() => expect(fetchEntityMetadata).toHaveBeenCalledTimes(1));
+
+    await userEvent.click(await screen.findByLabelText("Go back"));
+    await userEvent.click(screen.getByRole("link", { name: "Barna" }));
+    await expectTree(`
+Barna
+  [I] Trip ↩
+    `);
+    expect(
+      new URLSearchParams(window.location.search).get("fallbackLabel")
+    ).toBe("Barna");
+    await waitFor(() => expect(fetchEntityMetadata).toHaveBeenCalledTimes(1));
+  });
+
+  test("Wikidata 429 starts a provider cooldown for other entities", async () => {
+    const [alice] = setup([ALICE]);
+    const rateLimitedResponse = new Response("", { status: 429 });
+    Reflect.defineProperty(rateLimitedResponse, "status", { value: 429 });
+    Reflect.defineProperty(rateLimitedResponse, "headers", {
+      value: { get: () => "60" },
+    });
+    const fetchEntityMetadata = jest.fn(() =>
+      Promise.resolve(rateLimitedResponse)
+    );
+    renderApp({ ...alice(), fetchEntityMetadata });
+
+    await type("Trip{Escape}");
+    Reflect.defineProperty(navigator, "clipboard", {
+      value: {
+        readText: jest.fn(() =>
+          Promise.resolve("[Barcelona](#wd:Q1492)\n[Madrid](#wd:Q2807)")
+        ),
+      },
+      configurable: true,
+    });
+    await userEvent.click(screen.getByRole("treeitem", { name: "Trip" }));
+    await userEvent.keyboard("{Meta>}v{/Meta}");
+
+    await userEvent.click(screen.getByRole("link", { name: "Barcelona" }));
+    await expectTree(`
+Barcelona
+  [I] Trip ↩
+    `);
+    await waitFor(() => expect(fetchEntityMetadata).toHaveBeenCalledTimes(1));
+    await Promise.resolve();
+
+    await userEvent.click(await screen.findByLabelText("Go back"));
+    await userEvent.click(screen.getByRole("link", { name: "Madrid" }));
+    await expectTree(`
+Madrid
+  [I] Trip ↩
+    `);
+    expect(fetchEntityMetadata).toHaveBeenCalledTimes(1);
+  });
+
+  test("Resolved Wikidata labels replace only the transient title and route hint", async () => {
+    const [alice] = setup([ALICE]);
+    const fetchEntityMetadata = jest.fn(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            entities: {
+              Q1492: {
+                labels: {
+                  de: { value: "Barcelona auf Deutsch" },
+                  en: { value: "Barcelona" },
+                },
+              },
+            },
+          }),
+          { status: 200 }
+        )
+      )
+    );
+    const originalLanguages = navigator.languages;
+    Reflect.defineProperty(navigator, "languages", {
+      value: ["de-DE", "en-US"],
+      configurable: true,
+    });
+    renderApp({
+      ...alice(),
+      fetchEntityMetadata,
+      initialRoute: "/r/wd%3AQ1492?source=local&fallbackLabel=Local%20Name",
+    });
+
+    screen.getByRole("treeitem", { name: "Local Name" });
+    await waitFor(() => expect(fetchEntityMetadata).toHaveBeenCalledTimes(1));
+    await screen.findByRole("treeitem", { name: "Barcelona auf Deutsch" });
+    expect(
+      new URLSearchParams(window.location.search).get("fallbackLabel")
+    ).toBe("Barcelona auf Deutsch");
+    expect(fetchEntityMetadata).toHaveBeenCalledTimes(1);
+    Reflect.defineProperty(navigator, "languages", {
+      value: originalLanguages,
+      configurable: true,
+    });
+  });
+
+  test("First write on a dangling entity surface creates one canonical root", async () => {
+    const [alice] = setup([ALICE]);
+    const asset = "asset:rgb:AAAABBBBCCCCDDDDEEEE12345";
+    const { relayPool } = renderApp({
+      ...alice(),
+      initialRoute: `/r/${encodeURIComponent(
+        asset
+      )}?source=local&fallbackLabel=Asset%20Label`,
+    });
+
+    await screen.findByRole("treeitem", { name: "Asset Label" });
+    expect(relayPool.getDecryptedEvents()).toHaveLength(0);
+
+    await userEvent.click(await screen.findByLabelText("edit Asset Label"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(
+      await screen.findByLabelText("new node editor"),
+      "Child"
+    );
+    await userEvent.keyboard("{Escape}");
+
+    await expectTree(`
+Asset Label
+  Child
+    `);
     await waitFor(() => {
-      expect(decodeURIComponent(window.location.pathname)).toBe(
-        "/r/wd:Q131723"
-      );
+      expect(
+        relayPool
+          .getDecryptedEvents()
+          .some(
+            (event) =>
+              event.content.includes(`Asset Label <!-- id:${asset} -->`) &&
+              event.content.includes("Child")
+          )
+      ).toBe(true);
     });
   });
 

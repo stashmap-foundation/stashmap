@@ -28,15 +28,25 @@ export function addressForSource(
   return myPublicKey ? encodePublicKeyAddress(myPublicKey) : undefined;
 }
 
+export type NodeRouteOptions = {
+  scrollToId: ID | undefined;
+  fallbackLabel: string | undefined;
+};
+
 export function buildNodeRouteUrl(
   rootNode: ID,
   sourceId: SourceId,
-  scrollToId?: ID
+  options: NodeRouteOptions
 ): string {
-  const base = `/r/${encodeURIComponent(rootNode)}?source=${encodeURIComponent(
-    sourceId
-  )}`;
-  return scrollToId ? `${base}#${encodeURIComponent(scrollToId)}` : base;
+  const params = new URLSearchParams();
+  params.set("source", sourceId);
+  if (options.fallbackLabel !== undefined && options.fallbackLabel !== "") {
+    params.set("fallbackLabel", options.fallbackLabel);
+  }
+  const base = `/r/${encodeURIComponent(rootNode)}?${params.toString()}`;
+  return options.scrollToId
+    ? `${base}#${encodeURIComponent(options.scrollToId)}`
+    : base;
 }
 
 export function buildDocumentRouteUrl(
@@ -73,6 +83,14 @@ export function parseSourceFromSearch(search: string): SourceId | undefined {
   const params = new URLSearchParams(search);
   const sourceId = params.get("source");
   return sourceId || undefined;
+}
+
+export function parseFallbackLabelFromSearch(
+  search: string
+): string | undefined {
+  const params = new URLSearchParams(search);
+  const fallbackLabel = params.get("fallbackLabel");
+  return fallbackLabel || undefined;
 }
 
 // Capability links carry the document's storage key in the fragment so it

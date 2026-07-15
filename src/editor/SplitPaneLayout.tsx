@@ -51,6 +51,7 @@ export function PaneSearchButton(): JSX.Element {
         documentId: undefined,
         rootNodeId: undefined,
         scrollToId: undefined,
+        fallbackLabel: undefined,
         searchQuery: trimmedQuery,
         searchResultIDs,
       });

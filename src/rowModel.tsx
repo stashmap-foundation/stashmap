@@ -10,6 +10,7 @@ import {
   getRefTargetInfo,
 } from "./core/connections";
 import { useData } from "./DataContext";
+import { isCanonicalId } from "./core/entityRecognition";
 import { nodeText } from "./core/nodeSpans";
 import { EditorNavigationTarget } from "./editor/linkOperations";
 import { searchTargetID } from "./localSearch";
@@ -172,6 +173,9 @@ export function buildPaneTarget(data: Data, row: Row): EditorNavigationTarget {
     : {
         sourceId: row.sourceId,
         rootNodeId: row.node.id,
+        ...(isCanonicalId(row.node.id) && {
+          fallbackLabel: nodeText(row.node),
+        }),
       };
 }
 

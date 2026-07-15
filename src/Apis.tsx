@@ -18,6 +18,7 @@ export type Apis = {
   };
   eventLoadingTimeout: number;
   fetchCalendarFeed?: (url: string) => Promise<string>;
+  fetchEntityMetadata?: (url: string) => Promise<Response>;
 };
 
 const ApiContext = React.createContext<Apis | undefined>(undefined);

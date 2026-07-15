@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { List } from "immutable";
 import { useLocation } from "react-router-dom";
+import { LOCAL } from "../core/nodeRef";
 import { useDragAutoScroll } from "../useDragAutoScroll";
 import { ListItem } from "./Draggable";
 import {
@@ -13,7 +14,11 @@ import {
 import { useData } from "../DataContext";
 import { useCalendarFeeds } from "../CalendarFeedContext";
 import { calendarFeedUrl } from "../core/ical";
-import { useCurrentPane, usePaneIndex } from "../SplitPanesContext";
+import {
+  useCurrentPane,
+  usePaneIndex,
+  useSplitPanes,
+} from "../SplitPanesContext";
 import { useApis } from "../Apis";
 import {
   ActiveRowState,
@@ -36,7 +41,14 @@ import {
   getNodesInTree,
   type TreeResult,
 } from "../treeTraversal";
+import { isCanonicalId } from "../core/entityRecognition";
+import { getNodeInSource, graphLookupFromData } from "../core/graphLookup";
+import { newGraphNode } from "../core/nodeFactory";
+import { nodeText, plainSpans } from "../core/nodeSpans";
 import { getDocumentByIdOrFilePath } from "../core/Document";
+import { useEntityLabels } from "../EntityLabelContext";
+import { defaultEntitySurfaceTitle } from "../entityLabels";
+import { useNavigationState } from "../NavigationStateContext";
 
 const PaneTreeResultContext = React.createContext<TreeResult | undefined>(
   undefined
@@ -44,6 +56,19 @@ const PaneTreeResultContext = React.createContext<TreeResult | undefined>(
 
 function getPaneTraversalRootPath(pane: Pane, paneIndex: number): ViewPath {
   return [paneIndex, getPaneRootItemID(pane)];
+}
+
+function activeNodeId(): string | undefined {
+  if (typeof document === "undefined") {
+    return undefined;
+  }
+  const active = document.activeElement;
+  if (!(active instanceof HTMLElement)) {
+    return undefined;
+  }
+  return (
+    active.closest("[data-node-id]")?.getAttribute("data-node-id") ?? undefined
+  );
 }
 
 export function usePaneTreeResult(): TreeResult | undefined {
@@ -62,12 +87,15 @@ export function PaneTreeResultProvider({
     [baseData, calendarFeeds]
   );
   const pane = useCurrentPane();
+  const { setPane } = useSplitPanes();
+  const { replaceNextNavigation } = useNavigationState();
+  const { labelFor, requestLabel } = useEntityLabels();
   const paneIndex = usePaneIndex();
   const viewPath = useMemo(
     () => getPaneTraversalRootPath(pane, paneIndex),
     [pane.rootNodeId, pane.searchQuery, paneIndex]
   );
-  const document = pane.documentId
+  const paneDocument = pane.documentId
     ? getDocumentByIdOrFilePath(
         data.documents,
         data.documentByFilePath,
@@ -75,9 +103,43 @@ export function PaneTreeResultProvider({
         pane.documentId
       )
     : undefined;
+  const canonicalRootId =
+    pane.sourceId === LOCAL && pane.rootNodeId && isCanonicalId(pane.rootNodeId)
+      ? pane.rootNodeId
+      : undefined;
+  const localCanonicalRoot = useMemo(() => {
+    if (!canonicalRootId) {
+      return undefined;
+    }
+    return getNodeInSource(graphLookupFromData(data), {
+      sourceId: LOCAL,
+      id: canonicalRootId,
+    })?.node;
+  }, [canonicalRootId, data]);
+  const resolvedLabel = canonicalRootId ? labelFor(canonicalRootId) : undefined;
+  const focusedCanonicalRoot =
+    canonicalRootId !== undefined && activeNodeId() === canonicalRootId;
+  const displayedResolvedLabel = focusedCanonicalRoot
+    ? undefined
+    : resolvedLabel;
+  const projectedRoot = useMemo(() => {
+    if (!canonicalRootId || localCanonicalRoot) {
+      return undefined;
+    }
+    const displayTitle =
+      displayedResolvedLabel ??
+      pane.fallbackLabel ??
+      defaultEntitySurfaceTitle(canonicalRootId);
+    return newGraphNode(plainSpans(displayTitle), { uuid: canonicalRootId });
+  }, [
+    canonicalRootId,
+    displayedResolvedLabel,
+    localCanonicalRoot,
+    pane.fallbackLabel,
+  ]);
   const treeResult = useMemo(() => {
-    if (document) {
-      return getNodesInDocument(data, viewPath, document, pane.typeFilters);
+    if (paneDocument) {
+      return getNodesInDocument(data, viewPath, paneDocument, pane.typeFilters);
     }
     return getNodesInTree(
       data,
@@ -85,15 +147,61 @@ export function PaneTreeResultProvider({
       List<ViewPath>(),
       pane.rootNodeId,
       pane.sourceId,
-      pane.typeFilters
+      pane.typeFilters,
+      { projectedRoot }
     );
   }, [
     data,
-    document,
+    paneDocument,
     pane.sourceId,
     pane.rootNodeId,
     pane.typeFilters,
+    projectedRoot,
     viewPath,
+  ]);
+
+  useEffect(() => {
+    if (projectedRoot) {
+      requestLabel(projectedRoot.id);
+    }
+  }, [projectedRoot, requestLabel]);
+
+  useEffect(() => {
+    if (!canonicalRootId || !localCanonicalRoot) {
+      return;
+    }
+    const localFallbackLabel = nodeText(localCanonicalRoot) || undefined;
+    if (pane.fallbackLabel === localFallbackLabel) {
+      return;
+    }
+    replaceNextNavigation();
+    setPane({ ...pane, fallbackLabel: localFallbackLabel });
+  }, [
+    canonicalRootId,
+    localCanonicalRoot,
+    pane,
+    replaceNextNavigation,
+    setPane,
+  ]);
+
+  useEffect(() => {
+    if (
+      !projectedRoot ||
+      focusedCanonicalRoot ||
+      resolvedLabel === undefined ||
+      pane.fallbackLabel === resolvedLabel
+    ) {
+      return;
+    }
+    replaceNextNavigation();
+    setPane({ ...pane, fallbackLabel: resolvedLabel });
+  }, [
+    focusedCanonicalRoot,
+    pane,
+    projectedRoot,
+    replaceNextNavigation,
+    resolvedLabel,
+    setPane,
   ]);
 
   // Fetch-on-render: any visible calendar-feed node requests its feed;

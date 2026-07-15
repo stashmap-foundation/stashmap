@@ -10,6 +10,7 @@ import {
   buildDocumentRouteUrl,
   buildNodeRouteUrl,
   parseDocumentRouteUrl,
+  parseFallbackLabelFromSearch,
   parseNodeRouteUrl,
   parseSourceFromSearch,
   parseStorageKeyFromHash,
@@ -57,11 +58,10 @@ function paneToUrl(
     );
   }
   if (activePane.rootNodeId && address) {
-    return buildNodeRouteUrl(
-      activePane.rootNodeId,
-      address,
-      activePane.scrollToId
-    );
+    return buildNodeRouteUrl(activePane.rootNodeId, address, {
+      scrollToId: activePane.scrollToId,
+      fallbackLabel: activePane.fallbackLabel,
+    });
   }
 
   return "/";
@@ -74,6 +74,7 @@ function urlToPane(
   myPublicKey: PublicKey | undefined
 ): Pane {
   const sourceId = resolveAddress(parseSourceFromSearch(search), myPublicKey);
+  const fallbackLabel = parseFallbackLabelFromSearch(search);
   const storageKey = parseStorageKeyFromHash(hash);
   const documentRoute = parseDocumentRouteUrl(pathname);
   if (documentRoute) {
@@ -90,6 +91,7 @@ function urlToPane(
       id: generatePaneId(),
       sourceId,
       rootNodeId: nodeID,
+      ...(fallbackLabel !== undefined && { fallbackLabel }),
       ...(storageKey !== undefined && { storageKey }),
     };
   }

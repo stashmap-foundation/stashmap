@@ -384,7 +384,7 @@ Salon
   });
 });
 
-test("following a dangling entry link opens the carrying calendar at the entry", async () => {
+test("following a dangling entry link opens the entry surface", async () => {
   const [alice] = setup([ALICE]);
   renderApp({
     ...alice(),
@@ -403,10 +403,12 @@ test("following a dangling entry link opens the carrying calendar at the entry",
     await screen.findByRole("link", { name: dunbarText() })
   );
   await expectTree(`
-https://scholarium.at/salon.ics
-  14.07.2030 Sommerfest
-  ${dunbarText()}
+${dunbarText()}
+  [I] Salon ↩
   `);
+  expect(new URLSearchParams(window.location.search).get("fallbackLabel")).toBe(
+    dunbarText()
+  );
 });
 
 test("cross-pane drag of an entry lays down a link row, never a copy", async () => {

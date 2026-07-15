@@ -140,6 +140,7 @@ export function paneToJSON(pane: Pane): Serializable {
     s: pane.sourceId,
     d: pane.documentId,
     r: pane.rootNodeId,
+    l: pane.fallbackLabel,
     h: pane.searchQuery,
     q: pane.searchResultIDs,
     t: pane.typeFilters,
@@ -156,6 +157,7 @@ function jsonToPane(s: Serializable): Pane | undefined {
     sourceId: asString(obj.s),
     documentId: obj.d !== undefined ? asString(obj.d) : undefined,
     rootNodeId: obj.r !== undefined ? (asString(obj.r) as ID) : undefined,
+    fallbackLabel: obj.l !== undefined ? asString(obj.l) : undefined,
     searchQuery: obj.h !== undefined ? asString(obj.h) : undefined,
     searchResultIDs:
       obj.q !== undefined

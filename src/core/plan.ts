@@ -596,6 +596,7 @@ export type MaterializableRow = {
     // The row's parent when that parent is itself computed: the take
     // materializes the host first, then lands under what it returns.
     host?: MaterializableRow;
+    root?: true;
   };
 };
 
@@ -626,8 +627,31 @@ export function planMaterializeComputedRow<T extends GraphPlan>(
   metadata?: { relevance?: Relevance; argument?: Argument },
   placement?: { parentID?: ID; insertIndex?: number }
 ): [T, GraphNode, boolean] {
+  if (!row.materialize) {
+    return [plan, row.node, false];
+  }
+  if (row.materialize.root) {
+    const existingRoot = getWorkspaceNode(plan.knowledgeDBs, row.node.id);
+    if (existingRoot) {
+      return [plan, existingRoot, false];
+    }
+    const rootNode: GraphNode = {
+      ...row.node,
+      parent: undefined,
+      root: row.node.id,
+      updated: Date.now(),
+      relevance: metadata?.relevance,
+      argument: metadata?.argument,
+    };
+    const planWithRoot = planUpsertNodes(plan, rootNode);
+    const materializedRoot = getWorkspaceNode(
+      planWithRoot.knowledgeDBs,
+      rootNode.id
+    );
+    return [planWithRoot, materializedRoot ?? rootNode, true];
+  }
   const parentID = placement?.parentID ?? row.parentRef?.id;
-  if (!row.materialize || parentID === undefined) {
+  if (parentID === undefined) {
     return [plan, row.node, false];
   }
   const parentNode = getWorkspaceNode(plan.knowledgeDBs, parentID);

@@ -58,6 +58,7 @@ import {
 } from "../planner";
 import { parseTextToTrees, planPasteMarkdownTrees } from "./FileDropZone";
 import { getNodeText } from "../core/connections";
+import { isCanonicalId } from "../core/entityRecognition";
 import { getOwnLogRoot } from "../core/systemRoots";
 import {
   addressForSource,
@@ -96,6 +97,7 @@ import { planDeleteNode } from "../treeMutations";
 import { IS_MOBILE } from "./responsive";
 import { MobileActionBar } from "./MobileActionBar";
 import { nodeText } from "../core/nodeSpans";
+import { defaultEntitySurfaceTitle } from "../entityLabels";
 
 function BreadcrumbItem({
   label,
@@ -153,6 +155,7 @@ type BreadcrumbTarget = {
   documentId?: string;
   rootNodeId?: ID;
   scrollToId?: string;
+  fallbackLabel?: string;
 };
 
 type BreadcrumbEntry = {
@@ -289,11 +292,10 @@ function Breadcrumbs(): JSX.Element {
             );
           }
           if (target?.rootNodeId) {
-            return buildNodeRouteUrl(
-              target.rootNodeId,
-              target.sourceId,
-              target.scrollToId
-            );
+            return buildNodeRouteUrl(target.rootNodeId, target.sourceId, {
+              scrollToId: target.scrollToId,
+              fallbackLabel: target.fallbackLabel,
+            });
           }
           return undefined;
         })();
@@ -310,6 +312,7 @@ function Breadcrumbs(): JSX.Element {
                   searchQuery: undefined,
                   searchResultIDs: undefined,
                   scrollToId: target.scrollToId,
+                  fallbackLabel: undefined,
                 });
                 return;
               }
@@ -322,6 +325,7 @@ function Breadcrumbs(): JSX.Element {
                   searchQuery: undefined,
                   searchResultIDs: undefined,
                   scrollToId: target.scrollToId,
+                  fallbackLabel: target.fallbackLabel,
                 });
                 return;
               }
@@ -382,7 +386,10 @@ function ForkButton(): JSX.Element | null {
   };
 
   if (!isAtRoot) {
-    const href = buildNodeRouteUrl(rootNodeId, currentPane.sourceId);
+    const href = buildNodeRouteUrl(rootNodeId, currentPane.sourceId, {
+      scrollToId: undefined,
+      fallbackLabel: currentPane.fallbackLabel,
+    });
     return (
       <a
         href={href}
@@ -417,7 +424,10 @@ function HomeButton(): JSX.Element | null {
   if (!logNode) {
     return null;
   }
-  const href = buildNodeRouteUrl(logNode.id, LOCAL);
+  const href = buildNodeRouteUrl(logNode.id, LOCAL, {
+    scrollToId: undefined,
+    fallbackLabel: undefined,
+  });
 
   return (
     <a
@@ -466,7 +476,10 @@ function useHomeShortcut(): void {
         if (!logNode) {
           return;
         }
-        const href = buildNodeRouteUrl(logNode.id, LOCAL);
+        const href = buildNodeRouteUrl(logNode.id, LOCAL, {
+          scrollToId: undefined,
+          fallbackLabel: undefined,
+        });
         e.preventDefault();
         navigatePane(href);
       }
@@ -898,6 +911,9 @@ function CurrentNodeName(): JSX.Element {
     }
     if (rootNode) {
       return nodeText(rootNode);
+    }
+    if (pane.rootNodeId && isCanonicalId(pane.rootNodeId)) {
+      return pane.fallbackLabel ?? defaultEntitySurfaceTitle(pane.rootNodeId);
     }
     return "";
   })();

@@ -1,4 +1,3 @@
-import { calendarFeedUrl, isCalendarEntryId } from "../core/ical";
 import { LOCAL } from "../core/nodeRef";
 import { Document, getDocumentForNode, documentKeyOf } from "../core/Document";
 import {
@@ -14,6 +13,7 @@ export type EditorNavigationTarget = {
   documentId?: string;
   rootNodeId?: ID;
   scrollToId?: string;
+  fallbackLabel?: string;
 };
 
 function sourceFilePath(
@@ -42,39 +42,6 @@ export function resolveDocumentTarget(
   return data.documentByFilePath.get(resolvedPath);
 }
 
-function calendarEntryFallbackTarget(
-  data: Data,
-  targetID: ID
-): EditorNavigationTarget | undefined {
-  if (!isCalendarEntryId(targetID) || !data.calendarFeeds) {
-    return undefined;
-  }
-  const carryingUrl = data.calendarFeeds.findKey((entries) =>
-    entries.some((entry) => entry.id === targetID)
-  );
-  if (!carryingUrl) {
-    return undefined;
-  }
-  const findIn = (sourceId: SourceId): EditorNavigationTarget | undefined => {
-    const node = data.knowledgeDBs
-      .get(sourceId)
-      ?.nodes.find((candidate) => calendarFeedUrl(candidate) === carryingUrl);
-    return node
-      ? { sourceId, rootNodeId: node.id, scrollToId: targetID }
-      : undefined;
-  };
-  return (
-    findIn(LOCAL) ??
-    data.knowledgeDBs
-      .keySeq()
-      .filter((sourceId) => sourceId !== LOCAL)
-      .reduce<EditorNavigationTarget | undefined>(
-        (found, sourceId) => found ?? findIn(sourceId),
-        undefined
-      )
-  );
-}
-
 export function navigationTargetToHref(
   target: EditorNavigationTarget
 ): string | undefined {
@@ -86,7 +53,10 @@ export function navigationTargetToHref(
     );
   }
   return target.rootNodeId
-    ? buildNodeRouteUrl(target.rootNodeId, target.sourceId, target.scrollToId)
+    ? buildNodeRouteUrl(target.rootNodeId, target.sourceId, {
+        scrollToId: target.scrollToId,
+        fallbackLabel: target.fallbackLabel,
+      })
     : undefined;
 }
 
@@ -98,8 +68,7 @@ export function inlineTargetToHref(
   const graph = graphLookupFromData(data);
   const target = lookupNode(graph, targetID, sourceId);
   if (!target) {
-    const fallback = calendarEntryFallbackTarget(data, targetID);
-    return fallback ? navigationTargetToHref(fallback) : undefined;
+    return undefined;
   }
   const parent = target.node.parent
     ? getNodeInSource(graph, {
@@ -108,11 +77,31 @@ export function inlineTargetToHref(
       })
     : undefined;
   const targetRoot = parent ?? target;
-  return buildNodeRouteUrl(
-    targetRoot.node.id,
-    targetRoot.ref.sourceId,
-    targetRoot.node.id === target.node.id ? undefined : target.node.id
-  );
+  return buildNodeRouteUrl(targetRoot.node.id, targetRoot.ref.sourceId, {
+    scrollToId:
+      targetRoot.node.id === target.node.id ? undefined : target.node.id,
+    fallbackLabel: undefined,
+  });
+}
+
+function localTargetToHref(data: Data, targetID: ID): string | undefined {
+  const graph = graphLookupFromData(data);
+  const target = getNodeInSource(graph, { sourceId: LOCAL, id: targetID });
+  if (!target) {
+    return undefined;
+  }
+  const parent = target.node.parent
+    ? getNodeInSource(graph, {
+        sourceId: LOCAL,
+        id: target.node.parent,
+      })
+    : undefined;
+  const targetRoot = parent ?? target;
+  return buildNodeRouteUrl(targetRoot.node.id, LOCAL, {
+    scrollToId:
+      targetRoot.node.id === target.node.id ? undefined : target.node.id,
+    fallbackLabel: undefined,
+  });
 }
 
 export function isDeadLinkTarget(
@@ -141,22 +130,29 @@ export function inlineLinkToHref(
   data: Data,
   href: string,
   source: GraphNode,
-  sourceId: SourceId
+  sourceId: SourceId,
+  fallbackLabel?: string
 ): string | undefined {
   const targetClass = classifyLinkHref(href);
-  if (targetClass === "entity") {
+  if (targetClass === "entity" || targetClass === "calendar") {
     const targetID = href.slice(1);
     return (
-      inlineTargetToHref(data, targetID, sourceId) ??
-      buildNodeRouteUrl(targetID, sourceId)
+      localTargetToHref(data, targetID) ??
+      buildNodeRouteUrl(targetID, LOCAL, {
+        scrollToId: undefined,
+        fallbackLabel,
+      })
     );
   }
-  if (targetClass === "node" || targetClass === "calendar") {
+  if (targetClass === "node") {
     return (
       inlineTargetToHref(data, href.slice(1), sourceId) ??
       (sourceId === LOCAL
         ? undefined
-        : buildNodeRouteUrl(href.slice(1), sourceId))
+        : buildNodeRouteUrl(href.slice(1), sourceId, {
+            scrollToId: undefined,
+            fallbackLabel: undefined,
+          }))
     );
   }
   if (targetClass !== "document" && targetClass !== "file") {

@@ -43,7 +43,10 @@ async function renderNodeRoute(
   const profile = loadCliProfile({ cwd: workspacePath });
   await renderAppTree({
     path: workspacePath,
-    initialRoute: buildNodeRouteUrl(nodeId, profile.pubkey),
+    initialRoute: buildNodeRouteUrl(nodeId, profile.pubkey, {
+      scrollToId: undefined,
+      fallbackLabel: undefined,
+    }),
   });
 }
 

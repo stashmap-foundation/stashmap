@@ -23,9 +23,7 @@ import {
   planBatchOutdent,
 } from "./batchOperations";
 import {
-  getNodeText,
   getNode,
-  getNodeContext,
   isEmptyNodeID,
   computeEmptyNodeMetadata,
 } from "../core/connections";
@@ -197,94 +195,6 @@ function ErrorContent(): JSX.Element {
   return <span className="text-danger">Error: Node not found</span>;
 }
 
-const nodeNotFoundCounts = new Map<string, number>();
-
-function logNodeNotFoundDebug({
-  data,
-  viewPath,
-  nodeID,
-  displayText,
-}: {
-  data: Data;
-  viewPath: ViewPath;
-  nodeID: ID;
-  displayText: string;
-}): void {
-  if (process.env.DEBUG_NODE_NOT_FOUND !== "1") {
-    return;
-  }
-  const pane = data.panes[viewPath[0] as number];
-  const viewKey = viewPathToString(viewPath);
-  const logKey = `${window.location.pathname}${window.location.search}|${viewKey}`;
-  const count = (nodeNotFoundCounts.get(logKey) || 0) + 1;
-  nodeNotFoundCounts.set(logKey, count);
-  const dbs = data.knowledgeDBs
-    .entrySeq()
-    .map(([author, db]) => ({ author, nodeCount: db.nodes.size }))
-    .toArray();
-  const totalNodeCount = dbs.reduce((sum, db) => sum + db.nodeCount, 0);
-  const shouldLog =
-    count === 1 ||
-    (totalNodeCount > 0 && count % 5 === 0) ||
-    count === 30 ||
-    count === 100;
-  const matchingNodes = data.knowledgeDBs
-    .entrySeq()
-    .flatMap(([author, db]) =>
-      db.nodes
-        .valueSeq()
-        .filter((node) => getNodeText(node) === displayText)
-        .map((node) => ({
-          author,
-          id: node.id,
-          root: node.root,
-          parent: node.parent,
-          text: getNodeText(node),
-        }))
-    )
-    .toArray();
-  const userNode = getNode(data.knowledgeDBs, nodeID, LOCAL);
-  const paneNode = getNode(data.knowledgeDBs, nodeID, pane?.sourceId);
-  const rootNode = getNode(data.knowledgeDBs, pane?.rootNodeId, pane?.sourceId);
-  const nodeSummary = (
-    node: typeof userNode,
-    sourceId: SourceId
-  ): Record<string, unknown> | null =>
-    node
-      ? {
-          id: node.id,
-          root: node.root,
-          parent: node.parent,
-          text: getNodeText(node),
-          context: getNodeContext(data.knowledgeDBs, node, sourceId).toArray(),
-          children: node.children.toArray(),
-        }
-      : null;
-  if (!shouldLog) {
-    return;
-  }
-  const historyState = window.history.state as { panes?: unknown } | null;
-  // eslint-disable-next-line no-console
-  console.log("[node-not-found-debug]", {
-    count,
-    location: window.location.pathname + window.location.search,
-    historyPanes: historyState?.panes,
-    viewPath,
-    viewKey,
-    nodeID,
-    displayText,
-    pane,
-    user: LOCAL,
-    totalNodeCount,
-    dbs,
-    documents: data.documents.size,
-    userNode: nodeSummary(userNode, LOCAL),
-    paneNode: nodeSummary(paneNode, pane?.sourceId),
-    rootNode: nodeSummary(rootNode, pane?.sourceId),
-    matchingNodes,
-  });
-}
-
 function VersionContent({
   sourceId,
   meta,
@@ -345,7 +255,8 @@ function ReferenceContent({
     data,
     `#${reference.id}`,
     row.node,
-    reference.sourceId
+    reference.sourceId,
+    reference.targetLabel || reference.text
   );
   if (!href) return <ReferenceDisplay reference={reference} />;
   return (
@@ -501,7 +412,7 @@ function InlineLinkSpan({
   const internalHref =
     dead || calendarContent
       ? undefined
-      : inlineLinkToHref(data, span.href, node, sourceId);
+      : inlineLinkToHref(data, span.href, node, sourceId, span.text);
   const href = externalUrl ?? internalHref;
   const style: React.CSSProperties = isSearchResult
     ? { fontStyle: "italic", textDecoration: "none" }
@@ -1107,11 +1018,15 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       return;
     }
     await handleSave(spans);
+    const fallbackLabel = spans.find(
+      (span) => span.kind === "link" && span.href === href
+    )?.text;
     const targetHref = inlineLinkToHref(
       { ...data, calendarFeeds },
       href,
       row.node,
-      row.sourceId
+      row.sourceId,
+      fallbackLabel
     );
     if (targetHref) navigatePane(targetHref);
   };
@@ -1155,9 +1070,8 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
 }
 
 function InteractiveNodeContent({ rows }: { rows: List<Row> }): JSX.Element {
-  const data = useData();
   const row = useRow();
-  const { viewPath, virtualType, reference } = row;
+  const { virtualType, reference } = row;
   const currentNode = useCurrentNode();
   const isLoading = useNodeIsLoading();
   const isInSearchView = useIsInSearchView();
@@ -1178,12 +1092,6 @@ function InteractiveNodeContent({ rows }: { rows: List<Row> }): JSX.Element {
   }
 
   if (!currentNode && !reference && displayText === "") {
-    logNodeNotFoundDebug({
-      data,
-      viewPath,
-      nodeID: row.node.id,
-      displayText,
-    });
     return <ErrorContent />;
   }
 

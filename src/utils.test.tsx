@@ -381,7 +381,10 @@ function normalizeTestInitialRoute(
   if (!targetNode) {
     return route;
   }
-  const url = buildNodeRouteUrl(targetNode.id, querySource ?? LOCAL);
+  const url = buildNodeRouteUrl(targetNode.id, querySource ?? LOCAL, {
+    scrollToId: undefined,
+    fallbackLabel: undefined,
+  });
   if (!querySource || querySource === LOCAL) {
     return url;
   }
@@ -413,8 +416,14 @@ export function renderApis(
   children: React.ReactElement,
   options?: RenderApis
 ): TestApis & RenderResult {
-  const { fileStore, relayPool, backend, finalizeEvent, nip11 } =
-    applyApis(options);
+  const {
+    fileStore,
+    relayPool,
+    backend,
+    finalizeEvent,
+    nip11,
+    fetchEntityMetadata,
+  } = applyApis(options);
 
   // If user is explicity undefined it will be overwritten, if not set default Alice is used
   const optionsWithDefaultUser = {
@@ -464,6 +473,9 @@ export function renderApis(
           ...(options?.fetchCalendarFeed
             ? { fetchCalendarFeed: options.fetchCalendarFeed }
             : {}),
+          fetchEntityMetadata:
+            fetchEntityMetadata ??
+            (() => Promise.resolve(new Response("", { status: 503 }))),
         }}
       >
         <BackendProviderComponent>

@@ -28,11 +28,10 @@ export function FullscreenButton(): JSX.Element | null {
       );
     }
     if (target.rootNodeId) {
-      return buildNodeRouteUrl(
-        target.rootNodeId,
-        target.sourceId,
-        target.scrollToId
-      );
+      return buildNodeRouteUrl(target.rootNodeId, target.sourceId, {
+        scrollToId: target.scrollToId,
+        fallbackLabel: target.fallbackLabel,
+      });
     }
     return undefined;
   })();

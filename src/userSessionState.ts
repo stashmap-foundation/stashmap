@@ -11,6 +11,7 @@ import {
 } from "./serializer";
 import {
   parseDocumentRouteUrl,
+  parseFallbackLabelFromSearch,
   parseNodeRouteUrl,
   parseSourceFromSearch,
   parseStorageKeyFromHash,
@@ -130,12 +131,14 @@ function getUrlPanes(myPublicKey: PublicKey | undefined): Pane[] | undefined {
       parseSourceFromSearch(window.location.search),
       myPublicKey
     );
+    const fallbackLabel = parseFallbackLabelFromSearch(window.location.search);
     const storageKey = parseStorageKeyFromHash(window.location.hash);
     return [
       {
         id: generatePaneId(),
         sourceId: nodeSource,
         rootNodeId: nodeID,
+        ...(fallbackLabel !== undefined && { fallbackLabel }),
         ...(storageKey !== undefined && { storageKey }),
       },
     ];

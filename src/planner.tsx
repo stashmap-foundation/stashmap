@@ -538,6 +538,7 @@ export function planCreateNoteAtRoot(
             sourceId: LOCAL,
             documentId: undefined,
             rootNodeId: existingHome.root,
+            fallbackLabel: undefined,
             searchQuery: undefined,
             searchResultIDs: undefined,
           }
@@ -563,6 +564,7 @@ export function planCreateNoteAtRoot(
           sourceId: LOCAL,
           documentId: undefined,
           rootNodeId: createdNode.id,
+          fallbackLabel: undefined,
           searchQuery: undefined,
           searchResultIDs: undefined,
         }

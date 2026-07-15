@@ -142,6 +142,7 @@ declare global {
     // Capability from a share link (#key= fragment): the storage key that
     // opens the pane's encrypted foreign document.
     storageKey?: string;
+    fallbackLabel?: string;
     searchQuery?: string;
     searchResultIDs?: ID[];
     typeFilters?: (
@@ -230,6 +231,7 @@ declare global {
       take?: AddToParentTarget;
       defaults?: { relevance?: Relevance; argument?: Argument };
       host?: Pick<Row, "node" | "parentRef" | "materialize">;
+      root?: true;
     };
     standsFor?: { id: ID; liveText?: string };
     isFirstVirtual: boolean;

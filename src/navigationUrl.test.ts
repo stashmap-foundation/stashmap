@@ -4,6 +4,7 @@ import {
   buildDocumentRouteUrl,
   buildNodeRouteUrl,
   parseDocumentRouteUrl,
+  parseFallbackLabelFromSearch,
   parseNodeRouteUrl,
   parseSourceFromSearch,
   resolveAddress,
@@ -13,18 +14,36 @@ import { LOCAL } from "./core/nodeRef";
 const ALICE_SOURCE = "alice";
 
 test("buildNodeRouteUrl creates source-scoped node route", () => {
-  expect(buildNodeRouteUrl("some-node-id" as ID, ALICE_SOURCE)).toBe(
-    "/r/some-node-id?source=alice"
-  );
-  expect(buildNodeRouteUrl("encoded/id" as ID, "source/id")).toBe(
-    "/r/encoded%2Fid?source=source%2Fid"
-  );
+  expect(
+    buildNodeRouteUrl("some-node-id" as ID, ALICE_SOURCE, {
+      scrollToId: undefined,
+      fallbackLabel: undefined,
+    })
+  ).toBe("/r/some-node-id?source=alice");
+  expect(
+    buildNodeRouteUrl("encoded/id" as ID, "source/id", {
+      scrollToId: undefined,
+      fallbackLabel: undefined,
+    })
+  ).toBe("/r/encoded%2Fid?source=source%2Fid");
 });
 
 test("buildNodeRouteUrl includes scroll target as hash", () => {
   expect(
-    buildNodeRouteUrl("some-node-id" as ID, ALICE_SOURCE, "child/id" as ID)
+    buildNodeRouteUrl("some-node-id" as ID, ALICE_SOURCE, {
+      scrollToId: "child/id" as ID,
+      fallbackLabel: undefined,
+    })
   ).toBe("/r/some-node-id?source=alice#child%2Fid");
+});
+
+test("buildNodeRouteUrl includes fallback label as query text", () => {
+  expect(
+    buildNodeRouteUrl("wd:Q1492" as ID, ALICE_SOURCE, {
+      scrollToId: undefined,
+      fallbackLabel: "Barcelona / Barna",
+    })
+  ).toBe("/r/wd%3AQ1492?source=alice&fallbackLabel=Barcelona+%2F+Barna");
 });
 
 test("buildDocumentRouteUrl creates document route", () => {
@@ -67,6 +86,16 @@ test("parseSourceFromSearch extracts source", () => {
   expect(parseSourceFromSearch("?author=abc123")).toBeUndefined();
   expect(parseSourceFromSearch("?foo=bar")).toBeUndefined();
   expect(parseSourceFromSearch("")).toBeUndefined();
+});
+
+test("parseFallbackLabelFromSearch uses the first value and treats empty as absent", () => {
+  expect(
+    parseFallbackLabelFromSearch("?fallbackLabel=Barcelona+%2F+Barna")
+  ).toBe("Barcelona / Barna");
+  expect(
+    parseFallbackLabelFromSearch("?fallbackLabel=&fallbackLabel=Other")
+  ).toBeUndefined();
+  expect(parseFallbackLabelFromSearch("?source=abc123")).toBeUndefined();
 });
 
 const OWN_PUBKEY =

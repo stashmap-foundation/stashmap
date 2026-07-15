@@ -38,7 +38,8 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
       target.sourceId,
       target.rootNodeId,
       target.scrollToId,
-      target.documentId
+      target.documentId,
+      target.fallbackLabel
     );
   };
 

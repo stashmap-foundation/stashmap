@@ -51,6 +51,7 @@ export type TreeResult = {
 
 type TreeTraversalOptions = {
   isMarkdownExport?: boolean;
+  projectedRoot?: GraphNode;
 };
 
 const EMPTY_TREE_RESULT: TreeResult = { rows: List<Row>() };
@@ -231,7 +232,8 @@ function resolveRowForPath(
   data: Data,
   graph: GraphLookup,
   viewPath: ViewPath,
-  parentRow: Row | undefined = undefined
+  parentRow?: Row,
+  options?: TreeTraversalOptions
 ): Row | undefined {
   const paneSourceId = sourceIdForPath(data, viewPath);
   const [, ...segments] = viewPath;
@@ -239,10 +241,29 @@ function resolveRowForPath(
     return undefined;
   }
   const pathID = segments[segments.length - 1];
+  if (segments.length === 1 && options?.projectedRoot?.id === pathID) {
+    const row = createRow(
+      data,
+      graph,
+      viewPath,
+      options.projectedRoot,
+      graph.localSourceId,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      false,
+      undefined,
+      undefined
+    );
+    return { ...row, materialize: { precededBy: [], root: true } };
+  }
   const parentPath = getParentView(viewPath);
   const resolvedParentRow =
     parentRow ??
-    (parentPath ? resolveRowForPath(data, graph, parentPath) : undefined);
+    (parentPath
+      ? resolveRowForPath(data, graph, parentPath, undefined, options)
+      : undefined);
   const childIndex = resolvedParentRow
     ? getNodeIndexForPath(resolvedParentRow.node, pathID)
     : undefined;
@@ -986,7 +1007,13 @@ export function getTreeChildren(
   options?: TreeTraversalOptions
 ): TreeResult {
   const graph = graphLookupFromData(data);
-  const parentRow = resolveRowForPath(data, graph, parentPath);
+  const parentRow = resolveRowForPath(
+    data,
+    graph,
+    parentPath,
+    undefined,
+    options
+  );
   if (!parentRow) {
     return EMPTY_TREE_RESULT;
   }
@@ -1093,11 +1120,13 @@ export function getNodesInTree(
 ): TreeResult {
   const graph = graphLookupFromData(data);
   const rootRows = rootPaths
-    .map((rootPath) => resolveRowForPath(data, graph, rootPath))
+    .map((rootPath) =>
+      resolveRowForPath(data, graph, rootPath, undefined, options)
+    )
     .filter((row): row is Row => row !== undefined)
     .toList();
   const contextRows = ctx
-    .map((path) => resolveRowForPath(data, graph, path))
+    .map((path) => resolveRowForPath(data, graph, path, undefined, options))
     .filter((row): row is Row => row !== undefined)
     .toList();
   return {

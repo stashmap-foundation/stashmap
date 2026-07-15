@@ -1,4 +1,4 @@
-import { cleanup, screen, fireEvent } from "@testing-library/react";
+import { cleanup, screen, fireEvent, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   ALICE,
@@ -47,6 +47,30 @@ function dunbarText(): string {
 }
 
 afterEach(cleanup);
+
+test("bare Google calendar links render as calendar content", async () => {
+  const [alice] = setup([ALICE]);
+  const fetchCalendarFeed = jest.fn(() => Promise.resolve(FEED));
+  const url =
+    "https://calendar.google.com/calendar/ical/67t01k13lbgdntjmoh5pale1kg%40group.calendar.google.com/public/basic.ics";
+  renderApp({ ...alice(), fetchCalendarFeed });
+
+  await type(`Salon{Enter}{Tab}${url}{Escape}`);
+  const editor = await screen.findByRole("textbox", {
+    name: `edit ${url}`,
+  });
+  const feed = within(editor).getByText(url, { selector: "[data-href]" });
+  expect(feed.getAttribute("data-href")).toBe(`feed:${url}`);
+  expect(feed.getAttribute("style")).toBeNull();
+  expect(within(editor).queryByRole("link")).toBeNull();
+  expect(within(editor).queryByText("↗")).toBeNull();
+  expect(screen.getByTitle("Calendar").textContent).toBe("🗓︎");
+  await userEvent.click(await screen.findByLabelText(`expand ${url}`));
+
+  await screen.findByText("14.07.2030 Sommerfest");
+  expect(screen.getAllByTitle("Date")[0].textContent).toBe("📅︎");
+  expect(fetchCalendarFeed).toHaveBeenCalledWith(url);
+});
 
 test("upcoming entries project; bare past entries live behind the action row", async () => {
   const [alice] = setup([ALICE]);
@@ -112,11 +136,11 @@ test("bare feed urls wrap; the label renames without losing the feed", async () 
     },
   });
 
-  await type("Salon{Enter}{Tab}https://scholarium.at/salon.ics{Escape}");
+  await type("Salon{Enter}{Tab}webcal://scholarium.at/salon.ics{Escape}");
 
   // The editor shows and edits the label only; the URL is structural.
   const editor = await screen.findByLabelText(
-    "edit https://scholarium.at/salon.ics"
+    "edit webcal://scholarium.at/salon.ics"
   );
   await userEvent.click(editor);
   await userEvent.keyboard("{Control>}a{/Control}Salon Termine{Escape}");
@@ -308,6 +332,9 @@ Salon
   `);
 
   const editors = await screen.findAllByLabelText("edit 14.07.2030 Sommerfest");
+  editors.forEach((editor) => {
+    expect(within(editor).queryByRole("link")).toBeNull();
+  });
   await userEvent.click(editors[0]);
   await userEvent.keyboard("{Enter}{Tab}Meine Notiz{Escape}");
   const editorsAfter = await screen.findAllByLabelText(
@@ -329,10 +356,32 @@ Salon
       ${dunbarText()}
   `;
   await expectTree(expected);
+  const materializedEditors = await screen.findAllByLabelText(
+    "edit 14.07.2030 Sommerfest"
+  );
+  materializedEditors.forEach((editor) => {
+    expect(within(editor).queryByRole("link")).toBeNull();
+  });
+  const calendarPlacements = materializedEditors.flatMap((editor) => {
+    const placement = within(editor).queryByText("14.07.2030 Sommerfest", {
+      selector: "[data-href]",
+    });
+    return placement ? [placement] : [];
+  });
+  expect(calendarPlacements).toHaveLength(2);
+  calendarPlacements.forEach((placement) => {
+    expect(placement.getAttribute("style")).toBeNull();
+  });
 
   cleanup();
   renderApp({ ...alice(), fetchCalendarFeed: () => Promise.resolve(FEED) });
   await expectTree(expected);
+  const reloadedEditors = await screen.findAllByLabelText(
+    "edit 14.07.2030 Sommerfest"
+  );
+  reloadedEditors.forEach((editor) => {
+    expect(within(editor).queryByRole("link")).toBeNull();
+  });
 });
 
 test("following a dangling entry link opens the carrying calendar at the entry", async () => {
@@ -698,7 +747,11 @@ test("past entries render dimmed by type, judged rows full strength", async () =
   // point here.
   /* eslint-disable testing-library/no-node-access */
   const pastText = screen.getAllByText("01.01.2020 Founding seminar")[0];
-  expect(pastText.closest("span[style*='opacity']")).not.toBeNull();
+  const pastRow = pastText.closest('[data-row-focusable="true"]');
+  if (!(pastRow instanceof HTMLElement)) throw new Error("Missing past row");
+  const pastIcon = within(pastRow).getByTitle("Date");
+  expect(pastIcon.textContent).toBe("📅︎");
+  expect(pastIcon.closest("span[style*='opacity']")).not.toBeNull();
   const upcomingText = screen.getAllByText("14.07.2030 Sommerfest")[0];
   expect(upcomingText.closest("span[style*='opacity']")).toBeNull();
 

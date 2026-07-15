@@ -79,8 +79,12 @@ export function isBareIcalFeedUrl(text: string): boolean {
   return text.trim() === url;
 }
 
+export function calendarFeedHref(url: string): string {
+  return `feed:${url.trim().replace(/^webcal:\/\//iu, "https://")}`;
+}
+
 export function icalFeedLinkText(url: string, label?: string): string {
-  return `[${label ?? url}](feed:${url})`;
+  return `[${label ?? url}](${calendarFeedHref(url)})`;
 }
 
 // The one display-text rule for the feed-link form, shared by every

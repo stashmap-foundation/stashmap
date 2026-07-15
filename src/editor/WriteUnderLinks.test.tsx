@@ -145,6 +145,8 @@ test("missing local targets stay editable and carry per-link dead furniture", as
 
   expect(within(editor).getAllByText("†")).toHaveLength(3);
   expect(missing.style.cursor).toBe("default");
+  expect(missing.style.textDecorationLine).toBe("");
+  expect(missing.style.color).toBe("var(--base01)");
   expect(missingFile.style.cursor).toBe("default");
   expect(missingDocument.style.cursor).toBe("default");
   expect(live.style.cursor).not.toBe("default");
@@ -171,21 +173,58 @@ test("missing local targets stay editable and carry per-link dead furniture", as
   });
 });
 
+test("one-character links save pending edits before navigation", async () => {
+  const { path: workspacePath } = knowstrInit();
+  const targetID = "11111111-1111-4111-8111-111111111111";
+  write(
+    workspacePath,
+    "notes.md",
+    `# Notes\n\n- Open [X](#${targetID}) now\n- Target <!-- id:${targetID} -->\n`
+  );
+  await knowstrSave(workspacePath);
+
+  await renderAppTree({ path: workspacePath, search: "Notes" });
+  const editor = await screen.findByRole("textbox", {
+    name: "edit Open X now",
+  });
+  const link = within(editor).getByRole("link", { name: "X" });
+  expect(link.classList.contains("inline-link")).toBe(true);
+  expect(link.style.cursor).not.toBe("default");
+
+  editor.focus();
+  placeCursorAtEnd(editor);
+  await userEvent.keyboard(" !");
+  await userEvent.click(link);
+  await expectTree(`
+Notes
+  Open X now !
+  Target
+  `);
+  await waitFor(() => {
+    const markdown = fs.readFileSync(
+      path.join(workspacePath, "notes.md"),
+      "utf8"
+    );
+    expect(markdown).toContain(`Open [X](#${targetID}) now !`);
+  });
+});
+
 test("mixed external and entity links keep independent presentation and activation", async () => {
   const { path: workspacePath } = knowstrInit();
   const website = "https://example.com/articles/one#details";
   const feed = "feed:https://example.com/calendar.ics?team=one#events";
+  const asset = "asset:rgb:AAAABBBBCCCCDDDDEEEE12345";
   write(
     workspacePath,
     "notes.md",
-    `# Notes\n\n- Visit [Website](${website}) and [Feed](${feed}) near [Barcelona](#wd:Q1492)\n`
+    `# Notes\n\n- Visit [Website](${website}) and [Feed](${feed}) near [Barcelona](#wd:Q1492) and [Asset](#${asset})\n`
   );
   await knowstrSave(workspacePath);
   const open = jest.spyOn(window, "open").mockImplementation(() => null);
 
   await renderAppTree({ path: workspacePath, search: "Notes" });
   const editor = await screen.findByRole("textbox", {
-    name: "edit Visit Website and Feed near Barcelona",
+    name: "edit Visit Website and Feed near Barcelona and Asset",
   });
   const websiteLink = within(editor).getByRole("link", {
     name: "Website (opens externally)",
@@ -194,11 +233,14 @@ test("mixed external and entity links keep independent presentation and activati
     name: "Feed (opens externally)",
   });
   const entityLink = within(editor).getByRole("link", { name: "Barcelona" });
+  const assetLink = within(editor).getByRole("link", { name: "Asset" });
 
   expect(websiteLink.style.textDecoration).toBe("underline");
   expect(feedLink.style.textDecoration).toBe("underline");
   expect(entityLink.style.color).toBe("var(--violet)");
   expect(entityLink.style.textDecoration).toBe("");
+  expect(assetLink.style.color).toBe("var(--violet)");
+  expect(assetLink.style.textDecoration).toBe("");
   expect(editor.style.textDecoration).toBe("");
   expect(within(editor).getAllByText("↗")).toHaveLength(2);
 
@@ -232,7 +274,7 @@ test("mixed external and entity links keep independent presentation and activati
   );
   await waitFor(() => {
     const notes = fs.readFileSync(path.join(workspacePath, "notes.md"), "utf8");
-    expect(notes).toContain(`[Barcelona](#wd:Q1492) ! <!-- id:`);
+    expect(notes).toContain(`[Asset](#${asset}) ! <!-- id:`);
   });
 });
 

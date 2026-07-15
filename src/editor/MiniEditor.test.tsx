@@ -22,6 +22,8 @@ describe("MiniEditor", () => {
         initialSpans={plain("Original")}
         reciprocalLinks={[]}
         deadLinkIndexes={[]}
+        externalLinkIndexes={[]}
+        calendarLinkIndexes={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -43,6 +45,8 @@ describe("MiniEditor", () => {
         initialSpans={plain("Original")}
         reciprocalLinks={[]}
         deadLinkIndexes={[]}
+        externalLinkIndexes={[]}
+        calendarLinkIndexes={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -60,6 +64,8 @@ describe("MiniEditor", () => {
         initialSpans={plain("Original")}
         reciprocalLinks={[]}
         deadLinkIndexes={[]}
+        externalLinkIndexes={[]}
+        calendarLinkIndexes={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -79,6 +85,8 @@ describe("MiniEditor", () => {
         initialSpans={plain("Original")}
         reciprocalLinks={[]}
         deadLinkIndexes={[]}
+        externalLinkIndexes={[]}
+        calendarLinkIndexes={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -98,6 +106,8 @@ describe("MiniEditor", () => {
         initialSpans={plain("Original")}
         reciprocalLinks={[]}
         deadLinkIndexes={[]}
+        externalLinkIndexes={[]}
+        calendarLinkIndexes={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -119,6 +129,8 @@ describe("MiniEditor", () => {
         initialSpans={[]}
         reciprocalLinks={[]}
         deadLinkIndexes={[]}
+        externalLinkIndexes={[]}
+        calendarLinkIndexes={[]}
         onSave={onSave}
         onClose={onClose}
         onShiftTab={onShiftTab}
@@ -140,6 +152,8 @@ describe("MiniEditor", () => {
         initialSpans={plain("First")}
         reciprocalLinks={[]}
         deadLinkIndexes={[]}
+        externalLinkIndexes={[]}
+        calendarLinkIndexes={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -154,6 +168,8 @@ describe("MiniEditor", () => {
         initialSpans={plain("Changed")}
         reciprocalLinks={[]}
         deadLinkIndexes={[]}
+        externalLinkIndexes={[]}
+        calendarLinkIndexes={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -172,6 +188,8 @@ describe("MiniEditor", () => {
         initialSpans={plain("Original")}
         reciprocalLinks={[]}
         deadLinkIndexes={[]}
+        externalLinkIndexes={[]}
+        calendarLinkIndexes={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -181,6 +199,8 @@ describe("MiniEditor", () => {
         initialSpans={plain("Updated")}
         reciprocalLinks={[]}
         deadLinkIndexes={[]}
+        externalLinkIndexes={[]}
+        calendarLinkIndexes={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -205,6 +225,8 @@ describe("MiniEditor", () => {
           },
         ]}
         deadLinkIndexes={[]}
+        externalLinkIndexes={[]}
+        calendarLinkIndexes={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -232,6 +254,8 @@ describe("MiniEditor", () => {
         ]}
         reciprocalLinks={[]}
         deadLinkIndexes={[]}
+        externalLinkIndexes={[]}
+        calendarLinkIndexes={[]}
         onSave={onSave}
         autoFocus={false}
       />

@@ -686,6 +686,14 @@ body {
   cursor: pointer;
 }
 
+.calendar-type-indicator {
+  display: inline-block;
+  margin-right: 2px;
+  text-align: center;
+  user-select: none;
+  width: 1.35em;
+}
+
 // The incoming part: the other side's judgment chars plus the return
 // arrow, one superscript cluster. Link + incoming part = bidirectional;
 // the same cluster on a footer row is a suggested bidirectional link.

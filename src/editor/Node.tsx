@@ -33,10 +33,13 @@ import { isFileLinkHref, spansText, spansToMarkdown } from "../core/nodeSpans";
 import { classifyLinkHref, externalLinkUrl } from "../core/linkPath";
 import {
   calendarEntryTarget,
+  calendarFeedHref,
   calendarFeedUrl,
   displayTextOf,
   hiddenPastEntryCount,
   isBareIcalFeedUrl,
+  isCalendarEntryId,
+  isCalendarEntryPlacement,
 } from "../core/ical";
 import { useCalendarFeeds } from "../CalendarFeedContext";
 import {
@@ -487,13 +490,19 @@ function InlineLinkSpan({
 }): JSX.Element {
   const data = useData();
   const navigatePane = useNavigatePane();
-  const externalUrl = externalLinkUrl(span.href);
+  const row = useRow();
+  const isSearchResult = row.virtualType === "search";
+  const calendarContent =
+    !isSearchResult &&
+    (calendarFeedUrl(node) !== undefined ||
+      (row.standsFor !== undefined && isCalendarEntryId(row.standsFor.id)));
+  const externalUrl = calendarContent ? undefined : externalLinkUrl(span.href);
   const dead = isDeadLinkTarget(data, span.href, node, sourceId);
-  const internalHref = dead
-    ? undefined
-    : inlineLinkToHref(data, span.href, node, sourceId);
+  const internalHref =
+    dead || calendarContent
+      ? undefined
+      : inlineLinkToHref(data, span.href, node, sourceId);
   const href = externalUrl ?? internalHref;
-  const isSearchResult = useRow().virtualType === "search";
   const style: React.CSSProperties = isSearchResult
     ? { fontStyle: "italic", textDecoration: "none" }
     : linkStyleForHref(span.href, dead);
@@ -516,6 +525,23 @@ function InlineLinkSpan({
       †
     </sup>
   ) : null;
+  if (calendarContent) {
+    return (
+      <>
+        <span data-href={span.href} data-target={span.href}>
+          {span.text}
+        </span>
+        {reciprocal && (
+          <IncomingPart
+            relevance={reciprocal.relevance}
+            argument={reciprocal.argument}
+            ariaHidden
+          />
+        )}
+        <LinkReachChip span={span} node={node} sourceId={sourceId} />
+      </>
+    );
+  }
   if (!href) {
     return (
       <>
@@ -746,6 +772,10 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
     });
 
   const editorSpans = currentNode.spans;
+  const feedUrl = calendarFeedUrl(currentNode);
+  const calendarContent =
+    feedUrl !== undefined ||
+    isCalendarEntryPlacement(currentNode, parentNode ?? undefined);
   const reciprocals = reciprocalLinks(data, row.node, row.sourceId);
   const deadLinkIndexes = editorSpans.flatMap((span, index) =>
     span.kind === "link" &&
@@ -753,18 +783,26 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       ? [index]
       : []
   );
+  const externalLinkIndexes = calendarContent
+    ? []
+    : editorSpans.flatMap((span, index) =>
+        span.kind === "link" && externalLinkUrl(span.href) ? [index] : []
+      );
+  const calendarLinkIndexes = calendarContent ? [0] : [];
   const persistedSpans = (spans: InlineSpan[]): InlineSpan[] => {
     const text = spansText(spans).trim();
-    const feedUrl = calendarFeedUrl(currentNode);
     if (feedUrl && spans.every((span) => span.kind === "text")) {
-      return [{ kind: "link", href: `feed:${feedUrl}`, text }];
+      return [{ kind: "link", href: calendarFeedHref(feedUrl), text }];
     }
     return isBareIcalFeedUrl(text)
-      ? [{ kind: "link", href: `feed:${text}`, text }]
+      ? [{ kind: "link", href: calendarFeedHref(text), text }]
       : spans;
   };
 
-  const handleSave = (spans: InlineSpan[], submitted?: boolean): void => {
+  const handleSave = async (
+    spans: InlineSpan[],
+    submitted?: boolean
+  ): Promise<void> => {
     const nextSpans = persistedSpans(spans);
     // Write gestures take first; read gestures read. A computed row's
     // save materializes the row before the text lands — and an unchanged
@@ -814,7 +852,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
     escapeFocusPendingRef.current = false;
 
     if (!submitted || spansText(spans).trim() === "") {
-      executePlan(planWithEscFocus);
+      await executePlan(planWithEscFocus);
       return;
     }
 
@@ -851,7 +889,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
     })();
 
     if (!nextPosition) {
-      executePlan(planWithEscFocus);
+      await executePlan(planWithEscFocus);
       return;
     }
 
@@ -863,7 +901,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       paneIndex,
       nextPosition.insertAt
     );
-    executePlan(plan);
+    await executePlan(plan);
   };
 
   const handleTab = (spans: InlineSpan[]): void => {
@@ -1058,13 +1096,17 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
     return <NodeContent />;
   }
 
-  const handleActivateLink = (href: string, spans: InlineSpan[]): void => {
-    handleSave(spans);
+  const handleActivateLink = async (
+    href: string,
+    spans: InlineSpan[]
+  ): Promise<void> => {
     const externalUrl = externalLinkUrl(href);
     if (externalUrl) {
+      handleSave(spans);
       window.open(externalUrl, "_blank", "noopener,noreferrer");
       return;
     }
+    await handleSave(spans);
     const targetHref = inlineLinkToHref(
       { ...data, calendarFeeds },
       href,
@@ -1081,6 +1123,8 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
         initialSpans={editorSpans}
         reciprocalLinks={reciprocals}
         deadLinkIndexes={deadLinkIndexes}
+        externalLinkIndexes={externalLinkIndexes}
+        calendarLinkIndexes={calendarLinkIndexes}
         style={textStyle}
         onSave={handleSave}
         onTab={handleTab}
@@ -1250,6 +1294,13 @@ export function Node({
 
   const { virtualType } = row;
   const currentNode = useCurrentNode();
+  const calendarType = (() => {
+    if (isSuggestion || virtualType !== undefined) return undefined;
+    if (calendarFeedUrl(currentNode) !== undefined) return "Calendar";
+    return isCalendarEntryId(row.standsFor?.id ?? currentNode.id)
+      ? "Date"
+      : undefined;
+  })();
   const isViewingOtherUser = useIsViewingOtherUserContent();
   const node = row.reference;
   const isOtherUser = (node && node.sourceId !== LOCAL) || isViewingOtherUser;
@@ -1344,6 +1395,15 @@ export function Node({
         )}
         <div className={`w-100 node-content-wrapper ${contentClass}`}>
           <span className={textClassName} style={textStyle}>
+            {calendarType && (
+              <span
+                className="calendar-type-indicator"
+                title={calendarType}
+                aria-hidden="true"
+              >
+                {calendarType === "Calendar" ? "🗓︎" : "📅︎"}
+              </span>
+            )}
             <InteractiveNodeContent rows={rows} />
           </span>
         </div>

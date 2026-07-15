@@ -140,6 +140,29 @@ My Notes
       `);
     });
 
+    test("~Log stores machine-created link labels as plain text", async () => {
+      const [alice] = setup([ALICE]);
+      const { relayPool } = renderApp(alice());
+
+      await userEvent.type(
+        await screen.findByLabelText("new node editor"),
+        "[[First Note]](#fake){Escape}"
+      );
+      const events = relayPool
+        .getDecryptedEvents()
+        .filter(
+          (event) =>
+            event.kind === KIND_KNOWLEDGE_DOCUMENT &&
+            event.tags.some(([name, value]) => name === "s" && value === "log")
+        );
+      const event = events[events.length - 1];
+      if (!event) throw new Error("Missing Log event");
+
+      expect(event.content).toContain("[\\[First Note\\]");
+      expect(event.content).toMatch(/\]\(#[^)]+\) <!-- id:/u);
+      expect(event.content).not.toContain("[[First Note]");
+    });
+
     test("creating multiple notes at root shows all in ~Log", async () => {
       const [alice] = setup([ALICE]);
       renderApp(alice());

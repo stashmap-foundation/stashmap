@@ -255,7 +255,7 @@ Places
       value: {
         readText: jest.fn(() =>
           Promise.resolve(
-            "[Remote target](#33333333-3333-4333-8333-333333333333)"
+            "[Remote target](#33333333-3333-4333-8333-333333333333)\n[Remote website](https://example.com/page#section)"
           )
         ),
       },
@@ -265,6 +265,9 @@ Places
     await screen.findByRole("link", {
       name: "Remote target. Target no longer exists",
     });
+    await screen.findByRole("link", {
+      name: "Remote website (opens externally)",
+    });
 
     const shared = await copySecretLinkViaChip(bob(), "Remote Notes");
     cleanup();
@@ -273,6 +276,15 @@ Places
     expect(
       await screen.findByRole("link", { name: "Navigate to Remote target" })
     ).toBeDefined();
+    const website = await screen.findByRole("link", {
+      name: "Remote website (opens externally)",
+    });
+    expect(website.getAttribute("href")).toBe(
+      "https://example.com/page#section"
+    );
+    expect(website.getAttribute("target")).toBe("_blank");
+    expect(website.getAttribute("rel")).toBe("noopener noreferrer");
+    expect(screen.getByText("↗")).toBeDefined();
     expect(screen.queryByText("†")).toBeNull();
   });
 

@@ -4,7 +4,6 @@ import { isEditableElement } from "./keyboardNavigation";
 import { ParsedLine, parseClipboardText } from "../planner";
 import { spansText } from "../core/nodeSpans";
 import { parseInlineSpans } from "../core/markdownTree";
-import { externalLinkUrl } from "../core/linkPath";
 import { argumentColor, relevanceColor } from "./referenceDisplay";
 import { INCOMING_ARROW, argumentChar, relevanceChar } from "./referenceText";
 import {
@@ -31,6 +30,8 @@ type MiniEditorProps = {
   initialSpans: InlineSpan[];
   reciprocalLinks: ReciprocalLink[];
   deadLinkIndexes: number[];
+  externalLinkIndexes: number[];
+  calendarLinkIndexes: number[];
   onSave: (spans: InlineSpan[], submitted?: boolean) => void;
   style?: React.CSSProperties;
   onClose?: () => void;
@@ -124,6 +125,8 @@ export function MiniEditor({
   initialSpans,
   reciprocalLinks,
   deadLinkIndexes,
+  externalLinkIndexes,
+  calendarLinkIndexes,
   onSave,
   style,
   onClose,
@@ -158,10 +161,14 @@ export function MiniEditor({
           return [...children, document.createTextNode(span.text)];
         }
         const dead = deadLinkIndexes.includes(index);
-        const mark = createEditableLinkMark(span, dead);
-        const externalFurniture = externalLinkUrl(span.href)
-          ? [createExternalFurniture()]
-          : [];
+        const external = externalLinkIndexes.includes(index);
+        const mark = createEditableLinkMark(
+          span,
+          dead,
+          external,
+          !calendarLinkIndexes.includes(index)
+        );
+        const externalFurniture = external ? [createExternalFurniture()] : [];
         const deadFurniture = dead ? [createDeadFurniture()] : [];
         const reciprocal = reciprocalLinks.find(
           (candidate) => candidate.spanIndex === index
@@ -206,6 +213,8 @@ export function MiniEditor({
   }, [
     initialSpans,
     deadLinkIndexes.join(","),
+    externalLinkIndexes.join(","),
+    calendarLinkIndexes.join(","),
     reciprocalLinks
       .map(
         ({ spanIndex, relevance, argument }) =>
@@ -382,7 +391,11 @@ export function MiniEditor({
       return;
     }
     const href = mark.getAttribute("data-href");
-    if (href === null || mark.getAttribute("data-link-dead") === "true") {
+    if (
+      href === null ||
+      !mark.classList.contains("inline-link") ||
+      mark.getAttribute("data-link-dead") === "true"
+    ) {
       return;
     }
     e.preventDefault();

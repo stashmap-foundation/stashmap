@@ -100,20 +100,19 @@ export function selectionMarkdown(editor: HTMLElement): string | null {
 }
 
 export function linkStyleForHref(href: string, dead: boolean): CSSProperties {
+  if (dead) return { color: "var(--base01)", cursor: "default" };
   const targetClass = classifyLinkHref(href);
-  const cursor = dead ? { cursor: "default" } : {};
-  if (targetClass === "entity") return { color: "var(--violet)", ...cursor };
+  if (targetClass === "entity") return { color: "var(--violet)" };
   if (targetClass === "website" || targetClass === "feed") {
-    return { textDecoration: "underline", ...cursor };
+    return { textDecoration: "underline" };
   }
-  if (targetClass === "unsupported") return cursor;
+  if (targetClass === "unsupported") return {};
   return {
     textDecorationLine: "underline",
     textDecorationStyle: "dotted",
     textDecorationThickness: "1px",
     textUnderlineOffset: "3px",
     textDecorationColor: "var(--base01)",
-    ...cursor,
   };
 }
 
@@ -131,21 +130,27 @@ function styleAttribute(style: CSSProperties): string {
 
 export function createEditableLinkMark(
   span: Extract<InlineSpan, { kind: "link" }>,
-  dead: boolean
+  dead: boolean,
+  external: boolean,
+  interactive: boolean
 ): HTMLSpanElement {
   const mark = document.createElement("span");
-  mark.setAttribute("role", "link");
-  mark.setAttribute("class", "inline-link");
   mark.setAttribute("data-href", span.href);
   mark.setAttribute("data-target", span.href);
+  if (interactive) {
+    mark.setAttribute("role", "link");
+    mark.setAttribute("class", "inline-link");
+  }
   if (dead) {
     mark.setAttribute("data-link-dead", "true");
     mark.setAttribute("aria-disabled", "true");
     mark.setAttribute("aria-label", `${span.text}. Target no longer exists`);
-  } else if (externalLinkUrl(span.href)) {
+  } else if (external) {
     mark.setAttribute("aria-label", `${span.text} (opens externally)`);
   }
-  const style = styleAttribute(linkStyleForHref(span.href, dead));
+  const style = styleAttribute(
+    interactive ? linkStyleForHref(span.href, dead) : {}
+  );
   if (style) mark.setAttribute("style", style);
   mark.replaceChildren(document.createTextNode(span.text));
   return mark;
@@ -157,7 +162,12 @@ function htmlForSpans(spans: InlineSpan[]): string {
     ...spans.map((span) =>
       span.kind === "text"
         ? document.createTextNode(span.text)
-        : createEditableLinkMark(span, false)
+        : createEditableLinkMark(
+            span,
+            false,
+            externalLinkUrl(span.href) !== undefined,
+            true
+          )
     )
   );
   return container.innerHTML;

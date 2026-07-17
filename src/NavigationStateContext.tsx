@@ -6,16 +6,19 @@ import React, {
   useState,
 } from "react";
 import { useData } from "./DataContext";
+import { LOCAL } from "./core/nodeRef";
 import {
+  buildCoordinateRouteUrl,
   buildDocumentRouteUrl,
   buildNodeRouteUrl,
+  parseAtFromSearch,
+  parseCoordinateRouteUrl,
   parseDocumentRouteUrl,
   parseFallbackLabelFromSearch,
   parseNodeRouteUrl,
-  parseSourceFromSearch,
   parseStorageKeyFromHash,
-  addressForSource,
   resolveAddress,
+  routeCoordinateSourceId,
 } from "./navigationUrl";
 import { usePlanner } from "./planner";
 import { generatePaneId } from "./SplitPanesContext";
@@ -45,23 +48,39 @@ type HistoryState = {
   activePaneIndex: number;
 };
 
-function paneToUrl(
-  activePane: Pane,
-  myPublicKey: PublicKey | undefined
-): string | undefined {
-  const address = addressForSource(activePane.sourceId, myPublicKey);
-  if (activePane.documentId && address) {
-    return buildDocumentRouteUrl(
-      address,
-      activePane.documentId,
-      activePane.scrollToId
+function paneToUrl(activePane: Pane): string | undefined {
+  const withStorageKey = (url: string): string =>
+    activePane.storageKey === undefined || !url.startsWith("/storage/")
+      ? url
+      : `${url}#key=${encodeURIComponent(activePane.storageKey)}`;
+  if (activePane.routeCoordinate) {
+    const prefix =
+      activePane.routeCoordinate.eventKind === 34774 ? "deposit" : "storage";
+    return withStorageKey(
+      buildCoordinateRouteUrl(
+        prefix,
+        activePane.routeCoordinate,
+        activePane.scrollToId ?? activePane.rootNodeId,
+        undefined
+      )
     );
   }
-  if (activePane.rootNodeId && address) {
-    return buildNodeRouteUrl(activePane.rootNodeId, address, {
-      scrollToId: activePane.scrollToId,
-      fallbackLabel: activePane.fallbackLabel,
-    });
+  if (activePane.documentId) {
+    return withStorageKey(
+      buildDocumentRouteUrl(
+        activePane.sourceId,
+        activePane.documentId,
+        activePane.scrollToId
+      )
+    );
+  }
+  if (activePane.rootNodeId) {
+    return withStorageKey(
+      buildNodeRouteUrl(activePane.rootNodeId, activePane.sourceId, {
+        scrollToId: activePane.scrollToId,
+        fallbackLabel: activePane.fallbackLabel,
+      })
+    );
   }
 
   return "/";
@@ -73,31 +92,54 @@ function urlToPane(
   hash: string,
   myPublicKey: PublicKey | undefined
 ): Pane {
-  const sourceId = resolveAddress(parseSourceFromSearch(search), myPublicKey);
   const fallbackLabel = parseFallbackLabelFromSearch(search);
+  const at = parseAtFromSearch(search);
   const storageKey = parseStorageKeyFromHash(hash);
   const documentRoute = parseDocumentRouteUrl(pathname);
   if (documentRoute) {
     return {
       id: generatePaneId(),
-      sourceId: resolveAddress(documentRoute.address, myPublicKey),
+      sourceId: LOCAL,
       documentId: documentRoute.docId,
+      scrollToId: at,
+    };
+  }
+  const storageRoute = parseCoordinateRouteUrl(pathname, "storage");
+  if (storageRoute) {
+    return {
+      id: generatePaneId(),
+      sourceId: resolveAddress(storageRoute.pubkey, myPublicKey),
+      routeCoordinate: storageRoute,
+      ...(at === undefined
+        ? { documentId: storageRoute.dTag }
+        : { rootNodeId: at }),
       ...(storageKey !== undefined && { storageKey }),
+    };
+  }
+  const depositRoute = parseCoordinateRouteUrl(pathname, "deposit");
+  if (depositRoute) {
+    return {
+      id: generatePaneId(),
+      sourceId: routeCoordinateSourceId(depositRoute),
+      routeCoordinate: depositRoute,
+      ...(at === undefined
+        ? { documentId: depositRoute.dTag }
+        : { rootNodeId: at }),
     };
   }
   const nodeID = parseNodeRouteUrl(pathname);
   if (nodeID) {
     return {
       id: generatePaneId(),
-      sourceId,
+      sourceId: LOCAL,
       rootNodeId: nodeID,
+      scrollToId: at,
       ...(fallbackLabel !== undefined && { fallbackLabel }),
-      ...(storageKey !== undefined && { storageKey }),
     };
   }
   return {
     id: generatePaneId(),
-    sourceId,
+    sourceId: LOCAL,
   };
 }
 
@@ -137,7 +179,7 @@ export function NavigationStateProvider({
     if (!activePane) {
       return;
     }
-    const fullUrl = paneToUrl(activePane, user?.publicKey);
+    const fullUrl = paneToUrl(activePane);
 
     if (fullUrl === undefined) {
       return;

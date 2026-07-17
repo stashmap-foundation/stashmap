@@ -23,6 +23,7 @@ import { DocumentStoreProvider } from "../../DocumentStore";
 import { NostrCacheSync } from "./cache/NostrCacheSync";
 import { createEmptyGraphIndex } from "../../graphIndex";
 import { useUserSessionState } from "../../userSessionState";
+import { PullSourceProvider } from "../../PullSourceContext";
 
 export const KIND_SEARCH = [KIND_KNOWLEDGE_DOCUMENT];
 
@@ -126,23 +127,25 @@ export function NostrDataProvider({
       >
         <NostrCacheSync paneRelays={paneRelays} />
         <MergeKnowledgeDB>
-          <NostrExecutorProvider
-            setPublishEvents={session.setPublishStatus}
-            setPanes={session.setPanes}
-            setViews={session.setViews}
-            getRelays={() => ({
-              defaultRelays,
-              userRelays,
-            })}
-          >
-            <PlanningContextProvider
+          <PullSourceProvider>
+            <NostrExecutorProvider
               setPublishEvents={session.setPublishStatus}
               setPanes={session.setPanes}
               setViews={session.setViews}
+              getRelays={() => ({
+                defaultRelays,
+                userRelays,
+              })}
             >
-              <NavigationStateProvider>{children}</NavigationStateProvider>
-            </PlanningContextProvider>
-          </NostrExecutorProvider>
+              <PlanningContextProvider
+                setPublishEvents={session.setPublishStatus}
+                setPanes={session.setPanes}
+                setViews={session.setViews}
+              >
+                <NavigationStateProvider>{children}</NavigationStateProvider>
+              </PlanningContextProvider>
+            </NostrExecutorProvider>
+          </PullSourceProvider>
         </MergeKnowledgeDB>
       </DocumentStoreProvider>
     </DataContextProvider>

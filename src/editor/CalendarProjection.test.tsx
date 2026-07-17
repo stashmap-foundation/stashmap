@@ -406,7 +406,7 @@ test("following a dangling entry link opens the entry surface", async () => {
 ${dunbarText()}
   [I] Salon ↩
   `);
-  expect(new URLSearchParams(window.location.search).get("fallbackLabel")).toBe(
+  expect(new URLSearchParams(window.location.search).get("label")).toBe(
     dunbarText()
   );
 });

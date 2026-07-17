@@ -235,7 +235,7 @@ My Notes
       "open Child in fullscreen"
     );
     const nodeUrl = fullscreenLink.getAttribute("href");
-    expect(nodeUrl).toMatch(/^\/r\//);
+    expect(nodeUrl).toMatch(/^\/local\/n\//);
 
     const parentEditor = await screen.findByLabelText("edit Parent");
     await userEvent.click(parentEditor);
@@ -279,7 +279,7 @@ My Notes
       "open Child in fullscreen"
     );
     const nodeUrl = fullscreenLink.getAttribute("href");
-    expect(nodeUrl).toMatch(/^\/r\//);
+    expect(nodeUrl).toMatch(/^\/local\/n\//);
 
     const innerEditor = await screen.findByLabelText("edit Inner");
     await userEvent.click(innerEditor);

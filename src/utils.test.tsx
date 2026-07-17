@@ -1058,7 +1058,9 @@ export async function navigateToNodeViaSearch(
   const existingPaneScope = existingPaneContainer
     ? within(existingPaneContainer)
     : screen;
-  const isOnConcreteRoute = /^\/[rd]\//u.test(window.location.pathname);
+  const isOnConcreteRoute = /^\/(local|storage|deposit)\//u.test(
+    window.location.pathname
+  );
   if (isOnConcreteRoute && isPaneFocusedOnNode(existingPaneScope, nodeName)) {
     return;
   }
@@ -1090,8 +1092,14 @@ export async function navigateToNodeViaSearch(
   const exactNavigateButton =
     navigateButtons.find(
       (button) =>
+        button.getAttribute("aria-label") === `Navigate to ${nodeName}` &&
+        button.getAttribute("href")?.includes("/local/n/")
+    ) ||
+    navigateButtons.find(
+      (button) =>
         button.getAttribute("aria-label") === `Navigate to ${nodeName}`
-    ) || navigateButtons[0];
+    ) ||
+    navigateButtons[0];
   await userEvent.click(exactNavigateButton);
 
   // Navigation can finish before descendants are rendered; wait for the target
@@ -1113,15 +1121,23 @@ export async function navigateToNodeViaSearch(
     `open ${nodeName} in fullscreen`
   );
   if (fullscreenButtons.length > 0) {
-    await userEvent.click(fullscreenButtons[fullscreenButtons.length - 1]);
+    const fullscreenButton = fullscreenButtons[fullscreenButtons.length - 1];
+    const fullscreenHref = fullscreenButton.getAttribute("href");
+    await userEvent.click(fullscreenButton);
     await waitFor(() => {
+      if (fullscreenHref) {
+        expect(
+          `${window.location.pathname}${window.location.search}${window.location.hash}`
+        ).toBe(fullscreenHref);
+        return;
+      }
       expect(isPaneFocusedOnNode(paneScope, nodeName)).toBe(true);
     });
   }
 
   if (options.waitForFullscreen) {
     await waitFor(() => {
-      expect(window.location.pathname).toMatch(/^\/[rd]\//u);
+      expect(window.location.pathname).toMatch(/^\/(local|storage|deposit)\//u);
     });
   }
 }

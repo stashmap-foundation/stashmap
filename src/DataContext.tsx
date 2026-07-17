@@ -10,6 +10,8 @@ import {
   useDocuments,
   useDocumentByFilePath,
 } from "./DocumentStore";
+import { mergeGraphIndexes } from "./graphIndex";
+import type { Document as KnowstrDocument } from "./core/Document";
 
 export type DataContextProps = Data;
 
@@ -59,22 +61,47 @@ function mergeKnowledgeDBs(a: KnowledgeDBs, b: KnowledgeDBs): KnowledgeDBs {
 export function MergeKnowledgeDB({
   children,
   knowledgeDBs,
+  graphIndex,
+  documents,
+  documentByFilePath,
+  snapshotNodes,
+  pull,
 }: {
   children: React.ReactNode;
   knowledgeDBs?: KnowledgeDBs;
+  graphIndex?: GraphIndex;
+  documents?: Map<string, KnowstrDocument>;
+  documentByFilePath?: Map<string, KnowstrDocument>;
+  snapshotNodes?: SnapshotNodes;
+  pull?: PullOverlayData;
 }): JSX.Element {
   const data = useData();
   const { temporaryEvents } = data.publishEventsStatus;
 
   const documentDBs = useDocumentKnowledgeDBs();
-  const graphIndex = useDocumentGraphIndex();
-  const snapshotNodes = useDocumentSnapshotNodes();
-  const documents = useDocuments();
-  const documentByFilePath = useDocumentByFilePath();
+  const documentGraphIndex = useDocumentGraphIndex();
+  const documentSnapshotNodes = useDocumentSnapshotNodes();
+  const documentRecords = useDocuments();
+  const documentsByPath = useDocumentByFilePath();
   const mergedDataDBs = mergeKnowledgeDBs(data.knowledgeDBs, documentDBs);
   const baseDBs = knowledgeDBs
     ? mergeKnowledgeDBs(knowledgeDBs, mergedDataDBs)
     : mergedDataDBs;
+  const mergedGraphIndex = graphIndex
+    ? mergeGraphIndexes(
+        mergeGraphIndexes(data.graphIndex, documentGraphIndex),
+        graphIndex
+      )
+    : mergeGraphIndexes(data.graphIndex, documentGraphIndex);
+  const mergedDocuments = documents
+    ? documentRecords.merge(data.documents).merge(documents)
+    : documentRecords.merge(data.documents);
+  const mergedDocumentByFilePath = documentByFilePath
+    ? documentsByPath.merge(data.documentByFilePath).merge(documentByFilePath)
+    : documentsByPath.merge(data.documentByFilePath);
+  const mergedSnapshotNodes = snapshotNodes
+    ? data.snapshotNodes.merge(documentSnapshotNodes).merge(snapshotNodes)
+    : data.snapshotNodes.merge(documentSnapshotNodes);
 
   const injectedDBs = injectEmptyNodesIntoKnowledgeDBs(
     baseDBs,
@@ -87,10 +114,11 @@ export function MergeKnowledgeDB({
       value={{
         ...data,
         knowledgeDBs: injectedDBs,
-        graphIndex,
-        snapshotNodes,
-        documents,
-        documentByFilePath,
+        graphIndex: mergedGraphIndex,
+        snapshotNodes: mergedSnapshotNodes,
+        documents: mergedDocuments,
+        documentByFilePath: mergedDocumentByFilePath,
+        pull: pull ?? data.pull,
       }}
     >
       {children}

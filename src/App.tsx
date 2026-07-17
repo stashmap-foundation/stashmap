@@ -48,8 +48,10 @@ export function App(): JSX.Element {
             <Route path="signin" element={<SignInModal />} />
             <Route path="signup" element={<SignUp />} />
           </Route>
-          <Route path="/d/:author/:docId" element={<Dashboard />} />
-          <Route path="/r/:nodeId" element={<Dashboard />} />
+          <Route path="/local/d/:docId" element={<Dashboard />} />
+          <Route path="/local/n/:nodeId" element={<Dashboard />} />
+          <Route path="/storage/:naddr" element={<Dashboard />} />
+          <Route path="/deposit/:naddr" element={<Dashboard />} />
         </Routes>
       </EntityLabelProvider>
     </CalendarFeedProvider>

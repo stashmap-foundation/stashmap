@@ -1,7 +1,7 @@
 import React from "react";
 import { useMediaQuery } from "react-responsive";
 import { useDisplayText, buildPaneTarget, useRow } from "../rowModel";
-import { useNavigatePane } from "../SplitPanesContext";
+import { useCurrentPane, useNavigatePane } from "../SplitPanesContext";
 import { useData } from "../DataContext";
 import { buildDocumentRouteUrl, buildNodeRouteUrl } from "../navigationUrl";
 import { IS_MOBILE } from "./responsive";
@@ -11,6 +11,7 @@ export function FullscreenButton(): JSX.Element | null {
   const data = useData();
   const displayText = useDisplayText();
   const navigatePane = useNavigatePane();
+  const pane = useCurrentPane();
   const row = useRow();
   const isFullscreenNode = row.depth === 1;
   if (isFullscreenNode || isMobile) {
@@ -19,7 +20,7 @@ export function FullscreenButton(): JSX.Element | null {
 
   const target = buildPaneTarget(data, row);
 
-  const href = (() => {
+  const hrefWithoutCapability = (() => {
     if (target.documentId) {
       return buildDocumentRouteUrl(
         target.sourceId,
@@ -35,6 +36,13 @@ export function FullscreenButton(): JSX.Element | null {
     }
     return undefined;
   })();
+  const href =
+    hrefWithoutCapability &&
+    pane.storageKey !== undefined &&
+    target.sourceId === pane.sourceId &&
+    hrefWithoutCapability.startsWith("/storage/")
+      ? `${hrefWithoutCapability}#key=${encodeURIComponent(pane.storageKey)}`
+      : hrefWithoutCapability;
 
   if (!href) {
     return null;

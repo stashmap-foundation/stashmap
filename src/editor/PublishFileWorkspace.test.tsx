@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { renderAppTree } from "../appTestUtils.test";
 import { knowstrInit, knowstrSave, write } from "../testFixtures/workspace";
 import { loadCliProfile } from "../cli/config";
+import { LOCAL } from "../core/nodeRef";
 import { buildDocumentRouteUrl } from "../navigationUrl";
 import { KIND_KNOWLEDGE_DEPOSIT, KIND_KNOWLEDGE_DOCUMENT } from "../nostr";
 
@@ -23,10 +24,9 @@ test("each unpublished document link has its own reach grant", async () => {
   write(workspacePath, "one.md", "# One\n");
   write(workspacePath, "two.md", "# Two\n");
   knowstrSave(workspacePath);
-  const profile = loadCliProfile({ cwd: workspacePath });
   await renderAppTree({
     path: workspacePath,
-    initialRoute: buildDocumentRouteUrl(profile.pubkey, "source.md"),
+    initialRoute: buildDocumentRouteUrl(LOCAL, "source.md"),
   });
   await userEvent.click(await screen.findByLabelText("audience options"));
   await userEvent.click(await screen.findByLabelText("publish document"));
@@ -48,6 +48,65 @@ test("each unpublished document link has its own reach grant", async () => {
   expect(screen.getByLabelText(secondLabel)).toBeTruthy();
 });
 
+test("reach sharing publishes the target on its own direct tags", async () => {
+  const { path: workspacePath } = knowstrInit({
+    relays: ["wss://relay.test.example"],
+  });
+  write(
+    workspacePath,
+    "mises.md",
+    ["# Mises <!-- id:mises -->", "", "[Hayek](./hayek.md)", ""].join("\n")
+  );
+  write(
+    workspacePath,
+    "hayek.md",
+    ["# Hayek <!-- id:hayek -->", "", "[Wittgenstein](#wittgenstein)", ""].join(
+      "\n"
+    )
+  );
+  write(
+    workspacePath,
+    "wittgenstein.md",
+    "# Wittgenstein <!-- id:wittgenstein -->\n"
+  );
+  knowstrSave(workspacePath);
+  const { relayPool } = await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "mises.md"),
+  });
+  await userEvent.click(await screen.findByLabelText("audience options"));
+  await userEvent.click(await screen.findByLabelText("publish document"));
+  await waitFor(() => {
+    const deposit = relayPool
+      .getEvents()
+      .find(
+        (event) =>
+          event.kind === KIND_KNOWLEDGE_DEPOSIT &&
+          event.content.includes("id:mises")
+      );
+    expect(deposit?.tags.filter(([name]) => name === "S")).toEqual([
+      ["S", "mises"],
+      ["S", "hayek"],
+    ]);
+  });
+  await userEvent.click(
+    await screen.findByLabelText(/publish linked document/u)
+  );
+  await waitFor(() => {
+    const deposit = relayPool
+      .getEvents()
+      .find(
+        (event) =>
+          event.kind === KIND_KNOWLEDGE_DEPOSIT &&
+          event.content.includes("id:hayek")
+      );
+    expect(deposit?.tags.filter(([name]) => name === "S")).toEqual([
+      ["S", "hayek"],
+      ["S", "wittgenstein"],
+    ]);
+  });
+});
+
 test("publishing keeps the filename and deposits from the file workspace", async () => {
   const { path: workspacePath } = knowstrInit({
     relays: ["wss://relay.test.example"],
@@ -57,7 +116,7 @@ test("publishing keeps the filename and deposits from the file workspace", async
   const profile = loadCliProfile({ cwd: workspacePath });
   const { relayPool } = await renderAppTree({
     path: workspacePath,
-    initialRoute: buildDocumentRouteUrl(profile.pubkey, "essay.md"),
+    initialRoute: buildDocumentRouteUrl(LOCAL, "essay.md"),
   });
   await screen.findByText("Point one");
   expect(screen.getByLabelText("Navigation breadcrumbs").textContent).toContain(

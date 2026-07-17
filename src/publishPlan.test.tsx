@@ -1,3 +1,4 @@
+import type { Document } from "./core/Document";
 import { LOCAL } from "./core/nodeRef";
 import { documentEntityTags } from "./editor/publishReach";
 import { getAllLinks, plainSpans } from "./core/nodeSpans";
@@ -44,6 +45,16 @@ function planWithEssay(): { plan: Plan; docId: string; rootId: string } {
 function frontMatterOf(content: string): FrontMatter {
   const match = content.match(/^---\n([\s\S]*?)---\n/u);
   return match ? parseFrontMatter(match[1]) : {};
+}
+
+function documentByRoot(plan: Plan, rootId: ID): Document {
+  const document = plan.documents
+    .valueSeq()
+    .find((candidate) => candidate.topNodeShortIds.includes(rootId));
+  if (!document) {
+    throw new Error(`document missing for ${rootId}`);
+  }
+  return document;
 }
 
 test("publishing a document emits a deposit beside its storage event", () => {
@@ -245,9 +256,14 @@ test("link placements feed the publish tags", () => {
   if (!document) {
     throw new Error("document missing");
   }
-  expect(documentEntityTags(pasted.knowledgeDBs, document)).toContain(
-    `asset:${CONTRACT_ID}`
-  );
+  expect(
+    documentEntityTags(
+      pasted.knowledgeDBs,
+      pasted.documents,
+      pasted.documentByFilePath,
+      document
+    )
+  ).toContain(`asset:${CONTRACT_ID}`);
 });
 
 test("tags derive through link targets, one bare tag per entity", () => {
@@ -267,7 +283,12 @@ test("tags derive through link targets, one bare tag per entity", () => {
   if (!document) {
     throw new Error("document missing");
   }
-  const tags = documentEntityTags(plan.knowledgeDBs, document);
+  const tags = documentEntityTags(
+    plan.knowledgeDBs,
+    plan.documents,
+    plan.documentByFilePath,
+    document
+  );
   expect([...tags].sort()).toEqual(["wd:Q1492", "wd:Q48435"]);
 });
 
@@ -286,6 +307,56 @@ test("repeated entities dedupe to one tag", () => {
   if (!document) {
     throw new Error("document missing");
   }
-  const tags = documentEntityTags(plan.knowledgeDBs, document);
+  const tags = documentEntityTags(
+    plan.knowledgeDBs,
+    plan.documents,
+    plan.documentByFilePath,
+    document
+  );
   expect(tags).toEqual(["wd:Q1492"]);
+});
+
+test("direct link tags are source-local and directional", () => {
+  const [alice] = setup([ALICE]);
+  const [misesPlan] = planCreateNodesFromMarkdown(
+    createPlan(alice()),
+    ["# Mises <!-- id:mises -->", "", "- [Hayek](#hayek)"].join("\n")
+  );
+  const [hayekPlan] = planCreateNodesFromMarkdown(
+    misesPlan,
+    ["# Hayek <!-- id:hayek -->", "", "- [Wittgenstein](#wittgenstein)"].join(
+      "\n"
+    )
+  );
+  const [plan] = planCreateNodesFromMarkdown(
+    hayekPlan,
+    "# Wittgenstein <!-- id:wittgenstein -->"
+  );
+  const publish = (document: Document): string[][] => {
+    const next = planSetDocumentPublishState(plan, document.docId, {
+      entities: documentEntityTags(
+        plan.knowledgeDBs,
+        plan.documents,
+        plan.documentByFilePath,
+        document
+      ),
+      paused: false,
+    });
+    const deposit = buildDocumentEvents(next).find(
+      (event) => event.kind === KIND_KNOWLEDGE_DEPOSIT
+    );
+    if (!deposit) {
+      throw new Error("deposit missing");
+    }
+    return deposit.tags.filter(([name]) => name === "S");
+  };
+
+  expect(publish(documentByRoot(plan, "mises"))).toEqual([
+    ["S", "mises"],
+    ["S", "hayek"],
+  ]);
+  expect(publish(documentByRoot(plan, "hayek"))).toEqual([
+    ["S", "hayek"],
+    ["S", "wittgenstein"],
+  ]);
 });

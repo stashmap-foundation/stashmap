@@ -307,6 +307,8 @@ function Breadcrumbs(): JSX.Element {
                 setPane({
                   ...pane,
                   sourceId: target.sourceId,
+                  routeCoordinate: undefined,
+                  storageKey: undefined,
                   documentId: target.documentId,
                   rootNodeId: undefined,
                   searchQuery: undefined,
@@ -320,6 +322,8 @@ function Breadcrumbs(): JSX.Element {
                 setPane({
                   ...pane,
                   sourceId: target.sourceId,
+                  routeCoordinate: undefined,
+                  storageKey: undefined,
                   documentId: undefined,
                   rootNodeId: target.rootNodeId,
                   searchQuery: undefined,
@@ -619,7 +623,12 @@ function AudienceChip(): JSX.Element | null {
       entities: [
         ...new Set([
           ...(state?.entities ?? []),
-          ...documentEntityTags(data.knowledgeDBs, document),
+          ...documentEntityTags(
+            data.knowledgeDBs,
+            data.documents,
+            data.documentByFilePath,
+            document
+          ),
         ]),
       ],
       relays,

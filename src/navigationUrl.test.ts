@@ -1,107 +1,140 @@
 import { nip19 } from "nostr-tools";
 import {
   addressForSource,
+  buildCoordinateRouteUrl,
   buildDocumentRouteUrl,
   buildNodeRouteUrl,
+  buildShareRouteUrl,
+  MAX_ROUTE_RELAY_HINTS,
+  parseAtFromSearch,
+  parseCoordinateRouteUrl,
   parseDocumentRouteUrl,
   parseFallbackLabelFromSearch,
   parseNodeRouteUrl,
   parseSourceFromSearch,
+  parseStorageKeyFromHash,
   resolveAddress,
+  routeCoordinateSourceId,
 } from "./navigationUrl";
 import { LOCAL } from "./core/nodeRef";
-
-const ALICE_SOURCE = "alice";
-
-test("buildNodeRouteUrl creates source-scoped node route", () => {
-  expect(
-    buildNodeRouteUrl("some-node-id" as ID, ALICE_SOURCE, {
-      scrollToId: undefined,
-      fallbackLabel: undefined,
-    })
-  ).toBe("/r/some-node-id?source=alice");
-  expect(
-    buildNodeRouteUrl("encoded/id" as ID, "source/id", {
-      scrollToId: undefined,
-      fallbackLabel: undefined,
-    })
-  ).toBe("/r/encoded%2Fid?source=source%2Fid");
-});
-
-test("buildNodeRouteUrl includes scroll target as hash", () => {
-  expect(
-    buildNodeRouteUrl("some-node-id" as ID, ALICE_SOURCE, {
-      scrollToId: "child/id" as ID,
-      fallbackLabel: undefined,
-    })
-  ).toBe("/r/some-node-id?source=alice#child%2Fid");
-});
-
-test("buildNodeRouteUrl includes fallback label as query text", () => {
-  expect(
-    buildNodeRouteUrl("wd:Q1492" as ID, ALICE_SOURCE, {
-      scrollToId: undefined,
-      fallbackLabel: "Barcelona / Barna",
-    })
-  ).toBe("/r/wd%3AQ1492?source=alice&fallbackLabel=Barcelona+%2F+Barna");
-});
-
-test("buildDocumentRouteUrl creates document route", () => {
-  expect(buildDocumentRouteUrl("alice" as PublicKey, "doc.md")).toBe(
-    "/d/alice/doc.md"
-  );
-  expect(buildDocumentRouteUrl("alice/key" as PublicKey, "docs/file.md")).toBe(
-    "/d/alice%2Fkey/docs%2Ffile.md"
-  );
-});
-
-test("buildDocumentRouteUrl includes scroll target as hash", () => {
-  expect(
-    buildDocumentRouteUrl("alice" as PublicKey, "doc.md", "child/id" as ID)
-  ).toBe("/d/alice/doc.md#child%2Fid");
-});
-
-test("parseNodeRouteUrl extracts node ID", () => {
-  expect(parseNodeRouteUrl("/r/some-node-id")).toBe("some-node-id");
-  expect(parseNodeRouteUrl("/r/encoded%2Fid")).toBe("encoded/id");
-  expect(parseNodeRouteUrl("/n/something")).toBeUndefined();
-  expect(parseNodeRouteUrl("/")).toBeUndefined();
-});
-
-test("parseDocumentRouteUrl extracts address and document ID", () => {
-  expect(parseDocumentRouteUrl("/d/alice/doc.md")).toEqual({
-    address: "alice",
-    docId: "doc.md",
-  });
-  expect(parseDocumentRouteUrl("/d/alice%2Fkey/docs%2Ffile.md")).toEqual({
-    address: "alice/key",
-    docId: "docs/file.md",
-  });
-  expect(parseDocumentRouteUrl("/r/something")).toBeUndefined();
-  expect(parseDocumentRouteUrl("/")).toBeUndefined();
-});
-
-test("parseSourceFromSearch extracts source", () => {
-  expect(parseSourceFromSearch("?source=abc123")).toBe("abc123");
-  expect(parseSourceFromSearch("?author=abc123")).toBeUndefined();
-  expect(parseSourceFromSearch("?foo=bar")).toBeUndefined();
-  expect(parseSourceFromSearch("")).toBeUndefined();
-});
-
-test("parseFallbackLabelFromSearch uses the first value and treats empty as absent", () => {
-  expect(
-    parseFallbackLabelFromSearch("?fallbackLabel=Barcelona+%2F+Barna")
-  ).toBe("Barcelona / Barna");
-  expect(
-    parseFallbackLabelFromSearch("?fallbackLabel=&fallbackLabel=Other")
-  ).toBeUndefined();
-  expect(parseFallbackLabelFromSearch("?source=abc123")).toBeUndefined();
-});
+import { KIND_KNOWLEDGE_DEPOSIT, KIND_KNOWLEDGE_DOCUMENT } from "./nostr";
 
 const OWN_PUBKEY =
   "f0289b28573a7c9bb169f43102b26259b7a4b758aca66ea3ac8cd0fe516a3758" as PublicKey;
 const OTHER_PUBKEY =
   "f0010ab30d3bd17a4368f3bf3a26900c65d97c2b8db1f3d2c84931f1d54734f6" as PublicKey;
+
+function coordinate(
+  eventKind: 34774 | 34775,
+  dTag: string,
+  relays: string[] = []
+): RouteCoordinate {
+  return { eventKind, pubkey: OTHER_PUBKEY, dTag, relays };
+}
+
+test("buildNodeRouteUrl creates local node route", () => {
+  expect(
+    buildNodeRouteUrl("some-node-id" as ID, LOCAL, {
+      scrollToId: undefined,
+      fallbackLabel: undefined,
+    })
+  ).toBe("/local/n/some-node-id");
+  expect(
+    buildNodeRouteUrl("encoded/id" as ID, LOCAL, {
+      scrollToId: undefined,
+      fallbackLabel: undefined,
+    })
+  ).toBe("/local/n/encoded%2Fid");
+});
+
+test("buildNodeRouteUrl includes focus and label queries", () => {
+  expect(
+    buildNodeRouteUrl("wd:Q1492" as ID, LOCAL, {
+      scrollToId: "child/id" as ID,
+      fallbackLabel: "Barcelona / Barna",
+    })
+  ).toBe("/local/n/wd%3AQ1492?at=child%2Fid&label=Barcelona+%2F+Barna");
+});
+
+test("buildDocumentRouteUrl creates local document route", () => {
+  expect(buildDocumentRouteUrl(LOCAL, "doc.md")).toBe("/local/d/doc.md");
+  expect(buildDocumentRouteUrl(LOCAL, "docs/file.md")).toBe(
+    "/local/d/docs%2Ffile.md"
+  );
+});
+
+test("buildDocumentRouteUrl includes focus query", () => {
+  expect(buildDocumentRouteUrl(LOCAL, "doc.md", "child/id" as ID)).toBe(
+    "/local/d/doc.md?at=child%2Fid"
+  );
+});
+
+test("coordinate routes round-trip and cap relay hints", () => {
+  const route = buildCoordinateRouteUrl(
+    "deposit",
+    coordinate(KIND_KNOWLEDGE_DEPOSIT, "doc-1", [
+      "relay.one",
+      "wss://relay.two/",
+      "wss://relay.two",
+      "wss://relay.three",
+      "wss://relay.four",
+    ]),
+    "node-1" as ID,
+    undefined
+  );
+  const parsed = parseCoordinateRouteUrl(
+    new URL(route, "https://x").pathname,
+    "deposit"
+  );
+  expect(parsed).toEqual({
+    eventKind: KIND_KNOWLEDGE_DEPOSIT,
+    pubkey: OTHER_PUBKEY,
+    dTag: "doc-1",
+    relays: ["wss://relay.one/", "wss://relay.two/", "wss://relay.three/"],
+  });
+  expect(parsed?.relays).toHaveLength(MAX_ROUTE_RELAY_HINTS);
+  expect(parseAtFromSearch(new URL(route, "https://x").search)).toBe("node-1");
+});
+
+test("storage share route carries the key fragment", () => {
+  const route = buildShareRouteUrl(OTHER_PUBKEY, "doc-1", "secret key");
+  const url = new URL(route, "https://x");
+  expect(parseCoordinateRouteUrl(url.pathname, "storage")?.dTag).toBe("doc-1");
+  expect(parseStorageKeyFromHash(url.hash)).toBe("secret key");
+});
+
+test("route parsers reject retired and mismatched routes", () => {
+  const storage = buildCoordinateRouteUrl(
+    "storage",
+    coordinate(KIND_KNOWLEDGE_DOCUMENT, "doc-1"),
+    undefined,
+    undefined
+  );
+  expect(parseNodeRouteUrl("/local/n/some-node-id")).toBe("some-node-id");
+  expect(parseNodeRouteUrl("/r/some-node-id")).toBeUndefined();
+  expect(parseDocumentRouteUrl("/local/d/doc.md")).toEqual({
+    address: LOCAL,
+    docId: "doc.md",
+  });
+  expect(parseDocumentRouteUrl("/d/alice/doc.md")).toBeUndefined();
+  expect(
+    parseCoordinateRouteUrl(new URL(storage, "https://x").pathname, "deposit")
+  ).toBeUndefined();
+});
+
+test("label and source query parsing follows typed routes", () => {
+  expect(parseFallbackLabelFromSearch("?label=Barcelona+%2F+Barna")).toBe(
+    "Barcelona / Barna"
+  );
+  expect(parseFallbackLabelFromSearch("?label=&label=Other")).toBeUndefined();
+  expect(parseSourceFromSearch("?source=abc123")).toBeUndefined();
+});
+
+test("coordinate source ids are stable", () => {
+  expect(
+    routeCoordinateSourceId(coordinate(KIND_KNOWLEDGE_DEPOSIT, "doc-1"))
+  ).toBe(`${KIND_KNOWLEDGE_DEPOSIT}:${OTHER_PUBKEY}:doc-1`);
+});
 
 test("resolveAddress and addressForSource round-trip own and foreign addresses", () => {
   const ownNpub = nip19.npubEncode(OWN_PUBKEY);

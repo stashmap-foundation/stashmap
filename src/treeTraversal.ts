@@ -64,6 +64,19 @@ function sourceIdForPath(data: Data, path: ViewPath): SourceId {
   return data.panes[path[0]]?.sourceId ?? LOCAL;
 }
 
+function footerVisibleSources(
+  data: Data,
+  paneIndex: number,
+  localSourceIds: readonly SourceId[]
+): ImmutableSet<SourceId> {
+  const pane = data.panes[paneIndex];
+  const pulled =
+    pane && pane.sourceId === LOCAL
+      ? data.pull?.matchedSourceIdsByPaneId.get(pane.id) ?? []
+      : [];
+  return ImmutableSet<SourceId>([...localSourceIds, ...pulled]);
+}
+
 type VirtualFooterInput = {
   parentPath: ViewPath;
   parentRow?: Row;
@@ -916,7 +929,11 @@ function getChildrenForRegularNode(
     typeFilters
   );
 
-  const visibleAuthors = ImmutableSet<SourceId>([LOCAL, author, nodeSourceId]);
+  const visibleAuthors = footerVisibleSources(data, parentRow.viewPath[0], [
+    LOCAL,
+    author,
+    nodeSourceId,
+  ]);
 
   const incomingCrefs = getIncomingCrefsForNode(
     data,
@@ -1181,7 +1198,10 @@ export function getNodesInDocument(
     return treeResult;
   }
 
-  const visibleAuthors = ImmutableSet<SourceId>([LOCAL, document.sourceId]);
+  const visibleAuthors = footerVisibleSources(data, documentRootPath[0], [
+    LOCAL,
+    document.sourceId,
+  ]);
   const incomingCrefs = getIncomingCrefsForNode(
     data,
     visibleAuthors,

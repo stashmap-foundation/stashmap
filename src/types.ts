@@ -134,9 +134,29 @@ declare global {
     userRelays: Relays;
   };
 
+  type RouteCoordinate = {
+    eventKind: 34774 | 34775;
+    pubkey: PublicKey;
+    dTag: string;
+    relays: string[];
+  };
+
+  type PaneSource =
+    | { kind: "local" }
+    | { kind: "storage"; coordinate: RouteCoordinate; storageKey: string }
+    | { kind: "deposit"; coordinate: RouteCoordinate };
+
+  type PaneTarget =
+    | { kind: "home" }
+    | { kind: "node"; nodeId: ID; label?: string }
+    | { kind: "document"; docId: string }
+    | { kind: "source-document" }
+    | { kind: "search"; query: string; resultIds: ID[] };
+
   type Pane = {
     id: string;
     sourceId: SourceId;
+    routeCoordinate?: RouteCoordinate;
     documentId?: string;
     rootNodeId?: ID;
     // Capability from a share link (#key= fragment): the storage key that
@@ -155,6 +175,24 @@ declare global {
     scrollToId?: string;
   };
 
+  type PullSourceMetadata = {
+    sourceId: SourceId;
+    coordinate: RouteCoordinate;
+    latestEventId: string;
+    ms: number;
+    sTags: string[];
+    relays: string[];
+    snapshotId: string;
+    title: string;
+    rootIds: string[];
+  };
+
+  type PullOverlayData = {
+    sourceIds: ReadonlySet<SourceId>;
+    matchedSourceIdsByPaneId: ReadonlyMap<string, readonly SourceId[]>;
+    metadataBySourceId: ReadonlyMap<SourceId, PullSourceMetadata>;
+  };
+
   type Data = {
     user: User | undefined;
     knowledgeDBs: KnowledgeDBs;
@@ -168,6 +206,7 @@ declare global {
     // machine-feeds law. Projections derive from these at row-build time
     // and never enter knowledgeDBs.
     calendarFeeds?: Map<string, IcalEntry[]>;
+    pull?: PullOverlayData;
 
     views: Views;
     panes: Pane[];

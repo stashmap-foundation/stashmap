@@ -22,17 +22,16 @@ import {
   readNodeId,
   write,
 } from "../testFixtures/workspace";
-import { loadCliProfile } from "../cli/config";
+import { LOCAL } from "../core/nodeRef";
 import { buildDocumentRouteUrl, buildNodeRouteUrl } from "../navigationUrl";
 
 async function renderDocumentRoute(
   workspacePath: string,
   relativePath: string
 ): Promise<void> {
-  const profile = loadCliProfile({ cwd: workspacePath });
   await renderAppTree({
     path: workspacePath,
-    initialRoute: buildDocumentRouteUrl(profile.pubkey, relativePath),
+    initialRoute: buildDocumentRouteUrl(LOCAL, relativePath),
   });
 }
 
@@ -40,10 +39,9 @@ async function renderNodeRoute(
   workspacePath: string,
   nodeId: ID
 ): Promise<void> {
-  const profile = loadCliProfile({ cwd: workspacePath });
   await renderAppTree({
     path: workspacePath,
-    initialRoute: buildNodeRouteUrl(nodeId, profile.pubkey, {
+    initialRoute: buildNodeRouteUrl(nodeId, LOCAL, {
       scrollToId: undefined,
       fallbackLabel: undefined,
     }),

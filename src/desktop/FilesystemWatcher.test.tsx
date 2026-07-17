@@ -27,7 +27,7 @@ Doc
 `);
 });
 
-test("/d route keeps showing a known file after top node ids change", async () => {
+test("/local/d route keeps showing a known file after top node ids change", async () => {
   const { path } = knowstrInit();
   write(path, "doc.md", "# Doc\n- one\n");
   await knowstrSave(path);
@@ -38,9 +38,7 @@ test("/d route keeps showing a known file after top node ids change", async () =
 
   await renderAppTree({
     path,
-    initialRoute: `/d/${encodeURIComponent(
-      profile.pubkey
-    )}/${encodeURIComponent(document.docId)}`,
+    initialRoute: `/local/d/${encodeURIComponent(document.docId)}`,
   });
 
   await expectTree(`

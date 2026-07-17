@@ -14,6 +14,7 @@ import { FilesystemWatcher } from "./FilesystemWatcher";
 import { parseToDocument } from "../../core/Document";
 import { WalkContext } from "../../core/markdownNodes";
 import { WorkspaceMarkdownFile } from "./workspaceBackend";
+import { PullSourceProvider } from "../../PullSourceContext";
 
 function fallbackTitleFromRelativePath(relativePath: string): string {
   const pieces = relativePath.split(/[\\/]/);
@@ -108,19 +109,21 @@ export function FilesystemDataProvider({
       >
         <FilesystemWatcher />
         <MergeKnowledgeDB>
-          <FilesystemExecutorProvider
-            setPublishEvents={session.setPublishStatus}
-            setPanes={session.setPanes}
-            setViews={session.setViews}
-          >
-            <PlanningContextProvider
+          <PullSourceProvider>
+            <FilesystemExecutorProvider
               setPublishEvents={session.setPublishStatus}
               setPanes={session.setPanes}
               setViews={session.setViews}
             >
-              <NavigationStateProvider>{children}</NavigationStateProvider>
-            </PlanningContextProvider>
-          </FilesystemExecutorProvider>
+              <PlanningContextProvider
+                setPublishEvents={session.setPublishStatus}
+                setPanes={session.setPanes}
+                setViews={session.setViews}
+              >
+                <NavigationStateProvider>{children}</NavigationStateProvider>
+              </PlanningContextProvider>
+            </FilesystemExecutorProvider>
+          </PullSourceProvider>
         </MergeKnowledgeDB>
       </DocumentStoreProvider>
     </DataContextProvider>

@@ -24,15 +24,20 @@ test("App defaults to empty pane with new node editor when visiting /", async ()
   });
 });
 
-test("Navigate to specific node via URL using human-readable path", async () => {
+test("Navigate to specific node via local typed URL", async () => {
   const [alice] = setup([ALICE]);
   renderApp(alice());
   await type("Test Node{Escape}");
+  const nodeId =
+    screen
+      .getByRole("treeitem", { name: "Test Node" })
+      .getAttribute("data-node-id") ?? "";
+  expect(nodeId).not.toBe("");
   cleanup();
 
   renderApp({
     ...alice(),
-    initialRoute: `/n/${encodeURIComponent("Test Node")}`,
+    initialRoute: `/local/n/${encodeURIComponent(nodeId)}`,
   });
 
   await screen.findByRole("treeitem", { name: "Test Node" });
@@ -71,7 +76,7 @@ Cities
   `);
 });
 
-test("Bob can view Alice's node via /r/ URL without following her", async () => {
+test("Bob can view Alice's node via storage URL without following her", async () => {
   const [alice, bob] = setup([ALICE, BOB]);
 
   renderApp(alice());
@@ -95,7 +100,7 @@ test("Bob can view Alice's node via /r/ URL without following her", async () => 
   `);
 });
 
-test("Anonymous user can view node via /r/ URL", async () => {
+test("Anonymous user can view node via storage URL", async () => {
   const [alice, anon] = setup([ALICE, ANON]);
 
   renderApp(alice());
@@ -119,7 +124,7 @@ Cities
   `);
 });
 
-test("Anonymous user sees versioned node text via /r/ URL", async () => {
+test("Anonymous user sees versioned node text via storage URL", async () => {
   const [alice, anon] = setup([ALICE, ANON]);
 
   renderApp(alice());
@@ -184,7 +189,7 @@ test("Clicking breadcrumb while viewing other user's content preserves READONLY"
   `);
 });
 
-test("Opening /n/ URL with source param shows READONLY", async () => {
+test("Opening typed storage route shows READONLY", async () => {
   const [alice, bob] = setup([ALICE, BOB]);
 
   renderApp(alice());
@@ -195,9 +200,11 @@ test("Opening /n/ URL with source param shows READONLY", async () => {
 
   renderApp({
     ...bob(),
-    initialRoute: `/n/${encodeURIComponent("My Notes")}/${encodeURIComponent(
+    initialRoute: readonlyRoute(
+      requireUser(alice()).publicKey,
+      "My Notes",
       "Cities"
-    )}?source=${requireUser(alice()).publicKey}`,
+    ),
   });
 
   await screen.findByText("READONLY");
@@ -230,7 +237,7 @@ test("Breadcrumb navigation opens document URLs for document roots", async () =>
   await userEvent.click(await screen.findByLabelText("Navigate to My Notes"));
 
   await waitFor(() => {
-    expect(window.location.pathname).toMatch(/^\/d\//);
+    expect(window.location.pathname).toMatch(/^\/storage\//);
   });
   await screen.findByText("READONLY");
 });
@@ -269,7 +276,7 @@ test("Clicking fullscreen while viewing other user's content preserves READONLY"
   `);
 });
 
-test("Relay filters never contain invalid pubkeys when anonymous user views /r/ URL", async () => {
+test("Relay filters never contain invalid pubkeys when anonymous user views storage URL", async () => {
   const [alice, anon] = setup([ALICE, ANON]);
 
   renderApp(alice());
@@ -299,7 +306,7 @@ Cities
   });
 });
 
-test("/r/ URL takes priority over stale history state", async () => {
+test("typed URL takes priority over stale history state", async () => {
   const [alice, bob] = setup([ALICE, BOB]);
 
   renderApp(alice());
@@ -374,7 +381,7 @@ Cities
   `);
 });
 
-test("Navigating own content puts the absolute npub address in the address bar", async () => {
+test("Own storage route renders editable for owner", async () => {
   const [alice] = setup([ALICE]);
 
   renderApp(alice());
@@ -390,7 +397,5 @@ test("Navigating own content puts the absolute npub address in the address bar",
 Cities
   `);
 
-  await waitFor(() => {
-    expect(window.location.search).toContain(ownerNpub);
-  });
+  expect(screen.queryByText("READONLY")).toBeNull();
 });

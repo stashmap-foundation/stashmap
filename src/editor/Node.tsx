@@ -74,7 +74,10 @@ import { useNodeIsLoading } from "../LoadingStatus";
 import { NodeCard } from "../commons/Ui";
 import { usePaneIndex, useNavigatePane } from "../SplitPanesContext";
 import { RightMenu, usePublishedPaneDocument } from "./RightMenu";
-import { unpublishedLinkTargetForHref } from "./publishReach";
+import {
+  documentEntityTags,
+  unpublishedLinkTargetForHref,
+} from "./publishReach";
 import { useItemStyle } from "./useItemStyle";
 import { EditorTextProvider } from "./EditorTextContext";
 import {
@@ -298,16 +301,22 @@ function LinkReachChip({
   );
   if (!paneDocument || !target) return null;
   const grant = (): void => {
-    const state = publishStateOf(paneDocument.frontMatter);
+    const paneState = publishStateOf(paneDocument.frontMatter);
+    const targetState = publishStateOf(target.frontMatter);
     executePlan(
       planSetDocumentPublishState(createPlan(), target.docId, {
         entities: [
           ...new Set([
-            ...paneDocument.topNodeShortIds,
-            ...(state?.entities ?? []),
+            ...(targetState?.entities ?? []),
+            ...documentEntityTags(
+              data.knowledgeDBs,
+              data.documents,
+              data.documentByFilePath,
+              target
+            ),
           ]),
         ],
-        relays: state?.relays,
+        relays: paneState?.relays,
         paused: false,
       })
     );

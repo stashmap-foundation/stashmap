@@ -842,20 +842,21 @@ function depositEventFor(
     : undefined;
 }
 
-// Deposits alone — publication is storage-independent, so executors whose
-// storage isn't relay-backed (the desktop's filesystem) publish exactly
-// these and nothing else.
 export function buildDepositEvents(
   plan: GraphPlan
 ): List<UnsignedEvent & EventAttachment> {
+  const explicit = plan.publishEvents.filter(
+    (event) =>
+      event.kind === KIND_KNOWLEDGE_DEPOSIT || event.kind === KIND_DELETE
+  );
   if (!plan.user) {
-    return List();
+    return explicit;
   }
   const pubkey = plan.user.publicKey;
   return buildDocumentWrites(plan).reduce((events, write) => {
     const deposit = depositEventFor(plan, pubkey, write);
     return deposit ? events.push(deposit) : events;
-  }, List<UnsignedEvent & EventAttachment>());
+  }, explicit);
 }
 
 // Undo publishing (idea.md, M7 retract): a kind-5 on the deposit

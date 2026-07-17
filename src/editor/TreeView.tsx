@@ -11,6 +11,7 @@ import {
   getPaneRootItemID,
   viewPathToString,
 } from "../rowModel";
+import { EMPTY_NODE_ID } from "../core/connections";
 import { useData } from "../DataContext";
 import { useCalendarFeeds } from "../CalendarFeedContext";
 import { calendarFeedUrl } from "../core/ical";
@@ -469,6 +470,14 @@ function Tree(): JSX.Element | null {
     rowFocusIntent?.rowIndex,
     nodeKeys,
   ]);
+
+  if (
+    (rows.size === 0 || rootRow?.node.id === EMPTY_NODE_ID) &&
+    pane.sourceId !== LOCAL &&
+    (pane.documentId !== undefined || pane.rootNodeId !== undefined)
+  ) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <div

@@ -114,13 +114,13 @@ test("the copied secret link opens the private document for its holder", async (
 
   const link = await copySecretLinkViaChip(alice(), "Secret Plans");
   const url = new URL(link);
-  expect(url.pathname).toMatch(/^\/d\//);
+  expect(url.pathname).toMatch(/^\/storage\//);
   expect(parseStorageKeyFromHash(url.hash)).toBeTruthy();
 
   window.history.pushState({}, "", "/");
   renderApp({
     ...bob(),
-    initialRoute: `${url.pathname}${url.hash}`,
+    initialRoute: `${url.pathname}${url.search}${url.hash}`,
   });
   await screen.findAllByText("Secret Plans");
 

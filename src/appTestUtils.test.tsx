@@ -42,6 +42,7 @@ type AppRenderOptions = {
    * Initial browser route before mounting the filesystem app.
    */
   initialRoute?: string;
+  relayPool?: MockRelayPool;
   /**
    * Start the app with no workspace selected (the "no workspace" empty state).
    * Tests must drive the pick/create flow via the returned `ipc`.
@@ -64,7 +65,7 @@ export async function renderAppTree(
   const ipc = mockWorkspaceIpc(path ?? null);
   // eslint-disable-next-line functional/immutable-data
   PENDING_IPCS.push(ipc);
-  const relayPool = mockRelayPool();
+  const relayPool = options.relayPool ?? mockRelayPool();
 
   const utils = renderWithTestData(
     <FilesystemAppRoot>

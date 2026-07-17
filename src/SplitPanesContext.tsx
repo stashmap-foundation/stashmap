@@ -3,11 +3,14 @@ import { LOCAL } from "./core/nodeRef";
 import { planUpdatePanes, usePlanner } from "./planner";
 import { useData } from "./DataContext";
 import {
+  parseAtFromSearch,
+  parseCoordinateRouteUrl,
   parseDocumentRouteUrl,
   parseFallbackLabelFromSearch,
   parseNodeRouteUrl,
-  parseSourceFromSearch,
+  parseStorageKeyFromHash,
   resolveAddress,
+  routeCoordinateSourceId,
 } from "./navigationUrl";
 import { usePaneHistory } from "./PaneHistoryContext";
 
@@ -115,10 +118,10 @@ export function useNavigatePane(): (url: string) => void {
 
   return (url: string): void => {
     paneHistory?.push(pane.id, pane);
+    window.history.pushState({}, "", url);
     const hashIndex = url.indexOf("#");
     const urlWithoutHash = hashIndex >= 0 ? url.slice(0, hashIndex) : url;
-    const scrollToId =
-      hashIndex >= 0 ? decodeURIComponent(url.slice(hashIndex + 1)) : undefined;
+    const hash = hashIndex >= 0 ? url.slice(hashIndex) : "";
     const questionMarkIndex = urlWithoutHash.indexOf("?");
     const pathname =
       questionMarkIndex >= 0
@@ -126,20 +129,42 @@ export function useNavigatePane(): (url: string) => void {
         : urlWithoutHash;
     const search =
       questionMarkIndex >= 0 ? urlWithoutHash.slice(questionMarkIndex) : "";
-    const sourceId = resolveAddress(
-      parseSourceFromSearch(search),
-      user?.publicKey
-    );
     const fallbackLabel = parseFallbackLabelFromSearch(search);
+    const at = parseAtFromSearch(search);
     const documentRoute = parseDocumentRouteUrl(pathname);
     if (documentRoute) {
-      const docSource = resolveAddress(documentRoute.address, user?.publicKey);
       setPane({
         id: pane.id,
-        sourceId: docSource,
+        sourceId: LOCAL,
         documentId: documentRoute.docId,
-        scrollToId,
+        scrollToId: at,
         fallbackLabel: undefined,
+      });
+      return;
+    }
+    const storageRoute = parseCoordinateRouteUrl(pathname, "storage");
+    if (storageRoute) {
+      const storageKey = parseStorageKeyFromHash(hash);
+      setPane({
+        id: pane.id,
+        sourceId: resolveAddress(storageRoute.pubkey, user?.publicKey),
+        routeCoordinate: storageRoute,
+        ...(at === undefined
+          ? { documentId: storageRoute.dTag }
+          : { rootNodeId: at }),
+        ...(storageKey !== undefined && { storageKey }),
+      });
+      return;
+    }
+    const depositRoute = parseCoordinateRouteUrl(pathname, "deposit");
+    if (depositRoute) {
+      setPane({
+        id: pane.id,
+        sourceId: routeCoordinateSourceId(depositRoute),
+        routeCoordinate: depositRoute,
+        ...(at === undefined
+          ? { documentId: depositRoute.dTag }
+          : { rootNodeId: at }),
       });
       return;
     }
@@ -147,15 +172,15 @@ export function useNavigatePane(): (url: string) => void {
     if (nodeID) {
       setPane({
         id: pane.id,
-        sourceId,
+        sourceId: LOCAL,
         rootNodeId: nodeID,
-        scrollToId,
+        scrollToId: at,
         fallbackLabel,
       });
     } else {
       setPane({
         id: pane.id,
-        sourceId: sourceId || LOCAL,
+        sourceId: LOCAL,
         fallbackLabel: undefined,
       });
     }

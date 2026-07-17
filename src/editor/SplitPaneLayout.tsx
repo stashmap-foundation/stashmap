@@ -48,6 +48,8 @@ export function PaneSearchButton(): JSX.Element {
       setPane({
         ...pane,
         sourceId: LOCAL,
+        routeCoordinate: undefined,
+        storageKey: undefined,
         documentId: undefined,
         rootNodeId: undefined,
         scrollToId: undefined,

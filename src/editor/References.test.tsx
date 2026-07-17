@@ -243,9 +243,9 @@ Places
 https://www.wikidata.org/wiki/Q131723
   [I] Places ↩
     `);
-    expect(
-      new URLSearchParams(window.location.search).get("fallbackLabel")
-    ).toBe("https://www.wikidata.org/wiki/Q131723");
+    expect(new URLSearchParams(window.location.search).get("label")).toBe(
+      "https://www.wikidata.org/wiki/Q131723"
+    );
     await waitFor(() => expect(fetchEntityMetadata).toHaveBeenCalledTimes(1));
   });
 
@@ -257,7 +257,7 @@ https://www.wikidata.org/wiki/Q131723
     const { relayPool } = renderApp({
       ...alice(),
       fetchEntityMetadata,
-      initialRoute: "/r/wd%3AQ999?source=local",
+      initialRoute: "/local/n/wd%3AQ999",
     });
 
     await screen.findByRole("treeitem", { name: "Entity wd:Q999" });
@@ -326,9 +326,9 @@ Trip
 Barcelona
   [I] Trip ↩
     `);
-    expect(
-      new URLSearchParams(window.location.search).get("fallbackLabel")
-    ).toBe("Barcelona");
+    expect(new URLSearchParams(window.location.search).get("label")).toBe(
+      "Barcelona"
+    );
     await waitFor(() => expect(fetchEntityMetadata).toHaveBeenCalledTimes(1));
 
     await userEvent.click(await screen.findByLabelText("Go back"));
@@ -337,9 +337,9 @@ Barcelona
 Barna
   [I] Trip ↩
     `);
-    expect(
-      new URLSearchParams(window.location.search).get("fallbackLabel")
-    ).toBe("Barna");
+    expect(new URLSearchParams(window.location.search).get("label")).toBe(
+      "Barna"
+    );
     await waitFor(() => expect(fetchEntityMetadata).toHaveBeenCalledTimes(1));
   });
 
@@ -411,15 +411,15 @@ Madrid
     renderApp({
       ...alice(),
       fetchEntityMetadata,
-      initialRoute: "/r/wd%3AQ1492?source=local&fallbackLabel=Local%20Name",
+      initialRoute: "/local/n/wd%3AQ1492?label=Local%20Name",
     });
 
     screen.getByRole("treeitem", { name: "Local Name" });
     await waitFor(() => expect(fetchEntityMetadata).toHaveBeenCalledTimes(1));
     await screen.findByRole("treeitem", { name: "Barcelona auf Deutsch" });
-    expect(
-      new URLSearchParams(window.location.search).get("fallbackLabel")
-    ).toBe("Barcelona auf Deutsch");
+    expect(new URLSearchParams(window.location.search).get("label")).toBe(
+      "Barcelona auf Deutsch"
+    );
     expect(fetchEntityMetadata).toHaveBeenCalledTimes(1);
     Reflect.defineProperty(navigator, "languages", {
       value: originalLanguages,
@@ -432,9 +432,7 @@ Madrid
     const asset = "asset:rgb:AAAABBBBCCCCDDDDEEEE12345";
     const { relayPool } = renderApp({
       ...alice(),
-      initialRoute: `/r/${encodeURIComponent(
-        asset
-      )}?source=local&fallbackLabel=Asset%20Label`,
+      initialRoute: `/local/n/${encodeURIComponent(asset)}?label=Asset%20Label`,
     });
 
     await screen.findByRole("treeitem", { name: "Asset Label" });

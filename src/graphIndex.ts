@@ -387,6 +387,45 @@ export function removeNodesFromGraphIndex(
   return nextIndex;
 }
 
+export function mergeGraphIndexes(
+  base: GraphIndex,
+  overlay: GraphIndex
+): GraphIndex {
+  const nextIndex = cloneIndex(base);
+  overlay.nodesBySource.forEach((nodes, sourceId) => {
+    const nextNodes = new globalThis.Map<ID, GraphNode>(
+      nextIndex.nodesBySource.get(sourceId)
+    );
+    nodes.forEach((node, nodeId) => {
+      nextNodes.set(nodeId, node);
+      nextIndex.nodeByID.set(nodeId, node);
+    });
+    nextIndex.nodesBySource.set(sourceId, nextNodes);
+  });
+  overlay.sourceCandidatesById.forEach((refs, key) => {
+    refs.forEach((ref) =>
+      addRefToMap(nextIndex.sourceCandidatesById, key, ref)
+    );
+  });
+  overlay.incomingCrefs.forEach((refs, key) => {
+    refs.forEach((ref) => addRefToNodeMap(nextIndex.incomingCrefs, key, ref));
+  });
+  overlay.incomingCrefsByTarget.forEach((refs, key) => {
+    refs.forEach((ref) =>
+      addRefToMap(nextIndex.incomingCrefsByTarget, key, ref)
+    );
+  });
+  overlay.incomingFileLinks.forEach((refs, key) => {
+    refs.forEach((ref) => addRefToMap(nextIndex.incomingFileLinks, key, ref));
+  });
+  overlay.basedOnIndex.forEach((ids, key) => {
+    const nextIds = nextIndex.basedOnIndex.get(key) ?? new globalThis.Set<ID>();
+    ids.forEach((id) => nextIds.add(id));
+    nextIndex.basedOnIndex.set(key, nextIds);
+  });
+  return nextIndex;
+}
+
 function sourceIdFromDocumentKey(documentKey: string): SourceId {
   const [sourceId] = documentKey.split(":");
   return sourceId || LOCAL;

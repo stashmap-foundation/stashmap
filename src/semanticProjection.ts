@@ -136,6 +136,13 @@ function uniqueNodes(nodes: ResolvedNode[]): ResolvedNode[] {
   });
 }
 
+function pulledSourceOrder(data: Data, sourceId: SourceId): number | undefined {
+  const indexes = [...(data.pull?.matchedSourceIdsByPaneId.values() ?? [])]
+    .map((sourceIds) => sourceIds.indexOf(sourceId))
+    .filter((index) => index >= 0);
+  return indexes.length === 0 ? undefined : Math.min(...indexes);
+}
+
 export function getIncomingCrefsForNode(
   data: Data,
   visibleAuthors: ImmutableSet<SourceId>,
@@ -212,11 +219,23 @@ export function getIncomingCrefsForNode(
         node.systemRole !== LOG_ROOT_ROLE &&
         !isInSystemRoot(knowledgeDBs, node, ref.sourceId, LOG_ROOT_ROLE)
     )
-    .sort((left, right) =>
-      nodePathLabel(knowledgeDBs, left.node, left.ref.sourceId).localeCompare(
+    .sort((left, right) => {
+      const leftPullOrder = pulledSourceOrder(data, left.ref.sourceId);
+      const rightPullOrder = pulledSourceOrder(data, right.ref.sourceId);
+      if (leftPullOrder !== undefined || rightPullOrder !== undefined) {
+        return (
+          (leftPullOrder ?? Number.MAX_SAFE_INTEGER) -
+          (rightPullOrder ?? Number.MAX_SAFE_INTEGER)
+        );
+      }
+      return nodePathLabel(
+        knowledgeDBs,
+        left.node,
+        left.ref.sourceId
+      ).localeCompare(
         nodePathLabel(knowledgeDBs, right.node, right.ref.sourceId)
-      )
-    );
+      );
+    });
 
   return List(
     visibleSourceNodes.map(({ ref }) => ({
@@ -400,6 +419,30 @@ export function getAlternativeFooterData(
     );
   };
 
+  const sameIdSuggestionCandidates = suggestionsEnabled
+    ? lookupNodes(graph, currentNode.id)
+        .filter(
+          ({ ref }) =>
+            visibleAuthors.has(ref.sourceId) &&
+            ref.sourceId !== current.ref.sourceId
+        )
+        .reduce((acc, sourceNode) => {
+          return getChildNodes(
+            knowledgeDBs,
+            sourceNode.node,
+            sourceNode.ref.sourceId
+          )
+            .filter((item) => itemPassesFilters(item, filterTypes))
+            .reduce((itemAcc, item) => {
+              const originKey = (item.basedOn ?? item.id) as string;
+              if (isCoveredItem(item) || itemAcc.has(originKey)) {
+                return itemAcc;
+              }
+              return itemAcc.set(originKey, item.id);
+            }, acc);
+        }, OrderedMap<string, ID>())
+    : OrderedMap<string, ID>();
+
   const versionNodes = getVersions(graph, visibleAuthors, current);
   const versionDiffs = versionNodes
     .map((version) =>
@@ -426,7 +469,8 @@ export function getAlternativeFooterData(
               }, acc),
           OrderedMap<string, ID>()
         )
-    : OrderedMap<string, ID>();
+        .merge(sameIdSuggestionCandidates)
+    : sameIdSuggestionCandidates;
 
   const suggestions = allSuggestionCandidates
     .valueSeq()

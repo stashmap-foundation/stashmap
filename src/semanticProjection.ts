@@ -146,6 +146,45 @@ function uniqueRefs(refs: NodeRef[]): NodeRef[] {
   });
 }
 
+function localChildLinksTo(
+  graph: GraphLookup,
+  target: ResolvedNode,
+  sourceRoot: ResolvedNode
+): boolean {
+  return target.node.children.some((childID) => {
+    const child = getNodeInSource(graph, {
+      sourceId: target.ref.sourceId,
+      id: childID,
+    })?.node;
+    const judged =
+      child?.relevance !== undefined || child?.argument !== undefined;
+    if (childID === sourceRoot.node.id) {
+      return judged;
+    }
+    return child
+      ? judged &&
+          getAllLinks(child).some(
+            (link) => link.targetID === sourceRoot.node.id
+          )
+      : false;
+  });
+}
+
+function sourceRootCoveredByTarget(
+  graph: GraphLookup,
+  source: ResolvedNode,
+  target: ResolvedNode | undefined
+): boolean {
+  if (!target) {
+    return false;
+  }
+  const sourceRoot = getNodeInSource(graph, {
+    sourceId: source.ref.sourceId,
+    id: source.node.root,
+  });
+  return sourceRoot ? localChildLinksTo(graph, target, sourceRoot) : false;
+}
+
 function pulledSourceOrder(data: Data, sourceId: SourceId): number | undefined {
   const indexes = [...(data.pull?.matchedSourceIdsByPaneId.values() ?? [])]
     .map((sourceIds) => sourceIds.indexOf(sourceId))
@@ -214,7 +253,8 @@ export function getIncomingCrefsForNode(
         target === undefined ||
         findReciprocalLinkItem(graph, data, source, target) === undefined
     )
-    .map((source) => linkSpeaker(graph, source));
+    .map((source) => linkSpeaker(graph, source))
+    .filter((source) => !sourceRootCoveredByTarget(graph, source, target));
   const seenIncomingIds = new globalThis.Set<ID>();
   const visibleSourceNodes = uniqueNodes(sourceNodes)
     .filter(({ ref }) => visibleAuthors.has(ref.sourceId))

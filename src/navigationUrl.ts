@@ -131,7 +131,12 @@ export function buildNodeRouteUrl(
   }
   const prefix =
     coordinate.eventKind === KIND_KNOWLEDGE_DEPOSIT ? "deposit" : "storage";
-  return buildCoordinateRouteUrl(prefix, coordinate, rootNode, undefined);
+  return buildCoordinateRouteUrl(
+    prefix,
+    coordinate,
+    options.scrollToId ?? rootNode,
+    undefined
+  );
 }
 
 export function buildDocumentRouteUrl(

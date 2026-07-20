@@ -3,9 +3,14 @@ import os from "os";
 import path from "path";
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { BOB, expectTree, renderApp, setup } from "../utils.test";
+import { BOB, CAROL, expectTree, renderApp, setup } from "../utils.test";
 import { renderAppTree } from "../appTestUtils.test";
-import { knowstrInit, knowstrSave, write } from "../testFixtures/workspace";
+import {
+  expectMarkdown,
+  knowstrInit,
+  knowstrSave,
+  write,
+} from "../testFixtures/workspace";
 import { LOCAL } from "../core/nodeRef";
 import { KIND_KNOWLEDGE_DEPOSIT } from "../nostr";
 import {
@@ -47,6 +52,88 @@ async function fixedWorkspaceWithDocument(
 ): Promise<string> {
   const workspacePath = fixedWorkspace(author);
   write(workspacePath, relativePath, content);
+  await knowstrSave(workspacePath);
+  return workspacePath;
+}
+
+function austriaDocument(published: boolean): string {
+  return [
+    "---",
+    "knowstr_doc_id: austria-doc",
+    ...(published ? ["knowstr_publish:"] : []),
+    "---",
+    "# Austria <!-- id:wd:Q40 -->",
+    "",
+  ].join("\n");
+}
+
+function fergusonDocument(
+  docId: string,
+  rootId: string,
+  title: string,
+  quotePrefix: string,
+  quoteCount: number
+): string {
+  const quoteLines = Array.from({ length: quoteCount }, (_, index) => {
+    const n = index + 1;
+    return [
+      `- Quote ${n} <!-- id:${quotePrefix}-quote-${n} -->`,
+      `  - [Austria](#wd:Q40) <!-- id:${quotePrefix}-austria-link-${n} -->`,
+    ];
+  }).flat();
+  return [
+    "---",
+    `knowstr_doc_id: ${docId}`,
+    "---",
+    `# ${title} <!-- id:${rootId} -->`,
+    ...quoteLines,
+    "",
+  ].join("\n");
+}
+
+async function groupingWorkspace(quoteCount: number): Promise<string> {
+  const workspacePath = fixedWorkspace(BOB);
+  write(workspacePath, "austria.md", austriaDocument(false));
+  write(
+    workspacePath,
+    "ferguson.md",
+    fergusonDocument(
+      "ferguson-doc",
+      "isbn:ferguson-book",
+      "Ferguson",
+      "ferguson",
+      quoteCount
+    )
+  );
+  await knowstrSave(workspacePath);
+  return workspacePath;
+}
+
+async function multiSourceGroupingWorkspace(): Promise<string> {
+  const workspacePath = fixedWorkspace(BOB);
+  write(workspacePath, "austria.md", austriaDocument(false));
+  write(
+    workspacePath,
+    "ferguson-a.md",
+    fergusonDocument(
+      "ferguson-a-doc",
+      "isbn:ferguson-a",
+      "Ferguson A",
+      "ferguson-a",
+      2
+    )
+  );
+  write(
+    workspacePath,
+    "ferguson-b.md",
+    fergusonDocument(
+      "ferguson-b-doc",
+      "isbn:ferguson-b",
+      "Ferguson B",
+      "ferguson-b",
+      2
+    )
+  );
   await knowstrSave(workspacePath);
   return workspacePath;
 }
@@ -329,6 +416,256 @@ Ludwig von Mises
     );
   });
   await screen.findByText("READONLY");
+});
+
+test("incoming refs stay individual below the document grouping threshold", async () => {
+  const workspacePath = await groupingWorkspace(2);
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: "/local/n/wd%3AQ40?label=Austria",
+  });
+
+  await expectTree(`
+Austria
+  [I] Ferguson / Quote 1 ↩
+  [I] Ferguson / Quote 2 ↩
+  `);
+  expect(screen.queryByRole("treeitem", { name: "Ferguson ↩" })).toBeNull();
+});
+
+test("incoming refs group by source root at threshold and expand with short labels", async () => {
+  const workspacePath = await groupingWorkspace(3);
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: "/local/n/wd%3AQ40?label=Austria",
+  });
+
+  await expectTree(`
+Austria
+  [I] Ferguson ↩
+  `);
+  expect(screen.queryByText(/mentions/u)).toBeNull();
+
+  await userEvent.click(await screen.findByLabelText("expand Ferguson ↩"));
+
+  await expectTree(`
+Austria
+  [I] Ferguson ↩
+    [I] Quote 1 ↩
+    [I] Quote 2 ↩
+    [I] Quote 3 ↩
+  `);
+  expect(screen.queryByText("Ferguson / Quote 1 ↩")).toBeNull();
+});
+
+test("accepting grouped incoming source writes one root link and suppresses its quote refs", async () => {
+  const workspacePath = await groupingWorkspace(3);
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: "/local/n/wd%3AQ40?label=Austria",
+  });
+
+  await userEvent.click(
+    await screen.findByLabelText("accept Ferguson ↩ as relevant")
+  );
+
+  await expectTree(
+    `
+Austria
+  {!} Ferguson
+  `,
+    { showGutter: true }
+  );
+  await expectMarkdown(
+    workspacePath,
+    "austria.md",
+    [
+      "# Austria <!-- id:... -->",
+      "",
+      "- (!) [Ferguson](#isbn:ferguson-book) <!-- id:... -->",
+    ].join("\n")
+  );
+});
+
+test("accepting one grouped child writes that ref and dissolves the remaining pair", async () => {
+  const workspacePath = await groupingWorkspace(3);
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: "/local/n/wd%3AQ40?label=Austria",
+  });
+
+  await userEvent.click(await screen.findByLabelText("expand Ferguson ↩"));
+  await userEvent.click(
+    await screen.findByLabelText("accept Quote 1 ↩ as relevant")
+  );
+
+  await expectTree(
+    `
+Austria
+  {!} Quote 1↩
+  [I] Ferguson / Quote 2 ↩
+  [I] Ferguson / Quote 3 ↩
+  `,
+    { showGutter: true }
+  );
+  await expectMarkdown(
+    workspacePath,
+    "austria.md",
+    [
+      "# Austria <!-- id:... -->",
+      "",
+      "- (!) [Quote 1](#ferguson-quote-1) <!-- id:... -->",
+    ].join("\n")
+  );
+});
+
+test("incoming grouping does not merge different source documents", async () => {
+  const workspacePath = await multiSourceGroupingWorkspace();
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: "/local/n/wd%3AQ40?label=Austria",
+  });
+
+  await expectTree(`
+Austria
+  [I] Ferguson A / Quote 1 ↩
+  [I] Ferguson A / Quote 2 ↩
+  [I] Ferguson B / Quote 1 ↩
+  [I] Ferguson B / Quote 2 ↩
+  `);
+});
+
+test("remote incoming groups open the source root and expanded child source rows", async () => {
+  const relayPool = mockRelayPool();
+  const alicePath = await workspaceWithDocument(
+    "ferguson.md",
+    fergusonDocument(
+      "alice-ferguson",
+      "isbn:ferguson-book",
+      "Ferguson",
+      "alice-ferguson",
+      3
+    )
+  );
+  const [bob] = setup([BOB], { relayPool });
+  renderApp({
+    ...bob(),
+    defaultRelays: [RELAY_URL],
+    initialRoute: "/local/n/wd%3AQ40?label=Austria",
+  });
+
+  await publishDocumentThroughApp(
+    relayPool,
+    alicePath,
+    "ferguson.md",
+    "alice-ferguson",
+    "Ferguson"
+  );
+  await expectTree(`
+Austria
+  [OI] Ferguson ↩
+  `);
+  await userEvent.click(await screen.findByLabelText("expand Ferguson ↩"));
+  await expectTree(`
+Austria
+  [OI] Ferguson ↩
+    [OI] Quote 1 ↩
+    [OI] Quote 2 ↩
+    [OI] Quote 3 ↩
+  `);
+
+  await userEvent.click(
+    await screen.findByRole("link", { name: /Navigate to Ferguson/u })
+  );
+  await waitFor(() => {
+    expect(window.location.pathname).toMatch(/^\/deposit\//u);
+    expect(new URLSearchParams(window.location.search).get("at")).toBe(
+      "isbn:ferguson-book"
+    );
+  });
+
+  cleanup();
+  renderApp({
+    ...bob(),
+    defaultRelays: [RELAY_URL],
+    initialRoute: "/local/n/wd%3AQ40?label=Austria",
+  });
+  await expectTree(`
+Austria
+  [OI] Ferguson ↩
+    [OI] Quote 1 ↩
+    [OI] Quote 2 ↩
+    [OI] Quote 3 ↩
+  `);
+  await userEvent.click(
+    await screen.findByRole("link", { name: /Navigate to Quote 1/u })
+  );
+  await waitFor(() => {
+    expect(window.location.pathname).toMatch(/^\/deposit\//u);
+    expect(new URLSearchParams(window.location.search).get("at")).toBe(
+      "alice-ferguson-quote-1"
+    );
+  });
+});
+
+test("accepted grouped root links participate in published reach", async () => {
+  const relayPool = mockRelayPool();
+  const bobPath = fixedWorkspace(BOB);
+  write(bobPath, "austria.md", austriaDocument(false));
+  write(
+    bobPath,
+    "ferguson.md",
+    fergusonDocument(
+      "ferguson-doc",
+      "isbn:ferguson-book",
+      "Ferguson",
+      "ferguson",
+      3
+    )
+  );
+  await knowstrSave(bobPath);
+  const view = await renderAppTree({
+    path: bobPath,
+    relayPool,
+    initialRoute: "/local/n/wd%3AQ40?label=Austria",
+  });
+
+  await userEvent.click(
+    await screen.findByLabelText("accept Ferguson ↩ as relevant")
+  );
+  await expectMarkdown(
+    bobPath,
+    "austria.md",
+    [
+      "# Austria <!-- id:... -->",
+      "",
+      "- (!) [Ferguson](#isbn:ferguson-book) <!-- id:... -->",
+    ].join("\n")
+  );
+  view.unmount();
+
+  await publishDocumentThroughApp(
+    relayPool,
+    bobPath,
+    "austria.md",
+    "austria-doc",
+    "Ferguson"
+  );
+  const deposits = depositEvents(relayPool, "austria-doc");
+  const newest = deposits[deposits.length - 1];
+  expect(newest?.tags).toContainEqual(["S", "isbn:ferguson-book"]);
+
+  const [reader] = setup([CAROL], { relayPool });
+  renderApp({
+    ...reader(),
+    defaultRelays: [RELAY_URL],
+    initialRoute: "/local/n/isbn%3Aferguson-book?label=Ferguson",
+  });
+
+  await expectTree(`
+Ferguson
+  [OI] Austria !↩
+  `);
 });
 
 test("nonmatching and self-authored deposits do not render", async () => {

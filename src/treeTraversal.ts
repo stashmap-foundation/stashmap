@@ -36,6 +36,7 @@ import {
   getIncomingCrefsForNode,
 } from "./semanticProjection";
 import { buildReferenceItem } from "./buildReferenceRow";
+import { referenceToText } from "./editor/referenceText";
 import type { AddToParentTarget } from "./core/plan";
 import {
   GraphLookup,
@@ -55,6 +56,7 @@ type TreeTraversalOptions = {
 };
 
 const EMPTY_TREE_RESULT: TreeResult = { rows: List<Row>() };
+const INCOMING_GROUP_THRESHOLD = 3;
 
 function emptyTreeResult(rows: List<Row> = List<Row>()): TreeResult {
   return { rows };
@@ -448,6 +450,58 @@ function incomingTakeTarget(
   );
 }
 
+function incomingSourceRootRef(graph: GraphLookup, rowRef: NodeRef): NodeRef {
+  const source = getNodeInSource(graph, rowRef);
+  return {
+    sourceId: source?.ref.sourceId ?? rowRef.sourceId,
+    id: source?.node.root ?? rowRef.id,
+  };
+}
+
+function incomingGroupKey(ref: NodeRef): string {
+  return `${ref.sourceId}:${ref.id}`;
+}
+
+function groupIncomingRefs(
+  graph: GraphLookup,
+  refs: List<NodeRef>
+): Map<
+  string,
+  {
+    rootRef: NodeRef;
+    refs: NodeRef[];
+  }
+> {
+  return refs.reduce(
+    (acc, ref) => {
+      const rootRef = incomingSourceRootRef(graph, ref);
+      const key = incomingGroupKey(rootRef);
+      const existing = acc.get(key);
+      return acc.set(key, {
+        rootRef,
+        refs: [...(existing?.refs ?? []), ref],
+      });
+    },
+    Map<
+      string,
+      {
+        rootRef: NodeRef;
+        refs: NodeRef[];
+      }
+    >()
+  );
+}
+
+function withIncomingGroupChildren(row: Row, refs: NodeRef[]): Row {
+  return {
+    ...row,
+    node: {
+      ...row.node,
+      children: List<ID>(refs.map((ref) => ref.id)),
+    },
+  };
+}
+
 function createVirtualRow(
   data: Data,
   graph: GraphLookup,
@@ -738,26 +792,46 @@ function appendVirtualFooterRows(
   input: VirtualFooterInput,
   initial: TreeResult = emptyTreeResult()
 ): TreeResult {
+  const groups = groupIncomingRefs(graph, input.incomingCrefs);
   const incomingRows = input.incomingCrefs.reduce<{
     rows: Row[];
     priorAnchors: ID[];
+    emittedGroupKeys: ImmutableSet<string>;
   }>(
-    (acc, rowRef, index) => {
+    (acc, rowRef) => {
+      const rootRef = incomingSourceRootRef(graph, rowRef);
+      const key = incomingGroupKey(rootRef);
+      const group = groups.get(key);
+      const grouped =
+        group !== undefined && group.refs.length >= INCOMING_GROUP_THRESHOLD;
+      const nextPriorAnchors = [rowRef.id, ...acc.priorAnchors];
+      if (grouped && acc.emittedGroupKeys.has(key)) {
+        return {
+          ...acc,
+          priorAnchors: nextPriorAnchors,
+        };
+      }
       const row = createVirtualRow(
         data,
         graph,
         input,
-        rowRef,
+        grouped ? group.rootRef : rowRef,
         "incoming",
-        index === 0,
+        acc.rows.length === 0,
         acc.priorAnchors
       );
       return {
-        rows: [...acc.rows, row],
-        priorAnchors: [rowRef.id as ID, ...acc.priorAnchors],
+        rows: [
+          ...acc.rows,
+          grouped ? withIncomingGroupChildren(row, group.refs) : row,
+        ],
+        priorAnchors: nextPriorAnchors,
+        emittedGroupKeys: grouped
+          ? acc.emittedGroupKeys.add(key)
+          : acc.emittedGroupKeys,
       };
     },
-    { rows: [], priorAnchors: [] }
+    { rows: [], priorAnchors: [], emittedGroupKeys: ImmutableSet<string>() }
   ).rows;
   const suggestionOffset = incomingRows.length;
   const suggestionRows = input.suggestions.map((nodeID, index) =>
@@ -852,6 +926,101 @@ function getEmbedChildren(
           childID,
           index
         )
+      )
+      .filter((row): row is Row => row !== undefined)
+      .toList(),
+  };
+}
+
+function shortIncomingReference(reference: Row["reference"]): Row["reference"] {
+  if (!reference) {
+    return undefined;
+  }
+  return {
+    ...reference,
+    contextLabels: [],
+    text: referenceToText({
+      displayAs: "incoming",
+      contextLabels: [],
+      targetLabel: reference.targetLabel,
+      incomingRelevance: reference.incomingRelevance,
+      incomingArgument: reference.incomingArgument,
+    }),
+  };
+}
+
+function createIncomingGroupChildRow(
+  data: Data,
+  graph: GraphLookup,
+  parentRow: Row,
+  childID: ID,
+  index: number
+): Row | undefined {
+  const sourceNode = getNodeInSource(graph, {
+    sourceId: parentRow.sourceId,
+    id: childID,
+  })?.node;
+  if (!sourceNode || !parentRow.parentRef || !parentRow.parentNode) {
+    return undefined;
+  }
+  const node: GraphNode = {
+    children: List<ID>(),
+    id: childID,
+    spans: [linkSpan(childID, nodeText(sourceNode))],
+    parent: parentRow.parentRef.id,
+    updated: sourceNode.updated ?? parentRow.node.updated,
+    root: sourceNode.root ?? parentRow.node.root,
+    relevance: undefined,
+    argument: undefined,
+  };
+  const viewPath = appendNodeToPath(
+    parentRow.viewPath,
+    `incoming:${parentRow.sourceId}:${childID}` as ID
+  );
+  const row = createRow(
+    data,
+    graph,
+    viewPath,
+    node,
+    parentRow.sourceId,
+    parentRow,
+    parentRow.parentNode,
+    parentRow.parentRef,
+    undefined,
+    false,
+    "incoming",
+    undefined
+  );
+  const priorChildIds = parentRow.node.children.slice(0, index).reverse();
+  return {
+    ...row,
+    reference: shortIncomingReference(row.reference),
+    materialize: {
+      precededBy: [
+        ...priorChildIds.toArray(),
+        ...(parentRow.materialize?.precededBy ?? []),
+      ],
+      take: incomingTakeTarget(graph, childID, parentRow.sourceId),
+      defaults: {
+        relevance: sourceNode.relevance,
+        argument: sourceNode.argument,
+      },
+      ...(parentRow.materialize?.host
+        ? { host: parentRow.materialize.host }
+        : {}),
+    },
+  };
+}
+
+function getIncomingGroupChildren(
+  data: Data,
+  graph: GraphLookup,
+  parentRow: Row
+): TreeResult {
+  return {
+    rows: parentRow.node.children
+      .map((childID, index) =>
+        createIncomingGroupChildRow(data, graph, parentRow, childID, index)
       )
       .filter((row): row is Row => row !== undefined)
       .toList(),
@@ -1006,6 +1175,12 @@ function getTreeChildrenForResolvedRow(
 ): TreeResult {
   if (isEmbedRow(parentRow)) {
     return getEmbedChildren(data, graph, parentRow);
+  }
+  if (
+    parentRow.virtualType === "incoming" &&
+    parentRow.node.children.size > 0
+  ) {
+    return getIncomingGroupChildren(data, graph, parentRow);
   }
 
   return getChildrenForRegularNode(

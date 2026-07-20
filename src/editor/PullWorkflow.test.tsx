@@ -183,6 +183,154 @@ Barcelona
   ).toHaveLength(0);
 });
 
+test("entity page merges local and pulled incoming wikidata mentions", async () => {
+  const relayPool = mockRelayPool();
+  const bobPath = await fixedWorkspaceWithDocument(
+    BOB,
+    "bob-notes.md",
+    [
+      "# Bob Notes <!-- id:bob-notes -->",
+      "- [Ludwig von Mises](#wd:Q7242) <!-- id:bob-mises-link -->",
+      "",
+    ].join("\n")
+  );
+  const alicePath = await workspaceWithDocument(
+    "alice-notes.md",
+    [
+      "---",
+      "knowstr_doc_id: alice-notes",
+      "---",
+      "# Alice Notes <!-- id:alice-notes-root -->",
+      "- [Ludwig von Mises](#wd:Q7242) <!-- id:alice-mises-link -->",
+      "",
+    ].join("\n")
+  );
+  await renderAppTree({
+    path: bobPath,
+    relayPool,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "bob-notes.md"),
+  });
+
+  await publishDocumentThroughApp(
+    relayPool,
+    alicePath,
+    "alice-notes.md",
+    "alice-notes",
+    "Alice Notes"
+  );
+  await userEvent.click(
+    await screen.findByRole("link", { name: "Ludwig von Mises" })
+  );
+
+  await expectTree(`
+Ludwig von Mises
+  [I] Bob Notes ↩
+  [OI] Alice Notes ↩
+  `);
+});
+
+test("same-id local and pulled incoming entity refs deduplicate", async () => {
+  const relayPool = mockRelayPool();
+  const renderErrors = jest
+    .spyOn(console, "error")
+    .mockImplementation(() => undefined);
+  try {
+    const bobPath = await fixedWorkspaceWithDocument(
+      BOB,
+      "bitcoin.md",
+      [
+        "# Bitcoin <!-- id:wd:Q131723 -->",
+        "- [Ludwig von Mises](#wd:Q7242) <!-- id:bob-mises-link -->",
+        "",
+      ].join("\n")
+    );
+    const alicePath = await workspaceWithDocument(
+      "alice-bitcoin.md",
+      [
+        "---",
+        "knowstr_doc_id: alice-bitcoin",
+        "---",
+        "# Bitcoin <!-- id:wd:Q131723 -->",
+        "- [Ludwig von Mises](#wd:Q7242) <!-- id:alice-mises-link -->",
+        "",
+      ].join("\n")
+    );
+    await renderAppTree({
+      path: bobPath,
+      relayPool,
+      initialRoute: "/local/n/wd%3AQ7242?label=Ludwig%20von%20Mises",
+    });
+
+    await publishDocumentThroughApp(
+      relayPool,
+      alicePath,
+      "alice-bitcoin.md",
+      "alice-bitcoin",
+      "Bitcoin"
+    );
+
+    await expectTree(`
+Ludwig von Mises
+  [I] Bitcoin ↩
+  `);
+    expect(
+      renderErrors.mock.calls.some((call) =>
+        call.some(
+          (part) =>
+            typeof part === "string" &&
+            part.includes("Encountered two children with the same key")
+        )
+      )
+    ).toBe(false);
+  } finally {
+    renderErrors.mockRestore();
+  }
+});
+
+test("remote entity incoming refs open the remote deposit", async () => {
+  const relayPool = mockRelayPool();
+  const alicePath = await workspaceWithDocument(
+    "alice-bitcoin.md",
+    [
+      "---",
+      "knowstr_doc_id: alice-bitcoin",
+      "---",
+      "# Bitcoin <!-- id:wd:Q131723 -->",
+      "- [Ludwig von Mises](#wd:Q7242) <!-- id:alice-mises-link -->",
+      "",
+    ].join("\n")
+  );
+  const [bob] = setup([BOB], { relayPool });
+  renderApp({
+    ...bob(),
+    defaultRelays: [RELAY_URL],
+    initialRoute: "/local/n/wd%3AQ7242?label=Ludwig%20von%20Mises",
+  });
+
+  await publishDocumentThroughApp(
+    relayPool,
+    alicePath,
+    "alice-bitcoin.md",
+    "alice-bitcoin",
+    "Bitcoin"
+  );
+  await expectTree(`
+Ludwig von Mises
+  [OI] Bitcoin ↩
+  `);
+
+  await userEvent.click(
+    await screen.findByRole("link", { name: /Navigate to Bitcoin/u })
+  );
+  await waitFor(() => {
+    expect(window.location.pathname).toMatch(/^\/deposit\//u);
+    expect(new URLSearchParams(window.location.search).get("at")).toBe(
+      "wd:Q131723"
+    );
+  });
+  await screen.findByText("READONLY");
+});
+
 test("nonmatching and self-authored deposits do not render", async () => {
   const relayPool = mockRelayPool();
   const alicePath = await workspaceWithDocument(

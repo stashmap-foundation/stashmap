@@ -5,7 +5,11 @@ import { knowstrInit, knowstrSave, write } from "../testFixtures/workspace";
 import { loadCliProfile } from "../cli/config";
 import { LOCAL } from "../core/nodeRef";
 import { buildDocumentRouteUrl } from "../navigationUrl";
-import { KIND_KNOWLEDGE_DEPOSIT, KIND_KNOWLEDGE_DOCUMENT } from "../nostr";
+import {
+  DEFAULT_RELAYS,
+  KIND_KNOWLEDGE_DEPOSIT,
+  KIND_KNOWLEDGE_DOCUMENT,
+} from "../nostr";
 
 // Regression: the post-save reparse used to drop the filename-derived
 // title, so the first save (publishing included) silently renamed the
@@ -105,6 +109,32 @@ test("reach sharing publishes the target on its own direct tags", async () => {
       ["S", "wittgenstein"],
     ]);
   });
+});
+
+test("file workspace with no configured relays publishes deposits to app defaults", async () => {
+  const { path: workspacePath } = knowstrInit();
+  write(workspacePath, "essay.md", "# Default Relay Essay <!-- id:essay -->\n");
+  knowstrSave(workspacePath);
+  const { relayPool } = await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "essay.md"),
+  });
+
+  await userEvent.click(await screen.findByLabelText("audience options"));
+  await userEvent.click(await screen.findByLabelText("publish document"));
+
+  await waitFor(() => {
+    expect(
+      relayPool
+        .getEvents()
+        .some((event) => event.kind === KIND_KNOWLEDGE_DEPOSIT)
+    ).toBe(true);
+  });
+  expect(new Set(relayPool.getPublishedOnRelays())).toEqual(
+    new Set(
+      DEFAULT_RELAYS.filter((relay) => relay.write).map((relay) => relay.url)
+    )
+  );
 });
 
 test("publishing keeps the filename and deposits from the file workspace", async () => {

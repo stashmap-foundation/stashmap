@@ -28,6 +28,7 @@ import { SplitPaneLayout } from "./SplitPaneLayout";
 import { PaneHistoryProvider } from "../PaneHistoryContext";
 import { DND } from "../dnd";
 import { modClick } from "./Multiselect.testUtils";
+import { mockRelayPool } from "../nostrMock.test";
 
 /* eslint-disable functional/immutable-data */
 const ipcsToDispose: MockWorkspaceIpc[] = [];
@@ -35,6 +36,7 @@ const ipcsToDispose: MockWorkspaceIpc[] = [];
 
 function renderAppTreeMultiPane(workspacePath: string): void {
   const ipc = mockWorkspaceIpc(workspacePath);
+  const relayPool = mockRelayPool();
   // eslint-disable-next-line functional/immutable-data
   ipcsToDispose.push(ipc);
   renderWithTestData(
@@ -47,7 +49,14 @@ function renderAppTreeMultiPane(workspacePath: string): void {
     </FilesystemAppRoot>,
     {
       BackendProvider: ({ children }: { children: React.ReactNode }) => (
-        <FilesystemBackendProvider ipc={ipc}>
+        <FilesystemBackendProvider
+          ipc={ipc}
+          pool={{
+            subscribe: (relays, filters, params) =>
+              relayPool.subscribeMany(relays, filters, params),
+            publish: (relays, event) => relayPool.publish(relays, event),
+          }}
+        >
           {children}
         </FilesystemBackendProvider>
       ),

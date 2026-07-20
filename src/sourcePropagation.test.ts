@@ -203,7 +203,7 @@ test("incoming refs for duplicate ids stay scoped to the target source", () => {
   );
 
   expect(incomingRows.rows.map((row) => row.viewPath).toArray()).toEqual([
-    [0, "target", "root-b"],
+    [0, "target", "incoming:source-b:root-b"],
   ]);
 });
 

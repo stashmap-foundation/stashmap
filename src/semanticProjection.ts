@@ -136,6 +136,16 @@ function uniqueNodes(nodes: ResolvedNode[]): ResolvedNode[] {
   });
 }
 
+function uniqueRefs(refs: NodeRef[]): NodeRef[] {
+  const seen = new globalThis.Set<string>();
+  return refs.filter((ref) => {
+    const key = nodeRefKey(ref);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function pulledSourceOrder(data: Data, sourceId: SourceId): number | undefined {
   const indexes = [...(data.pull?.matchedSourceIdsByPaneId.values() ?? [])]
     .map((sourceIds) => sourceIds.indexOf(sourceId))
@@ -178,9 +188,8 @@ export function getIncomingCrefsForNode(
       graphIndex.incomingCrefsByTarget.get(
         nodeRefKey({ sourceId: itemsSourceId, id: currentNodeID })
       ) ?? [];
-    return sourceScopedRefs.length > 0
-      ? sourceScopedRefs
-      : graphIndex.incomingCrefs.get(currentNodeID) ?? [];
+    const unscopedRefs = graphIndex.incomingCrefs.get(currentNodeID) ?? [];
+    return uniqueRefs([...sourceScopedRefs, ...unscopedRefs]);
   })();
   const graphLinkSourceNodes = graphLinkRefs
     .map((ref) => getNodeInSource(graph, ref))
@@ -206,6 +215,7 @@ export function getIncomingCrefsForNode(
         findReciprocalLinkItem(graph, data, source, target) === undefined
     )
     .map((source) => linkSpeaker(graph, source));
+  const seenIncomingIds = new globalThis.Set<ID>();
   const visibleSourceNodes = uniqueNodes(sourceNodes)
     .filter(({ ref }) => visibleAuthors.has(ref.sourceId))
     .filter(
@@ -222,11 +232,14 @@ export function getIncomingCrefsForNode(
     .sort((left, right) => {
       const leftPullOrder = pulledSourceOrder(data, left.ref.sourceId);
       const rightPullOrder = pulledSourceOrder(data, right.ref.sourceId);
-      if (leftPullOrder !== undefined || rightPullOrder !== undefined) {
-        return (
-          (leftPullOrder ?? Number.MAX_SAFE_INTEGER) -
-          (rightPullOrder ?? Number.MAX_SAFE_INTEGER)
-        );
+      if (leftPullOrder !== undefined && rightPullOrder !== undefined) {
+        return leftPullOrder - rightPullOrder;
+      }
+      if (leftPullOrder !== undefined) {
+        return 1;
+      }
+      if (rightPullOrder !== undefined) {
+        return -1;
       }
       return nodePathLabel(
         knowledgeDBs,
@@ -235,6 +248,13 @@ export function getIncomingCrefsForNode(
       ).localeCompare(
         nodePathLabel(knowledgeDBs, right.node, right.ref.sourceId)
       );
+    })
+    .filter(({ ref }) => {
+      if (seenIncomingIds.has(ref.id)) {
+        return false;
+      }
+      seenIncomingIds.add(ref.id);
+      return true;
     });
 
   return List(

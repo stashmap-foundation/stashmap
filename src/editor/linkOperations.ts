@@ -136,13 +136,18 @@ export function inlineLinkToHref(
   const targetClass = classifyLinkHref(href);
   if (targetClass === "entity" || targetClass === "calendar") {
     const targetID = href.slice(1);
-    return (
-      localTargetToHref(data, targetID) ??
-      buildNodeRouteUrl(targetID, LOCAL, {
-        scrollToId: undefined,
-        fallbackLabel,
-      })
-    );
+    return sourceId === LOCAL
+      ? localTargetToHref(data, targetID) ??
+          buildNodeRouteUrl(targetID, LOCAL, {
+            scrollToId: undefined,
+            fallbackLabel,
+          })
+      : inlineTargetToHref(data, targetID, sourceId) ??
+          localTargetToHref(data, targetID) ??
+          buildNodeRouteUrl(targetID, LOCAL, {
+            scrollToId: undefined,
+            fallbackLabel,
+          });
   }
   if (targetClass === "node") {
     return (

@@ -469,10 +469,14 @@ function createVirtualRow(
     input.parentID === undefined
       ? input.parentPath
       : addNodesToLastElement(input.parentPath, input.parentID);
+  const viewNodeID =
+    virtualType === "incoming"
+      ? (`incoming:${sourceId}:${sourceNodeID}` as ID)
+      : node.id;
   const viewPath =
     input.parentID === undefined
-      ? addNodesToLastElement(parentPath, node.id)
-      : appendNodeToPath(parentPath, node.id);
+      ? addNodesToLastElement(parentPath, viewNodeID)
+      : appendNodeToPath(parentPath, viewNodeID);
   const parentRef = input.parentID
     ? { sourceId: input.parentSourceId, id: input.parentID }
     : undefined;

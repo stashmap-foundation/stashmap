@@ -1,5 +1,5 @@
 import React from "react";
-import { List } from "immutable";
+import { List, Map as ImmutableMap } from "immutable";
 import { LOCAL, nodeRefKey } from "../core/nodeRef";
 import {
   ViewPath,
@@ -276,6 +276,40 @@ function ReferenceContent({
       <ReferenceDisplay reference={reference} />
     </a>
   );
+}
+
+type LinkReachChipEntry = {
+  key: string;
+  span: Extract<InlineSpan, { kind: "link" }>;
+};
+
+function linkReachChipEntries(spans: InlineSpan[]): LinkReachChipEntry[] {
+  return spans
+    .reduce(
+      (state, span) => {
+        const start = state.textOffset;
+        const textOffset = start + span.text.length;
+        if (span.kind !== "link") {
+          return { ...state, textOffset };
+        }
+        const baseKey = `${start}-${span.href}-${span.text}`;
+        const count = state.keyCounts.get(baseKey, 0);
+        return {
+          textOffset,
+          keyCounts: state.keyCounts.set(baseKey, count + 1),
+          entries: state.entries.push({
+            key: count === 0 ? baseKey : `${baseKey}-${count}`,
+            span,
+          }),
+        };
+      },
+      {
+        textOffset: 0,
+        keyCounts: ImmutableMap<string, number>(),
+        entries: List<LinkReachChipEntry>(),
+      }
+    )
+    .entries.toArray();
 }
 
 function LinkReachChip({
@@ -1064,16 +1098,14 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
         onPasteMultiLine={handlePasteMultiLine}
         onActivateLink={handleActivateLink}
       />
-      {editorSpans.map((span) =>
-        span.kind === "link" ? (
-          <LinkReachChip
-            key={`${span.href}-${span.text}`}
-            span={span}
-            node={row.node}
-            sourceId={row.sourceId}
-          />
-        ) : null
-      )}
+      {linkReachChipEntries(editorSpans).map(({ key, span }) => (
+        <LinkReachChip
+          key={key}
+          span={span}
+          node={row.node}
+          sourceId={row.sourceId}
+        />
+      ))}
     </>
   );
 }

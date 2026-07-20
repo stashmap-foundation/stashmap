@@ -13,6 +13,7 @@ export type IpcChannel = {
     files: WorkspaceMarkdownFile[];
     snapshots?: WorkspaceSnapshotFile[];
   } | null>;
+  loadSnapshots: () => Promise<ReadonlyArray<WorkspaceSnapshotFile>>;
   pickFolder: () => Promise<string | null>;
   open: (folder: string) => Promise<void>;
   create: (args: { folder: string; secretKeyInput?: string }) => Promise<void>;
@@ -41,6 +42,13 @@ export function electronWorkspaceIpc(): WorkspaceIpc {
         return null;
       }
       return channel.load();
+    },
+    loadSnapshots: async () => {
+      const channel = getChannel();
+      if (!channel) {
+        return [];
+      }
+      return channel.loadSnapshots();
     },
     pickFolder: async () => {
       const channel = getChannel();

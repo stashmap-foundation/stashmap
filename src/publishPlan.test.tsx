@@ -1,6 +1,5 @@
-import type { Document } from "./core/Document";
+import { type Document, withDocumentRealWorldEntities } from "./core/Document";
 import { LOCAL } from "./core/nodeRef";
-import { documentEntityTags } from "./editor/publishReach";
 import { getAllLinks, plainSpans } from "./core/nodeSpans";
 import { EMPTY_NODE_ID } from "./core/connections";
 import { parseInlineSpans } from "./core/markdownTree";
@@ -57,10 +56,28 @@ function documentByRoot(plan: Plan, rootId: ID): Document {
   return document;
 }
 
+function realWorldEntities(plan: Plan, document: Document): string[] {
+  return withDocumentRealWorldEntities(
+    plan.knowledgeDBs,
+    plan.documents,
+    plan.documentByFilePath,
+    document
+  ).realWorldEntities;
+}
+
 test("publishing a document emits a deposit beside its storage event", () => {
   const { plan, docId, rootId } = planWithEssay();
-  const published = planSetDocumentPublishState(plan, docId, {
-    entities: ["asset:rgb:test-contract"],
+  const parent = plan.knowledgeDBs.get(LOCAL)?.nodes.get(rootId);
+  if (!parent) {
+    throw new Error("parent missing");
+  }
+  const linked = planPasteMarkdownTrees(
+    plan,
+    parseTextToTrees("[Asset](#asset:rgb:test-contract)"),
+    parent,
+    0
+  );
+  const published = planSetDocumentPublishState(linked, docId, {
     relays: ["wss://salon.example"],
     paused: false,
   });
@@ -85,10 +102,19 @@ test("publishing a document emits a deposit beside its storage event", () => {
   });
 });
 
-test("the deposit's S set equals {roots} ∪ frontmatter entities (interop rule)", () => {
+test("the deposit's S set equals roots plus graph-derived tags", () => {
   const { plan, docId, rootId } = planWithEssay();
-  const published = planSetDocumentPublishState(plan, docId, {
-    entities: ["wd:Q1 wd:Q2"],
+  const parent = plan.knowledgeDBs.get(LOCAL)?.nodes.get(rootId);
+  if (!parent) {
+    throw new Error("parent missing");
+  }
+  const linked = planPasteMarkdownTrees(
+    plan,
+    parseTextToTrees("[Barcelona](#wd:Q1492)"),
+    parent,
+    0
+  );
+  const published = planSetDocumentPublishState(linked, docId, {
     paused: false,
   });
 
@@ -97,16 +123,16 @@ test("the deposit's S set equals {roots} ∪ frontmatter entities (interop rule)
   );
   const state = publishStateOf(frontMatterOf(deposit?.content ?? ""));
 
+  expect(state).toEqual({ paused: false });
   expect(deposit?.tags.filter(([name]) => name === "S")).toEqual([
     ["S", rootId],
-    ...(state?.entities ?? []).map((entity) => ["S", entity]),
+    ["S", "wd:Q1492"],
   ]);
 });
 
 test("paused documents emit storage but no deposit; the flag rides the file", () => {
   const { plan, docId } = planWithEssay();
   const paused = planSetDocumentPublishState(plan, docId, {
-    entities: ["asset:rgb:test-contract"],
     paused: true,
   });
 
@@ -122,11 +148,9 @@ test("paused documents emit storage but no deposit; the flag rides the file", ()
 test("unpausing emits a clean deposit without the paused flag", () => {
   const { plan, docId } = planWithEssay();
   const paused = planSetDocumentPublishState(plan, docId, {
-    entities: ["asset:rgb:test-contract"],
     paused: true,
   });
   const unpaused = planSetDocumentPublishState(paused, docId, {
-    entities: ["asset:rgb:test-contract"],
     paused: false,
   });
 
@@ -256,17 +280,10 @@ test("link placements feed the publish tags", () => {
   if (!document) {
     throw new Error("document missing");
   }
-  expect(
-    documentEntityTags(
-      pasted.knowledgeDBs,
-      pasted.documents,
-      pasted.documentByFilePath,
-      document
-    )
-  ).toContain(`asset:${CONTRACT_ID}`);
+  expect(realWorldEntities(pasted, document)).toContain(`asset:${CONTRACT_ID}`);
 });
 
-test("tags derive through link targets, one bare tag per entity", () => {
+test("tags derive through link targets, one bare tag per linked entity", () => {
   const [alice] = setup([ALICE]);
   const [plan] = planCreateNodesFromMarkdown(
     createPlan(alice()),
@@ -283,13 +300,7 @@ test("tags derive through link targets, one bare tag per entity", () => {
   if (!document) {
     throw new Error("document missing");
   }
-  const tags = documentEntityTags(
-    plan.knowledgeDBs,
-    plan.documents,
-    plan.documentByFilePath,
-    document
-  );
-  expect([...tags].sort()).toEqual(["wd:Q1492", "wd:Q48435"]);
+  expect(realWorldEntities(plan, document)).toEqual(["wd:Q1492", "wd:Q48435"]);
 });
 
 test("repeated entities dedupe to one tag", () => {
@@ -307,13 +318,31 @@ test("repeated entities dedupe to one tag", () => {
   if (!document) {
     throw new Error("document missing");
   }
-  const tags = documentEntityTags(
-    plan.knowledgeDBs,
-    plan.documents,
-    plan.documentByFilePath,
-    document
+  expect(realWorldEntities(plan, document)).toEqual(["wd:Q1492"]);
+});
+
+test("deep links tag the target container root", () => {
+  const [alice] = setup([ALICE]);
+  const [targetPlan] = planCreateNodesFromMarkdown(
+    createPlan(alice()),
+    [
+      "# Life in Lviv <!-- id:lviv-life -->",
+      "",
+      "- Childhood <!-- id:lviv-childhood -->",
+    ].join("\n")
   );
-  expect(tags).toEqual(["wd:Q1492"]);
+  const [plan] = planCreateNodesFromMarkdown(
+    targetPlan,
+    ["# Notes", "", "- [Childhood](#lviv-childhood)"].join("\n")
+  );
+  const document = plan.documents
+    .valueSeq()
+    .find((candidate) => candidate.title === "Notes");
+  if (!document) {
+    throw new Error("document missing");
+  }
+
+  expect(realWorldEntities(plan, document)).toEqual(["lviv-life"]);
 });
 
 test("direct link tags are source-local and directional", () => {
@@ -334,12 +363,6 @@ test("direct link tags are source-local and directional", () => {
   );
   const publish = (document: Document): string[][] => {
     const next = planSetDocumentPublishState(plan, document.docId, {
-      entities: documentEntityTags(
-        plan.knowledgeDBs,
-        plan.documents,
-        plan.documentByFilePath,
-        document
-      ),
       paused: false,
     });
     const deposit = buildDocumentEvents(next).find(

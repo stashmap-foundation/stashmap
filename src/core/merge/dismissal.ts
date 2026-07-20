@@ -75,5 +75,6 @@ export function constructDismissalBaseline(
     topNodeShortIds: topIds,
     updatedMs: 0,
     title: "",
+    realWorldEntities: [],
   });
 }

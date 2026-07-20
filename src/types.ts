@@ -175,6 +175,31 @@ declare global {
     scrollToId?: string;
   };
 
+  type RelatedSourceTagWeight = {
+    tag: string;
+    weight: number;
+  };
+
+  type RelatedSourceContext = {
+    targetRef: NodeRef;
+    pathRefs: readonly NodeRef[];
+    weightedTags: readonly RelatedSourceTagWeight[];
+  };
+
+  type RelatedSourcePlacement = {
+    sourceId: SourceId;
+    targetRef: NodeRef;
+    score: number;
+    overlapTags: readonly string[];
+  };
+
+  type RelatedSourceCandidate = {
+    rootRef: NodeRef;
+    sTags: readonly string[];
+    ms: number;
+    title: string;
+  };
+
   type PullSourceMetadata = {
     sourceId: SourceId;
     coordinate: RouteCoordinate;
@@ -190,6 +215,7 @@ declare global {
   type PullOverlayData = {
     sourceIds: ReadonlySet<SourceId>;
     matchedSourceIdsByPaneId: ReadonlyMap<string, readonly SourceId[]>;
+    relatedSourceIdsByPaneId: ReadonlyMap<string, readonly SourceId[]>;
     metadataBySourceId: ReadonlyMap<SourceId, PullSourceMetadata>;
   };
 
@@ -257,7 +283,7 @@ declare global {
     // is and whose content it carries. Derived once at row creation;
     // display code branches on this, never on virtualType.
     provenance?: {
-      kind: "suggestion" | "incoming" | "version";
+      kind: "suggestion" | "incoming" | "version" | "related-source";
       sourceId: SourceId;
     };
     // The materialization recipe (idea.md: write gestures take first).
@@ -274,10 +300,16 @@ declare global {
     };
     standsFor?: { id: ID; liveText?: string };
     isFirstVirtual: boolean;
-    virtualType: "suggestion" | "search" | "incoming" | "version" | undefined;
+    virtualType:
+      | "suggestion"
+      | "search"
+      | "incoming"
+      | "version"
+      | "related-source"
+      | undefined;
     // The action row: a button in row position, obviously not content.
     // One interaction (click); no gutter, no editor, no judgment, no drag.
-    action?: "toggle-past-entries";
+    action?: "toggle-past-entries" | "open-related-sources";
     // A rename suggestion (replacement-shaped): the version's text left
     // the edge baseline. Rendered strikethrough-old + new; x dismisses
     // that version's text, any other judgment takes it.

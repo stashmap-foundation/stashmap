@@ -21,6 +21,7 @@ import {
 import { mockRelayPool, MockRelayPool } from "../nostrMock.test";
 import { createWorkspaceProfile } from "../cli/init";
 import { loadCliProfile } from "../cli/config";
+import { RELATED_SOURCE_QUERY_TAG_LIMIT } from "../pullSources";
 
 const RELAY_URL = "wss://relay.test/";
 const RELAYS = [{ url: RELAY_URL, read: true, write: true }];
@@ -138,6 +139,96 @@ async function multiSourceGroupingWorkspace(): Promise<string> {
   return workspacePath;
 }
 
+function hayekDocument(): string {
+  return [
+    "---",
+    "knowstr_doc_id: hayek-doc",
+    "---",
+    "# Hayek <!-- id:wd:Q1325 -->",
+    "",
+    "- Life in [Salzburg](#wd:Q34713) <!-- id:hayek-salzburg -->",
+    "- Period at the [LSE](#wd:Q174570) <!-- id:hayek-lse -->",
+    "  - Rivalry with [Keynes](#wd:Q9317) <!-- id:hayek-keynes -->",
+    "",
+  ].join("\n");
+}
+
+function relatedHayekSource(): string {
+  return [
+    "---",
+    "knowstr_doc_id: hayek-lse-keynes-doc",
+    "---",
+    "# Hayek LSE Keynes <!-- id:alice-hayek-lse-keynes -->",
+    "",
+    "- [Hayek](#wd:Q1325) <!-- id:alice-hayek-link -->",
+    "- [LSE](#wd:Q174570) <!-- id:alice-lse-link -->",
+    "- [Keynes](#wd:Q9317) <!-- id:alice-keynes-link -->",
+    "",
+  ].join("\n");
+}
+
+function relatedSourceCapHost(): string {
+  return [
+    "---",
+    "knowstr_doc_id: host-related-cap",
+    "---",
+    "# Host <!-- id:host-related-root -->",
+    "",
+    "- Quote [Mises](#wd:Q23129) and [Hayek](#wd:Q1325) <!-- id:host-related-quote -->",
+    "",
+  ].join("\n");
+}
+
+function relatedSourceCapSource(index: number): string {
+  const suffix = index.toString().padStart(2, "0");
+  return [
+    "---",
+    `knowstr_doc_id: source-related-${suffix}`,
+    "---",
+    `# Source ${suffix} <!-- id:source-related-root-${suffix} -->`,
+    "",
+    `- [Mises](#wd:Q23129) <!-- id:source-related-mises-${suffix} -->`,
+    `- [Hayek](#wd:Q1325) <!-- id:source-related-hayek-${suffix} -->`,
+    "",
+  ].join("\n");
+}
+
+async function relatedSourceCapWorkspace(count: number): Promise<string> {
+  const workspacePath = fixedWorkspace(BOB);
+  write(workspacePath, "host.md", relatedSourceCapHost());
+  Array.from({ length: count }, (_, index) => index + 1).forEach((index) => {
+    const suffix = index.toString().padStart(2, "0");
+    write(workspacePath, `source-${suffix}.md`, relatedSourceCapSource(index));
+  });
+  await knowstrSave(workspacePath);
+  return workspacePath;
+}
+
+async function relatedSourceWorkspace(): Promise<string> {
+  const workspacePath = fixedWorkspace(BOB);
+  write(workspacePath, "hayek.md", hayekDocument());
+  await knowstrSave(workspacePath);
+  return workspacePath;
+}
+
+function manyEntityDocument(count: number): string {
+  return [
+    "---",
+    "knowstr_doc_id: many-doc",
+    "---",
+    "# Many <!-- id:many-root -->",
+    "",
+    ...Array.from(
+      { length: count },
+      (_, index) =>
+        `- Entity ${index + 1} [Q${index + 1}](#wd:Q${
+          index + 1
+        }) <!-- id:many-${index + 1} -->`
+    ),
+    "",
+  ].join("\n");
+}
+
 function depositEvents(
   relayPool: MockRelayPool,
   dTag: string
@@ -149,6 +240,10 @@ function depositEvents(
         event.kind === KIND_KNOWLEDGE_DEPOSIT &&
         event.tags.some(([name, value]) => name === "d" && value === dTag)
     );
+}
+
+function relatedSourceReferenceRows(): HTMLElement[] {
+  return screen.queryAllByRole("treeitem", { name: /^Source \d\d$/u });
 }
 
 async function publishDocumentThroughApp(
@@ -268,6 +363,51 @@ Barcelona
   expect(
     relayPool.getEvents().filter((event) => event.pubkey === BOB.publicKey)
   ).toHaveLength(0);
+});
+
+test("accepting remote incoming on an unmaterialized entity keeps bidirectional arrow", async () => {
+  const relayPool = mockRelayPool();
+  const bobPath = fixedWorkspace(BOB);
+  const alicePath = await workspaceWithDocument(
+    "barcelona.md",
+    [
+      "---",
+      "knowstr_doc_id: alice-barcelona",
+      "---",
+      "# Alice Barcelona <!-- id:alice-root -->",
+      "- [Barcelona](#wd:Q1492) <!-- id:alice-link -->",
+      "",
+    ].join("\n")
+  );
+  await publishDocumentThroughApp(
+    relayPool,
+    alicePath,
+    "barcelona.md",
+    "alice-barcelona",
+    "Alice Barcelona"
+  );
+  await renderAppTree({
+    path: bobPath,
+    relayPool,
+    initialRoute: "/local/n/wd%3AQ1492?label=Barcelona",
+  });
+
+  await expectTree(`
+Barcelona
+  [OI] Alice Barcelona ↩
+  `);
+
+  await userEvent.click(
+    await screen.findByLabelText("accept Alice Barcelona ↩ as relevant")
+  );
+
+  await expectTree(
+    `
+Barcelona
+  {!} Alice Barcelona↩
+  `,
+    { showGutter: true }
+  );
 });
 
 test("entity page merges local and pulled incoming wikidata mentions", async () => {
@@ -668,6 +808,275 @@ Ferguson
   `);
 });
 
+test("bare one-tag entity pages do not show related source rows", async () => {
+  const relayPool = mockRelayPool();
+  const alicePath = await workspaceWithDocument(
+    "hayek.md",
+    relatedHayekSource()
+  );
+  await publishDocumentThroughApp(
+    relayPool,
+    alicePath,
+    "hayek.md",
+    "hayek-lse-keynes-doc",
+    "Hayek LSE Keynes"
+  );
+  const [bob] = setup([BOB], { relayPool });
+  renderApp({
+    ...bob(),
+    defaultRelays: [RELAY_URL],
+    initialRoute: "/local/n/wd%3AQ1325?label=Hayek",
+  });
+
+  await expectTree(`
+Hayek
+  [OI] Hayek LSE Keynes ↩
+  `);
+  expect(screen.queryByText("↝")).toBeNull();
+});
+
+test("related sources land under the best visible row context", async () => {
+  const relayPool = mockRelayPool();
+  const bobPath = await relatedSourceWorkspace();
+  const alicePath = await workspaceWithDocument(
+    "hayek.md",
+    relatedHayekSource()
+  );
+  await publishDocumentThroughApp(
+    relayPool,
+    alicePath,
+    "hayek.md",
+    "hayek-lse-keynes-doc",
+    "Hayek LSE Keynes"
+  );
+  await renderAppTree({
+    path: bobPath,
+    relayPool,
+    initialRoute: "/local/n/wd%3AQ1325?label=Hayek",
+  });
+  await waitFor(() => {
+    expect(
+      relayPool
+        .getSubscriptions()
+        .some((sub) =>
+          sub.filters.some((filter) => filter["#S"]?.includes("wd:Q9317"))
+        )
+    ).toBe(true);
+  });
+
+  await userEvent.click(
+    await screen.findByLabelText("expand Period at the LSE")
+  );
+  await userEvent.click(
+    await screen.findByLabelText("expand Rivalry with Keynes")
+  );
+
+  await expectTree(`
+Hayek
+  Life in Salzburg
+  Period at the LSE
+    Rivalry with Keynes
+      [O↝] Hayek LSE Keynes
+  [OI] Hayek LSE Keynes ↩
+  `);
+
+  await userEvent.click(
+    await screen.findByLabelText("Navigate to Hayek LSE Keynes")
+  );
+  await waitFor(() => {
+    expect(window.location.pathname).toMatch(/^\/deposit\//);
+  });
+  expect(window.location.search).toContain("at=alice-hayek-lse-keynes");
+});
+
+test("related sources include local documents", async () => {
+  const bobPath = fixedWorkspace(BOB);
+  write(bobPath, "hayek.md", hayekDocument());
+  write(bobPath, "hayek-lse-keynes.md", relatedHayekSource());
+  await knowstrSave(bobPath);
+  await renderAppTree({
+    path: bobPath,
+    relayPool: mockRelayPool(),
+    initialRoute: "/local/n/wd%3AQ1325?label=Hayek",
+  });
+
+  await userEvent.click(
+    await screen.findByLabelText("expand Period at the LSE")
+  );
+  await userEvent.click(
+    await screen.findByLabelText("expand Rivalry with Keynes")
+  );
+
+  await expectTree(`
+Hayek
+  Life in Salzburg
+  Period at the LSE
+    Rivalry with Keynes
+      [↝] Hayek LSE Keynes
+    [↝] Hayek LSE Keynes
+  [I] Hayek LSE Keynes ↩
+  `);
+
+  await userEvent.click(
+    (
+      await screen.findAllByLabelText("Navigate to Hayek LSE Keynes")
+    )[0]
+  );
+  await waitFor(() => {
+    expect(window.location.pathname).toBe("/local/n/alice-hayek-lse-keynes");
+  });
+});
+
+test("many related sources are capped below document rows and uncapped fullscreen", async () => {
+  const workspacePath = await relatedSourceCapWorkspace(8);
+  await withNow(1_000, async () => {
+    await renderAppTree({
+      path: workspacePath,
+      relayPool: mockRelayPool(),
+      initialRoute: "/local/n/host-related-root",
+    });
+  });
+
+  await userEvent.click(
+    await screen.findByLabelText("expand Quote Mises and Hayek")
+  );
+
+  await waitFor(() => {
+    expect(relatedSourceReferenceRows()).toHaveLength(7);
+  });
+  await userEvent.click(
+    await screen.findByLabelText("Open to see more related sources")
+  );
+  await waitFor(() => {
+    expect(window.location.pathname).toBe("/local/n/host-related-quote");
+    expect(relatedSourceReferenceRows()).toHaveLength(8);
+  });
+  expect(
+    screen.queryByLabelText("Open to see more related sources")
+  ).toBeNull();
+});
+
+test("more related sources action opens the host row in split pane", async () => {
+  const workspacePath = await relatedSourceCapWorkspace(8);
+  await withNow(1_000, async () => {
+    await renderAppTree({
+      path: workspacePath,
+      relayPool: mockRelayPool(),
+      initialRoute: "/local/n/host-related-root",
+    });
+  });
+
+  await userEvent.click(
+    await screen.findByLabelText("expand Quote Mises and Hayek")
+  );
+
+  await screen.findByLabelText("Open to see more related sources");
+  const splitButtons = await screen.findAllByLabelText("open in split pane");
+  await userEvent.click(splitButtons[splitButtons.length - 1]);
+
+  await screen.findByLabelText("Search to change pane 1 content");
+  await waitFor(() => {
+    expect(relatedSourceReferenceRows()).toHaveLength(15);
+  });
+});
+
+test("related source interests are capped per pane", async () => {
+  const relayPool = mockRelayPool();
+  const bobPath = fixedWorkspace(BOB);
+  write(
+    bobPath,
+    "many.md",
+    manyEntityDocument(RELATED_SOURCE_QUERY_TAG_LIMIT + 25)
+  );
+  await knowstrSave(bobPath);
+  await renderAppTree({
+    path: bobPath,
+    relayPool,
+    initialRoute: "/local/d/many-doc",
+  });
+
+  await waitFor(() => {
+    expect(
+      relayPool
+        .getSubscriptions()
+        .flatMap((sub) => sub.filters)
+        .filter(
+          (filter) =>
+            filter.kinds?.includes(KIND_KNOWLEDGE_DEPOSIT) && filter["#S"]
+        )
+    ).toHaveLength(2);
+  });
+  const tagFilters = relayPool
+    .getSubscriptions()
+    .flatMap((sub) => sub.filters)
+    .flatMap((filter) =>
+      filter.kinds?.includes(KIND_KNOWLEDGE_DEPOSIT) && filter["#S"]
+        ? [filter["#S"]]
+        : []
+    );
+  expect(
+    tagFilters.filter((tags) => tags.length === RELATED_SOURCE_QUERY_TAG_LIMIT)
+  ).toHaveLength(1);
+  expect(
+    tagFilters.some((tags) => tags.length > RELATED_SOURCE_QUERY_TAG_LIMIT)
+  ).toBe(true);
+});
+
+test("accepting a related source writes one root link under its context", async () => {
+  const relayPool = mockRelayPool();
+  const bobPath = await relatedSourceWorkspace();
+  const alicePath = await workspaceWithDocument(
+    "hayek.md",
+    relatedHayekSource()
+  );
+  await publishDocumentThroughApp(
+    relayPool,
+    alicePath,
+    "hayek.md",
+    "hayek-lse-keynes-doc",
+    "Hayek LSE Keynes"
+  );
+  await renderAppTree({
+    path: bobPath,
+    relayPool,
+    initialRoute: "/local/n/wd%3AQ1325?label=Hayek",
+  });
+
+  await userEvent.click(
+    await screen.findByLabelText("expand Period at the LSE")
+  );
+  await userEvent.click(
+    await screen.findByLabelText("expand Rivalry with Keynes")
+  );
+  await userEvent.click(
+    await screen.findByLabelText("accept Hayek LSE Keynes as relevant")
+  );
+
+  await expectTree(
+    `
+Hayek
+  Life in Salzburg
+  Period at the LSE
+    Rivalry with Keynes
+      {!} Hayek LSE Keynes
+  [OI] Hayek LSE Keynes ↩
+  `,
+    { showGutter: true }
+  );
+  await expectMarkdown(
+    bobPath,
+    "hayek.md",
+    [
+      "# Hayek <!-- id:... -->",
+      "",
+      "- Life in [Salzburg](#wd:Q34713) <!-- id:... -->",
+      "- Period at the [LSE](#wd:Q174570) <!-- id:... -->",
+      "  - Rivalry with [Keynes](#wd:Q9317) <!-- id:... -->",
+      "    - (!) [Hayek LSE Keynes](#alice-hayek-lse-keynes) <!-- id:... -->",
+    ].join("\n")
+  );
+});
+
 test("nonmatching and self-authored deposits do not render", async () => {
   const relayPool = mockRelayPool();
   const alicePath = await workspaceWithDocument(
@@ -777,14 +1186,14 @@ Barcelona
 test("document panes rank matching deposits by reader graph overlap", async () => {
   const relayPool = mockRelayPool();
   const bobPath = knowstrInit({ relays: [RELAY_URL] }).path;
-  write(bobPath, "mises.md", "# Ludwig von Mises <!-- id:mises -->\n");
+  write(bobPath, "mises.md", "# Ludwig von Mises <!-- id:wd:Q23129 -->\n");
   write(
     bobPath,
     "interests.md",
     [
       "# Interests <!-- id:interests -->",
-      "- [Bitcoin](#bitcoin) <!-- id:bob-bitcoin -->",
-      "- [Money Theory](#money-theory) <!-- id:bob-money-theory -->",
+      "- [Bitcoin](#wd:Q131723) <!-- id:bob-bitcoin -->",
+      "- [Money Theory](#wd:Q1) <!-- id:bob-money-theory -->",
       "",
     ].join("\n")
   );
@@ -796,9 +1205,9 @@ test("document panes rank matching deposits by reader graph overlap", async () =
       "knowstr_doc_id: broad-mises",
       "---",
       "# Broad Mises <!-- id:broad-root -->",
-      "- [Ludwig von Mises](#mises) <!-- id:broad-mises-link -->",
-      "- [Bitcoin](#bitcoin) <!-- id:broad-bitcoin-link -->",
-      "- [Money Theory](#money-theory) <!-- id:broad-money-link -->",
+      "- [Ludwig von Mises](#wd:Q23129) <!-- id:broad-mises-link -->",
+      "- [Bitcoin](#wd:Q131723) <!-- id:broad-bitcoin-link -->",
+      "- [Money Theory](#wd:Q1) <!-- id:broad-money-link -->",
       "",
     ].join("\n")
   );
@@ -809,19 +1218,10 @@ test("document panes rank matching deposits by reader graph overlap", async () =
       "knowstr_doc_id: narrow-mises",
       "---",
       "# Narrow Mises <!-- id:narrow-root -->",
-      "- [Ludwig von Mises](#mises) <!-- id:narrow-mises-link -->",
+      "- [Ludwig von Mises](#wd:Q23129) <!-- id:narrow-mises-link -->",
       "",
     ].join("\n")
   );
-  await renderAppTree({
-    path: bobPath,
-    relayPool,
-    initialRoute: buildNodeRouteUrl("mises", LOCAL, {
-      scrollToId: undefined,
-      fallbackLabel: undefined,
-    }),
-  });
-
   await withNow(10_000, () =>
     publishDocumentThroughApp(
       relayPool,
@@ -840,6 +1240,15 @@ test("document panes rank matching deposits by reader graph overlap", async () =
       "Narrow Mises"
     )
   );
+
+  await renderAppTree({
+    path: bobPath,
+    relayPool,
+    initialRoute: buildNodeRouteUrl("wd:Q23129", LOCAL, {
+      scrollToId: undefined,
+      fallbackLabel: undefined,
+    }),
+  });
 
   await expectTree(`
 Ludwig von Mises

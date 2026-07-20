@@ -94,6 +94,9 @@ export function mockWorkspaceIpc(
       await getRuntime()?.ready();
       logMockWorkspaceDebug("ready", { current: state.current });
     },
+    loadSnapshots: async () => {
+      return [...((await getRuntime()?.loadSnapshots()) ?? [])];
+    },
     pickFolder: () => {
       if (state.pickerQueue.length === 0) {
         throw new Error(

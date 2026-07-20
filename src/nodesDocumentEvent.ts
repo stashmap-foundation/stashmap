@@ -50,18 +50,13 @@ export function buildDocumentEvent(
   };
 }
 
-// The S set is {own roots} ∪ knowstr_publish.entities (interop rule: tags
-// and content sit inside one signature and MUST agree). Roots stay implicit
-// in the frontmatter; entities is the carried record of granted audiences.
 export function depositEntityTags(document: Document): string[] {
-  const entities = publishStateOf(document.frontMatter)?.entities ?? [];
-  return [...new Set([...document.topNodeShortIds, ...entities])];
+  return [
+    ...new Set([...document.topNodeShortIds, ...document.realWorldEntities]),
+  ];
 }
 
-// Whether any tag involves an asset entity. Ladder rungs are space-joined
-// sets, so the asset id can sit anywhere inside a rung, not only at the
-// start of a bare tag.
-export function hasAssetEntityTag(tags: string[]): boolean {
+export function hasAssetEntityTag(tags: readonly string[]): boolean {
   return tags.some((tag) =>
     tag.split(" ").some((id) => id.startsWith("asset:"))
   );
@@ -70,7 +65,8 @@ export function hasAssetEntityTag(tags: string[]): boolean {
 export function buildDepositEvent(
   document: Document,
   pubkey: PublicKey,
-  content: string
+  content: string,
+  tags: readonly string[]
 ): UnsignedEvent {
   const systemRoleTags = document.systemRole
     ? ([["s", document.systemRole]] as string[][])
@@ -81,7 +77,7 @@ export function buildDepositEvent(
     created_at: newTimestamp(),
     tags: [
       ["d", document.docId],
-      ...depositEntityTags(document).map((id) => ["S", id]),
+      ...tags.map((id) => ["S", id]),
       ...systemRoleTags,
       msTag(),
     ],
@@ -98,10 +94,11 @@ export function buildDepositEvent(
 export function depositWriteRelayConf(
   document: Document,
   userRelays: Relays,
+  tags: readonly string[],
   assetRelay: string | undefined = ASSET_ENTITY_RELAY
 ): WriteRelayConf {
   const declared = publishStateOf(document.frontMatter)?.relays;
-  const hasAssetEntity = hasAssetEntityTag(depositEntityTags(document));
+  const hasAssetEntity = hasAssetEntityTag(tags);
   const scheme = assetRelay && hasAssetEntity ? [assetRelay] : [];
   const toRelay = (url: string): Relay => ({ url, read: false, write: true });
   if (declared !== undefined) {

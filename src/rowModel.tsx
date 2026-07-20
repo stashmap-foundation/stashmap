@@ -159,6 +159,20 @@ export function getViewForNode(data: Data, path: ViewPath, nodeID: ID): View {
 }
 
 export function buildPaneTarget(data: Data, row: Row): EditorNavigationTarget {
+  if (
+    row.action === "open-related-sources" &&
+    row.parentRef &&
+    row.parentNode
+  ) {
+    return {
+      sourceId: row.parentRef.sourceId,
+      rootNodeId: row.parentNode.id,
+      ...(isCanonicalId(row.parentNode.id) && {
+        fallbackLabel: nodeText(row.parentNode),
+      }),
+    };
+  }
+
   const targetID =
     row.virtualType === "search" ? searchTargetID(row.node) : row.reference?.id;
   const refInfo = targetID

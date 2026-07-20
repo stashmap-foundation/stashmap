@@ -192,13 +192,20 @@ function compareRank(
 
 function matchedPaneMap(
   records: PullRecordMap,
-  interests: readonly PullInterest[]
+  interests: readonly PullInterest[],
+  purpose: "footer" | "related-source"
 ): ReadonlyMap<string, readonly SourceId[]> {
   const paneIds = new Set(interests.map((interest) => interest.paneId));
   const entries = [...paneIds].map((paneId): [string, readonly SourceId[]] => {
-    const paneInterests = interests.filter(
-      (interest) => interest.paneId === paneId
-    );
+    const paneInterests = interests.filter((interest) => {
+      if (interest.paneId !== paneId) {
+        return false;
+      }
+      if (purpose === "related-source") {
+        return interest.kind === "tag" && interest.purpose === purpose;
+      }
+      return interest.kind === "coordinate" || interest.purpose === purpose;
+    });
     const keys = new Set(paneInterests.map((interest) => interest.interestKey));
     const localTags = [
       ...new Set(
@@ -239,7 +246,12 @@ function overlayData(
   );
   return {
     sourceIds: new Set(availableRecords.map((record) => record.sourceId)),
-    matchedSourceIdsByPaneId: matchedPaneMap(records, interests),
+    matchedSourceIdsByPaneId: matchedPaneMap(records, interests, "footer"),
+    relatedSourceIdsByPaneId: matchedPaneMap(
+      records,
+      interests,
+      "related-source"
+    ),
     metadataBySourceId: new Map(
       availableRecords.flatMap((record): [SourceId, PullSourceMetadata][] => {
         const metadata = sourceRecordMetadata(record);

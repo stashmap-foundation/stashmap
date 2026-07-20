@@ -15,7 +15,6 @@ import {
   planSetDocumentPublishState,
   planTakeRenameSuggestion,
 } from "../core/plan";
-import { documentEntityTags } from "./publishReach";
 import { TemporaryViewProvider, useTemporaryView } from "./temporaryViewState";
 
 import { getDisplayTextForRow, getIndependentRows } from "../rowModel";
@@ -594,7 +593,8 @@ function AudienceChip(): JSX.Element | null {
     configured.length > 0
       ? configured
       : getWriteRelays(DEFAULT_RELAYS).map((relay) => relay.url);
-  const hasAssetEntity = hasAssetEntityTag(depositEntityTags(document));
+  const audienceTags = depositEntityTags(document);
+  const hasAssetEntity = hasAssetEntityTag(audienceTags);
   const baseline = hasAssetEntity ? [ASSET_ENTITY_RELAY] : configuredOrDefault;
   const declared = state?.relays;
   const effective = declared !== undefined ? declared : baseline;
@@ -620,17 +620,6 @@ function AudienceChip(): JSX.Element | null {
 
   const handlePublish = (relays: string[] | undefined): void => {
     applyState({
-      entities: [
-        ...new Set([
-          ...(state?.entities ?? []),
-          ...documentEntityTags(
-            data.knowledgeDBs,
-            data.documents,
-            data.documentByFilePath,
-            document
-          ),
-        ]),
-      ],
       relays,
       paused: false,
     });
@@ -740,8 +729,8 @@ function AudienceChip(): JSX.Element | null {
     ...new Set([...baseline, ...configuredOrDefault, ...(declared ?? [])]),
   ];
   return (
-    // autoClose="outside": toggling destinations and entities is an
-    // editing session — the menu closes on outside click, not per click.
+    // autoClose="outside": toggling destinations is an editing session —
+    // the menu closes on outside click, not per click.
     <Dropdown className="options-dropdown publish-dropdown" autoClose="outside">
       <Dropdown.Toggle
         as="button"
@@ -763,27 +752,6 @@ function AudienceChip(): JSX.Element | null {
       <Dropdown.Menu>
         {secretLinkItem}
         {secretLinkItem && <Dropdown.Divider />}
-        {state.entities.map((entity) => (
-          <Dropdown.Item
-            key={entity}
-            className="d-flex menu-item"
-            onClick={() =>
-              applyState({
-                ...state,
-                entities: state.entities.filter((e) => e !== entity),
-              })
-            }
-            aria-label={`stop publishing under ${entity}`}
-            title={`Stop publishing under ${entity}`}
-            tabIndex={0}
-          >
-            <span className="d-block dropdown-item-icon" aria-hidden="true">
-              ×
-            </span>
-            <div className="menu-item-text">{entity}</div>
-          </Dropdown.Item>
-        ))}
-        {state.entities.length > 0 && <Dropdown.Divider />}
         {relayRows.map((url) => {
           const active = effective.includes(url);
           return (

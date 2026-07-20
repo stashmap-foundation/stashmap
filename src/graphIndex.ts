@@ -143,10 +143,13 @@ function addNodeSourceEntries(
   sourceId: SourceId
 ): void {
   const existingSourceNodes = graphIndex.nodesBySource.get(sourceId);
-  const sourceNodes = new globalThis.Map<ID, GraphNode>(existingSourceNodes);
+  const sourceNodes =
+    existingSourceNodes ?? new globalThis.Map<ID, GraphNode>();
   sourceNodes.set(node.id, node);
   addSourceCandidate(graphIndex, node.id, { sourceId, id: node.id });
-  graphIndex.nodesBySource.set(sourceId, sourceNodes);
+  if (!existingSourceNodes) {
+    graphIndex.nodesBySource.set(sourceId, sourceNodes);
+  }
   graphIndex.nodeByID.set(node.id as ID, node);
 }
 
@@ -172,7 +175,7 @@ function removeNodeSourceEntries(
     setNodeByIDFromCandidates(graphIndex, node.id as ID);
     return;
   }
-  const sourceNodes = new globalThis.Map<ID, GraphNode>(existingSourceNodes);
+  const sourceNodes = existingSourceNodes;
   const ref: NodeRef = { sourceId, id: node.id };
   const existingNode = sourceNodes.get(node.id);
   if (existingNode?.id === node.id) {
@@ -181,8 +184,6 @@ function removeNodeSourceEntries(
   removeSourceCandidate(graphIndex, node.id, ref);
   if (sourceNodes.size === 0) {
     graphIndex.nodesBySource.delete(sourceId);
-  } else {
-    graphIndex.nodesBySource.set(sourceId, sourceNodes);
   }
   setNodeByIDFromCandidates(graphIndex, node.id as ID);
 }
@@ -393,14 +394,15 @@ export function mergeGraphIndexes(
 ): GraphIndex {
   const nextIndex = cloneIndex(base);
   overlay.nodesBySource.forEach((nodes, sourceId) => {
-    const nextNodes = new globalThis.Map<ID, GraphNode>(
-      nextIndex.nodesBySource.get(sourceId)
-    );
+    const existingNodes = nextIndex.nodesBySource.get(sourceId);
+    const nextNodes = existingNodes ?? new globalThis.Map<ID, GraphNode>();
     nodes.forEach((node, nodeId) => {
       nextNodes.set(nodeId, node);
       nextIndex.nodeByID.set(nodeId, node);
     });
-    nextIndex.nodesBySource.set(sourceId, nextNodes);
+    if (!existingNodes) {
+      nextIndex.nodesBySource.set(sourceId, nextNodes);
+    }
   });
   overlay.sourceCandidatesById.forEach((refs, key) => {
     refs.forEach((ref) =>
@@ -436,14 +438,27 @@ export function buildGraphIndexFromDocuments(
   filePathByDocumentKey: ImmutableMap<string, string> = ImmutableMap(),
   sourceIdByDocumentKey: ImmutableMap<string, SourceId> = ImmutableMap()
 ): GraphIndex {
-  return nodesByDocumentKey.entrySeq().reduce((acc, [key, nodes]) => {
-    const sourceId =
-      sourceIdByDocumentKey.get(key) ?? sourceIdFromDocumentKey(key);
-    return addNodesToGraphIndex(
-      acc,
+  const graphIndex = createEmptyGraphIndex();
+  const documents = nodesByDocumentKey
+    .entrySeq()
+    .map(([key, nodes]) => ({
       nodes,
-      filePathByDocumentKey.get(key),
-      sourceId
-    );
-  }, createEmptyGraphIndex());
+      sourceId: sourceIdByDocumentKey.get(key) ?? sourceIdFromDocumentKey(key),
+      sourceFilePath: filePathByDocumentKey.get(key),
+    }))
+    .toArray();
+
+  documents.forEach(({ nodes, sourceId }) => {
+    nodes.valueSeq().forEach((node) => {
+      addNodeSourceEntries(graphIndex, node, sourceId);
+    });
+  });
+
+  documents.forEach(({ nodes, sourceId, sourceFilePath }) => {
+    nodes.valueSeq().forEach((node) => {
+      addNodeIndexEntries(graphIndex, node, sourceId, sourceFilePath);
+    });
+  });
+
+  return graphIndex;
 }

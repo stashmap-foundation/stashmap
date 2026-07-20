@@ -1,8 +1,12 @@
 import { Map as ImmutableMap } from "immutable";
 import { LOCAL } from "./nodeRef";
 import { getNode } from "./connections";
-import { ensureKnowstrDocId } from "./knowstrFrontmatter";
-import { documentLinkHref } from "./linkPath";
+import {
+  ensureKnowstrDocId,
+  withoutPublishEntities,
+} from "./knowstrFrontmatter";
+import { isCanonicalId } from "./entityRecognition";
+import { docLinkId, documentLinkHref, resolveLinkPath } from "./linkPath";
 import { MarkdownTreeNode, parseMarkdown } from "./markdownTree";
 import {
   MaterializeOptions,
@@ -11,7 +15,7 @@ import {
   materializeTree,
   materializeTreePreservingExplicitIds,
 } from "./markdownNodes";
-import { nodeText, spansText } from "./nodeSpans";
+import { getAllFileLinks, getAllLinks, nodeText, spansText } from "./nodeSpans";
 import { LOG_ROOT_FILE, LOG_ROOT_ROLE } from "./systemRoots";
 
 export type Document = {
@@ -24,6 +28,7 @@ export type Document = {
   filePath?: string;
   relativePath?: string;
   systemRole?: RootSystemRole;
+  realWorldEntities: string[];
   // Per-document storage encryption key (nostr storage only; filesystem
   // documents never carry one). Absent until the document first rides a
   // storage event.
@@ -95,6 +100,173 @@ export function getDocumentForNode(
   return docId ? documents.get(documentKeyOf(sourceId, docId)) : undefined;
 }
 
+function sortedUnique(values: readonly string[]): string[] {
+  return [...new Set(values)].sort();
+}
+
+function linkDocumentPath(path: string): string {
+  const hashIndex = path.lastIndexOf("#");
+  return hashIndex < 0 ? path : path.slice(0, hashIndex);
+}
+
+function sourceFilePath(
+  knowledgeDBs: KnowledgeDBs,
+  documents: ImmutableMap<string, Document>,
+  source: GraphNode,
+  sourceId: SourceId
+): string | undefined {
+  return getDocumentForNode(knowledgeDBs, documents, source, sourceId)
+    ?.filePath;
+}
+
+export function resolveDocumentTarget(
+  data: Pick<Data, "knowledgeDBs" | "documents" | "documentByFilePath">,
+  source: GraphNode,
+  sourceId: SourceId,
+  path: string
+): Document | undefined {
+  const documentPath = linkDocumentPath(path);
+  const docId = docLinkId(documentPath);
+  if (docId !== undefined) {
+    return data.documents.get(documentKeyOf(sourceId, docId));
+  }
+  const resolvedPath = resolveLinkPath(
+    documentPath,
+    sourceFilePath(data.knowledgeDBs, data.documents, source, sourceId)
+  );
+  return data.documentByFilePath.get(resolvedPath);
+}
+
+function linkTargetContainerRoot(
+  knowledgeDBs: KnowledgeDBs,
+  targetID: ID,
+  sourceId: SourceId
+): ID | undefined {
+  const target = getNode(knowledgeDBs, targetID, sourceId);
+  if (target) {
+    return target.root;
+  }
+  return isCanonicalId(targetID) ? targetID : undefined;
+}
+
+export function nodeLinkContainerTags(
+  knowledgeDBs: KnowledgeDBs,
+  documents: ImmutableMap<string, Document>,
+  documentByFilePath: ImmutableMap<string, Document>,
+  node: GraphNode,
+  sourceId: SourceId
+): string[] {
+  return sortedUnique([
+    ...getAllLinks(node).flatMap((link) => {
+      const root = linkTargetContainerRoot(
+        knowledgeDBs,
+        link.targetID,
+        sourceId
+      );
+      return root ? [root] : [];
+    }),
+    ...getAllFileLinks(node).flatMap((link) => {
+      const target = resolveDocumentTarget(
+        { knowledgeDBs, documents, documentByFilePath },
+        node,
+        sourceId,
+        link.path
+      );
+      return target ? target.topNodeShortIds : [];
+    }),
+  ]);
+}
+
+export function documentRealWorldEntities(
+  knowledgeDBs: KnowledgeDBs,
+  documents: ImmutableMap<string, Document>,
+  documentByFilePath: ImmutableMap<string, Document>,
+  document: Document
+): string[] {
+  const nodes = knowledgeDBs.get(document.sourceId)?.nodes;
+  if (!nodes) {
+    return [];
+  }
+  const rootIds = new Set(document.topNodeShortIds);
+  const walk = (nodeId: ID): string[] => {
+    const node = nodes.get(nodeId);
+    if (!node) {
+      return [];
+    }
+    return [
+      ...nodeLinkContainerTags(
+        knowledgeDBs,
+        documents,
+        documentByFilePath,
+        node,
+        document.sourceId
+      ).filter((tag) => !rootIds.has(tag)),
+      ...node.children.toArray().flatMap((childId) => walk(childId)),
+    ];
+  };
+  return sortedUnique(document.topNodeShortIds.flatMap((id) => walk(id)));
+}
+
+export function documentAudienceTags(document: Document): string[] {
+  return sortedUnique([
+    ...document.topNodeShortIds,
+    ...document.realWorldEntities,
+  ]);
+}
+
+export function withDocumentRealWorldEntities(
+  knowledgeDBs: KnowledgeDBs,
+  documents: ImmutableMap<string, Document>,
+  documentByFilePath: ImmutableMap<string, Document>,
+  document: Document
+): Document {
+  return {
+    ...document,
+    realWorldEntities: documentRealWorldEntities(
+      knowledgeDBs,
+      documents,
+      documentByFilePath,
+      document
+    ),
+  };
+}
+
+export function withRealWorldEntitiesForDocuments(
+  knowledgeDBs: KnowledgeDBs,
+  documents: ImmutableMap<string, Document>,
+  documentByFilePath: ImmutableMap<string, Document>
+): {
+  documents: ImmutableMap<string, Document>;
+  documentByFilePath: ImmutableMap<string, Document>;
+} {
+  const nextDocuments = documents
+    .entrySeq()
+    .reduce(
+      (acc, [key, document]) =>
+        acc.set(
+          key,
+          withDocumentRealWorldEntities(
+            knowledgeDBs,
+            documents,
+            documentByFilePath,
+            document
+          )
+        ),
+      ImmutableMap<string, Document>()
+    );
+  const nextDocumentByFilePath = nextDocuments
+    .valueSeq()
+    .reduce(
+      (acc, document) =>
+        document.filePath ? acc.set(document.filePath, document) : acc,
+      ImmutableMap<string, Document>()
+    );
+  return {
+    documents: nextDocuments,
+    documentByFilePath: nextDocumentByFilePath,
+  };
+}
+
 function basenameWithoutMarkdownExtension(path: string): string {
   const pieces = path.split(/[\\/]/u);
   const filename = pieces[pieces.length - 1] ?? path;
@@ -127,6 +299,7 @@ export function createDocumentFromRootNode(rootNode: GraphNode): Document {
     topNodeShortIds: [rootNode.id],
     updatedMs: rootNode.updated,
     title: nodeText(rootNode) || "Untitled",
+    realWorldEntities: [],
     frontMatter: { knowstr_doc_id: docId },
     ...(rootNode.systemRole !== undefined && {
       systemRole: rootNode.systemRole,
@@ -163,6 +336,7 @@ function parseToDocumentWithMaterializer(
 ): ParseToDocumentResult {
   const parsed = parseMarkdown(content);
   const ensured = ensureKnowstrDocId(parsed.frontMatter, options.docIdFallback);
+  const frontMatter = withoutPublishEntities(ensured.frontMatter);
 
   const updatedMs = options.updatedMsOverride ?? Date.now();
   const systemRole =
@@ -206,7 +380,8 @@ function parseToDocumentWithMaterializer(
     topNodeShortIds,
     updatedMs,
     title,
-    ...(ensured.frontMatter && { frontMatter: ensured.frontMatter }),
+    realWorldEntities: [],
+    ...(frontMatter && { frontMatter }),
     ...(options.filePath !== undefined && { filePath: options.filePath }),
     ...(options.relativePath !== undefined && {
       relativePath: options.relativePath,

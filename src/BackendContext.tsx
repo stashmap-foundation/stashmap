@@ -18,6 +18,7 @@ export type WorkspaceState = {
     deletedPaths?: ReadonlyArray<string>
   ) => Promise<{ changed_paths: string[]; removed_paths: string[] }>;
   subscribeFsEvents: (handler: FsEventHandler) => () => void;
+  loadSnapshots: () => Promise<ReadonlyArray<WorkspaceSnapshotFile>>;
   profile: LoadedCliProfile | null;
   files: WorkspaceMarkdownFile[];
   snapshots: ReadonlyArray<WorkspaceSnapshotFile>;

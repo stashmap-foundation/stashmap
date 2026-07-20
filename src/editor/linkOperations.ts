@@ -1,11 +1,11 @@
 import { LOCAL } from "../core/nodeRef";
-import { Document, getDocumentForNode, documentKeyOf } from "../core/Document";
+import { resolveDocumentTarget } from "../core/Document";
 import {
   getNodeInSource,
   graphLookupFromData,
   lookupNode,
 } from "../core/graphLookup";
-import { classifyLinkHref, docLinkId, resolveLinkPath } from "../core/linkPath";
+import { classifyLinkHref } from "../core/linkPath";
 import { buildDocumentRouteUrl, buildNodeRouteUrl } from "../navigationUrl";
 
 export type EditorNavigationTarget = {
@@ -15,32 +15,6 @@ export type EditorNavigationTarget = {
   scrollToId?: string;
   fallbackLabel?: string;
 };
-
-function sourceFilePath(
-  data: Pick<Data, "knowledgeDBs" | "documents" | "documentByFilePath">,
-  source: GraphNode,
-  sourceId: SourceId
-): string | undefined {
-  return getDocumentForNode(data.knowledgeDBs, data.documents, source, sourceId)
-    ?.filePath;
-}
-
-export function resolveDocumentTarget(
-  data: Pick<Data, "knowledgeDBs" | "documents" | "documentByFilePath">,
-  source: GraphNode,
-  sourceId: SourceId,
-  path: string
-): Document | undefined {
-  const docId = docLinkId(path);
-  if (docId !== undefined) {
-    return data.documents.get(documentKeyOf(sourceId, docId));
-  }
-  const resolvedPath = resolveLinkPath(
-    path,
-    sourceFilePath(data, source, sourceId)
-  );
-  return data.documentByFilePath.get(resolvedPath);
-}
 
 export function navigationTargetToHref(
   target: EditorNavigationTarget
@@ -114,10 +88,8 @@ export function isDeadLinkTarget(
   const targetClass = classifyLinkHref(href);
   if (targetClass === "node") {
     return (
-      getNodeInSource(graphLookupFromData(data), {
-        sourceId,
-        id: href.slice(1),
-      }) === undefined
+      lookupNode(graphLookupFromData(data), href.slice(1), sourceId) ===
+      undefined
     );
   }
   if (targetClass !== "document" && targetClass !== "file") return false;

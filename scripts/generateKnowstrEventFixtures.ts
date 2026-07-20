@@ -7,8 +7,8 @@
  * `buildDepositEvent` path, signed with fixed keys at fixed timestamps,
  * for the wallet's Rust backend — the wire contract's second
  * implementation — to verify: signature validity, `d` = `knowstr_doc_id`,
- * `S` = {roots} ∪ `knowstr_publish.entities` (bare entity tags), and
- * newest-wins selection per (pubkey, docId) with the `ms` tie-break.
+ * graph-derived `S` tags, and newest-wins selection per (pubkey, docId)
+ * with the `ms` tie-break.
  *
  * Usage:
  *   npx esbuild scripts/generateKnowstrEventFixtures.ts --bundle \
@@ -18,11 +18,16 @@
 /// <reference path="../src/types.ts" />
 import * as fs from "fs";
 import * as path from "path";
+import { Map as ImmutableMap } from "immutable";
 import { finalizeEvent, getPublicKey } from "nostr-tools";
 import { hexToBytes } from "@noble/hashes/utils";
 import { base64 } from "@scure/base";
-import { parseToDocumentPreservingExplicitIds } from "../src/core/Document";
-import { buildDepositEvent } from "../src/nodesDocumentEvent";
+import {
+  documentKeyOf,
+  parseToDocumentPreservingExplicitIds,
+  withDocumentRealWorldEntities,
+} from "../src/core/Document";
+import { buildDepositEvent, depositEntityTags } from "../src/nodesDocumentEvent";
 import { LOCAL } from "../src/core/nodeRef";
 import { KIND_KNOWLEDGE_DOCUMENT } from "../src/nostr";
 import { buildStorageEnvelope } from "../src/storageEncryption";
@@ -50,7 +55,6 @@ const CASES: FixtureCase[] = [
       "---",
       "knowstr_doc_id: fixture-asset-home",
       "knowstr_publish:",
-      "  entities: []",
       "---",
       "",
       `# ${CONTRACT_ID} <!-- id:asset:${CONTRACT_ID} -->`,
@@ -64,15 +68,11 @@ const CASES: FixtureCase[] = [
     ms: 1750000000000,
   },
   {
-    // Bare entity tags recorded in knowstr_publish.entities.
     name: "entities-essay",
     markdown: [
       "---",
       "knowstr_doc_id: fixture-entities-essay",
       "knowstr_publish:",
-      "  entities:",
-      "    - wd:Q1492",
-      "    - wd:Q48435",
       "---",
       "",
       "# Travel <!-- id:u1 -->",
@@ -92,7 +92,6 @@ const CASES: FixtureCase[] = [
       "---",
       "knowstr_doc_id: fixture-replaceable",
       "knowstr_publish:",
-      "  entities: []",
       "---",
       "",
       "# Notes <!-- id:u20 -->",
@@ -110,7 +109,6 @@ const CASES: FixtureCase[] = [
       "---",
       "knowstr_doc_id: fixture-replaceable",
       "knowstr_publish:",
-      "  entities: []",
       "---",
       "",
       "# Notes <!-- id:u20 -->",
@@ -129,7 +127,6 @@ const CASES: FixtureCase[] = [
       "---",
       "knowstr_doc_id: fixture-tie",
       "knowstr_publish:",
-      "  entities: []",
       "---",
       "",
       "# Tie <!-- id:u30 -->",
@@ -147,7 +144,6 @@ const CASES: FixtureCase[] = [
       "---",
       "knowstr_doc_id: fixture-tie",
       "knowstr_publish:",
-      "  entities: []",
       "---",
       "",
       "# Tie <!-- id:u30 -->",
@@ -167,7 +163,6 @@ const CASES: FixtureCase[] = [
       "---",
       "knowstr_doc_id: fixture-replaceable",
       "knowstr_publish:",
-      "  entities: []",
       "---",
       "",
       "# Notes <!-- id:u20 -->",
@@ -187,10 +182,20 @@ function buildFixture(fixtureCase: FixtureCase) {
     fixtureCase.markdown,
     {}
   );
+  const documents = ImmutableMap([
+    [documentKeyOf(LOCAL, parsed.document.docId), parsed.document],
+  ]);
+  const document = withDocumentRealWorldEntities(
+    parsed.context.knowledgeDBs,
+    documents,
+    ImmutableMap(),
+    parsed.document
+  );
   const template = buildDepositEvent(
-    parsed.document,
+    document,
     "" as PublicKey,
-    fixtureCase.markdown
+    fixtureCase.markdown,
+    depositEntityTags(document)
   );
   const withFixedTime = {
     ...template,

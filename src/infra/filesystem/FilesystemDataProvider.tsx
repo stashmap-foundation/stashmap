@@ -4,7 +4,12 @@ import { useUser } from "../../NostrAuthContext";
 import { useUserSessionState } from "../../userSessionState";
 import { useBackend } from "../../BackendContext";
 import { DataContextProvider, MergeKnowledgeDB } from "../../DataContext";
-import { DocumentStoreProvider, ParsedDocument } from "../../DocumentStore";
+import {
+  DocumentStoreProvider,
+  ParsedDocument,
+  SnapshotContent,
+  useDocumentStore,
+} from "../../DocumentStore";
 import { LOCAL } from "../../core/nodeRef";
 import { PlanningContextProvider } from "../../planner";
 import { FilesystemExecutorProvider } from "./FilesystemExecutorProvider";
@@ -24,13 +29,12 @@ function fallbackTitleFromRelativePath(relativePath: string): string {
 
 function assertUniqueDocIds(documents: ReadonlyArray<ParsedDocument>): void {
   const counts = documents.reduce(
-    (acc, parsed) => ({
-      ...acc,
-      [parsed.document.docId]: (acc[parsed.document.docId] || 0) + 1,
-    }),
-    {} as Record<string, number>
+    (acc, parsed) =>
+      acc.set(parsed.document.docId, (acc.get(parsed.document.docId) ?? 0) + 1),
+    Map<string, number>()
   );
-  const duplicates = List(Object.entries(counts))
+  const duplicates = counts
+    .entrySeq()
     .filter(([, count]) => count > 1)
     .map(([docId]) => docId)
     .sort()
@@ -48,7 +52,7 @@ function parseWorkspaceFiles(
   files: ReadonlyArray<WorkspaceMarkdownFile>
 ): ReadonlyArray<ParsedDocument> {
   const result = files.reduce<{
-    documents: ParsedDocument[];
+    documents: List<ParsedDocument>;
     context: WalkContext | undefined;
   }>(
     (acc, file) => {
@@ -60,17 +64,80 @@ function parseWorkspaceFiles(
         ...(acc.context !== undefined ? { context: acc.context } : {}),
       });
       return {
-        documents: [
-          ...acc.documents,
-          { document: parsed.document, nodes: parsed.nodes },
-        ],
+        documents: acc.documents.push({
+          document: parsed.document,
+          nodes: parsed.nodes,
+        }),
         context: parsed.context,
       };
     },
-    { documents: [], context: undefined }
+    { documents: List<ParsedDocument>(), context: undefined }
   );
-  assertUniqueDocIds(result.documents);
-  return result.documents;
+  const documents = result.documents.toArray();
+  assertUniqueDocIds(documents);
+  return documents;
+}
+
+const SNAPSHOT_LOAD_BATCH_SIZE = 20;
+
+function enqueueSnapshotBatches(
+  addSnapshotContents: (snapshots: ReadonlyArray<SnapshotContent>) => void,
+  snapshots: ReadonlyArray<SnapshotContent>,
+  index: number,
+  signal: AbortSignal
+): void {
+  if (signal.aborted) {
+    return;
+  }
+  const batch = snapshots.slice(index, index + SNAPSHOT_LOAD_BATCH_SIZE);
+  if (batch.length === 0) {
+    return;
+  }
+  addSnapshotContents(batch);
+  if (index + SNAPSHOT_LOAD_BATCH_SIZE < snapshots.length) {
+    window.setTimeout(() =>
+      enqueueSnapshotBatches(
+        addSnapshotContents,
+        snapshots,
+        index + SNAPSHOT_LOAD_BATCH_SIZE,
+        signal
+      )
+    );
+  }
+}
+
+function WorkspaceSnapshotLoader({
+  workspaceKey,
+}: {
+  workspaceKey: string;
+}): JSX.Element | null {
+  const { workspace } = useBackend();
+  const store = useDocumentStore();
+  const addSnapshotContents = store?.addSnapshotContents;
+  React.useEffect(() => {
+    const controller = new AbortController();
+    if (!workspace || !addSnapshotContents) {
+      return () => controller.abort();
+    }
+    window.setTimeout(() => {
+      if (controller.signal.aborted) {
+        return;
+      }
+      workspace
+        .loadSnapshots()
+        .then((snapshots) =>
+          enqueueSnapshotBatches(
+            addSnapshotContents,
+            snapshots,
+            0,
+            controller.signal
+          )
+        )
+        .catch(() => undefined);
+    });
+    return () => controller.abort();
+  }, [workspace, workspaceKey, addSnapshotContents]);
+  return null;
 }
 
 export function FilesystemDataProvider({
@@ -107,6 +174,7 @@ export function FilesystemDataProvider({
         initialSnapshots={workspace?.snapshots ?? []}
         unpublishedEvents={session.publishStatus.unsignedEvents}
       >
+        <WorkspaceSnapshotLoader workspaceKey={workspaceKey} />
         <FilesystemWatcher />
         <MergeKnowledgeDB>
           <PullSourceProvider>

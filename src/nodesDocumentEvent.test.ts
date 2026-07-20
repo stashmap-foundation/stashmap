@@ -22,6 +22,13 @@ function parseDoc(markdown: string): Document {
   }).document;
 }
 
+function withEntities(
+  document: Document,
+  realWorldEntities: readonly string[]
+): Document {
+  return { ...document, realWorldEntities: [...realWorldEntities] };
+}
+
 test("publishStateOf is undefined without the key", () => {
   expect(publishStateOf(undefined)).toBeUndefined();
   expect(publishStateOf({ knowstr_doc_id: "d1" })).toBeUndefined();
@@ -29,16 +36,15 @@ test("publishStateOf is undefined without the key", () => {
 
 test("the bare key is the minimal published form", () => {
   const fm = parseFrontMatter("knowstr_doc_id: d1\nknowstr_publish:\n");
-  expect(publishStateOf(fm)).toEqual({ entities: [], paused: false });
+  expect(publishStateOf(fm)).toEqual({ paused: false });
 });
 
-test("publishStateOf reads entities, relays, and paused", () => {
+test("publishStateOf reads relays and paused", () => {
   const fm = parseFrontMatter(
     [
       "knowstr_publish:",
       "  entities:",
       "    - asset:rgb:test-contract",
-      "    - wd:Q1 wd:Q2",
       "  relays:",
       "    - wss://relay.example",
       "  paused: true",
@@ -46,7 +52,6 @@ test("publishStateOf reads entities, relays, and paused", () => {
     ].join("\n")
   );
   expect(publishStateOf(fm)).toEqual({
-    entities: ["asset:rgb:test-contract", "wd:Q1 wd:Q2"],
     relays: ["wss://relay.example"],
     paused: true,
   });
@@ -54,7 +59,6 @@ test("publishStateOf reads entities, relays, and paused", () => {
 
 test("publish state round-trips through frontmatter serialization", () => {
   const state = {
-    entities: ["asset:rgb:test-contract"],
     relays: ["wss://relay.example"],
     paused: true,
   };
@@ -66,16 +70,15 @@ test("publish state round-trips through frontmatter serialization", () => {
 });
 
 test("withPublishState writes the bare key for the minimal form", () => {
-  const fm = withPublishState(undefined, { entities: [], paused: false });
+  const fm = withPublishState(undefined, { paused: false });
   expect("knowstr_publish" in fm).toBe(true);
-  expect(publishStateOf(fm)).toEqual({ entities: [], paused: false });
+  expect(publishStateOf(fm)).toEqual({ paused: false });
 });
 
 test("withoutPublishState removes the key entirely", () => {
   const fm = withPublishState(
     { knowstr_doc_id: "d1" },
     {
-      entities: ["wd:Q1"],
       paused: false,
     }
   );
@@ -83,19 +86,19 @@ test("withoutPublishState removes the key entirely", () => {
   expect(withoutPublishState(fm).knowstr_doc_id).toBe("d1");
 });
 
-test("deposit S set is {own roots} ∪ entities, deduplicated", () => {
-  const document = parseDoc(
-    [
-      "---",
-      "knowstr_doc_id: doc-1",
-      "knowstr_publish:",
-      "  entities:",
-      "    - asset:rgb:test-contract",
-      "    - u77",
-      "---",
-      "# Essay <!-- id:u77 -->",
-      "",
-    ].join("\n")
+test("deposit S set is own roots plus real-world entities", () => {
+  const document = withEntities(
+    parseDoc(
+      [
+        "---",
+        "knowstr_doc_id: doc-1",
+        "knowstr_publish:",
+        "---",
+        "# Essay <!-- id:u77 -->",
+        "",
+      ].join("\n")
+    ),
+    ["asset:rgb:test-contract"]
   );
   expect(depositEntityTags(document)).toEqual([
     "u77",
@@ -104,19 +107,25 @@ test("deposit S set is {own roots} ∪ entities, deduplicated", () => {
 });
 
 test("buildDepositEvent carries kind 34774, d, S tags, and ms", () => {
-  const document = parseDoc(
-    [
-      "---",
-      "knowstr_doc_id: doc-1",
-      "knowstr_publish:",
-      "  entities:",
-      "    - asset:rgb:test-contract",
-      "---",
-      "# Essay <!-- id:u77 -->",
-      "",
-    ].join("\n")
+  const document = withEntities(
+    parseDoc(
+      [
+        "---",
+        "knowstr_doc_id: doc-1",
+        "knowstr_publish:",
+        "---",
+        "# Essay <!-- id:u77 -->",
+        "",
+      ].join("\n")
+    ),
+    ["asset:rgb:test-contract"]
   );
-  const event = buildDepositEvent(document, TEST_PUBKEY, "content");
+  const event = buildDepositEvent(
+    document,
+    TEST_PUBKEY,
+    "content",
+    depositEntityTags(document)
+  );
   expect(event.kind).toBe(KIND_KNOWLEDGE_DEPOSIT);
   expect(event.pubkey).toBe(TEST_PUBKEY);
   expect(event.content).toBe("content");
@@ -128,17 +137,18 @@ test("buildDepositEvent carries kind 34774, d, S tags, and ms", () => {
   expect(event.tags.some(([name]) => name === "ms")).toBe(true);
 });
 
-test("an unpublished document's deposit tags are its roots alone", () => {
-  const document = parseDoc("# Essay <!-- id:u77 -->\n");
-  expect(depositEntityTags(document)).toEqual(["u77"]);
+test("deposit tags dedupe roots and real-world entities", () => {
+  const document = withEntities(parseDoc("# Essay <!-- id:u77 -->\n"), [
+    "u77",
+    "wd:Q1",
+  ]);
+  expect(depositEntityTags(document)).toEqual(["u77", "wd:Q1"]);
 });
 
 const PUBLISHED_UNDER_ASSET = [
   "---",
   "knowstr_doc_id: doc-1",
   "knowstr_publish:",
-  "  entities:",
-  "    - asset:rgb:test-contract",
   "  relays:",
   "    - wss://salon.example",
   "---",
@@ -151,9 +161,16 @@ const USER_RELAYS: Relays = [
 ];
 
 test("declared relays replace the configured set; the asset scheme joins", () => {
-  const document = parseDoc(PUBLISHED_UNDER_ASSET);
+  const document = withEntities(parseDoc(PUBLISHED_UNDER_ASSET), [
+    "asset:rgb:test-contract",
+  ]);
   expect(
-    depositWriteRelayConf(document, USER_RELAYS, "wss://deedsats.example")
+    depositWriteRelayConf(
+      document,
+      USER_RELAYS,
+      depositEntityTags(document),
+      "wss://deedsats.example"
+    )
   ).toEqual({
     extraRelays: [
       { url: "wss://salon.example", read: false, write: true },
@@ -164,7 +181,6 @@ test("declared relays replace the configured set; the asset scheme joins", () =>
 
 test("an explicitly empty destination set persists and publishes nowhere", () => {
   const fm = withPublishState(undefined, {
-    entities: [],
     relays: [],
     paused: false,
   });
@@ -183,7 +199,7 @@ test("an explicitly empty destination set persists and publishes nowhere", () =>
       "",
     ].join("\n")
   );
-  expect(depositWriteRelayConf(document, USER_RELAYS, undefined)).toEqual({
+  expect(depositWriteRelayConf(document, USER_RELAYS, [], undefined)).toEqual({
     extraRelays: [],
   });
 });
@@ -194,25 +210,33 @@ test("without declared relays: the configured set, else the defaults", () => {
       "---",
       "knowstr_doc_id: doc-1",
       "knowstr_publish:",
-      "  entities:",
-      "    - asset:rgb:test-contract",
       "---",
       "# Essay <!-- id:u77 -->",
       "",
     ].join("\n")
   );
-  expect(depositWriteRelayConf(noDeclared, USER_RELAYS, "")).toEqual({
+  expect(depositWriteRelayConf(noDeclared, USER_RELAYS, [], "")).toEqual({
     user: true,
     extraRelays: [],
   });
-  // The v0 cheat: without a declared choice, asset documents go to the
-  // asset relay ONLY — not the configured set.
+  const assetDocument = withEntities(noDeclared, ["asset:rgb:test-contract"]);
   expect(
-    depositWriteRelayConf(noDeclared, USER_RELAYS, "wss://deedsats.example")
+    depositWriteRelayConf(
+      assetDocument,
+      USER_RELAYS,
+      depositEntityTags(assetDocument),
+      "wss://deedsats.example"
+    )
   ).toEqual({
     extraRelays: [{ url: "wss://deedsats.example", read: false, write: true }],
   });
-  expect(depositWriteRelayConf(noDeclared, USER_RELAYS)).toEqual({
+  expect(
+    depositWriteRelayConf(
+      assetDocument,
+      USER_RELAYS,
+      depositEntityTags(assetDocument)
+    )
+  ).toEqual({
     extraRelays: [
       { url: "wss://nostr.nodesmap.com/", read: false, write: true },
     ],
@@ -222,7 +246,7 @@ test("without declared relays: the configured set, else the defaults", () => {
       .concat(["# Essay <!-- id:u77 -->", ""])
       .join("\n")
   );
-  expect(depositWriteRelayConf(noAsset, [], undefined)).toEqual({
+  expect(depositWriteRelayConf(noAsset, [], [], undefined)).toEqual({
     defaultRelays: true,
     extraRelays: [],
   });

@@ -1,5 +1,5 @@
 import { List, Map, Set as ImmutableSet } from "immutable";
-import { LOCAL } from "./core/nodeRef";
+import { LOCAL, nodeRefKey } from "./core/nodeRef";
 import {
   ViewPath,
   addNodeToPathWithNodes,
@@ -19,7 +19,8 @@ import {
   itemPassesFilters,
   nodePathLabel as nodePathLabelOf,
 } from "./core/connections";
-import { linkSpan, nodeText, plainSpans } from "./core/nodeSpans";
+import { isCanonicalId } from "./core/entityRecognition";
+import { getAllLinks, linkSpan, nodeText, plainSpans } from "./core/nodeSpans";
 import {
   IcalEntry,
   calendarEntryTarget,
@@ -29,7 +30,11 @@ import {
   icalEntryDisplayText,
   mergeProjectedEntries,
 } from "./core/ical";
-import { getDocumentByIdOrFilePath, type Document } from "./core/Document";
+import {
+  getDocumentByIdOrFilePath,
+  getDocumentForNode,
+  type Document,
+} from "./core/Document";
 import { DEFAULT_TYPE_FILTERS } from "./core/constants";
 import {
   getAlternativeFooterData,
@@ -37,6 +42,11 @@ import {
 } from "./semanticProjection";
 import { buildReferenceItem } from "./buildReferenceRow";
 import { referenceToText } from "./editor/referenceText";
+import {
+  RELATED_SOURCE_MIN_OVERLAP,
+  localDocumentTags,
+  nodeRelatedTags,
+} from "./pullSources";
 import type { AddToParentTarget } from "./core/plan";
 import {
   GraphLookup,
@@ -57,6 +67,7 @@ type TreeTraversalOptions = {
 
 const EMPTY_TREE_RESULT: TreeResult = { rows: List<Row>() };
 const INCOMING_GROUP_THRESHOLD = 3;
+const RELATED_SOURCE_INLINE_LIMIT = 7;
 
 function emptyTreeResult(rows: List<Row> = List<Row>()): TreeResult {
   return { rows };
@@ -103,6 +114,7 @@ type VirtualFooterInput = {
     snapshotId: string;
     baselineNodeId: ID;
   }>;
+  relatedSourceRefs: List<NodeRef>;
 };
 
 function nodePathLabel(
@@ -140,7 +152,8 @@ function createRow(
   const provenance =
     rowVirtualType === "suggestion" ||
     rowVirtualType === "incoming" ||
-    rowVirtualType === "version"
+    rowVirtualType === "version" ||
+    rowVirtualType === "related-source"
       ? { kind: rowVirtualType, sourceId }
       : undefined;
   const pane = data.panes[viewPath[0]];
@@ -395,8 +408,28 @@ function createVirtualRowNode(
     virtualType === "version"
       ? lookupNode(graph, sourceNodeID, graph.localSourceId)
       : undefined;
-  const resolvedSource = sourceRow ?? incomingRow ?? versionRow;
+  const relatedSourceRow =
+    virtualType === "related-source"
+      ? getNodeInSource(graph, rowRef)
+      : undefined;
+  const resolvedSource =
+    sourceRow ?? incomingRow ?? versionRow ?? relatedSourceRow;
   const sourceNode = resolvedSource?.node;
+  if (virtualType === "related-source") {
+    return {
+      node: {
+        children: List<ID>(),
+        id: sourceNodeID,
+        spans: [linkSpan(sourceNodeID, sourceNode ? nodeText(sourceNode) : "")],
+        parent: input.parentID,
+        updated: sourceNode?.updated ?? input.parentUpdated,
+        root: sourceNode?.root ?? sourceNodeID,
+        relevance: undefined,
+        argument: undefined,
+      },
+      sourceId: resolvedSource?.ref.sourceId ?? rowRef.sourceId,
+    };
+  }
   if (virtualType !== "incoming") {
     return {
       node: sourceNode ?? {
@@ -458,10 +491,6 @@ function incomingSourceRootRef(graph: GraphLookup, rowRef: NodeRef): NodeRef {
   };
 }
 
-function incomingGroupKey(ref: NodeRef): string {
-  return `${ref.sourceId}:${ref.id}`;
-}
-
 function groupIncomingRefs(
   graph: GraphLookup,
   refs: List<NodeRef>
@@ -475,7 +504,7 @@ function groupIncomingRefs(
   return refs.reduce(
     (acc, ref) => {
       const rootRef = incomingSourceRootRef(graph, ref);
-      const key = incomingGroupKey(rootRef);
+      const key = nodeRefKey(rootRef);
       const existing = acc.get(key);
       return acc.set(key, {
         rootRef,
@@ -502,6 +531,385 @@ function withIncomingGroupChildren(row: Row, refs: NodeRef[]): Row {
   };
 }
 
+function tagWeightMap(
+  weights: readonly RelatedSourceTagWeight[]
+): globalThis.Map<string, number> {
+  return weights.reduce(
+    (acc, weight) => new globalThis.Map(acc).set(weight.tag, weight.weight),
+    new globalThis.Map<string, number>()
+  );
+}
+
+function addContextTags(
+  weights: readonly RelatedSourceTagWeight[],
+  tags: readonly string[],
+  weight: number
+): RelatedSourceTagWeight[] {
+  const merged = tags.reduce(
+    (acc, tag) =>
+      new globalThis.Map(acc).set(tag, (acc.get(tag) ?? 0) + weight),
+    tagWeightMap(weights)
+  );
+  return [...merged.entries()].map(([tag, value]) => ({ tag, weight: value }));
+}
+
+function relatedContextScore(
+  context: RelatedSourceContext,
+  sourceTags: readonly string[]
+): RelatedSourcePlacement {
+  const sourceTagSet = new globalThis.Set(sourceTags);
+  const overlapTags = context.weightedTags
+    .filter((weight) => sourceTagSet.has(weight.tag))
+    .map((weight) => weight.tag)
+    .sort();
+  const sourceWidth = sourceTags.length === 0 ? 1 : sourceTags.length;
+  const score =
+    context.weightedTags
+      .filter((weight) => sourceTagSet.has(weight.tag))
+      .reduce((sum, weight) => sum + weight.weight, 0) +
+    overlapTags.length / sourceWidth;
+  return {
+    sourceId: "",
+    targetRef: context.targetRef,
+    score,
+    overlapTags,
+  };
+}
+
+function compareRelatedPlacement(
+  left: RelatedSourcePlacement,
+  right: RelatedSourcePlacement
+): number {
+  return (
+    right.score - left.score ||
+    right.overlapTags.length - left.overlapTags.length ||
+    left.targetRef.id.localeCompare(right.targetRef.id) ||
+    left.targetRef.sourceId.localeCompare(right.targetRef.sourceId)
+  );
+}
+
+function visibleRelatedContextsForNode(
+  data: Data,
+  graph: GraphLookup,
+  node: GraphNode,
+  sourceId: SourceId,
+  viewPath: ViewPath,
+  rootIds: ReadonlySet<ID>,
+  pathRefs: readonly NodeRef[],
+  weights: readonly RelatedSourceTagWeight[]
+): RelatedSourceContext[] {
+  const ref = { sourceId, id: node.id };
+  const nextPathRefs = [...pathRefs, ref];
+  const nextWeights = addContextTags(
+    weights,
+    nodeRelatedTags(data, node, sourceId, rootIds),
+    nextPathRefs.length
+  );
+  const context = {
+    targetRef: ref,
+    pathRefs: nextPathRefs,
+    weightedTags: nextWeights,
+  };
+  const view = getViewForNode(data, viewPath, node.id);
+  if (!view.expanded) {
+    return [context];
+  }
+  return [
+    context,
+    ...node.children.toArray().flatMap((childId, index) => {
+      const child = getNodeInSource(graph, { sourceId, id: childId })?.node;
+      if (!child) {
+        return [];
+      }
+      return visibleRelatedContextsForNode(
+        data,
+        graph,
+        child,
+        sourceId,
+        addNodeToPathWithNodes(viewPath, node, index),
+        rootIds,
+        nextPathRefs,
+        nextWeights
+      );
+    }),
+  ];
+}
+
+function visibleRelatedContextsForRow(
+  data: Data,
+  graph: GraphLookup,
+  row: Row
+): RelatedSourceContext[] {
+  if (row.sourceId !== LOCAL) {
+    return [];
+  }
+  const topId = row.viewPath[1];
+  const top = getNodeInSource(graph, {
+    sourceId: row.sourceId,
+    id: topId,
+  })?.node;
+  if (!top) {
+    return [];
+  }
+  const topPath: ViewPath = [row.viewPath[0], topId];
+  const rootIds = new globalThis.Set<ID>([top.root ?? top.id]);
+  return visibleRelatedContextsForNode(
+    data,
+    graph,
+    top,
+    row.sourceId,
+    topPath,
+    rootIds,
+    [],
+    []
+  );
+}
+
+function sourceRootRef(
+  data: Data,
+  graph: GraphLookup,
+  sourceId: SourceId
+): NodeRef | undefined {
+  const rootId = data.pull?.metadataBySourceId.get(sourceId)?.rootIds[0];
+  if (!rootId) {
+    return undefined;
+  }
+  return getNodeInSource(graph, { sourceId, id: rootId })?.ref;
+}
+
+function pulledRelatedSourceCandidates(
+  data: Data,
+  graph: GraphLookup,
+  pane: Pane | undefined
+): RelatedSourceCandidate[] {
+  const relatedSourceIds = pane
+    ? data.pull?.relatedSourceIdsByPaneId.get(pane.id) ?? []
+    : [];
+  return relatedSourceIds.flatMap((sourceId) => {
+    const metadata = data.pull?.metadataBySourceId.get(sourceId);
+    const rootRef = sourceRootRef(data, graph, sourceId);
+    return metadata && rootRef
+      ? [
+          {
+            rootRef,
+            sTags: metadata.sTags,
+            ms: metadata.ms,
+            title: metadata.title,
+          },
+        ]
+      : [];
+  });
+}
+
+function currentDocumentForRow(
+  data: Data,
+  graph: GraphLookup,
+  row: Row
+): Document | undefined {
+  const pane = data.panes[row.viewPath[0]];
+  const paneDocument = pane?.documentId
+    ? getDocumentByIdOrFilePath(
+        data.documents,
+        data.documentByFilePath,
+        LOCAL,
+        pane.documentId
+      )
+    : undefined;
+  if (paneDocument) {
+    return paneDocument;
+  }
+  const topId = row.viewPath[1];
+  const top = getNodeInSource(graph, {
+    sourceId: row.sourceId,
+    id: topId,
+  })?.node;
+  return top
+    ? getDocumentForNode(data.knowledgeDBs, data.documents, top, row.sourceId)
+    : undefined;
+}
+
+function localSourceCandidateTags(data: Data, document: Document): string[] {
+  const rootIds = new globalThis.Set(document.topNodeShortIds);
+  return localDocumentTags(document).filter(
+    (tag) => !rootIds.has(tag) || isCanonicalId(tag)
+  );
+}
+
+function localRelatedSourceCandidates(
+  data: Data,
+  graph: GraphLookup,
+  rows: List<Row>
+): RelatedSourceCandidate[] {
+  const currentDocIds = new globalThis.Set(
+    rows
+      .map((row) => currentDocumentForRow(data, graph, row)?.docId)
+      .filter((docId): docId is string => docId !== undefined)
+      .toArray()
+  );
+  const currentRootIds = new globalThis.Set(
+    rows
+      .map((row) => row.viewPath[1])
+      .filter((rootId): rootId is ID => rootId !== undefined)
+      .toArray()
+  );
+  return data.documents
+    .valueSeq()
+    .toArray()
+    .flatMap((document) => {
+      const rootId = document.topNodeShortIds[0];
+      if (
+        document.sourceId !== LOCAL ||
+        currentDocIds.has(document.docId) ||
+        (rootId !== undefined && currentRootIds.has(rootId))
+      ) {
+        return [];
+      }
+      const root = rootId
+        ? getNodeInSource(graph, { sourceId: LOCAL, id: rootId })
+        : undefined;
+      const sTags = localSourceCandidateTags(data, document);
+      return root &&
+        sTags.length >= RELATED_SOURCE_MIN_OVERLAP &&
+        sTags.some(isCanonicalId)
+        ? [
+            {
+              rootRef: root.ref,
+              sTags,
+              ms: document.updatedMs,
+              title: document.title,
+            },
+          ]
+        : [];
+    });
+}
+
+function rowAlreadyLinksSourceRoot(
+  graph: GraphLookup,
+  row: Row,
+  rootRef: NodeRef
+): boolean {
+  if (row.node.id === rootRef.id) {
+    return true;
+  }
+  if (getAllLinks(row.node).some((link) => link.targetID === rootRef.id)) {
+    return true;
+  }
+  return row.node.children.some((childId) => {
+    if (childId === rootRef.id) {
+      return true;
+    }
+    const child = getNodeInSource(graph, {
+      sourceId: row.sourceId,
+      id: childId,
+    })?.node;
+    return child
+      ? getAllLinks(child).some((link) => link.targetID === rootRef.id)
+      : false;
+  });
+}
+
+function compareRelatedCandidatePlacement(
+  left: {
+    candidate: RelatedSourceCandidate;
+    placement: RelatedSourcePlacement;
+  },
+  right: {
+    candidate: RelatedSourceCandidate;
+    placement: RelatedSourcePlacement;
+  }
+): number {
+  const leftWidth = left.candidate.sTags.length || 1;
+  const rightWidth = right.candidate.sTags.length || 1;
+  return (
+    right.placement.score - left.placement.score ||
+    right.placement.overlapTags.length - left.placement.overlapTags.length ||
+    right.placement.overlapTags.length / rightWidth -
+      left.placement.overlapTags.length / leftWidth ||
+    right.candidate.ms - left.candidate.ms ||
+    left.candidate.title.localeCompare(right.candidate.title) ||
+    nodeRefKey(left.candidate.rootRef).localeCompare(
+      nodeRefKey(right.candidate.rootRef)
+    )
+  );
+}
+
+function relatedSourceRefsByRow(
+  data: Data,
+  graph: GraphLookup,
+  rows: List<Row>
+): Map<string, List<NodeRef>> {
+  const localRows = rows.filter((row) => row.sourceId === LOCAL).toList();
+  if (localRows.size === 0) {
+    return Map<string, List<NodeRef>>();
+  }
+  const pane = data.panes[localRows.first()?.viewPath[0] ?? 0];
+  const contexts = localRows
+    .toArray()
+    .flatMap((row) => visibleRelatedContextsForRow(data, graph, row));
+  const candidates = [
+    ...pulledRelatedSourceCandidates(data, graph, pane),
+    ...localRelatedSourceCandidates(data, graph, localRows),
+  ];
+  const placements = candidates.flatMap((candidate) => {
+    const matchingPlacements = contexts
+      .map((context) => ({
+        ...relatedContextScore(context, candidate.sTags),
+        sourceId: candidate.rootRef.sourceId,
+      }))
+      .filter(
+        (placement) =>
+          placement.overlapTags.length >= RELATED_SOURCE_MIN_OVERLAP
+      );
+    if (candidate.rootRef.sourceId === LOCAL) {
+      return matchingPlacements.map((placement) => ({ candidate, placement }));
+    }
+    const best = matchingPlacements.slice().sort(compareRelatedPlacement)[0];
+    return best ? [{ candidate, placement: best }] : [];
+  });
+  const grouped = placements.reduce(
+    (acc, placement) => {
+      const key = nodeRefKey(placement.placement.targetRef);
+      return acc.set(key, [...(acc.get(key) ?? []), placement]);
+    },
+    Map<
+      string,
+      {
+        candidate: RelatedSourceCandidate;
+        placement: RelatedSourcePlacement;
+      }[]
+    >()
+  );
+  return grouped.map((placementsForRow) =>
+    List(
+      placementsForRow
+        .slice()
+        .sort(compareRelatedCandidatePlacement)
+        .map(({ candidate }) => candidate.rootRef)
+    )
+  );
+}
+
+function relatedSourceRefsForRow(
+  graph: GraphLookup,
+  row: Row,
+  incomingCrefs: List<NodeRef>,
+  refsByRow: Map<string, List<NodeRef>>
+): List<NodeRef> {
+  if (row.sourceId !== LOCAL) {
+    return List<NodeRef>();
+  }
+  const incomingRootKeys = new globalThis.Set(
+    incomingCrefs
+      .map((ref) => nodeRefKey(incomingSourceRootRef(graph, ref)))
+      .toArray()
+  );
+  return (refsByRow.get(nodeRefKey(row.ref)) ?? List<NodeRef>()).filter(
+    (rootRef) =>
+      !incomingRootKeys.has(nodeRefKey(rootRef)) &&
+      !rowAlreadyLinksSourceRoot(graph, row, rootRef)
+  );
+}
+
 function createVirtualRow(
   data: Data,
   graph: GraphLookup,
@@ -524,8 +932,8 @@ function createVirtualRow(
       ? input.parentPath
       : addNodesToLastElement(input.parentPath, input.parentID);
   const viewNodeID =
-    virtualType === "incoming"
-      ? (`incoming:${sourceId}:${sourceNodeID}` as ID)
+    virtualType === "incoming" || virtualType === "related-source"
+      ? (`${virtualType}:${sourceId}:${sourceNodeID}` as ID)
       : node.id;
   const viewPath =
     input.parentID === undefined
@@ -552,13 +960,9 @@ function createVirtualRow(
     virtualType,
     versionMeta
   );
-  if (virtualType !== "incoming") {
+  if (virtualType !== "incoming" && virtualType !== "related-source") {
     return row;
   }
-  // Incoming references are unordered proposals: they take at the
-  // boundary — the end of the parent's current children (idea.md,
-  // Proposals take at commit) — as references, with the source's
-  // judgment as default.
   const parentChildren = input.parentID
     ? getNodeInSource(graph, {
         sourceId: input.parentSourceId,
@@ -575,8 +979,9 @@ function createVirtualRow(
       precededBy: [...priorAnchors, ...([...parentChildren].reverse() as ID[])],
       take: incomingTakeTarget(graph, sourceNodeID, sourceId),
       defaults: {
-        relevance: inherited?.relevance,
-        argument: inherited?.argument,
+        relevance:
+          virtualType === "incoming" ? inherited?.relevance : undefined,
+        argument: virtualType === "incoming" ? inherited?.argument : undefined,
       },
       ...(input.parentRow?.materialize
         ? {
@@ -636,17 +1041,20 @@ function createProjectionRow(
 // Shareholder" element, shared instead of reinvented. One interaction
 // (click), no gutter, no editor, no judgment. Carries its own view
 // state (showPastEntries), so the reveal survives collapse/expand.
-function createPastDatesActionRow(
+function createFooterActionRow(
   data: Data,
   graph: GraphLookup,
   parentRow: Row,
   parentNode: GraphNode,
-  parentSourceId: SourceId
+  parentSourceId: SourceId,
+  id: ID,
+  label: string,
+  action: Row["action"]
 ): Row {
   const node: GraphNode = {
     children: List<ID>(),
-    id: `action:past:${parentNode.id}` as ID,
-    spans: plainSpans("past dates"),
+    id,
+    spans: plainSpans(label),
     parent: parentNode.id,
     updated: parentNode.updated ?? Date.now(),
     root: parentNode.root ?? parentNode.id,
@@ -668,7 +1076,45 @@ function createPastDatesActionRow(
     undefined,
     undefined
   );
-  return { ...row, action: "toggle-past-entries" };
+  return { ...row, action };
+}
+
+function createPastDatesActionRow(
+  data: Data,
+  graph: GraphLookup,
+  parentRow: Row,
+  parentNode: GraphNode,
+  parentSourceId: SourceId
+): Row {
+  return createFooterActionRow(
+    data,
+    graph,
+    parentRow,
+    parentNode,
+    parentSourceId,
+    `action:past:${parentNode.id}` as ID,
+    "past dates",
+    "toggle-past-entries"
+  );
+}
+
+function createMoreRelatedSourcesActionRow(
+  data: Data,
+  graph: GraphLookup,
+  parentRow: Row,
+  parentNode: GraphNode,
+  parentSourceId: SourceId
+): Row {
+  return createFooterActionRow(
+    data,
+    graph,
+    parentRow,
+    parentNode,
+    parentSourceId,
+    `action:related:${parentNode.id}` as ID,
+    "Open to see more related sources",
+    "open-related-sources"
+  );
 }
 
 // The machine-feeds merge at row level: children keep document order,
@@ -800,7 +1246,7 @@ function appendVirtualFooterRows(
   }>(
     (acc, rowRef) => {
       const rootRef = incomingSourceRootRef(graph, rowRef);
-      const key = incomingGroupKey(rootRef);
+      const key = nodeRefKey(rootRef);
       const group = groups.get(key);
       const grouped =
         group !== undefined && group.refs.length >= INCOMING_GROUP_THRESHOLD;
@@ -833,7 +1279,43 @@ function appendVirtualFooterRows(
     },
     { rows: [], priorAnchors: [], emittedGroupKeys: ImmutableSet<string>() }
   ).rows;
-  const suggestionOffset = incomingRows.length;
+  const capRelatedSources = (input.parentRow?.depth ?? 1) > 1;
+  const visibleRelatedSourceRefs = capRelatedSources
+    ? input.relatedSourceRefs.take(RELATED_SOURCE_INLINE_LIMIT)
+    : input.relatedSourceRefs;
+  const hiddenRelatedSourceCount =
+    input.relatedSourceRefs.size - visibleRelatedSourceRefs.size;
+  const relatedRows = visibleRelatedSourceRefs.map((rowRef, index) =>
+    createVirtualRow(
+      data,
+      graph,
+      input,
+      rowRef,
+      "related-source",
+      incomingRows.length + index === 0,
+      []
+    )
+  );
+  const moreRelatedSourcesRow =
+    hiddenRelatedSourceCount > 0 && input.parentRow
+      ? createMoreRelatedSourcesActionRow(
+          data,
+          graph,
+          input.parentRow,
+          input.parentRow.node,
+          input.parentSourceId
+        )
+      : undefined;
+  const relatedActionRows = moreRelatedSourcesRow
+    ? List<Row>([
+        {
+          ...moreRelatedSourcesRow,
+          isFirstVirtual: incomingRows.length + relatedRows.size === 0,
+        },
+      ])
+    : List<Row>();
+  const suggestionOffset =
+    incomingRows.length + relatedRows.size + relatedActionRows.size;
   const suggestionRows = input.suggestions.map((nodeID, index) =>
     createVirtualRow(
       data,
@@ -844,7 +1326,7 @@ function appendVirtualFooterRows(
       suggestionOffset + index === 0
     )
   );
-  const versionOffset = incomingRows.length + suggestionRows.size;
+  const versionOffset = suggestionOffset + suggestionRows.size;
   const versionRows = input.versionMetas
     .keySeq()
     .toList()
@@ -897,6 +1379,8 @@ function appendVirtualFooterRows(
   return {
     rows: initial.rows
       .concat(incomingRows)
+      .concat(relatedRows)
+      .concat(relatedActionRows)
       .concat(suggestionRows)
       .concat(versionRows)
       .concat(renameRows),
@@ -1034,6 +1518,7 @@ function getChildrenForRegularNode(
   rootNode: ID | undefined,
   author: SourceId,
   typeFilters: Pane["typeFilters"],
+  refsByRow: Map<string, List<NodeRef>>,
   options?: TreeTraversalOptions
 ): TreeResult {
   const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
@@ -1120,6 +1605,9 @@ function getChildrenForRegularNode(
   const visibleIncomingCrefs = activeFilters.includes("incoming")
     ? incomingCrefs
     : List<NodeRef>();
+  const relatedSourceRefs = activeFilters.includes("incoming")
+    ? relatedSourceRefsForRow(graph, parentRow, visibleIncomingCrefs, refsByRow)
+    : List<NodeRef>();
 
   const isOwnContent = nodeSourceId === LOCAL;
   const {
@@ -1146,6 +1634,7 @@ function getChildrenForRegularNode(
     suggestions: diffItems,
     versionMetas,
     renames,
+    relatedSourceRefs,
   });
 
   // The action row leads the footer block: it carries the dotted
@@ -1171,6 +1660,7 @@ function getTreeChildrenForResolvedRow(
   rootNode: ID | undefined,
   author: SourceId,
   typeFilters: Pane["typeFilters"],
+  refsByRow: Map<string, List<NodeRef>>,
   options?: TreeTraversalOptions
 ): TreeResult {
   if (isEmbedRow(parentRow)) {
@@ -1190,6 +1680,7 @@ function getTreeChildrenForResolvedRow(
     rootNode,
     author,
     typeFilters,
+    refsByRow,
     options
   );
 }
@@ -1213,6 +1704,10 @@ export function getTreeChildren(
   if (!parentRow) {
     return EMPTY_TREE_RESULT;
   }
+  const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
+  const refsByRow = activeFilters.includes("incoming")
+    ? relatedSourceRefsByRow(data, graph, List<Row>([parentRow]))
+    : Map<string, List<NodeRef>>();
   return {
     rows: reindexRows(
       getTreeChildrenForResolvedRow(
@@ -1222,6 +1717,7 @@ export function getTreeChildren(
         rootNode,
         author,
         typeFilters,
+        refsByRow,
         options
       ).rows
     ),
@@ -1257,6 +1753,7 @@ function getNodesInRows(
   rootNode: ID | undefined,
   author: SourceId,
   typeFilters: Pane["typeFilters"],
+  refsByRow: Map<string, List<NodeRef>>,
   options?: TreeTraversalOptions
 ): TreeResult {
   return rootRows.reduce<TreeResult>((result, rootRow) => {
@@ -1267,6 +1764,7 @@ function getNodesInRows(
       rootNode,
       author,
       typeFilters,
+      refsByRow,
       options
     );
     const row = {
@@ -1300,6 +1798,7 @@ function getNodesInRows(
       rootNode,
       author,
       typeFilters,
+      refsByRow,
       options
     );
   }, emptyTreeResult(ctx));
@@ -1325,6 +1824,10 @@ export function getNodesInTree(
     .map((path) => resolveRowForPath(data, graph, path, undefined, options))
     .filter((row): row is Row => row !== undefined)
     .toList();
+  const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
+  const refsByRow = activeFilters.includes("incoming")
+    ? relatedSourceRefsByRow(data, graph, rootRows)
+    : Map<string, List<NodeRef>>();
   return {
     rows: reindexRows(
       getNodesInRows(
@@ -1335,6 +1838,7 @@ export function getNodesInTree(
         rootNode,
         author,
         typeFilters,
+        refsByRow,
         options
       ).rows
     ),
@@ -1359,6 +1863,9 @@ export function getNodesInDocument(
     .filter((row): row is Row => row !== undefined)
     .toList();
   const topNodes = topRows.map((row) => row.node);
+  const refsByRow = activeFilters.includes("incoming")
+    ? relatedSourceRefsByRow(data, graph, topRows)
+    : Map<string, List<NodeRef>>();
   const treeResult = {
     rows: reindexRows(
       getNodesInRows(
@@ -1368,7 +1875,8 @@ export function getNodesInDocument(
         List<Row>(),
         undefined,
         document.sourceId,
-        activeFilters
+        activeFilters,
+        refsByRow
       ).rows
     ),
   };
@@ -1410,6 +1918,7 @@ export function getNodesInDocument(
       snapshotId: string;
       baselineNodeId: ID;
     }>(),
+    relatedSourceRefs: List<NodeRef>(),
   });
   const secondTopRow = topRows.get(1);
   const footerIndex = secondTopRow

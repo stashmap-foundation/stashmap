@@ -785,6 +785,7 @@ function getItemPrefix(innerNode: Element | null, isRef: boolean): string {
   if (virtualType === "version") return isOtherUser ? "[VO] " : "[V] ";
   const typeCharMap: Record<string, string> = {
     incoming: "I",
+    "related-source": "↝",
   };
   const typeChar = typeCharMap[virtualType ?? ""] ?? (isRef ? "R" : "");
   if (isOtherUser && typeChar) return `[O${typeChar}] `;

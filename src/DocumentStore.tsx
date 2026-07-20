@@ -10,6 +10,7 @@ import {
 } from "./infra/snapshotStore";
 import {
   addNodesToGraphIndex,
+  buildGraphIndexFromDocuments,
   createEmptyGraphIndex,
   removeNodesFromGraphIndex,
 } from "./graphIndex";
@@ -19,6 +20,7 @@ import {
   DocumentDelete,
   ParsedDocument,
   documentKeyOf,
+  withRealWorldEntitiesForDocuments,
 } from "./core/Document";
 import { newDB } from "./core/knowledge";
 
@@ -55,14 +57,80 @@ const DocumentStoreContext = React.createContext<
   DocumentStoreState | undefined
 >(undefined);
 
-function createEmptySnapshot(): DocumentSnapshot {
+function withRealWorldEntities(snapshot: DocumentSnapshot): DocumentSnapshot {
+  const derived = withRealWorldEntitiesForDocuments(
+    snapshot.knowledgeDBs,
+    snapshot.documents,
+    snapshot.documentByFilePath
+  );
   return {
-    documents: ImmutableMap<string, Document>(),
-    documentByFilePath: ImmutableMap<string, Document>(),
-    deletes: ImmutableMap<string, DocumentDelete>(),
-    knowledgeDBs: ImmutableMap<SourceId, KnowledgeData>(),
-    graphIndex: createEmptyGraphIndex(),
+    ...snapshot,
+    documents: derived.documents,
+    documentByFilePath: derived.documentByFilePath,
   };
+}
+
+function createInitialSnapshot(
+  records: ReadonlyArray<ParsedDocument>
+): DocumentSnapshot {
+  const documents = ImmutableMap<string, Document>(
+    records.map((parsed) => [
+      documentKeyOf(parsed.document.sourceId, parsed.document.docId),
+      parsed.document,
+    ])
+  );
+  const documentByFilePath = records.reduce(
+    (acc, parsed) =>
+      parsed.document.filePath
+        ? acc.set(parsed.document.filePath, parsed.document)
+        : acc,
+    ImmutableMap<string, Document>()
+  );
+  const nodesByDocumentKey = ImmutableMap<
+    string,
+    ImmutableMap<string, GraphNode>
+  >(
+    records.map((parsed) => [
+      documentKeyOf(parsed.document.sourceId, parsed.document.docId),
+      parsed.nodes,
+    ])
+  );
+  const filePathByDocumentKey = ImmutableMap<string, string>(
+    records.flatMap((parsed): [string, string][] =>
+      parsed.document.filePath
+        ? [
+            [
+              documentKeyOf(parsed.document.sourceId, parsed.document.docId),
+              parsed.document.filePath,
+            ],
+          ]
+        : []
+    )
+  );
+  const sourceIdByDocumentKey = ImmutableMap<string, SourceId>(
+    records.map((parsed) => [
+      documentKeyOf(parsed.document.sourceId, parsed.document.docId),
+      parsed.document.sourceId,
+    ])
+  );
+  const knowledgeDBs = records.reduce((acc, parsed) => {
+    const db = acc.get(parsed.document.sourceId) ?? newDB();
+    return acc.set(parsed.document.sourceId, {
+      ...db,
+      nodes: db.nodes.merge(parsed.nodes),
+    });
+  }, ImmutableMap<SourceId, KnowledgeData>());
+  return withRealWorldEntities({
+    documents,
+    documentByFilePath,
+    deletes: ImmutableMap<string, DocumentDelete>(),
+    knowledgeDBs,
+    graphIndex: buildGraphIndexFromDocuments(
+      nodesByDocumentKey,
+      filePathByDocumentKey,
+      sourceIdByDocumentKey
+    ),
+  });
 }
 
 function nodesForDocument(
@@ -230,10 +298,13 @@ function applyRecordsToSnapshot(
     (acc, parsed) => applyDocumentToSnapshot(acc, parsed),
     snapshot
   );
-  return deletes.reduce(
+  const withDeletes = deletes.reduce(
     (acc, deletion) => applyDeleteToSnapshot(acc, deletion),
     withDocuments
   );
+  return records.length > 0 || deletes.length > 0
+    ? withRealWorldEntities(withDeletes)
+    : withDeletes;
 }
 
 function parsedWithSource(
@@ -285,7 +356,7 @@ export function DocumentStoreProvider({
   initialSnapshots?: ReadonlyArray<SnapshotContent>;
 }): JSX.Element {
   const [snapshot, setSnapshot] = React.useState<DocumentSnapshot>(() =>
-    applyRecordsToSnapshot(createEmptySnapshot(), initialDocuments, [])
+    createInitialSnapshot(initialDocuments)
   );
   const [snapshotNodes, setSnapshotNodes] = React.useState<SnapshotNodes>(() =>
     ImmutableMap(

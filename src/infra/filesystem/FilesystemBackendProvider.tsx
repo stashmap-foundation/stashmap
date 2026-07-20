@@ -31,6 +31,7 @@ export type WorkspaceIpc = {
     deletedPaths?: ReadonlyArray<string>
   ) => Promise<{ changed_paths: string[]; removed_paths: string[] }>;
   ready?: () => Promise<void>;
+  loadSnapshots: () => Promise<ReadonlyArray<WorkspaceSnapshotFile>>;
   subscribeFsEvents: (handler: FsEventHandler) => () => void;
 };
 
@@ -66,12 +67,12 @@ export function FilesystemBackendProvider({
 
   useEffect(() => {
     const controller = new AbortController();
-    ipc.load().then(async (data) => {
-      if (data) {
-        await ipc.ready?.();
-      }
+    ipc.load().then((data) => {
       if (!controller.signal.aborted) {
         setState({ status: "loaded", data });
+      }
+      if (data && ipc.ready) {
+        ipc.ready().catch(() => undefined);
       }
     });
     return () => controller.abort();
@@ -113,6 +114,7 @@ export function FilesystemBackendProvider({
         refresh();
       },
       save: (writes, deletedPaths) => ipc.save(writes, deletedPaths),
+      loadSnapshots: () => ipc.loadSnapshots(),
       subscribeFsEvents: (handler) => ipc.subscribeFsEvents(handler),
     };
     return {

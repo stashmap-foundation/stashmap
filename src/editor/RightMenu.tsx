@@ -50,7 +50,8 @@ export function RightMenu(): JSX.Element {
   const isVirtualItem =
     virtualType === "suggestion" ||
     virtualType === "incoming" ||
-    virtualType === "version";
+    virtualType === "version" ||
+    virtualType === "related-source";
   const isRoot = useIsRoot();
   const pane = useCurrentPane();
   const currentNode = useCurrentNode();

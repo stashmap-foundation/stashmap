@@ -1,6 +1,7 @@
 import React from "react";
 import { List, Map as ImmutableMap } from "immutable";
 import { LOCAL, nodeRefKey } from "../core/nodeRef";
+import { isCanonicalId } from "../core/entityRecognition";
 import {
   ViewPath,
   useSearchDepth,
@@ -40,11 +41,8 @@ import {
   isCalendarEntryPlacement,
 } from "../core/ical";
 import { useCalendarFeeds } from "../CalendarFeedContext";
-import {
-  inlineLinkToHref,
-  isDeadLinkTarget,
-  resolveDocumentTarget,
-} from "./linkOperations";
+import { resolveDocumentTarget } from "../core/Document";
+import { inlineLinkToHref, isDeadLinkTarget } from "./linkOperations";
 import { IncomingPart, ReferenceDisplay } from "./referenceDisplay";
 import { MiniEditor, ReciprocalLink, preventEditorBlur } from "./AddNode";
 import { linkStyleForHref } from "./editorDom";
@@ -72,18 +70,18 @@ import { parsedLinesToTrees, planPasteMarkdownTrees } from "./FileDropZone";
 import { planDisconnectFromParent } from "../treeMutations";
 import { useNodeIsLoading } from "../LoadingStatus";
 import { NodeCard } from "../commons/Ui";
+import { buildNodeRouteUrl } from "../navigationUrl";
 import { usePaneIndex, useNavigatePane } from "../SplitPanesContext";
 import { RightMenu, usePublishedPaneDocument } from "./RightMenu";
-import {
-  documentEntityTags,
-  unpublishedLinkTargetForHref,
-} from "./publishReach";
+import { OpenInSplitPaneButton } from "./OpenInSplitPaneButton";
+import { unpublishedLinkTargetForHref } from "./publishReach";
 import { useItemStyle } from "./useItemStyle";
 import { EditorTextProvider } from "./EditorTextContext";
 import {
   ResolvedNode,
   getNodeInSource,
   graphLookupFromData,
+  lookupNode,
 } from "../core/graphLookup";
 import { findReciprocalLinkItem } from "../buildReferenceRow";
 
@@ -184,6 +182,32 @@ function PastDatesActionRow(): JSX.Element {
       onMouseDown={preventEditorBlur}
       aria-label={label}
       aria-pressed={showPast}
+    >
+      {label}
+    </button>
+  );
+}
+
+function MoreRelatedSourcesActionRow(): JSX.Element | null {
+  const row = useRow();
+  const navigatePane = useNavigatePane();
+  if (!row.parentRef || !row.parentNode) {
+    return null;
+  }
+  const label = "Open to see more related sources";
+  const href = buildNodeRouteUrl(row.parentNode.id, row.parentRef.sourceId, {
+    scrollToId: undefined,
+    fallbackLabel: isCanonicalId(row.parentNode.id)
+      ? spansText(row.parentNode.spans)
+      : undefined,
+  });
+  return (
+    <button
+      type="button"
+      className="action-row-btn"
+      onClick={() => navigatePane(href)}
+      onMouseDown={preventEditorBlur}
+      aria-label={label}
     >
       {label}
     </button>
@@ -336,20 +360,8 @@ function LinkReachChip({
   if (!paneDocument || !target) return null;
   const grant = (): void => {
     const paneState = publishStateOf(paneDocument.frontMatter);
-    const targetState = publishStateOf(target.frontMatter);
     executePlan(
       planSetDocumentPublishState(createPlan(), target.docId, {
-        entities: [
-          ...new Set([
-            ...(targetState?.entities ?? []),
-            ...documentEntityTags(
-              data.knowledgeDBs,
-              data.documents,
-              data.documentByFilePath,
-              target
-            ),
-          ]),
-        ],
         relays: paneState?.relays,
         paused: false,
       })
@@ -383,7 +395,7 @@ function reciprocalTarget(
     targetClass === "node" ||
     targetClass === "calendar"
   ) {
-    return getNodeInSource(graph, { sourceId, id: href.slice(1) });
+    return lookupNode(graph, href.slice(1), sourceId);
   }
   if (!isFileLinkHref(href)) {
     return undefined;
@@ -1204,6 +1216,18 @@ function IncomingRefGutterIndicator(): JSX.Element {
   );
 }
 
+function RelatedSourceIndicator(): JSX.Element {
+  return (
+    <span
+      className="related-source-indicator"
+      title="Related source — judge it (! ? ~ + -) to link it here"
+      aria-hidden="true"
+    >
+      ↝
+    </span>
+  );
+}
+
 function VersionIndicator({
   isOtherUser,
 }: {
@@ -1252,9 +1276,13 @@ export function Node({
   })();
   const isViewingOtherUser = useIsViewingOtherUserContent();
   const node = row.reference;
-  const isOtherUser = (node && node.sourceId !== LOCAL) || isViewingOtherUser;
-
   const isVersion = virtualType === "version";
+  const isRelatedSource = virtualType === "related-source";
+  const isOtherUser =
+    (node && node.sourceId !== LOCAL) ||
+    isViewingOtherUser ||
+    (isRelatedSource && row.sourceId !== LOCAL);
+
   const isSuggestionWithChildren = isSuggestion && !!currentNode;
   const showExpandCollapse =
     (!isSuggestion && !isVersion) || isSuggestionWithChildren;
@@ -1262,7 +1290,7 @@ export function Node({
 
   const contentClass = isSuggestion ? "content-suggestion" : "";
 
-  if (row.action === "toggle-past-entries") {
+  if (row.action) {
     // Footer-row dress: gutter mark, marker, node-size text — laid out by
     // the ordinary row grid so it aligns by construction. The ellipsis is
     // the honest glyph: content elided here.
@@ -1284,7 +1312,18 @@ export function Node({
           data-testid="node-marker"
         />
         <div className="w-100 node-content-wrapper">
-          <PastDatesActionRow />
+          {row.action === "toggle-past-entries" ? (
+            <PastDatesActionRow />
+          ) : (
+            <MoreRelatedSourcesActionRow />
+          )}
+        </div>
+        <div className="right-menu">
+          <div className="relevance-slot" />
+          <div className="evidence-slot" />
+          <div className="action-slot">
+            {row.action === "open-related-sources" && <OpenInSplitPaneButton />}
+          </div>
         </div>
       </NodeCard>
     );
@@ -1304,6 +1343,7 @@ export function Node({
           {isSuggestion && <SuggestionIndicator />}
           {isVersion && <VersionIndicator isOtherUser={!!isOtherUser} />}
           {virtualType === "incoming" && <IncomingRefGutterIndicator />}
+          {isRelatedSource && <RelatedSourceIndicator />}
           {relevance === "relevant" && !isSuggestion && (
             <span
               className="relevant-indicator"

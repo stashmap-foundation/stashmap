@@ -2,6 +2,7 @@ import { List, Set } from "immutable";
 import { displayTextOf } from "./core/ical";
 import { nodeText } from "./core/nodeSpans";
 import { getDocumentForNode } from "./core/Document";
+import { isCanonicalId } from "./core/entityRecognition";
 import { fileLinkIndexKey } from "./core/linkPath";
 import { nodeRefKey } from "./core/nodeRef";
 import { referenceToText } from "./editor/referenceText";
@@ -92,12 +93,25 @@ function sameRef(left: NodeRef, right: NodeRef): boolean {
   return left.id === right.id && left.sourceId === right.sourceId;
 }
 
-function incomingGraphRefs(data: Data, target: ResolvedNode): NodeRef[] {
-  return (
-    data.graphIndex.incomingCrefsByTarget.get(nodeRefKey(target.ref)) ??
-    data.graphIndex.incomingCrefs.get(target.node.id) ??
+function uniqueRefs(refs: readonly NodeRef[]): NodeRef[] {
+  return refs.reduce<NodeRef[]>(
+    (acc, ref) =>
+      acc.some((candidate) => sameRef(candidate, ref)) ? acc : [...acc, ref],
     []
   );
+}
+
+function incomingGraphRefs(data: Data, target: ResolvedNode): NodeRef[] {
+  const exact =
+    data.graphIndex.incomingCrefsByTarget.get(nodeRefKey(target.ref)) ?? [];
+  const unscoped = data.graphIndex.incomingCrefs.get(target.node.id) ?? [];
+  if (isCanonicalId(target.node.id)) {
+    return uniqueRefs([...exact, ...unscoped]);
+  }
+  if (exact.length > 0) {
+    return exact;
+  }
+  return unscoped;
 }
 
 function incomingFileRefs(data: Data, target: ResolvedNode): NodeRef[] {
@@ -136,8 +150,7 @@ export function findReciprocalLinkItem(
 ): GraphNode | undefined {
   const source = linkSpeaker(graph, sourceOccurrence);
   const refs = [
-    ...(data.graphIndex.incomingCrefsByTarget.get(nodeRefKey(source.ref)) ??
-      []),
+    ...incomingGraphRefs(data, source),
     ...incomingFileRefs(data, source),
   ];
   return refs

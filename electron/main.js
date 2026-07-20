@@ -96,7 +96,6 @@ function readProfilePrivateKey(profile) {
 async function loadProfileAndEvents(profile) {
   const runtime = await getWorkspaceRuntime(profile.workspaceDir);
   const loaded = await runtime.load();
-  await runtime.ready();
   return {
     profile: loaded.profile,
     files: loaded.files,
@@ -328,6 +327,22 @@ app.whenReady().then(() => {
     return response.text();
   });
   ipcMain.handle("workspace:load", async () => loadCurrentWorkspace());
+  ipcMain.handle("workspace:loadSnapshots", async () => {
+    const envArgs = envCliProfileArgs();
+    const pruned = recentWorkspaces.listAndPrune();
+    const autoOpenId = pickAutoOpenId(pruned);
+    const autoOpenEntry = autoOpenId ? pruned.workspaces[autoOpenId] : undefined;
+    const profile = envArgs
+      ? loadCliProfile(envArgs)
+      : autoOpenEntry
+        ? loadCliProfile({ cwd: autoOpenEntry.path })
+        : null;
+    if (!profile) {
+      return [];
+    }
+    const runtime = await getWorkspaceRuntime(profile.workspaceDir);
+    return runtime.loadSnapshots();
+  });
   ipcMain.handle("workspace:pickFolder", async () => pickWorkspaceFolder());
   ipcMain.handle("workspace:isInitialised", async (_event, folder) =>
     isInitialisedFolder(folder)

@@ -1,11 +1,13 @@
 import fs from "fs/promises";
 import path from "path";
-import { Map as ImmutableMap } from "immutable";
+import { List, Map as ImmutableMap } from "immutable";
 import ignore, { Ignore } from "ignore";
 import { LOCAL } from "../../core/nodeRef";
 import {
   Document,
+  documentKeyOf,
   parseToDocumentPreservingExplicitIds,
+  withRealWorldEntitiesForDocuments,
 } from "../../core/Document";
 import { WalkContext } from "../../core/markdownNodes";
 import { MarkdownTreeNode, parseMarkdown } from "../../core/markdownTree";
@@ -56,32 +58,28 @@ async function collectMarkdownFiles(
     .slice()
     .sort((left, right) => left.name.localeCompare(right.name));
 
-  return sortedEntries.reduce(async (previous, entry) => {
-    const acc = await previous;
-    const nextRelativePath = path.join(relativeDir, entry.name);
+  const nested = await Promise.all(
+    sortedEntries.map(async (entry) => {
+      const nextRelativePath = path.join(relativeDir, entry.name);
 
-    if (entry.isDirectory()) {
-      if (ig.ignores(`${nextRelativePath}/`)) {
-        return acc;
+      if (entry.isDirectory()) {
+        return ig.ignores(`${nextRelativePath}/`)
+          ? []
+          : collectMarkdownFiles(workspaceDir, ig, nextRelativePath);
       }
-      const nestedFiles = await collectMarkdownFiles(
-        workspaceDir,
-        ig,
-        nextRelativePath
-      );
-      return [...acc, ...nestedFiles];
-    }
 
-    if (!entry.isFile() || !entry.name.endsWith(".md")) {
-      return acc;
-    }
+      if (
+        !entry.isFile() ||
+        !entry.name.endsWith(".md") ||
+        ig.ignores(nextRelativePath)
+      ) {
+        return [];
+      }
 
-    if (ig.ignores(nextRelativePath)) {
-      return acc;
-    }
-
-    return [...acc, path.join(workspaceDir, nextRelativePath)];
-  }, Promise.resolve([] as string[]));
+      return [path.join(workspaceDir, nextRelativePath)];
+    })
+  );
+  return nested.flat();
 }
 
 export async function collectWorkspaceMarkdownFiles(
@@ -180,7 +178,7 @@ function checkSnapshotIds(
 }
 
 type ScanAcc = {
-  documents: ScannedWorkspaceDocument[];
+  documents: List<ScannedWorkspaceDocument>;
   context: WalkContext | undefined;
 };
 
@@ -237,16 +235,40 @@ export async function scanWorkspaceDocuments(
     (acc, file) => {
       const { scanned, context } = parseFile(file, acc.context);
       return {
-        documents: [...acc.documents, scanned],
+        documents: acc.documents.push(scanned),
         context,
       };
     },
-    { documents: [], context: undefined }
+    { documents: List<ScannedWorkspaceDocument>(), context: undefined }
   );
+  const scannedDocuments = final.documents.toArray();
 
-  checkDuplicateDocIds(final.documents);
+  checkDuplicateDocIds(scannedDocuments);
 
   const knowledgeDBs =
     final.context?.knowledgeDBs ?? ImmutableMap<SourceId, KnowledgeData>();
-  return { documents: final.documents, knowledgeDBs };
+  const documents = ImmutableMap<string, Document>(
+    scannedDocuments.map((document) => [
+      documentKeyOf(document.sourceId, document.docId),
+      document,
+    ])
+  );
+  const documentByFilePath = scannedDocuments.reduce(
+    (acc, document) => acc.set(document.filePath, document),
+    ImmutableMap<string, Document>()
+  );
+  const derived = withRealWorldEntitiesForDocuments(
+    knowledgeDBs,
+    documents,
+    documentByFilePath
+  );
+  return {
+    documents: scannedDocuments.map((document) => ({
+      ...document,
+      realWorldEntities:
+        derived.documents.get(documentKeyOf(document.sourceId, document.docId))
+          ?.realWorldEntities ?? [],
+    })),
+    knowledgeDBs,
+  };
 }

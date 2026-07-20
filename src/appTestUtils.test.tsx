@@ -1,5 +1,5 @@
 import React from "react";
-import { RenderResult, screen } from "@testing-library/react";
+import { RenderResult, within } from "@testing-library/react";
 import { nip19 } from "nostr-tools";
 import { FilesystemBackendProvider } from "./infra/filesystem/FilesystemBackendProvider";
 import { FilesystemDataProvider } from "./infra/filesystem/FilesystemDataProvider";
@@ -93,13 +93,14 @@ export async function renderAppTree(
     }
   );
 
+  const app = within(utils.container);
   if (path === undefined) {
-    await screen.findByLabelText("Open Folder as Workspace");
+    await app.findByLabelText("Open Folder as Workspace");
     return { ...utils, ipc, relayPool };
   }
 
   const profile = loadCliProfile({ cwd: path });
-  await screen.findByLabelText("Search to change pane 0 content");
+  await app.findByLabelText("Search to change pane 0 content");
   if (options.search) {
     await navigateToNodeViaSearch(0, options.search, {
       waitForFullscreen: true,

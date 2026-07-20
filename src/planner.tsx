@@ -11,12 +11,17 @@ import {
 } from "./nostr";
 import { useData } from "./DataContext";
 import { useExecutor } from "./ExecutorContext";
-import { Document as KnowstrDocument, documentKeyOf } from "./core/Document";
+import {
+  Document as KnowstrDocument,
+  documentKeyOf,
+  withDocumentRealWorldEntities,
+} from "./core/Document";
 import { renderDocumentMarkdown } from "./documentRenderer";
 import {
   buildDepositEvent,
   buildDocumentEvent,
   buildSnapshotEvent,
+  depositEntityTags,
   depositWriteRelayConf,
   snapshotIdForContent,
 } from "./nodesDocumentEvent";
@@ -766,10 +771,16 @@ export function buildDocumentWrites(plan: GraphPlan): {
   snapshotContents: string[];
 }[] {
   return plan.affectedDocuments.toArray().flatMap((docId) => {
-    const document = plan.documents.get(documentKeyOf(LOCAL, docId));
-    if (!document) {
+    const rawDocument = plan.documents.get(documentKeyOf(LOCAL, docId));
+    if (!rawDocument) {
       return [];
     }
+    const document = withDocumentRealWorldEntities(
+      plan.knowledgeDBs,
+      plan.documents,
+      plan.documentByFilePath,
+      rawDocument
+    );
     const topNodes = document.topNodeShortIds
       .map((topNodeShortId) =>
         plan.knowledgeDBs.get(LOCAL)?.nodes.get(topNodeShortId)
@@ -831,15 +842,18 @@ function depositEventFor(
   write: { document: KnowstrDocument; content: string }
 ): (UnsignedEvent & EventAttachment) | undefined {
   const publishState = publishStateOf(write.document.frontMatter);
-  return publishState && !publishState.paused
-    ? ({
-        ...buildDepositEvent(write.document, pubkey, write.content),
-        writeRelayConf: depositWriteRelayConf(
-          write.document,
-          plan.relays.userRelays
-        ),
-      } as UnsignedEvent & EventAttachment)
-    : undefined;
+  if (!publishState || publishState.paused) {
+    return undefined;
+  }
+  const tags = depositEntityTags(write.document);
+  return {
+    ...buildDepositEvent(write.document, pubkey, write.content, tags),
+    writeRelayConf: depositWriteRelayConf(
+      write.document,
+      plan.relays.userRelays,
+      tags
+    ),
+  } as UnsignedEvent & EventAttachment;
 }
 
 export function buildDepositEvents(
@@ -872,9 +886,17 @@ export function planRetractDocument<T extends GraphPlan>(
     return plan;
   }
   const pubkey = plan.user.publicKey;
+  const documentWithTags = withDocumentRealWorldEntities(
+    plan.knowledgeDBs,
+    plan.documents,
+    plan.documentByFilePath,
+    document
+  );
+  const tags = depositEntityTags(documentWithTags);
   const writeRelayConf = depositWriteRelayConf(
     document,
-    plan.relays.userRelays
+    plan.relays.userRelays,
+    tags
   );
   const retraction = {
     kind: KIND_DELETE,

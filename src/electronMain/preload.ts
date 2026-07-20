@@ -5,6 +5,7 @@ import type { FsEvent } from "../infra/filesystem/workspaceWatcher";
 
 const workspace: IpcChannel = {
   load: () => ipcRenderer.invoke("workspace:load"),
+  loadSnapshots: () => ipcRenderer.invoke("workspace:loadSnapshots"),
   pickFolder: () => ipcRenderer.invoke("workspace:pickFolder"),
   open: (folder) => ipcRenderer.invoke("workspace:open", folder),
   create: (args) => ipcRenderer.invoke("workspace:create", args),

@@ -26,6 +26,7 @@ export type WorkspaceRuntimeLoaded = {
 export type WorkspaceRuntime = {
   load: () => Promise<WorkspaceRuntimeLoaded>;
   ready: () => Promise<void>;
+  loadSnapshots: () => Promise<ReadonlyArray<WorkspaceSnapshotFile>>;
   save: (
     writes: ReadonlyArray<WorkspaceWriteRequest>,
     deletedPaths?: ReadonlyArray<string>
@@ -136,11 +137,8 @@ export function createWorkspaceRuntime(workspaceDir: string): WorkspaceRuntime {
       const files = await loadWorkspaceFiles({
         workspaceDir: profile.workspaceDir,
       });
-      const snapshots = await loadWorkspaceSnapshots({
-        workspaceDir: profile.workspaceDir,
-      });
       ensureWatcher();
-      return { profile, files: [...files], snapshots: [...snapshots] };
+      return { profile, files: [...files], snapshots: [] };
     },
     ready: async () => {
       ensureWatcher();
@@ -150,6 +148,13 @@ export function createWorkspaceRuntime(workspaceDir: string): WorkspaceRuntime {
       const instance = await state.watcher;
       await instance.ready;
       logWorkspaceRuntimeDebug("ready", { workspaceDir });
+    },
+    loadSnapshots: async () => {
+      const profile = loadCliProfile({ cwd: workspaceDir });
+      const snapshots = await loadWorkspaceSnapshots({
+        workspaceDir: profile.workspaceDir,
+      });
+      return [...snapshots];
     },
     save: async (documents, deletedPaths = []) => {
       const profile = loadCliProfile({ cwd: workspaceDir });

@@ -553,29 +553,6 @@ function addContextTags(
   return [...merged.entries()].map(([tag, value]) => ({ tag, weight: value }));
 }
 
-function relatedContextScore(
-  context: RelatedSourceContext,
-  sourceTags: readonly string[]
-): RelatedSourcePlacement {
-  const sourceTagSet = new globalThis.Set(sourceTags);
-  const overlapTags = context.weightedTags
-    .filter((weight) => sourceTagSet.has(weight.tag))
-    .map((weight) => weight.tag)
-    .sort();
-  const sourceWidth = sourceTags.length === 0 ? 1 : sourceTags.length;
-  const score =
-    context.weightedTags
-      .filter((weight) => sourceTagSet.has(weight.tag))
-      .reduce((sum, weight) => sum + weight.weight, 0) +
-    overlapTags.length / sourceWidth;
-  return {
-    sourceId: "",
-    targetRef: context.targetRef,
-    score,
-    overlapTags,
-  };
-}
-
 function visibleRelatedContextResultForNode(
   data: Data,
   graph: GraphLookup,
@@ -827,6 +804,69 @@ function compareRelatedCandidatePlacement(
   );
 }
 
+function relatedContextEntriesByTag(
+  contexts: readonly RelatedSourceContext[]
+): globalThis.Map<string, { context: RelatedSourceContext; weight: number }[]> {
+  return contexts.reduce(
+    (acc, context) =>
+      context.weightedTags.reduce((tagAcc, tagWeight) => {
+        const entries = tagAcc.get(tagWeight.tag) ?? [];
+        return tagAcc.set(tagWeight.tag, [
+          ...entries,
+          { context, weight: tagWeight.weight },
+        ]);
+      }, acc),
+    new globalThis.Map<
+      string,
+      { context: RelatedSourceContext; weight: number }[]
+    >()
+  );
+}
+
+function relatedSourcePlacementsForCandidate(
+  entriesByTag: globalThis.Map<
+    string,
+    { context: RelatedSourceContext; weight: number }[]
+  >,
+  candidate: RelatedSourceCandidate
+): {
+  candidate: RelatedSourceCandidate;
+  placement: RelatedSourcePlacement;
+}[] {
+  const sourceWidth = candidate.sTags.length || 1;
+  const hits = candidate.sTags.reduce(
+    (candidateAcc, tag) =>
+      (entriesByTag.get(tag) ?? []).reduce((entryAcc, entry) => {
+        const key = nodeRefKey(entry.context.targetRef);
+        const existing = entryAcc.get(key);
+        return entryAcc.set(key, {
+          context: entry.context,
+          score: (existing?.score ?? 0) + entry.weight,
+          overlapCount: (existing?.overlapCount ?? 0) + 1,
+        });
+      }, candidateAcc),
+    new globalThis.Map<
+      string,
+      {
+        context: RelatedSourceContext;
+        score: number;
+        overlapCount: number;
+      }
+    >()
+  );
+  return [...hits.values()]
+    .filter((hit) => hit.overlapCount >= RELATED_SOURCE_MIN_OVERLAP)
+    .map((hit) => ({
+      candidate,
+      placement: {
+        sourceId: candidate.rootRef.sourceId,
+        targetRef: hit.context.targetRef,
+        score: hit.score + hit.overlapCount / sourceWidth,
+        overlapTags: new Array(hit.overlapCount).fill(""),
+      },
+    }));
+}
+
 function relatedSourceRefsByRow(
   data: Data,
   graph: GraphLookup,
@@ -840,23 +880,13 @@ function relatedSourceRefsByRow(
   const contexts = localRows
     .toArray()
     .flatMap((row) => visibleRelatedContextsForRow(data, graph, row));
+  const entriesByTag = relatedContextEntriesByTag(contexts);
   const candidates = [
     ...pulledRelatedSourceCandidates(data, graph, pane),
     ...localRelatedSourceCandidates(data, graph, localRows),
   ];
   const placements = candidates.flatMap((candidate) =>
-    contexts
-      .map((context) => ({
-        candidate,
-        placement: {
-          ...relatedContextScore(context, candidate.sTags),
-          sourceId: candidate.rootRef.sourceId,
-        },
-      }))
-      .filter(
-        ({ placement }) =>
-          placement.overlapTags.length >= RELATED_SOURCE_MIN_OVERLAP
-      )
+    relatedSourcePlacementsForCandidate(entriesByTag, candidate)
   );
   const grouped = placements.reduce(
     (acc, placement) => {

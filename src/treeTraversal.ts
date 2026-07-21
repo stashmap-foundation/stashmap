@@ -576,19 +576,7 @@ function relatedContextScore(
   };
 }
 
-function compareRelatedPlacement(
-  left: RelatedSourcePlacement,
-  right: RelatedSourcePlacement
-): number {
-  return (
-    right.score - left.score ||
-    right.overlapTags.length - left.overlapTags.length ||
-    left.targetRef.id.localeCompare(right.targetRef.id) ||
-    left.targetRef.sourceId.localeCompare(right.targetRef.sourceId)
-  );
-}
-
-function visibleRelatedContextsForNode(
+function visibleRelatedContextResultForNode(
   data: Data,
   graph: GraphLookup,
   node: GraphNode,
@@ -597,31 +585,18 @@ function visibleRelatedContextsForNode(
   rootIds: ReadonlySet<ID>,
   pathRefs: readonly NodeRef[],
   weights: readonly RelatedSourceTagWeight[]
-): RelatedSourceContext[] {
+): { contexts: RelatedSourceContext[]; subtreeTags: string[] } {
   const ref = { sourceId, id: node.id };
+  const ownTags = nodeRelatedTags(data, node, sourceId, rootIds);
   const nextPathRefs = [...pathRefs, ref];
-  const nextWeights = addContextTags(
-    weights,
-    nodeRelatedTags(data, node, sourceId, rootIds),
-    nextPathRefs.length
-  );
-  const context = {
-    targetRef: ref,
-    pathRefs: nextPathRefs,
-    weightedTags: nextWeights,
-  };
-  const view = getViewForNode(data, viewPath, node.id);
-  if (!view.expanded) {
-    return [context];
-  }
-  return [
-    context,
-    ...node.children.toArray().flatMap((childId, index) => {
-      const child = getNodeInSource(graph, { sourceId, id: childId })?.node;
-      if (!child) {
-        return [];
-      }
-      return visibleRelatedContextsForNode(
+  const nextWeights = addContextTags(weights, ownTags, nextPathRefs.length);
+  const childResults = node.children.toArray().flatMap((childId, index) => {
+    const child = getNodeInSource(graph, { sourceId, id: childId })?.node;
+    if (!child) {
+      return [];
+    }
+    return [
+      visibleRelatedContextResultForNode(
         data,
         graph,
         child,
@@ -630,9 +605,28 @@ function visibleRelatedContextsForNode(
         rootIds,
         nextPathRefs,
         nextWeights
-      );
-    }),
-  ];
+      ),
+    ];
+  });
+  const subtreeTags = [
+    ...ownTags,
+    ...childResults.flatMap((childResult) => childResult.subtreeTags),
+  ].sort();
+  const context = {
+    targetRef: ref,
+    pathRefs: nextPathRefs,
+    weightedTags: addContextTags(nextWeights, subtreeTags, 1),
+  };
+  const view = getViewForNode(data, viewPath, node.id);
+  return {
+    contexts: view.expanded
+      ? [
+          context,
+          ...childResults.flatMap((childResult) => childResult.contexts),
+        ]
+      : [context],
+    subtreeTags,
+  };
 }
 
 function visibleRelatedContextsForRow(
@@ -653,7 +647,7 @@ function visibleRelatedContextsForRow(
   }
   const topPath: ViewPath = [row.viewPath[0], topId];
   const rootIds = new globalThis.Set<ID>([top.root ?? top.id]);
-  return visibleRelatedContextsForNode(
+  return visibleRelatedContextResultForNode(
     data,
     graph,
     top,
@@ -662,7 +656,7 @@ function visibleRelatedContextsForRow(
     rootIds,
     [],
     []
-  );
+  ).contexts;
 }
 
 function sourceRootRef(
@@ -850,22 +844,20 @@ function relatedSourceRefsByRow(
     ...pulledRelatedSourceCandidates(data, graph, pane),
     ...localRelatedSourceCandidates(data, graph, localRows),
   ];
-  const placements = candidates.flatMap((candidate) => {
-    const matchingPlacements = contexts
+  const placements = candidates.flatMap((candidate) =>
+    contexts
       .map((context) => ({
-        ...relatedContextScore(context, candidate.sTags),
-        sourceId: candidate.rootRef.sourceId,
+        candidate,
+        placement: {
+          ...relatedContextScore(context, candidate.sTags),
+          sourceId: candidate.rootRef.sourceId,
+        },
       }))
       .filter(
-        (placement) =>
+        ({ placement }) =>
           placement.overlapTags.length >= RELATED_SOURCE_MIN_OVERLAP
-      );
-    if (candidate.rootRef.sourceId === LOCAL) {
-      return matchingPlacements.map((placement) => ({ candidate, placement }));
-    }
-    const best = matchingPlacements.slice().sort(compareRelatedPlacement)[0];
-    return best ? [{ candidate, placement: best }] : [];
-  });
+      )
+  );
   const grouped = placements.reduce(
     (acc, placement) => {
       const key = nodeRefKey(placement.placement.targetRef);

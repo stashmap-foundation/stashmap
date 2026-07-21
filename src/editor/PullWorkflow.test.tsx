@@ -211,6 +211,42 @@ async function relatedSourceWorkspace(): Promise<string> {
   return workspacePath;
 }
 
+function salonabendSource(): string {
+  return [
+    "---",
+    "knowstr_doc_id: salonabend-doc",
+    "---",
+    "# Salonabend: Wirtschaftsrechnung im Sozialismus <!-- id:salonabend-root -->",
+    "",
+    "- Warum [Mises](#wd:Q84233) 1920 behauptet: ohne Preise kein Kalkül <!-- id:salonabend-mises -->",
+    "- Danach: [Hayek](#wd:Q1325) und das Wissensproblem — Kalkül braucht Wissen, das niemand hat <!-- id:salonabend-hayek -->",
+    "- Lektüre vorab: Die Gemeinwirtschaft, Zweiter Teil <!-- id:salonabend-lektuere -->",
+    "- Donnerstag, 19 Uhr, [Wien](#wd:Q1741) <!-- id:salonabend-wien -->",
+    "",
+  ].join("\n");
+}
+
+function lesenotizSource(): string {
+  return [
+    "---",
+    "knowstr_doc_id: lesenotiz-doc",
+    "---",
+    "# Lesenotiz: Die Gemeinwirtschaft <!-- id:lesenotiz-root -->",
+    "",
+    "- [Mises](#wd:Q84233) trennt Eigentum an Konsumgütern von Eigentum an Produktionsmitteln — der Streit beginnt erst bei letzterem <!-- id:lesenotiz-mises -->",
+    "- Frage: Gilt das Kalkulationsargument auch für Zentralbanken wie die [Federal Reserve](#wd:Q53536)? <!-- id:lesenotiz-fed -->",
+    "- Gegenlesen: [Hayek](#wd:Q1325) über Wissen statt Kalkül <!-- id:lesenotiz-hayek -->",
+    "",
+  ].join("\n");
+}
+
+async function lesenotizWorkspace(): Promise<string> {
+  const workspacePath = fixedWorkspace(BOB);
+  write(workspacePath, "lesenotiz.md", lesenotizSource());
+  await knowstrSave(workspacePath);
+  return workspacePath;
+}
+
 function manyEntityDocument(count: number): string {
   return [
     "---",
@@ -835,7 +871,7 @@ Hayek
   expect(screen.queryByText("↝")).toBeNull();
 });
 
-test("related sources land under the best visible row context", async () => {
+test("related sources appear under each matching visible row context", async () => {
   const relayPool = mockRelayPool();
   const bobPath = await relatedSourceWorkspace();
   const alicePath = await workspaceWithDocument(
@@ -877,16 +913,48 @@ Hayek
   Period at the LSE
     Rivalry with Keynes
       [O↝] Hayek LSE Keynes
+    [O↝] Hayek LSE Keynes
   [OI] Hayek LSE Keynes ↩
   `);
 
   await userEvent.click(
-    await screen.findByLabelText("Navigate to Hayek LSE Keynes")
+    (
+      await screen.findAllByLabelText("Navigate to Hayek LSE Keynes")
+    )[0]
   );
   await waitFor(() => {
     expect(window.location.pathname).toMatch(/^\/deposit\//);
   });
   expect(window.location.search).toContain("at=alice-hayek-lse-keynes");
+});
+
+test("related sources use sibling subtree overlap at the root footer", async () => {
+  const relayPool = mockRelayPool();
+  const bobPath = await lesenotizWorkspace();
+  const alicePath = await workspaceWithDocument(
+    "salonabend.md",
+    salonabendSource()
+  );
+  await publishDocumentThroughApp(
+    relayPool,
+    alicePath,
+    "salonabend.md",
+    "salonabend-doc",
+    "Salonabend: Wirtschaftsrechnung im Sozialismus"
+  );
+  await renderAppTree({
+    path: bobPath,
+    relayPool,
+    initialRoute: "/local/n/lesenotiz-root",
+  });
+
+  await expectTree(`
+Lesenotiz: Die Gemeinwirtschaft
+  Mises trennt Eigentum an Konsumgütern von Eigentum an Produktionsmitteln — der Streit beginnt erst bei letzterem
+  Frage: Gilt das Kalkulationsargument auch für Zentralbanken wie die Federal Reserve?
+  Gegenlesen: Hayek über Wissen statt Kalkül
+  [O↝] Salonabend: Wirtschaftsrechnung im Sozialismus
+  `);
 });
 
 test("related sources include local documents", async () => {
@@ -942,7 +1010,7 @@ test("many related sources are capped below document rows and uncapped fullscree
   );
 
   await waitFor(() => {
-    expect(relatedSourceReferenceRows()).toHaveLength(7);
+    expect(relatedSourceReferenceRows()).toHaveLength(15);
   });
   await userEvent.click(
     await screen.findByLabelText("Open to see more related sources")
@@ -976,7 +1044,7 @@ test("more related sources action opens the host row in split pane", async () =>
 
   await screen.findByLabelText("Search to change pane 1 content");
   await waitFor(() => {
-    expect(relatedSourceReferenceRows()).toHaveLength(15);
+    expect(relatedSourceReferenceRows()).toHaveLength(23);
   });
 });
 
@@ -1049,7 +1117,9 @@ test("accepting a related source writes one root link under its context", async 
     await screen.findByLabelText("expand Rivalry with Keynes")
   );
   await userEvent.click(
-    await screen.findByLabelText("accept Hayek LSE Keynes as relevant")
+    (
+      await screen.findAllByLabelText("accept Hayek LSE Keynes as relevant")
+    )[0]
   );
 
   await expectTree(
@@ -1059,6 +1129,7 @@ Hayek
   Period at the LSE
     Rivalry with Keynes
       {!} Hayek LSE Keynes
+    [O↝] Hayek LSE Keynes
   [OI] Hayek LSE Keynes ↩
   `,
     { showGutter: true }

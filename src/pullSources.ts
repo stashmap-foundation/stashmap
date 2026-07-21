@@ -206,7 +206,7 @@ function pathToRoot(
   return parent ? [...pathToRoot(nodes, parent), node] : [node];
 }
 
-function nodePathRelatedTags(data: Data, node: GraphNode): string[] {
+function nodeContextRelatedTags(data: Data, node: GraphNode): string[] {
   const nodes = data.knowledgeDBs.get(LOCAL)?.nodes;
   if (!nodes) {
     return [];
@@ -214,12 +214,13 @@ function nodePathRelatedTags(data: Data, node: GraphNode): string[] {
   const path = pathToRoot(nodes, node);
   const rootId = path[0]?.id;
   const rootIds = new Set<ID>(rootId ? [rootId] : []);
+  const pathCounts = path.reduce<ReadonlyMap<string, number>>(
+    (acc, pathNode) =>
+      countTags(acc, nodeRelatedTags(data, pathNode, LOCAL, rootIds)),
+    new Map<string, number>()
+  );
   return relatedQueryTags(
-    weightedTags(
-      path.flatMap((pathNode) =>
-        nodeRelatedTags(data, pathNode, LOCAL, rootIds)
-      )
-    )
+    countsToWeights(subtreeTagCounts(data, nodes, rootIds, node.id, pathCounts))
   );
 }
 
@@ -247,7 +248,7 @@ function paneRelatedTags(
     return relatedQueryTags(weightedTags(paneTags));
   }
   if (node.parent) {
-    return nodePathRelatedTags(data, node);
+    return nodeContextRelatedTags(data, node);
   }
   const document = getDocumentForNode(
     data.knowledgeDBs,
@@ -257,7 +258,7 @@ function paneRelatedTags(
   );
   return document
     ? documentRelatedTags(data, document)
-    : nodePathRelatedTags(data, node);
+    : nodeContextRelatedTags(data, node);
 }
 
 function relaysForTags(

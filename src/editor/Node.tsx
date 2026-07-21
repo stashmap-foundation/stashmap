@@ -45,8 +45,10 @@ import { resolveDocumentTarget } from "../core/Document";
 import { inlineLinkToHref, isDeadLinkTarget } from "./linkOperations";
 import { IncomingPart, ReferenceDisplay } from "./referenceDisplay";
 import { MiniEditor, ReciprocalLink, preventEditorBlur } from "./AddNode";
+import { EditorTextProvider } from "./EditorTextContext";
 import { linkStyleForHref } from "./editorDom";
 import { useOnToggleExpanded } from "./SelectNodes";
+import { useApis } from "../Apis";
 import { useData } from "../DataContext";
 import {
   planMaterializeComputedRow,
@@ -76,7 +78,6 @@ import { RightMenu, usePublishedPaneDocument } from "./RightMenu";
 import { OpenInSplitPaneButton } from "./OpenInSplitPaneButton";
 import { unpublishedLinkTargetForHref } from "./publishReach";
 import { useItemStyle } from "./useItemStyle";
-import { EditorTextProvider } from "./EditorTextContext";
 import {
   ResolvedNode,
   getNodeInSource,
@@ -707,6 +708,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
   const { parentNode, viewKey, viewPath } = row;
   const paneIndex = usePaneIndex();
   const data = useData();
+  const { fetchEntityMetadata } = useApis();
   const { textStyle } = useItemStyle();
   const { createPlan, executePlan } = usePlanner();
   const navigatePane = useNavigatePane();
@@ -1109,6 +1111,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
         onDelete={isEmptyNode ? undefined : handleDelete}
         onPasteMultiLine={handlePasteMultiLine}
         onActivateLink={handleActivateLink}
+        entityPicker={{ fetchEntityMetadata }}
       />
       {linkReachChipEntries(editorSpans).map(({ key, span }) => (
         <LinkReachChip
@@ -1330,58 +1333,58 @@ export function Node({
   }
 
   return (
-    <EditorTextProvider>
-      <NodeCard
-        className={cls}
-        cardBodyClassName={clsBody}
-        style={cardStyle}
-        data-suggestion={isSuggestion ? "true" : undefined}
-        data-virtual-type={virtualType || (isVersion ? "version" : undefined)}
-        data-other-user={isOtherUser ? "true" : undefined}
-      >
-        <div className="indicator-gutter">
-          {isSuggestion && <SuggestionIndicator />}
-          {isVersion && <VersionIndicator isOtherUser={!!isOtherUser} />}
-          {virtualType === "incoming" && <IncomingRefGutterIndicator />}
-          {isRelatedSource && <RelatedSourceIndicator />}
-          {relevance === "relevant" && !isSuggestion && (
-            <span
-              className="relevant-indicator"
-              title="Relevant"
-              aria-hidden="true"
-            >
-              !
-            </span>
-          )}
-          {relevance === "maybe_relevant" && !isSuggestion && (
-            <span
-              className="maybe-relevant-indicator"
-              title="Maybe Relevant"
-              aria-hidden="true"
-            >
-              ?
-            </span>
-          )}
-          {relevance === "little_relevant" && !isSuggestion && (
-            <span
-              className="little-relevant-indicator"
-              title="Little Relevant"
-              aria-hidden="true"
-            >
-              ~
-            </span>
-          )}
-        </div>
-        {levels > 0 && <Indent levels={levels} colorLevels={searchDepth} />}
-        {showExpandCollapse && hasChildren && <ExpandCollapseToggle />}
-        {((showExpandCollapse && !hasChildren) ||
-          (isSuggestion && !showExpandCollapse)) && (
+    <NodeCard
+      className={cls}
+      cardBodyClassName={clsBody}
+      style={cardStyle}
+      data-suggestion={isSuggestion ? "true" : undefined}
+      data-virtual-type={virtualType || (isVersion ? "version" : undefined)}
+      data-other-user={isOtherUser ? "true" : undefined}
+    >
+      <div className="indicator-gutter">
+        {isSuggestion && <SuggestionIndicator />}
+        {isVersion && <VersionIndicator isOtherUser={!!isOtherUser} />}
+        {virtualType === "incoming" && <IncomingRefGutterIndicator />}
+        {isRelatedSource && <RelatedSourceIndicator />}
+        {relevance === "relevant" && !isSuggestion && (
           <span
-            className="node-marker"
+            className="relevant-indicator"
+            title="Relevant"
             aria-hidden="true"
-            data-testid="node-marker"
-          />
+          >
+            !
+          </span>
         )}
+        {relevance === "maybe_relevant" && !isSuggestion && (
+          <span
+            className="maybe-relevant-indicator"
+            title="Maybe Relevant"
+            aria-hidden="true"
+          >
+            ?
+          </span>
+        )}
+        {relevance === "little_relevant" && !isSuggestion && (
+          <span
+            className="little-relevant-indicator"
+            title="Little Relevant"
+            aria-hidden="true"
+          >
+            ~
+          </span>
+        )}
+      </div>
+      {levels > 0 && <Indent levels={levels} colorLevels={searchDepth} />}
+      {showExpandCollapse && hasChildren && <ExpandCollapseToggle />}
+      {((showExpandCollapse && !hasChildren) ||
+        (isSuggestion && !showExpandCollapse)) && (
+        <span
+          className="node-marker"
+          aria-hidden="true"
+          data-testid="node-marker"
+        />
+      )}
+      <EditorTextProvider>
         <div className={`w-100 node-content-wrapper ${contentClass}`}>
           <span className={textClassName} style={textStyle}>
             {calendarType && (
@@ -1397,8 +1400,8 @@ export function Node({
           </span>
         </div>
         <RightMenu />
-      </NodeCard>
-    </EditorTextProvider>
+      </EditorTextProvider>
+    </NodeCard>
   );
 }
 

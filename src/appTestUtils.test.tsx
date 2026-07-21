@@ -14,6 +14,8 @@ import { knowstrInit } from "./testFixtures/workspace";
 import { navigateToNodeViaSearch, renderWithTestData } from "./utils.test";
 import { SplitPaneLayout } from "./editor/SplitPaneLayout";
 import { PaneHistoryProvider } from "./PaneHistoryContext";
+import { CalendarFeedProvider } from "./CalendarFeedContext";
+import { EntityLabelProvider } from "./EntityLabelContext";
 import { DND } from "./dnd";
 
 // eslint-disable-next-line @typescript-eslint/no-empty-function
@@ -48,6 +50,7 @@ type AppRenderOptions = {
    * Tests must drive the pick/create flow via the returned `ipc`.
    */
   empty?: boolean;
+  fetchEntityMetadata?: (url: string) => Promise<Response>;
 };
 
 type AppRenderResult = RenderResult & {
@@ -69,11 +72,15 @@ export async function renderAppTree(
 
   const utils = renderWithTestData(
     <FilesystemAppRoot>
-      <DND>
-        <PaneHistoryProvider>
-          <SplitPaneLayout />
-        </PaneHistoryProvider>
-      </DND>
+      <CalendarFeedProvider>
+        <EntityLabelProvider>
+          <DND>
+            <PaneHistoryProvider>
+              <SplitPaneLayout />
+            </PaneHistoryProvider>
+          </DND>
+        </EntityLabelProvider>
+      </CalendarFeedProvider>
     </FilesystemAppRoot>,
     {
       BackendProvider: ({ children }) => (
@@ -90,6 +97,7 @@ export async function renderAppTree(
       ),
       DataProvider: FilesystemDataProvider,
       initialRoute: options.initialRoute,
+      fetchEntityMetadata: options.fetchEntityMetadata,
     }
   );
 

@@ -1,9 +1,17 @@
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import { useApis } from "./Apis";
 import { useCalendarFeeds } from "./CalendarFeedContext";
+import { useData } from "./DataContext";
+import { isEntityId } from "./core/linkPath";
+import { LOCAL } from "./core/nodeRef";
+import { spansText } from "./core/nodeSpans";
 import {
+  EntityPickerCandidate,
+  browserEntityLabelLanguages,
   calendarEntryLabel,
+  defaultEntityMetadataFetcher,
   entityLabelLanguageOrder,
+  responsePayload,
   retryAfterUntilMs,
   wikidataLabelFromResponse,
   wikidataMetadataUrl,
@@ -12,29 +20,108 @@ import {
 const EntityLabelContext = React.createContext<{
   labelFor: (id: string) => string | undefined;
   requestLabel: (id: string) => void;
+  localEntityCandidates: (query: string) => EntityPickerCandidate[];
 }>({
   labelFor: () => undefined,
   requestLabel: () => undefined,
+  localEntityCandidates: () => [],
 });
 
-function browserLanguages(): string[] {
-  if (typeof navigator === "undefined") {
-    return [];
-  }
-  return navigator.languages.length > 0
-    ? [...navigator.languages]
-    : [navigator.language].filter((language) => language !== "");
+function entityIdFromHref(href: string): string | undefined {
+  return href.startsWith("#") && isEntityId(href.slice(1))
+    ? href.slice(1)
+    : undefined;
 }
 
-async function responsePayload(response: Response): Promise<unknown> {
-  if (typeof response.json === "function") {
-    const payload: unknown = await response.json();
-    return payload;
+function normalizedSearch(value: string): string {
+  return value.trim().toLocaleLowerCase();
+}
+
+type LocalEntityPickerCandidate = EntityPickerCandidate & {
+  searchText: string;
+};
+
+function localEntitySearchText(candidate: EntityPickerCandidate): string {
+  return [candidate.label, candidate.id, candidate.description]
+    .map(normalizedSearch)
+    .join("\u0000");
+}
+
+function addLocalEntityCandidate(
+  candidatesById: Map<string, LocalEntityPickerCandidate>,
+  candidate: EntityPickerCandidate
+): void {
+  if (candidatesById.has(candidate.id)) {
+    return;
   }
-  const payload: unknown = JSON.parse(
-    typeof response.text === "function" ? await response.text() : ""
+  candidatesById.set(candidate.id, {
+    ...candidate,
+    searchText: localEntitySearchText(candidate),
+  });
+}
+
+function localEntityCandidateList(
+  knowledgeDBs: KnowledgeDBs
+): LocalEntityPickerCandidate[] {
+  const local = knowledgeDBs.get(LOCAL);
+  if (!local) {
+    return [];
+  }
+  const candidatesById = new Map<string, LocalEntityPickerCandidate>();
+  local.nodes.forEach((node) => {
+    if (isEntityId(node.id)) {
+      addLocalEntityCandidate(candidatesById, {
+        id: node.id,
+        label: spansText(node.spans) || node.id,
+        description: "local entity",
+        source: "local",
+      });
+    }
+    node.spans.forEach((span) => {
+      if (span.kind !== "link") {
+        return;
+      }
+      const id = entityIdFromHref(span.href);
+      if (!id) {
+        return;
+      }
+      addLocalEntityCandidate(candidatesById, {
+        id,
+        label: span.text,
+        description: "local link",
+        source: "local",
+      });
+    });
+  });
+  return [...candidatesById.values()];
+}
+
+function* matchingLocalEntityCandidateSequence(
+  candidates: readonly LocalEntityPickerCandidate[],
+  query: string
+): Generator<EntityPickerCandidate> {
+  for (const candidate of candidates) {
+    if (candidate.searchText.includes(query)) {
+      yield candidate;
+    }
+  }
+}
+
+function matchingLocalEntityCandidates(
+  candidates: readonly LocalEntityPickerCandidate[],
+  query: string
+): EntityPickerCandidate[] {
+  const normalized = normalizedSearch(query);
+  if (normalized === "") {
+    return candidates.slice(0, 7);
+  }
+  const iterator = matchingLocalEntityCandidateSequence(candidates, normalized);
+  return Array.from({ length: 7 }, () => {
+    const next = iterator.next();
+    return next.done ? undefined : next.value;
+  }).filter(
+    (candidate): candidate is EntityPickerCandidate => candidate !== undefined
   );
-  return payload;
 }
 
 export function EntityLabelProvider({
@@ -44,15 +131,20 @@ export function EntityLabelProvider({
 }): JSX.Element {
   const { fetchEntityMetadata } = useApis();
   const { feeds } = useCalendarFeeds();
+  const data = useData();
   const [labels, setLabels] = useState(() => new Map<string, string>());
   const attempted = useRef(new Set<string>());
   const inFlight = useRef(new Set<string>());
   const cooldown = useRef(new Map<string, number>());
   const languages = useMemo(
-    () => entityLabelLanguageOrder(browserLanguages()),
+    () => entityLabelLanguageOrder(browserEntityLabelLanguages()),
     []
   );
   const calendarFeeds = useMemo(() => feeds.valueSeq().toArray(), [feeds]);
+  const localEntityBase = useMemo(
+    () => localEntityCandidateList(data.knowledgeDBs),
+    [data.knowledgeDBs]
+  );
 
   const labelFor = useCallback(
     (id: string): string | undefined =>
@@ -76,8 +168,7 @@ export function EntityLabelProvider({
       }
       attempted.current.add(id);
       inFlight.current.add(id);
-      const fetcher =
-        fetchEntityMetadata ?? ((metadataUrl: string) => fetch(metadataUrl));
+      const fetcher = fetchEntityMetadata ?? defaultEntityMetadataFetcher();
       Promise.resolve()
         .then(() => fetcher(url))
         .then(async (response) => {
@@ -122,9 +213,15 @@ export function EntityLabelProvider({
     [fetchEntityMetadata, languages]
   );
 
+  const localEntityCandidates = useCallback(
+    (query: string): EntityPickerCandidate[] =>
+      matchingLocalEntityCandidates(localEntityBase, query),
+    [localEntityBase]
+  );
+
   const value = useMemo(
-    () => ({ labelFor, requestLabel }),
-    [labelFor, requestLabel]
+    () => ({ labelFor, requestLabel, localEntityCandidates }),
+    [labelFor, localEntityCandidates, requestLabel]
   );
 
   return (
@@ -137,6 +234,7 @@ export function EntityLabelProvider({
 export function useEntityLabels(): {
   labelFor: (id: string) => string | undefined;
   requestLabel: (id: string) => void;
+  localEntityCandidates: (query: string) => EntityPickerCandidate[];
 } {
   return React.useContext(EntityLabelContext);
 }

@@ -1,6 +1,8 @@
 import React, { useEffect, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
 import { useEditorText } from "./EditorTextContext";
 import { isEditableElement } from "./keyboardNavigation";
+import { useEntityLabels } from "../EntityLabelContext";
 import { ParsedLine, parseClipboardText } from "../planner";
 import { spansText } from "../core/nodeSpans";
 import { parseInlineSpans } from "../core/markdownTree";
@@ -9,10 +11,21 @@ import { INCOMING_ARROW, argumentChar, relevanceChar } from "./referenceText";
 import {
   createEditableLinkMark,
   deleteSelection,
+  editableTextBeforeSelection,
+  replaceEditorTextRangeWithSpans,
   replaceSelectionWithSpans,
   selectionMarkdown,
   spansFromEditor,
 } from "./editorDom";
+import {
+  EntityPickerCandidate,
+  browserEntityLabelLanguages,
+  defaultEntityMetadataFetcher,
+  entityLabelLanguageOrder,
+  responsePayload,
+  wikidataSearchCandidatesFromResponse,
+  wikidataSearchUrl,
+} from "../entityLabels";
 
 export function preventEditorBlur(e: React.MouseEvent): void {
   if (isEditableElement(document.activeElement)) {
@@ -24,6 +37,10 @@ export type ReciprocalLink = {
   spanIndex: number;
   relevance?: Relevance;
   argument?: Argument;
+};
+
+type EntityPickerConfig = {
+  fetchEntityMetadata?: (url: string) => Promise<Response>;
 };
 
 type MiniEditorProps = {
@@ -51,7 +68,104 @@ type MiniEditorProps = {
     currentSpans: InlineSpan[]
   ) => void;
   onActivateLink?: (href: string, spans: InlineSpan[]) => void;
+  entityPicker?: EntityPickerConfig;
 };
+
+type EntityPickerTrigger = {
+  start: number;
+  end: number;
+  query: string;
+};
+
+type EntityPickerPosition = {
+  top: number;
+  left: number;
+  minWidth: number;
+};
+
+const ENTITY_PICKER_DEBOUNCE_MS = 200;
+
+function entityLinkHref(id: string): string {
+  return `#${id}`;
+}
+
+function responseOk(response: Response): boolean {
+  return !(response.status < 200 || response.status >= 300);
+}
+
+async function fetchWikidataCandidates(
+  query: string,
+  languages: readonly string[],
+  fetcher: (url: string) => Promise<Response>,
+  shouldContinue: () => boolean
+): Promise<EntityPickerCandidate[]> {
+  const searchUrl = wikidataSearchUrl(query, languages);
+  if (!searchUrl || !shouldContinue()) {
+    return [];
+  }
+  const searchResponse = await fetcher(searchUrl);
+  if (!shouldContinue() || !responseOk(searchResponse)) {
+    return [];
+  }
+  return wikidataSearchCandidatesFromResponse(
+    await responsePayload(searchResponse)
+  ).map((hit) => ({
+    id: `wd:${hit.qid}`,
+    label: hit.label,
+    description: hit.description || hit.qid,
+    source: "wikidata",
+  }));
+}
+
+function pickerPositionFromEditor(
+  editor: HTMLElement | null
+): EntityPickerPosition | undefined {
+  if (!editor) {
+    return undefined;
+  }
+  const rect = editor.getBoundingClientRect();
+  return {
+    top: rect.bottom + 4,
+    left: rect.left,
+    minWidth: Math.max(280, rect.width),
+  };
+}
+
+function samePickerTrigger(
+  left: EntityPickerTrigger | undefined,
+  right: EntityPickerTrigger | undefined
+): boolean {
+  if (!left || !right) {
+    return left === right;
+  }
+  return (
+    left.start === right.start &&
+    left.end === right.end &&
+    left.query === right.query
+  );
+}
+
+function pickerTriggerFromEditor(
+  editor: HTMLElement | null
+): EntityPickerTrigger | undefined {
+  if (!editor) {
+    return undefined;
+  }
+  const text = editableTextBeforeSelection(editor);
+  if (text === undefined) {
+    return undefined;
+  }
+  const at = text.lastIndexOf("@");
+  if (at < 0) {
+    return undefined;
+  }
+  const previous = at === 0 ? "" : text[at - 1];
+  const query = text.slice(at + 1);
+  if (previous && /[\p{Letter}\p{Number}_]/u.test(previous)) {
+    return undefined;
+  }
+  return { start: at, end: text.length, query };
+}
 
 function recoverRewrittenLink(
   initialSpans: InlineSpan[],
@@ -139,14 +253,99 @@ export function MiniEditor({
   onDelete,
   onPasteMultiLine,
   onActivateLink,
+  entityPicker,
 }: MiniEditorProps): JSX.Element {
   const editorRef = React.useRef<HTMLSpanElement>(null);
   const [lastSavedSpans, setLastSavedSpans] = React.useState(initialSpans);
+  const [pickerTrigger, setPickerTrigger] = React.useState<
+    EntityPickerTrigger | undefined
+  >(undefined);
+  const [remoteCandidates, setRemoteCandidates] = React.useState<
+    EntityPickerCandidate[]
+  >([]);
+  const [remotePending, setRemotePending] = React.useState(false);
+  const [activeCandidateIndex, setActiveCandidateIndex] = React.useState(0);
+  const [pickerPosition, setPickerPosition] = React.useState<
+    EntityPickerPosition | undefined
+  >(undefined);
+  const [dismissedPickerStart, setDismissedPickerStart] = React.useState<
+    number | undefined
+  >(undefined);
+
   const editorTextContext = useEditorText();
+  const { localEntityCandidates } = useEntityLabels();
+  const entityPickerEnabled = entityPicker !== undefined;
+  const pickerFetch = entityPicker?.fetchEntityMetadata;
+  const languages = React.useMemo(
+    () => entityLabelLanguageOrder(browserEntityLabelLanguages()),
+    []
+  );
+  const entityFetch = React.useMemo(
+    () => pickerFetch ?? defaultEntityMetadataFetcher(),
+    [pickerFetch]
+  );
+  const localCandidates = React.useMemo(
+    () => (pickerTrigger ? localEntityCandidates(pickerTrigger.query) : []),
+    [localEntityCandidates, pickerTrigger]
+  );
+  const pickerCandidates = React.useMemo(
+    () =>
+      pickerTrigger
+        ? [
+            ...localCandidates,
+            ...remoteCandidates.filter(
+              (candidate) =>
+                !localCandidates.some((local) => local.id === candidate.id)
+            ),
+          ]
+        : [],
+    [localCandidates, pickerTrigger, remoteCandidates]
+  );
 
   useEffect(() => {
     setLastSavedSpans(initialSpans);
   }, [initialSpans]);
+
+  useEffect(() => {
+    if (
+      !pickerTrigger ||
+      !entityPickerEnabled ||
+      pickerTrigger.query.trim() === ""
+    ) {
+      setRemoteCandidates([]);
+      setRemotePending(false);
+      return undefined;
+    }
+    const { query } = pickerTrigger;
+    const abort = new AbortController();
+    const shouldContinue = (): boolean => !abort.signal.aborted;
+    setRemoteCandidates([]);
+    setRemotePending(true);
+    const timeout = window.setTimeout(() => {
+      fetchWikidataCandidates(query, languages, entityFetch, shouldContinue)
+        .then((candidates) => {
+          if (shouldContinue()) {
+            setRemoteCandidates(candidates);
+          }
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          if (shouldContinue()) {
+            setRemotePending(false);
+          }
+        });
+    }, ENTITY_PICKER_DEBOUNCE_MS);
+    return () => {
+      window.clearTimeout(timeout);
+      abort.abort();
+    };
+  }, [entityPickerEnabled, languages, pickerTrigger]);
+
+  useEffect(() => {
+    if (activeCandidateIndex >= pickerCandidates.length) {
+      setActiveCandidateIndex(0);
+    }
+  }, [activeCandidateIndex, pickerCandidates.length]);
 
   useLayoutEffect(() => {
     const editor = editorRef.current;
@@ -237,6 +436,65 @@ export function MiniEditor({
   const getSpans = (): InlineSpan[] =>
     recoverRewrittenLink(lastSavedSpans, spansFromEditor(editorRef.current));
 
+  const refreshPicker = (): void => {
+    if (!entityPicker) {
+      return;
+    }
+    const nextTrigger = pickerTriggerFromEditor(editorRef.current);
+    if (
+      dismissedPickerStart !== undefined &&
+      (!nextTrigger || nextTrigger.start !== dismissedPickerStart)
+    ) {
+      setDismissedPickerStart(undefined);
+    }
+    const visibleTrigger =
+      nextTrigger?.start === dismissedPickerStart ? undefined : nextTrigger;
+    if (samePickerTrigger(pickerTrigger, visibleTrigger)) {
+      return;
+    }
+    setPickerTrigger(visibleTrigger);
+    setPickerPosition(
+      visibleTrigger ? pickerPositionFromEditor(editorRef.current) : undefined
+    );
+    setActiveCandidateIndex(0);
+    if (visibleTrigger) {
+      return;
+    }
+    setRemoteCandidates([]);
+    setRemotePending(false);
+  };
+
+  const chooseEntityCandidate = (
+    candidate: EntityPickerCandidate | undefined
+  ): void => {
+    const editor = editorRef.current;
+    if (!editor || !pickerTrigger || !candidate) {
+      return;
+    }
+    const inserted = replaceEditorTextRangeWithSpans(
+      editor,
+      pickerTrigger.start,
+      pickerTrigger.end,
+      [
+        {
+          kind: "link",
+          href: entityLinkHref(candidate.id),
+          text: candidate.label,
+        },
+        { kind: "text", text: " " },
+      ]
+    );
+    if (!inserted) {
+      return;
+    }
+    setPickerTrigger(undefined);
+    setPickerPosition(undefined);
+    setDismissedPickerStart(undefined);
+    setRemoteCandidates([]);
+    setRemotePending(false);
+    editorTextContext?.setSpans(getSpans());
+  };
+
   const saveIfChanged = (): void => {
     const spans = getSpans();
     if (spans.length === 0 || spansEqual(spans, lastSavedSpans)) return;
@@ -249,9 +507,47 @@ export function MiniEditor({
       e.nativeEvent instanceof InputEvent ? e.nativeEvent.inputType : "";
     if (inputType === "historyUndo" || inputType === "historyRedo") return;
     editorTextContext?.setSpans(getSpans());
+    refreshPicker();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLSpanElement>): void => {
+    if (pickerTrigger) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setActiveCandidateIndex((index) =>
+          pickerCandidates.length === 0
+            ? 0
+            : (index + 1) % pickerCandidates.length
+        );
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setActiveCandidateIndex((index) =>
+          pickerCandidates.length === 0
+            ? 0
+            : (index + pickerCandidates.length - 1) % pickerCandidates.length
+        );
+        return;
+      }
+      if (e.key === "Enter" || e.key === "Tab") {
+        const candidate = pickerCandidates[activeCandidateIndex];
+        if (candidate) {
+          e.preventDefault();
+          chooseEntityCandidate(candidate);
+          return;
+        }
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setPickerTrigger(undefined);
+        setPickerPosition(undefined);
+        setDismissedPickerStart(pickerTrigger.start);
+        setRemoteCandidates([]);
+        setRemotePending(false);
+        return;
+      }
+    }
     if (e.key === "Escape") {
       e.preventDefault();
       const currentRow = editorRef.current?.closest(
@@ -385,9 +681,13 @@ export function MiniEditor({
   };
 
   const handleEditorClick = (e: React.MouseEvent): void => {
-    if (!(e.target instanceof Element) || !onActivateLink) return;
+    if (!(e.target instanceof Element) || !onActivateLink) {
+      refreshPicker();
+      return;
+    }
     const mark = e.target.closest("[data-href]");
     if (!(mark instanceof HTMLElement) || !editorRef.current?.contains(mark)) {
+      refreshPicker();
       return;
     }
     const href = mark.getAttribute("data-href");
@@ -396,6 +696,7 @@ export function MiniEditor({
       !mark.classList.contains("inline-link") ||
       mark.getAttribute("data-link-dead") === "true"
     ) {
+      refreshPicker();
       return;
     }
     e.preventDefault();
@@ -404,6 +705,58 @@ export function MiniEditor({
     if (!spansEqual(spans, lastSavedSpans)) setLastSavedSpans(spans);
     onActivateLink(href, spans);
   };
+
+  const pickerStatus = remotePending ? "Searching Wikidata…" : "No entities";
+  const picker =
+    pickerTrigger && entityPicker && pickerPosition
+      ? createPortal(
+          <span
+            className="entity-picker"
+            role="listbox"
+            aria-label="entity suggestions"
+            style={{
+              top: pickerPosition.top,
+              left: pickerPosition.left,
+              minWidth: pickerPosition.minWidth,
+            }}
+          >
+            {pickerCandidates.map((candidate, index) => {
+              const active = index === activeCandidateIndex;
+              return (
+                <button
+                  key={`${candidate.source}:${candidate.id}`}
+                  type="button"
+                  role="option"
+                  aria-selected={active}
+                  aria-label={`Insert entity ${candidate.label} ${candidate.id}`}
+                  className={`entity-picker-option${
+                    active ? " entity-picker-option-active" : ""
+                  }`}
+                  onMouseDown={preventEditorBlur}
+                  onClick={() => chooseEntityCandidate(candidate)}
+                >
+                  <span className="entity-picker-line">
+                    <span className="entity-picker-label">
+                      {candidate.label}
+                    </span>
+                    <span className="entity-picker-id">{candidate.id}</span>
+                    <span className="entity-picker-source">
+                      {candidate.source}
+                    </span>
+                  </span>
+                  <span className="entity-picker-description">
+                    {candidate.description}
+                  </span>
+                </button>
+              );
+            })}
+            {pickerCandidates.length === 0 && (
+              <span className="entity-picker-empty">{pickerStatus}</span>
+            )}
+          </span>,
+          document.body
+        )
+      : null;
 
   return (
     <span
@@ -429,6 +782,7 @@ export function MiniEditor({
         onClick={handleEditorClick}
         aria-label={ariaLabel || "note editor"}
       />
+      {picker}
     </span>
   );
 }

@@ -1254,12 +1254,86 @@ input:focus,
 .mini-editor-wrapper {
   padding-right: 30px;
   cursor: text;
+  position: relative;
 }
 
 .mini-editor {
   outline: none;
   display: inline-block;
   min-width: 10px;
+  white-space: pre-wrap;
+}
+
+.entity-picker {
+  position: fixed;
+  z-index: 1000;
+  min-width: 280px;
+  max-width: 380px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 2px;
+  border: 1px solid var(--base01);
+  background: var(--base03);
+  color: var(--base0);
+  font-size: 0.9rem;
+}
+
+.entity-picker-option {
+  display: block;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.entity-picker-option:hover,
+.entity-picker-option-active {
+  background: var(--base02);
+  color: var(--base1);
+}
+
+.entity-picker-line {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.entity-picker-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entity-picker-id,
+.entity-picker-source {
+  color: var(--violet);
+  font-family: monospace;
+  font-size: 0.82em;
+}
+
+.entity-picker-source {
+  color: var(--base01);
+}
+
+.entity-picker-description,
+.entity-picker-empty {
+  display: block;
+  overflow: hidden;
+  color: var(--base01);
+  font-size: 0.82em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entity-picker-empty {
+  padding: 6px 8px;
+  font-style: italic;
 }
 
 // ============================================

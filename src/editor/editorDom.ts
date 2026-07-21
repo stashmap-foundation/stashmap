@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import { classifyLinkHref, externalLinkUrl } from "../core/linkPath";
-import { spansToMarkdown } from "../core/nodeSpans";
+import { spansText, spansToMarkdown } from "../core/nodeSpans";
 
 function appendSpan(spans: InlineSpan[], span: InlineSpan): InlineSpan[] {
   if (span.text === "") return spans;
@@ -73,6 +73,43 @@ function containingMark(node: Node, editor: HTMLElement): HTMLElement | null {
 export function spansFromEditor(editor: HTMLElement | null): InlineSpan[] {
   if (!editor) return [];
   return trimSpans(spansFromDomNode(editor, null));
+}
+
+function editableTextNodes(node: Node): Text[] {
+  if (node instanceof HTMLElement && node.hasAttribute("data-link-furniture")) {
+    return [];
+  }
+  if (node instanceof Text) {
+    return [node];
+  }
+  return Array.from(node.childNodes).flatMap(editableTextNodes);
+}
+
+function textPointAtOffset(
+  editor: HTMLElement,
+  targetOffset: number
+): { node: Node; offset: number } | undefined {
+  if (targetOffset < 0) return undefined;
+  const textNodes = editableTextNodes(editor);
+  const found = textNodes.reduce<{
+    remaining: number;
+    point?: { node: Node; offset: number };
+  }>(
+    (state, node) => {
+      const { point, remaining } = state;
+      if (point) return state;
+      const { length } = domText(node);
+      if (remaining <= length) {
+        return { remaining: 0, point: { node, offset: remaining } };
+      }
+      return { remaining: remaining - length };
+    },
+    { remaining: targetOffset }
+  );
+  if (found.point) return found.point;
+  return found.remaining === 0
+    ? { node: editor, offset: editor.childNodes.length }
+    : undefined;
 }
 
 export function selectionMarkdown(editor: HTMLElement): string | null {
@@ -156,20 +193,20 @@ export function createEditableLinkMark(
   return mark;
 }
 
+function nodeForEditableSpan(span: InlineSpan): Node {
+  return span.kind === "text"
+    ? document.createTextNode(span.text)
+    : createEditableLinkMark(
+        span,
+        false,
+        externalLinkUrl(span.href) !== undefined,
+        true
+      );
+}
+
 function htmlForSpans(spans: InlineSpan[]): string {
   const container = document.createElement("div");
-  container.replaceChildren(
-    ...spans.map((span) =>
-      span.kind === "text"
-        ? document.createTextNode(span.text)
-        : createEditableLinkMark(
-            span,
-            false,
-            externalLinkUrl(span.href) !== undefined,
-            true
-          )
-    )
-  );
+  container.replaceChildren(...spans.map(nodeForEditableSpan));
   return container.innerHTML;
 }
 
@@ -186,6 +223,17 @@ function selectionRange(editor: HTMLElement): Range | null {
     editor.contains(range.endContainer)
     ? range
     : null;
+}
+
+export function editableTextBeforeSelection(
+  editor: HTMLElement
+): string | undefined {
+  const range = selectionRange(editor);
+  if (!range || !range.collapsed) return undefined;
+  const before = document.createRange();
+  before.selectNodeContents(editor);
+  before.setEnd(range.startContainer, range.startOffset);
+  return spansText(spansFromDomNode(before.cloneContents(), null));
 }
 
 function markTextBefore(mark: HTMLElement, range: Range): string {
@@ -282,6 +330,57 @@ export function replaceSelectionWithSpans(
     placeBeforeAfterSpans(trailingParent, next, after.length);
   }
   return inserted;
+}
+
+function replaceRangeContentsWithSpans(
+  editor: HTMLElement,
+  range: Range,
+  spans: InlineSpan[]
+): boolean {
+  const nodes = spans.map(nodeForEditableSpan);
+  const lastNode = nodes[nodes.length - 1];
+  if (!lastNode) return false;
+  const selection = window.getSelection();
+  range.deleteContents();
+  const fragment = document.createDocumentFragment();
+  fragment.replaceChildren(...nodes);
+  range.insertNode(fragment);
+  const after = document.createRange();
+  if (lastNode instanceof Text) {
+    after.setStart(lastNode, lastNode.data.length);
+  } else {
+    after.setStartAfter(lastNode);
+  }
+  after.collapse(true);
+  selection?.removeAllRanges();
+  selection?.addRange(after);
+  return editor.contains(lastNode);
+}
+
+export function replaceEditorTextRangeWithSpans(
+  editor: HTMLElement,
+  startOffset: number,
+  endOffset: number,
+  spans: InlineSpan[]
+): boolean {
+  const start = textPointAtOffset(editor, startOffset);
+  const end = textPointAtOffset(editor, endOffset);
+  const lastSpan = spans[spans.length - 1];
+  if (!start || !end || !lastSpan || endOffset < startOffset) return false;
+  const range = document.createRange();
+  range.setStart(start.node, start.offset);
+  range.setEnd(end.node, end.offset);
+  const selection = window.getSelection();
+  selection?.removeAllRanges();
+  selection?.addRange(range);
+  if (
+    (containingMark(range.startContainer, editor) ||
+      containingMark(range.endContainer, editor)) &&
+    replaceSelectionWithSpans(editor, spans)
+  ) {
+    return true;
+  }
+  return replaceRangeContentsWithSpans(editor, range, spans);
 }
 
 export function deleteSelection(editor: HTMLElement): boolean {

@@ -2,9 +2,9 @@
 
 ## How we work
 
-- Planning documents live in the shared planning repo `../deedsats-docs/knowstr/` (knowstr and deedsats are developed in tandem; all idea/implementation docs are consolidated there).
-- Its idea.md describes what we are currently implementing and what the goal of the current sprint is. It's descriptive from a UX perspective
-- Its implementation.md describes how we implement it; spaces-protocol.md is the wire contract shared with deedsats
+- Planning documents live in the shared planning repo `../deedsats-docs/`.
+- The root `idea.md` there is the shared model and wire contract; `deedsats/idea.md` is the wallet's forward-looking picture.
+- The root `implementation.md` is the single implementation plan for knowstr and deedsats-wallet.
 
 ## Rules for implementation
 
@@ -16,7 +16,7 @@
 - Avoid optionality. Do not add optional function parameters, optional object fields, nullable/undefined unions, or partial internal data unless absence is a real domain state or required by an external API.
 - Do not add optional parameters for convenience, future-proofing, or to avoid updating call sites.
 - Break backwards compatibility. There are no users yet, this project is pre-first-release. No migration or backwards compatibility is needed. Backwards compatibility is actually harmful because you add complexity for no reason.
-- Before you are done with a step, reread ideas.md and implementation.md to make sure that we reached the goal.
+- Before you are done with a step, reread the root `idea.md` and `implementation.md` in `../deedsats-docs/` to make sure that we reached the goal.
 
 ## Project coding rules
 

@@ -1,9 +1,9 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { cleanup, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { BOB, CAROL, expectTree, renderApp, setup } from "../utils.test";
+import { BOB, expectTree, renderApp, setup } from "../utils.test";
 import { renderAppTree } from "../appTestUtils.test";
 import {
   expectMarkdown,
@@ -13,15 +13,14 @@ import {
 } from "../testFixtures/workspace";
 import { LOCAL } from "../core/nodeRef";
 import { KIND_KNOWLEDGE_DEPOSIT } from "../nostr";
+import { loadWorkspaceAsDocuments } from "../infra/filesystem/workspaceBackend";
 import {
   buildCoordinateRouteUrl,
   buildDocumentRouteUrl,
-  buildNodeRouteUrl,
 } from "../navigationUrl";
 import { mockRelayPool, MockRelayPool } from "../nostrMock.test";
 import { createWorkspaceProfile } from "../cli/init";
 import { loadCliProfile } from "../cli/config";
-import { RELATED_SOURCE_QUERY_TAG_LIMIT } from "../pullSources";
 
 const RELAY_URL = "wss://relay.test/";
 const RELAYS = [{ url: RELAY_URL, read: true, write: true }];
@@ -57,11 +56,10 @@ async function fixedWorkspaceWithDocument(
   return workspacePath;
 }
 
-function austriaDocument(published: boolean): string {
+function austriaDocument(): string {
   return [
     "---",
     "knowstr_doc_id: austria-doc",
-    ...(published ? ["knowstr_publish:"] : []),
     "---",
     "# Austria <!-- id:wd:Q40 -->",
     "",
@@ -94,7 +92,7 @@ function fergusonDocument(
 
 async function groupingWorkspace(quoteCount: number): Promise<string> {
   const workspacePath = fixedWorkspace(BOB);
-  write(workspacePath, "austria.md", austriaDocument(false));
+  write(workspacePath, "austria.md", austriaDocument());
   write(
     workspacePath,
     "ferguson.md",
@@ -112,7 +110,7 @@ async function groupingWorkspace(quoteCount: number): Promise<string> {
 
 async function multiSourceGroupingWorkspace(): Promise<string> {
   const workspacePath = fixedWorkspace(BOB);
-  write(workspacePath, "austria.md", austriaDocument(false));
+  write(workspacePath, "austria.md", austriaDocument());
   write(
     workspacePath,
     "ferguson-a.md",
@@ -139,132 +137,6 @@ async function multiSourceGroupingWorkspace(): Promise<string> {
   return workspacePath;
 }
 
-function hayekDocument(): string {
-  return [
-    "---",
-    "knowstr_doc_id: hayek-doc",
-    "---",
-    "# Hayek <!-- id:wd:Q1325 -->",
-    "",
-    "- Life in [Salzburg](#wd:Q34713) <!-- id:hayek-salzburg -->",
-    "- Period at the [LSE](#wd:Q174570) <!-- id:hayek-lse -->",
-    "  - Rivalry with [Keynes](#wd:Q9317) <!-- id:hayek-keynes -->",
-    "",
-  ].join("\n");
-}
-
-function relatedHayekSource(): string {
-  return [
-    "---",
-    "knowstr_doc_id: hayek-lse-keynes-doc",
-    "---",
-    "# Hayek LSE Keynes <!-- id:alice-hayek-lse-keynes -->",
-    "",
-    "- [Hayek](#wd:Q1325) <!-- id:alice-hayek-link -->",
-    "- [LSE](#wd:Q174570) <!-- id:alice-lse-link -->",
-    "- [Keynes](#wd:Q9317) <!-- id:alice-keynes-link -->",
-    "",
-  ].join("\n");
-}
-
-function relatedSourceCapHost(): string {
-  return [
-    "---",
-    "knowstr_doc_id: host-related-cap",
-    "---",
-    "# Host <!-- id:host-related-root -->",
-    "",
-    "- Quote [Mises](#wd:Q23129) and [Hayek](#wd:Q1325) <!-- id:host-related-quote -->",
-    "",
-  ].join("\n");
-}
-
-function relatedSourceCapSource(index: number): string {
-  const suffix = index.toString().padStart(2, "0");
-  return [
-    "---",
-    `knowstr_doc_id: source-related-${suffix}`,
-    "---",
-    `# Source ${suffix} <!-- id:source-related-root-${suffix} -->`,
-    "",
-    `- [Mises](#wd:Q23129) <!-- id:source-related-mises-${suffix} -->`,
-    `- [Hayek](#wd:Q1325) <!-- id:source-related-hayek-${suffix} -->`,
-    "",
-  ].join("\n");
-}
-
-async function relatedSourceCapWorkspace(count: number): Promise<string> {
-  const workspacePath = fixedWorkspace(BOB);
-  write(workspacePath, "host.md", relatedSourceCapHost());
-  Array.from({ length: count }, (_, index) => index + 1).forEach((index) => {
-    const suffix = index.toString().padStart(2, "0");
-    write(workspacePath, `source-${suffix}.md`, relatedSourceCapSource(index));
-  });
-  await knowstrSave(workspacePath);
-  return workspacePath;
-}
-
-async function relatedSourceWorkspace(): Promise<string> {
-  const workspacePath = fixedWorkspace(BOB);
-  write(workspacePath, "hayek.md", hayekDocument());
-  await knowstrSave(workspacePath);
-  return workspacePath;
-}
-
-function salonabendSource(): string {
-  return [
-    "---",
-    "knowstr_doc_id: salonabend-doc",
-    "---",
-    "# Salonabend: Wirtschaftsrechnung im Sozialismus <!-- id:salonabend-root -->",
-    "",
-    "- Warum [Mises](#wd:Q84233) 1920 behauptet: ohne Preise kein Kalkül <!-- id:salonabend-mises -->",
-    "- Danach: [Hayek](#wd:Q1325) und das Wissensproblem — Kalkül braucht Wissen, das niemand hat <!-- id:salonabend-hayek -->",
-    "- Lektüre vorab: Die Gemeinwirtschaft, Zweiter Teil <!-- id:salonabend-lektuere -->",
-    "- Donnerstag, 19 Uhr, [Wien](#wd:Q1741) <!-- id:salonabend-wien -->",
-    "",
-  ].join("\n");
-}
-
-function lesenotizSource(): string {
-  return [
-    "---",
-    "knowstr_doc_id: lesenotiz-doc",
-    "---",
-    "# Lesenotiz: Die Gemeinwirtschaft <!-- id:lesenotiz-root -->",
-    "",
-    "- [Mises](#wd:Q84233) trennt Eigentum an Konsumgütern von Eigentum an Produktionsmitteln — der Streit beginnt erst bei letzterem <!-- id:lesenotiz-mises -->",
-    "- Frage: Gilt das Kalkulationsargument auch für Zentralbanken wie die [Federal Reserve](#wd:Q53536)? <!-- id:lesenotiz-fed -->",
-    "- Gegenlesen: [Hayek](#wd:Q1325) über Wissen statt Kalkül <!-- id:lesenotiz-hayek -->",
-    "",
-  ].join("\n");
-}
-
-async function lesenotizWorkspace(): Promise<string> {
-  const workspacePath = fixedWorkspace(BOB);
-  write(workspacePath, "lesenotiz.md", lesenotizSource());
-  await knowstrSave(workspacePath);
-  return workspacePath;
-}
-
-function manyEntityDocument(count: number): string {
-  return [
-    "---",
-    "knowstr_doc_id: many-doc",
-    "---",
-    "# Many <!-- id:many-root -->",
-    "",
-    ...Array.from(
-      { length: count },
-      (_, index) =>
-        `- Entity ${index + 1} [Q${index + 1}](#wd:Q${
-          index + 1
-        }) <!-- id:many-${index + 1} -->`
-    ),
-    "",
-  ].join("\n");
-}
-
 function depositEvents(
   relayPool: MockRelayPool,
   dTag: string
@@ -278,64 +150,69 @@ function depositEvents(
     );
 }
 
-function relatedSourceReferenceRows(): HTMLElement[] {
-  return screen.queryAllByRole("treeitem", { name: /^Source \d\d$/u });
-}
-
-async function publishDocumentThroughApp(
+async function publishDepositFixture(
   relayPool: MockRelayPool,
   workspacePath: string,
   relativePath: string,
   dTag: string,
   contentNeedle: string
 ): Promise<void> {
-  const before = depositEvents(relayPool, dTag).length;
-  const view = await renderAppTree({
-    path: workspacePath,
-    relayPool,
-    initialRoute: buildDocumentRouteUrl(LOCAL, relativePath),
-  });
-  try {
-    const app = within(view.container);
-    await userEvent.click(await app.findByLabelText("audience options"));
-    await userEvent.click(await app.findByLabelText("publish document"));
-    await waitFor(() => {
-      const deposits = depositEvents(relayPool, dTag);
-      const newest = deposits[deposits.length - 1];
-      expect(deposits.length).toBeGreaterThan(before);
-      expect(newest?.content).toContain(contentNeedle);
-    });
-  } finally {
-    view.unmount();
+  const profile = loadCliProfile({ cwd: workspacePath });
+  const documents = await loadWorkspaceAsDocuments(profile);
+  const document = documents.find((candidate) => candidate.docId === dTag);
+  if (!document) {
+    throw new Error(`Missing fixture document ${dTag}`);
   }
+  const content = fs.readFileSync(
+    path.join(workspacePath, relativePath),
+    "utf8"
+  );
+  const ms = Date.now();
+  expect(content).toContain(contentNeedle);
+  await Promise.all(
+    relayPool.publish([RELAY_URL], {
+      id: `${dTag}-${ms}`.padEnd(64, "0").slice(0, 64),
+      pubkey: profile.pubkey,
+      created_at: Math.floor(ms / 1000),
+      kind: KIND_KNOWLEDGE_DEPOSIT,
+      tags: [
+        ["d", dTag],
+        ...[
+          ...new Set([
+            ...document.topNodeShortIds,
+            ...document.realWorldEntities,
+          ]),
+        ].map((id) => ["S", id]),
+        ["ms", `${ms}`],
+      ],
+      content,
+      sig: "0".repeat(128),
+    })
+  );
 }
 
-async function stopPublishingThroughApp(
+async function removeDepositFixture(
   relayPool: MockRelayPool,
-  workspacePath: string,
-  relativePath: string,
   dTag: string
 ): Promise<void> {
-  const before = depositEvents(relayPool, dTag).length;
-  const view = await renderAppTree({
-    path: workspacePath,
-    relayPool,
-    initialRoute: buildDocumentRouteUrl(LOCAL, relativePath),
-  });
-  try {
-    const app = within(view.container);
-    await userEvent.click(await app.findByLabelText("audience options"));
-    await userEvent.click(await app.findByLabelText("stop publishing"));
-    await waitFor(() => {
-      const deposits = depositEvents(relayPool, dTag);
-      const newest = deposits[deposits.length - 1];
-      expect(deposits.length).toBeGreaterThan(before);
-      expect(newest?.content).toBe("");
-      expect(newest?.tags.some(([name]) => name === "S")).toBe(false);
-    });
-  } finally {
-    view.unmount();
+  const previous = depositEvents(relayPool, dTag).at(-1);
+  if (!previous) {
+    throw new Error(`Missing fixture deposit ${dTag}`);
   }
+  const ms = Date.now();
+  await Promise.all(
+    relayPool.publish([RELAY_URL], {
+      ...previous,
+      id: `${dTag}-removed-${ms}`.padEnd(64, "0").slice(0, 64),
+      created_at: Math.floor(ms / 1000),
+      tags: [
+        ...previous.tags.filter(([name]) => name === "S"),
+        ["d", dTag],
+        ["ms", `${ms}`],
+      ],
+      content: "",
+    })
+  );
 }
 
 async function withNow(ms: number, action: () => Promise<void>): Promise<void> {
@@ -367,7 +244,7 @@ test("two strangers find each other through an entity", async () => {
     initialRoute: "/local/n/wd%3AQ1492?label=Barcelona",
   });
 
-  await publishDocumentThroughApp(
+  await publishDepositFixture(
     relayPool,
     alicePath,
     "barcelona.md",
@@ -415,7 +292,7 @@ test("accepting remote incoming on an unmaterialized entity keeps bidirectional 
       "",
     ].join("\n")
   );
-  await publishDocumentThroughApp(
+  await publishDepositFixture(
     relayPool,
     alicePath,
     "barcelona.md",
@@ -474,7 +351,7 @@ test("entity page merges local and pulled incoming wikidata mentions", async () 
     initialRoute: buildDocumentRouteUrl(LOCAL, "bob-notes.md"),
   });
 
-  await publishDocumentThroughApp(
+  await publishDepositFixture(
     relayPool,
     alicePath,
     "alice-notes.md",
@@ -524,7 +401,7 @@ test("same-id local and pulled incoming entity refs deduplicate", async () => {
       initialRoute: "/local/n/wd%3AQ7242?label=Ludwig%20von%20Mises",
     });
 
-    await publishDocumentThroughApp(
+    await publishDepositFixture(
       relayPool,
       alicePath,
       "alice-bitcoin.md",
@@ -570,7 +447,7 @@ test("remote entity incoming refs open the remote deposit", async () => {
     initialRoute: "/local/n/wd%3AQ7242?label=Ludwig%20von%20Mises",
   });
 
-  await publishDocumentThroughApp(
+  await publishDepositFixture(
     relayPool,
     alicePath,
     "alice-bitcoin.md",
@@ -730,7 +607,7 @@ test("remote incoming groups open the source root and expanded child source rows
     initialRoute: "/local/n/wd%3AQ40?label=Austria",
   });
 
-  await publishDocumentThroughApp(
+  await publishDepositFixture(
     relayPool,
     alicePath,
     "ferguson.md",
@@ -784,370 +661,6 @@ Austria
   });
 });
 
-test("accepted grouped root links participate in published reach", async () => {
-  const relayPool = mockRelayPool();
-  const bobPath = fixedWorkspace(BOB);
-  write(bobPath, "austria.md", austriaDocument(false));
-  write(
-    bobPath,
-    "ferguson.md",
-    fergusonDocument(
-      "ferguson-doc",
-      "isbn:ferguson-book",
-      "Ferguson",
-      "ferguson",
-      3
-    )
-  );
-  await knowstrSave(bobPath);
-  const view = await renderAppTree({
-    path: bobPath,
-    relayPool,
-    initialRoute: "/local/n/wd%3AQ40?label=Austria",
-  });
-
-  await userEvent.click(
-    await screen.findByLabelText("accept Ferguson ↩ as relevant")
-  );
-  await expectMarkdown(
-    bobPath,
-    "austria.md",
-    [
-      "# Austria <!-- id:... -->",
-      "",
-      "- (!) [Ferguson](#isbn:ferguson-book) <!-- id:... -->",
-    ].join("\n")
-  );
-  view.unmount();
-
-  await publishDocumentThroughApp(
-    relayPool,
-    bobPath,
-    "austria.md",
-    "austria-doc",
-    "Ferguson"
-  );
-  const deposits = depositEvents(relayPool, "austria-doc");
-  const newest = deposits[deposits.length - 1];
-  expect(newest?.tags).toContainEqual(["S", "isbn:ferguson-book"]);
-
-  const [reader] = setup([CAROL], { relayPool });
-  renderApp({
-    ...reader(),
-    defaultRelays: [RELAY_URL],
-    initialRoute: "/local/n/isbn%3Aferguson-book?label=Ferguson",
-  });
-
-  await expectTree(`
-Ferguson
-  [OI] Austria !↩
-  `);
-});
-
-test("bare one-tag entity pages do not show related source rows", async () => {
-  const relayPool = mockRelayPool();
-  const alicePath = await workspaceWithDocument(
-    "hayek.md",
-    relatedHayekSource()
-  );
-  await publishDocumentThroughApp(
-    relayPool,
-    alicePath,
-    "hayek.md",
-    "hayek-lse-keynes-doc",
-    "Hayek LSE Keynes"
-  );
-  const [bob] = setup([BOB], { relayPool });
-  renderApp({
-    ...bob(),
-    defaultRelays: [RELAY_URL],
-    initialRoute: "/local/n/wd%3AQ1325?label=Hayek",
-  });
-
-  await expectTree(`
-Hayek
-  [OI] Hayek LSE Keynes ↩
-  `);
-  expect(screen.queryByText("↝")).toBeNull();
-});
-
-test("related sources appear under each matching visible row context", async () => {
-  const relayPool = mockRelayPool();
-  const bobPath = await relatedSourceWorkspace();
-  const alicePath = await workspaceWithDocument(
-    "hayek.md",
-    relatedHayekSource()
-  );
-  await publishDocumentThroughApp(
-    relayPool,
-    alicePath,
-    "hayek.md",
-    "hayek-lse-keynes-doc",
-    "Hayek LSE Keynes"
-  );
-  await renderAppTree({
-    path: bobPath,
-    relayPool,
-    initialRoute: "/local/n/wd%3AQ1325?label=Hayek",
-  });
-  await waitFor(() => {
-    expect(
-      relayPool
-        .getSubscriptions()
-        .some((sub) =>
-          sub.filters.some((filter) => filter["#S"]?.includes("wd:Q9317"))
-        )
-    ).toBe(true);
-  });
-
-  await userEvent.click(
-    await screen.findByLabelText("expand Period at the LSE")
-  );
-  await userEvent.click(
-    await screen.findByLabelText("expand Rivalry with Keynes")
-  );
-
-  await expectTree(`
-Hayek
-  Life in Salzburg
-  Period at the LSE
-    Rivalry with Keynes
-      [O↝] Hayek LSE Keynes
-    [O↝] Hayek LSE Keynes
-  [OI] Hayek LSE Keynes ↩
-  `);
-
-  await userEvent.click(
-    (
-      await screen.findAllByLabelText("Navigate to Hayek LSE Keynes")
-    )[0]
-  );
-  await waitFor(() => {
-    expect(window.location.pathname).toMatch(/^\/deposit\//);
-  });
-  expect(window.location.search).toContain("at=alice-hayek-lse-keynes");
-});
-
-test("related sources use sibling subtree overlap at the root footer", async () => {
-  const relayPool = mockRelayPool();
-  const bobPath = await lesenotizWorkspace();
-  const alicePath = await workspaceWithDocument(
-    "salonabend.md",
-    salonabendSource()
-  );
-  await publishDocumentThroughApp(
-    relayPool,
-    alicePath,
-    "salonabend.md",
-    "salonabend-doc",
-    "Salonabend: Wirtschaftsrechnung im Sozialismus"
-  );
-  await renderAppTree({
-    path: bobPath,
-    relayPool,
-    initialRoute: "/local/n/lesenotiz-root",
-  });
-
-  await expectTree(`
-Lesenotiz: Die Gemeinwirtschaft
-  Mises trennt Eigentum an Konsumgütern von Eigentum an Produktionsmitteln — der Streit beginnt erst bei letzterem
-  Frage: Gilt das Kalkulationsargument auch für Zentralbanken wie die Federal Reserve?
-  Gegenlesen: Hayek über Wissen statt Kalkül
-  [O↝] Salonabend: Wirtschaftsrechnung im Sozialismus
-  `);
-});
-
-test("related sources include local documents", async () => {
-  const bobPath = fixedWorkspace(BOB);
-  write(bobPath, "hayek.md", hayekDocument());
-  write(bobPath, "hayek-lse-keynes.md", relatedHayekSource());
-  await knowstrSave(bobPath);
-  await renderAppTree({
-    path: bobPath,
-    relayPool: mockRelayPool(),
-    initialRoute: "/local/n/wd%3AQ1325?label=Hayek",
-  });
-
-  await userEvent.click(
-    await screen.findByLabelText("expand Period at the LSE")
-  );
-  await userEvent.click(
-    await screen.findByLabelText("expand Rivalry with Keynes")
-  );
-
-  await expectTree(`
-Hayek
-  Life in Salzburg
-  Period at the LSE
-    Rivalry with Keynes
-      [↝] Hayek LSE Keynes
-    [↝] Hayek LSE Keynes
-  [I] Hayek LSE Keynes ↩
-  `);
-
-  await userEvent.click(
-    (
-      await screen.findAllByLabelText("Navigate to Hayek LSE Keynes")
-    )[0]
-  );
-  await waitFor(() => {
-    expect(window.location.pathname).toBe("/local/n/alice-hayek-lse-keynes");
-  });
-});
-
-test("many related sources are capped below document rows and uncapped fullscreen", async () => {
-  const workspacePath = await relatedSourceCapWorkspace(8);
-  await withNow(1_000, async () => {
-    await renderAppTree({
-      path: workspacePath,
-      relayPool: mockRelayPool(),
-      initialRoute: "/local/n/host-related-root",
-    });
-  });
-
-  await userEvent.click(
-    await screen.findByLabelText("expand Quote Mises and Hayek")
-  );
-
-  await waitFor(() => {
-    expect(relatedSourceReferenceRows()).toHaveLength(15);
-  });
-  await userEvent.click(
-    await screen.findByLabelText("Open to see more related sources")
-  );
-  await waitFor(() => {
-    expect(window.location.pathname).toBe("/local/n/host-related-quote");
-    expect(relatedSourceReferenceRows()).toHaveLength(8);
-  });
-  expect(
-    screen.queryByLabelText("Open to see more related sources")
-  ).toBeNull();
-});
-
-test("more related sources action opens the host row in split pane", async () => {
-  const workspacePath = await relatedSourceCapWorkspace(8);
-  await withNow(1_000, async () => {
-    await renderAppTree({
-      path: workspacePath,
-      relayPool: mockRelayPool(),
-      initialRoute: "/local/n/host-related-root",
-    });
-  });
-
-  await userEvent.click(
-    await screen.findByLabelText("expand Quote Mises and Hayek")
-  );
-
-  await screen.findByLabelText("Open to see more related sources");
-  const splitButtons = await screen.findAllByLabelText("open in split pane");
-  await userEvent.click(splitButtons[splitButtons.length - 1]);
-
-  await screen.findByLabelText("Search to change pane 1 content");
-  await waitFor(() => {
-    expect(relatedSourceReferenceRows()).toHaveLength(23);
-  });
-});
-
-test("related source interests are capped per pane", async () => {
-  const relayPool = mockRelayPool();
-  const bobPath = fixedWorkspace(BOB);
-  write(
-    bobPath,
-    "many.md",
-    manyEntityDocument(RELATED_SOURCE_QUERY_TAG_LIMIT + 25)
-  );
-  await knowstrSave(bobPath);
-  await renderAppTree({
-    path: bobPath,
-    relayPool,
-    initialRoute: "/local/d/many-doc",
-  });
-
-  await waitFor(() => {
-    expect(
-      relayPool
-        .getSubscriptions()
-        .flatMap((sub) => sub.filters)
-        .filter(
-          (filter) =>
-            filter.kinds?.includes(KIND_KNOWLEDGE_DEPOSIT) && filter["#S"]
-        )
-    ).toHaveLength(2);
-  });
-  const tagFilters = relayPool
-    .getSubscriptions()
-    .flatMap((sub) => sub.filters)
-    .flatMap((filter) =>
-      filter.kinds?.includes(KIND_KNOWLEDGE_DEPOSIT) && filter["#S"]
-        ? [filter["#S"]]
-        : []
-    );
-  expect(
-    tagFilters.filter((tags) => tags.length === RELATED_SOURCE_QUERY_TAG_LIMIT)
-  ).toHaveLength(1);
-  expect(
-    tagFilters.some((tags) => tags.length > RELATED_SOURCE_QUERY_TAG_LIMIT)
-  ).toBe(true);
-});
-
-test("accepting a related source writes one root link under its context", async () => {
-  const relayPool = mockRelayPool();
-  const bobPath = await relatedSourceWorkspace();
-  const alicePath = await workspaceWithDocument(
-    "hayek.md",
-    relatedHayekSource()
-  );
-  await publishDocumentThroughApp(
-    relayPool,
-    alicePath,
-    "hayek.md",
-    "hayek-lse-keynes-doc",
-    "Hayek LSE Keynes"
-  );
-  await renderAppTree({
-    path: bobPath,
-    relayPool,
-    initialRoute: "/local/n/wd%3AQ1325?label=Hayek",
-  });
-
-  await userEvent.click(
-    await screen.findByLabelText("expand Period at the LSE")
-  );
-  await userEvent.click(
-    await screen.findByLabelText("expand Rivalry with Keynes")
-  );
-  await userEvent.click(
-    (
-      await screen.findAllByLabelText("accept Hayek LSE Keynes as relevant")
-    )[0]
-  );
-
-  await expectTree(
-    `
-Hayek
-  Life in Salzburg
-  Period at the LSE
-    Rivalry with Keynes
-      {!} Hayek LSE Keynes
-    [O↝] Hayek LSE Keynes
-  [OI] Hayek LSE Keynes ↩
-  `,
-    { showGutter: true }
-  );
-  await expectMarkdown(
-    bobPath,
-    "hayek.md",
-    [
-      "# Hayek <!-- id:... -->",
-      "",
-      "- Life in [Salzburg](#wd:Q34713) <!-- id:... -->",
-      "- Period at the [LSE](#wd:Q174570) <!-- id:... -->",
-      "  - Rivalry with [Keynes](#wd:Q9317) <!-- id:... -->",
-      "    - (!) [Hayek LSE Keynes](#alice-hayek-lse-keynes) <!-- id:... -->",
-    ].join("\n")
-  );
-});
-
 test("nonmatching and self-authored deposits do not render", async () => {
   const relayPool = mockRelayPool();
   const alicePath = await workspaceWithDocument(
@@ -1180,14 +693,14 @@ test("nonmatching and self-authored deposits do not render", async () => {
     initialRoute: "/local/n/wd%3AQ1492?label=Barcelona",
   });
 
-  await publishDocumentThroughApp(
+  await publishDepositFixture(
     relayPool,
     alicePath,
     "madrid.md",
     "alice-madrid",
     "Alice Madrid"
   );
-  await publishDocumentThroughApp(
+  await publishDepositFixture(
     relayPool,
     bobPath,
     "barcelona.md",
@@ -1197,134 +710,6 @@ test("nonmatching and self-authored deposits do not render", async () => {
 
   await expectTree(`
 Barcelona
-  `);
-});
-
-test("pulled incoming rows rank by pane-local tag overlap", async () => {
-  const relayPool = mockRelayPool();
-  const carolPath = await workspaceWithDocument(
-    "spray.md",
-    [
-      "---",
-      "knowstr_doc_id: carol-spray",
-      "---",
-      "# Carol Spray <!-- id:carol-root -->",
-      "- [Barcelona](#wd:Q1492) <!-- id:carol-link -->",
-      "- [Madrid](#wd:Q2807) <!-- id:carol-extra -->",
-      "",
-    ].join("\n")
-  );
-  const alicePath = await workspaceWithDocument(
-    "focused.md",
-    [
-      "---",
-      "knowstr_doc_id: alice-focused",
-      "---",
-      "# Alice Focused <!-- id:alice-focused-root -->",
-      "- [Barcelona](#wd:Q1492) <!-- id:alice-focused-link -->",
-      "",
-    ].join("\n")
-  );
-  const [bob] = setup([BOB], { relayPool });
-  renderApp({
-    ...bob(),
-    defaultRelays: [RELAY_URL],
-    initialRoute: "/local/n/wd%3AQ1492?label=Barcelona",
-  });
-
-  await publishDocumentThroughApp(
-    relayPool,
-    carolPath,
-    "spray.md",
-    "carol-spray",
-    "Carol Spray"
-  );
-  await publishDocumentThroughApp(
-    relayPool,
-    alicePath,
-    "focused.md",
-    "alice-focused",
-    "Alice Focused"
-  );
-
-  await expectTree(`
-Barcelona
-  [OI] Alice Focused ↩
-  [OI] Carol Spray ↩
-  `);
-});
-
-test("document panes rank matching deposits by reader graph overlap", async () => {
-  const relayPool = mockRelayPool();
-  const bobPath = knowstrInit({ relays: [RELAY_URL] }).path;
-  write(bobPath, "mises.md", "# Ludwig von Mises <!-- id:wd:Q23129 -->\n");
-  write(
-    bobPath,
-    "interests.md",
-    [
-      "# Interests <!-- id:interests -->",
-      "- [Bitcoin](#wd:Q131723) <!-- id:bob-bitcoin -->",
-      "- [Money Theory](#wd:Q1) <!-- id:bob-money-theory -->",
-      "",
-    ].join("\n")
-  );
-  await knowstrSave(bobPath);
-  const broadPath = await workspaceWithDocument(
-    "broad.md",
-    [
-      "---",
-      "knowstr_doc_id: broad-mises",
-      "---",
-      "# Broad Mises <!-- id:broad-root -->",
-      "- [Ludwig von Mises](#wd:Q23129) <!-- id:broad-mises-link -->",
-      "- [Bitcoin](#wd:Q131723) <!-- id:broad-bitcoin-link -->",
-      "- [Money Theory](#wd:Q1) <!-- id:broad-money-link -->",
-      "",
-    ].join("\n")
-  );
-  const narrowPath = await workspaceWithDocument(
-    "narrow.md",
-    [
-      "---",
-      "knowstr_doc_id: narrow-mises",
-      "---",
-      "# Narrow Mises <!-- id:narrow-root -->",
-      "- [Ludwig von Mises](#wd:Q23129) <!-- id:narrow-mises-link -->",
-      "",
-    ].join("\n")
-  );
-  await withNow(10_000, () =>
-    publishDocumentThroughApp(
-      relayPool,
-      broadPath,
-      "broad.md",
-      "broad-mises",
-      "Broad Mises"
-    )
-  );
-  await withNow(20_000, () =>
-    publishDocumentThroughApp(
-      relayPool,
-      narrowPath,
-      "narrow.md",
-      "narrow-mises",
-      "Narrow Mises"
-    )
-  );
-
-  await renderAppTree({
-    path: bobPath,
-    relayPool,
-    initialRoute: buildNodeRouteUrl("wd:Q23129", LOCAL, {
-      scrollToId: undefined,
-      fallbackLabel: undefined,
-    }),
-  });
-
-  await expectTree(`
-Ludwig von Mises
-  [OI] Broad Mises ↩
-  [OI] Narrow Mises ↩
   `);
 });
 
@@ -1349,7 +734,7 @@ test("live replacement removes visible remote rows and stale events stay ignored
   });
 
   await withNow(10_000, () =>
-    publishDocumentThroughApp(
+    publishDepositFixture(
       relayPool,
       alicePath,
       "live.md",
@@ -1362,15 +747,13 @@ Barcelona
   [OI] Alice Barcelona ↩
   `);
 
-  await withNow(20_000, () =>
-    stopPublishingThroughApp(relayPool, alicePath, "live.md", "alice-live")
-  );
+  await withNow(20_000, () => removeDepositFixture(relayPool, "alice-live"));
   await expectTree(`
 Barcelona
   `);
 
   await withNow(5_000, () =>
-    publishDocumentThroughApp(
+    publishDepositFixture(
       relayPool,
       alicePath,
       "live.md",
@@ -1417,47 +800,6 @@ test("tag subscriptions close when local attention navigates away", async () => 
   });
 });
 
-test("a remote child under a shared parent becomes a suggestion", async () => {
-  const relayPool = mockRelayPool();
-  const alicePath = await workspaceWithDocument(
-    "topic.md",
-    "# Topic <!-- id:topic -->\n"
-  );
-  const bobPath = await fixedWorkspaceWithDocument(
-    BOB,
-    "topic.md",
-    [
-      "---",
-      "knowstr_doc_id: bob-topic",
-      "---",
-      "# Topic <!-- id:topic -->",
-      "- Bob child <!-- id:bob-child -->",
-      "",
-    ].join("\n")
-  );
-  await renderAppTree({
-    path: alicePath,
-    relayPool,
-    initialRoute: buildNodeRouteUrl("topic", LOCAL, {
-      scrollToId: undefined,
-      fallbackLabel: undefined,
-    }),
-  });
-
-  await publishDocumentThroughApp(
-    relayPool,
-    bobPath,
-    "topic.md",
-    "bob-topic",
-    "Bob child"
-  );
-
-  await expectTree(`
-Topic
-  [S] Bob child
-  `);
-});
-
 test("deposit routes render Loading until the exact source arrives", async () => {
   const relayPool = mockRelayPool();
   const alicePath = await workspaceWithDocument(
@@ -1490,7 +832,7 @@ test("deposit routes render Loading until the exact source arrives", async () =>
   });
 
   await screen.findByText("Loading...");
-  await publishDocumentThroughApp(
+  await publishDepositFixture(
     relayPool,
     alicePath,
     "route.md",

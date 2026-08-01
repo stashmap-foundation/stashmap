@@ -19,9 +19,7 @@ export function KeyboardShortcutsModal({
           <li>j/k or arrows: move between visible rows</li>
           <li>h/l or arrows: collapse/expand or move parent/child</li>
           <li>g g: first row, G: last row</li>
-          <li>
-            Enter or i: edit current row (on a suggestion, Enter takes it)
-          </li>
+          <li>Enter or i: edit current row</li>
           <li>/: search in current pane</li>
           <li>
             H: go home (~Log), N: new root note, P: open new pane, q: close pane
@@ -52,8 +50,8 @@ export function KeyboardShortcutsModal({
         <h6>Pane Filters</h6>
         <ul>
           <li>1 relevant, 2 maybe, 3 little, 4 not relevant</li>
-          <li>5 contains, 6 confirms, 7 contra, 8 suggestions</li>
-          <li>f! f? f~ fx fo f+ f- f@: toggle filters by symbol</li>
+          <li>5 contains, 6 confirms, 7 contra</li>
+          <li>f! f? f~ fx fo f+ f-: toggle filters by symbol</li>
         </ul>
 
         <h6>Help</h6>

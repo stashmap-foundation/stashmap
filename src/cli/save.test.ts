@@ -254,7 +254,7 @@ test("save rejects duplicate node ids across documents", async () => {
 
   await expect(knowstrSave(workspaceDir)).rejects.toMatchObject({
     message: expect.stringMatching(
-      /a\.md and b\.md both contain id:.+\n {2}- if a file is a variant, give it fresh IDs \(future: knowstr fork\)\n {2}- if it's a backup, move it out or add it to \.knowstrignore/u
+      /a\.md and b\.md both contain id:.+\n {2}- if a file is a variant, give it fresh IDs\n {2}- if it's a backup, move it out or add it to \.knowstrignore/u
     ),
   });
 });
@@ -300,7 +300,7 @@ test("save rejects a node id repeated within one file", async () => {
   });
 });
 
-test("save rejects malformed node snapshot ids with the file path", async () => {
+test("save preserves arbitrary legacy node attributes", async () => {
   const { path: workspaceDir } = knowstrInit();
   write(
     workspaceDir,
@@ -308,26 +308,10 @@ test("save rejects malformed node snapshot ids with the file path", async () => 
     '# Alpha\n- item one <!-- id:n1 basedOn="n0" snapshot="not-a-snapshot" -->\n'
   );
 
-  await expect(knowstrSave(workspaceDir)).rejects.toMatchObject({
-    message: expect.stringMatching(
-      /a\.md: invalid snapshot id "not-a-snapshot" \(expected snap_sha256_<64 lowercase hex chars>\)/u
-    ),
-  });
-});
-
-test("save preserves well-formed node snapshot ids", async () => {
-  const { path: workspaceDir } = knowstrInit();
-  const snapshotId = `snap_sha256_${"ab".repeat(32)}`;
-  write(
-    workspaceDir,
-    "a.md",
-    `# Alpha\n- item one <!-- id:n1 basedOn="n0" snapshot="${snapshotId}" -->\n`
-  );
-
   await knowstrSave(workspaceDir);
 
   const raw = fs.readFileSync(path.join(workspaceDir, "a.md"), "utf8");
-  expect(raw).toContain(`snapshot="${snapshotId}"`);
+  expect(raw).toContain('basedOn="n0" snapshot="not-a-snapshot"');
 });
 
 test("save preserves safe explicit markdown ids exactly", async () => {

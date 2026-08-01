@@ -1,76 +1,15 @@
-import React from "react";
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import fs from "fs";
 import path from "path";
 import { renderAppTree } from "../appTestUtils.test";
-import {
-  expectTree,
-  getPane,
-  navigateToNodeViaSearch,
-  renderWithTestData,
-  setDropIndentLevel,
-} from "../utils.test";
+import { expectTree } from "../utils.test";
 import {
   knowstrInit,
   knowstrSave,
   readNodeId,
   write,
 } from "../testFixtures/workspace";
-import {
-  MockWorkspaceIpc,
-  mockWorkspaceIpc,
-} from "../testFixtures/mockWorkspaceIpc";
-import { FilesystemBackendProvider } from "../infra/filesystem/FilesystemBackendProvider";
-import { FilesystemDataProvider } from "../infra/filesystem/FilesystemDataProvider";
-import { FilesystemAppRoot } from "../desktop/FilesystemAppRoot";
-import { SplitPaneLayout } from "./SplitPaneLayout";
-import { PaneHistoryProvider } from "../PaneHistoryContext";
-import { DND } from "../dnd";
-import { modClick } from "./Multiselect.testUtils";
-import { mockRelayPool } from "../nostrMock.test";
-
-/* eslint-disable functional/immutable-data */
-const ipcsToDispose: MockWorkspaceIpc[] = [];
-/* eslint-enable functional/immutable-data */
-
-function renderAppTreeMultiPane(workspacePath: string): void {
-  const ipc = mockWorkspaceIpc(workspacePath);
-  const relayPool = mockRelayPool();
-  // eslint-disable-next-line functional/immutable-data
-  ipcsToDispose.push(ipc);
-  renderWithTestData(
-    <FilesystemAppRoot>
-      <DND>
-        <PaneHistoryProvider>
-          <SplitPaneLayout />
-        </PaneHistoryProvider>
-      </DND>
-    </FilesystemAppRoot>,
-    {
-      BackendProvider: ({ children }: { children: React.ReactNode }) => (
-        <FilesystemBackendProvider
-          ipc={ipc}
-          pool={{
-            subscribe: (relays, filters, params) =>
-              relayPool.subscribeMany(relays, filters, params),
-            publish: (relays, event) => relayPool.publish(relays, event),
-          }}
-        >
-          {children}
-        </FilesystemBackendProvider>
-      ),
-      DataProvider: FilesystemDataProvider,
-    }
-  );
-}
-
-afterEach(async () => {
-  cleanup();
-  // eslint-disable-next-line functional/immutable-data
-  const pending = ipcsToDispose.splice(0);
-  await Promise.all(pending.map((ipc) => ipc.dispose()));
-});
 
 test("Cross-file link round-trips through save and renders in tree", async () => {
   const { path: workspacePath } = knowstrInit();
@@ -103,40 +42,6 @@ test("Cross-directory link resolves and is clickable to target root", async () =
 
   await screen.findByLabelText(/^edit B(\s|$)/);
   await screen.findByText("B-child");
-});
-
-test("DnD copy of a file-link bullet between panes preserves resolution to original target", async () => {
-  const { path: workspacePath } = knowstrInit();
-  write(workspacePath, "a.md", "# A\n\n- [Open B](./b.md)\n");
-  write(workspacePath, "b.md", "# B\n\n- B-child\n");
-  write(workspacePath, "c.md", "# C\n\n- C-child\n");
-
-  await knowstrSave(workspacePath);
-  renderAppTreeMultiPane(workspacePath);
-
-  await navigateToNodeViaSearch(0, "A");
-
-  await userEvent.click(
-    (
-      await screen.findAllByLabelText("open in split pane")
-    )[0]
-  );
-  await navigateToNodeViaSearch(1, "C");
-
-  const sourceLink = getPane(0).getByText("Open B");
-  const targetC = getPane(1).getByRole("treeitem", { name: "C" });
-
-  await userEvent.keyboard("{Alt>}");
-  fireEvent.dragStart(sourceLink);
-  setDropIndentLevel("Open B", "C", 2);
-  fireEvent.dragOver(targetC, { altKey: true });
-  fireEvent.drop(targetC, { altKey: true });
-  await userEvent.keyboard("{/Alt}");
-
-  await waitFor(() => {
-    const cContent = fs.readFileSync(path.join(workspacePath, "c.md"), "utf8");
-    expect(cContent).toMatch(/Open B/u);
-  });
 });
 
 test("File link surfaces as incoming reference on target's root", async () => {
@@ -340,43 +245,4 @@ A
   `,
     { showGutter: true }
   );
-});
-
-test("Multiselect DnD of file links targets every document, not the source rows", async () => {
-  const { path: workspacePath } = knowstrInit();
-  write(
-    workspacePath,
-    "links.md",
-    "# Links\n\n- [Open B](./b.md)\n- [Open D](./d.md)\n"
-  );
-  write(workspacePath, "b.md", "# B\n\n- B-child\n");
-  write(workspacePath, "d.md", "# D\n\n- D-child\n");
-  write(workspacePath, "c.md", "# C\n\n- C-child\n");
-
-  await knowstrSave(workspacePath);
-  renderAppTreeMultiPane(workspacePath);
-
-  await navigateToNodeViaSearch(0, "Links");
-  await userEvent.click(
-    (
-      await screen.findAllByLabelText("open in split pane")
-    )[0]
-  );
-  await navigateToNodeViaSearch(1, "C");
-
-  modClick(getPane(0).getByLabelText("Open B"), { metaKey: true });
-  modClick(getPane(0).getByLabelText("Open D"), { metaKey: true });
-
-  fireEvent.dragStart(getPane(0).getByText("Open B"));
-  fireEvent.drop(getPane(1).getByRole("treeitem", { name: "C" }));
-
-  // Every dragged link points at its document; the non-primary rows must
-  // not degrade to node links into the source rows (they would open the
-  // links document instead of the target).
-  await waitFor(() => {
-    const cContent = fs.readFileSync(path.join(workspacePath, "c.md"), "utf8");
-    expect(cContent).toMatch(/\[[^\]]*\]\([^)#]*b\.md\)/u);
-    expect(cContent).toMatch(/\[[^\]]*\]\([^)#]*d\.md\)/u);
-    expect(cContent).not.toMatch(/\(#/u);
-  });
 });

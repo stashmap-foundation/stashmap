@@ -55,11 +55,7 @@ function isRowReadonly(
 ): boolean {
   if (row.depth === 1 || isInSearch) return true;
   if (!isOtherUser) return false;
-  return (
-    row.virtualType !== "suggestion" &&
-    row.virtualType !== "incoming" &&
-    row.virtualType !== "version"
-  );
+  return row.virtualType !== "incoming";
 }
 
 function isUserEntryRow(row: HTMLElement): boolean {
@@ -121,8 +117,6 @@ export function MobileActionBar({
 
   const innerNode = activeRow.querySelector(".inner-node");
   if (!innerNode) return null;
-  const isSuggestion = currentRow.virtualType === "suggestion";
-
   const handleRelevance = (level: number): void => {
     const root = wrapperRef.current;
     if (!root) return;
@@ -178,52 +172,48 @@ export function MobileActionBar({
           </span>
         ))}
       </div>
-      {!isSuggestion && (
-        <>
-          <span
-            className="pill evidence-selector"
-            role="button"
-            tabIndex={0}
-            onMouseDown={preventEditorBlur}
-            onClick={() => handleEvidence("confirms")}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                handleEvidence("confirms");
-              }
-            }}
-            style={{
-              color:
-                currentArgument === "confirms"
-                  ? TYPE_COLORS.confirms
-                  : TYPE_COLORS.inactive,
-            }}
-          >
-            +
-          </span>
-          <span
-            className="pill evidence-selector"
-            role="button"
-            tabIndex={0}
-            onMouseDown={preventEditorBlur}
-            onClick={() => handleEvidence("contra")}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                handleEvidence("contra");
-              }
-            }}
-            style={{
-              color:
-                currentArgument === "contra"
-                  ? TYPE_COLORS.contra
-                  : TYPE_COLORS.inactive,
-            }}
-          >
-            -
-          </span>
-        </>
-      )}
+      <span
+        className="pill evidence-selector"
+        role="button"
+        tabIndex={0}
+        onMouseDown={preventEditorBlur}
+        onClick={() => handleEvidence("confirms")}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            handleEvidence("confirms");
+          }
+        }}
+        style={{
+          color:
+            currentArgument === "confirms"
+              ? TYPE_COLORS.confirms
+              : TYPE_COLORS.inactive,
+        }}
+      >
+        +
+      </span>
+      <span
+        className="pill evidence-selector"
+        role="button"
+        tabIndex={0}
+        onMouseDown={preventEditorBlur}
+        onClick={() => handleEvidence("contra")}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            handleEvidence("contra");
+          }
+        }}
+        style={{
+          color:
+            currentArgument === "contra"
+              ? TYPE_COLORS.contra
+              : TYPE_COLORS.inactive,
+        }}
+      >
+        -
+      </span>
     </div>
   );
 

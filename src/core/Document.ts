@@ -1,10 +1,7 @@
 import { Map as ImmutableMap } from "immutable";
 import { LOCAL } from "./nodeRef";
 import { getNode } from "./connections";
-import {
-  ensureKnowstrDocId,
-  withoutPublishEntities,
-} from "./knowstrFrontmatter";
+import { ensureKnowstrDocId } from "./knowstrFrontmatter";
 import { isCanonicalId } from "./entityRecognition";
 import { docLinkId, documentLinkHref, resolveLinkPath } from "./linkPath";
 import { MarkdownTreeNode, parseMarkdown } from "./markdownTree";
@@ -336,7 +333,7 @@ function parseToDocumentWithMaterializer(
 ): ParseToDocumentResult {
   const parsed = parseMarkdown(content);
   const ensured = ensureKnowstrDocId(parsed.frontMatter, options.docIdFallback);
-  const frontMatter = withoutPublishEntities(ensured.frontMatter);
+  const { frontMatter } = ensured;
 
   const updatedMs = options.updatedMsOverride ?? Date.now();
   const systemRole =

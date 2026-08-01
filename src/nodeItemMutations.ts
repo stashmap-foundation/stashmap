@@ -6,7 +6,6 @@ import { NodeItemMetadata, updateNodeItemMetadata } from "./nodeItemMetadata";
 import { ViewPath } from "./rowModel";
 import {
   Plan,
-  planDeepCopyNode,
   planSaveNodeAndEnsureNodes,
   planUpdateEmptyNodeMetadata,
   planUpsertNodes,
@@ -67,12 +66,10 @@ export function planUpdateViewItemMetadata(
   input: {
     node: GraphNode;
     nodeID: ID;
-    sourceId: SourceId;
     viewPath: ViewPath;
     parentNode: GraphNode | undefined;
     parentViewPath: ViewPath | undefined;
     childIndex: number | undefined;
-    virtualType: Row["virtualType"];
     paneIndex: number;
     paneAuthor: SourceId;
     documentId: string | undefined;
@@ -88,7 +85,6 @@ export function planUpdateViewItemMetadata(
     parentNode,
     parentViewPath,
     childIndex,
-    virtualType,
     paneIndex,
     documentId,
   } = input;
@@ -123,20 +119,7 @@ export function planUpdateViewItemMetadata(
   }
 
   if (childIndex === undefined) {
-    if (!virtualType || !parentNode) {
-      return plan;
-    }
-    return planDeepCopyNode(
-      plan,
-      input.sourceId,
-      node,
-      parentNode.id,
-      viewPath,
-      parentViewPath,
-      undefined,
-      metadata.relevance,
-      metadata.argument
-    );
+    return plan;
   }
 
   const basePlan =

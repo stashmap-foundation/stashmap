@@ -15,36 +15,7 @@ export function createEmptyGraphIndex(): GraphIndex {
     incomingCrefs: new globalThis.Map<ID, NodeRef[]>(),
     incomingCrefsByTarget: new globalThis.Map<string, NodeRef[]>(),
     incomingFileLinks: new globalThis.Map<string, NodeRef[]>(),
-    basedOnIndex: new globalThis.Map<ID, globalThis.Set<ID>>(),
   };
-}
-
-function addToNodeMap(
-  map: globalThis.Map<ID, globalThis.Set<ID>>,
-  targetNodeID: ID,
-  sourceNodeID: ID
-): void {
-  const existing = map.get(targetNodeID);
-  if (existing) {
-    existing.add(sourceNodeID);
-    return;
-  }
-  map.set(targetNodeID, new globalThis.Set<ID>([sourceNodeID]));
-}
-
-function removeFromNodeMap(
-  map: globalThis.Map<ID, globalThis.Set<ID>>,
-  targetNodeID: ID,
-  sourceNodeID: ID
-): void {
-  const existing = map.get(targetNodeID);
-  if (!existing) {
-    return;
-  }
-  existing.delete(sourceNodeID);
-  if (existing.size === 0) {
-    map.delete(targetNodeID);
-  }
 }
 
 function sameRef(left: NodeRef, right: NodeRef): boolean {
@@ -246,10 +217,6 @@ function addNodeIndexEntries(
   sourceId: SourceId,
   sourceFilePath: string | undefined
 ): void {
-  if (node.basedOn) {
-    addToNodeMap(graphIndex.basedOnIndex, node.basedOn, node.id);
-  }
-
   if (!node.parent) {
     addNodeLinkEntries(graphIndex, node, sourceId, sourceFilePath, node.id);
   }
@@ -278,10 +245,6 @@ function removeNodeIndexEntries(
   sourceId: SourceId,
   sourceFilePath: string | undefined
 ): void {
-  if (node.basedOn) {
-    removeFromNodeMap(graphIndex.basedOnIndex, node.basedOn, node.id);
-  }
-
   if (!node.parent) {
     removeNodeLinkEntries(graphIndex, node, sourceId, sourceFilePath, node.id);
   }
@@ -334,12 +297,6 @@ function cloneIndex(graphIndex: GraphIndex): GraphIndex {
       [...graphIndex.incomingFileLinks.entries()].map(([key, refs]) => [
         key,
         [...refs],
-      ])
-    ),
-    basedOnIndex: new globalThis.Map<ID, globalThis.Set<ID>>(
-      [...graphIndex.basedOnIndex.entries()].map(([key, ids]) => [
-        key,
-        new globalThis.Set<ID>(ids),
       ])
     ),
   };
@@ -419,11 +376,6 @@ export function mergeGraphIndexes(
   });
   overlay.incomingFileLinks.forEach((refs, key) => {
     refs.forEach((ref) => addRefToMap(nextIndex.incomingFileLinks, key, ref));
-  });
-  overlay.basedOnIndex.forEach((ids, key) => {
-    const nextIds = nextIndex.basedOnIndex.get(key) ?? new globalThis.Set<ID>();
-    ids.forEach((id) => nextIds.add(id));
-    nextIndex.basedOnIndex.set(key, nextIds);
   });
   return nextIndex;
 }

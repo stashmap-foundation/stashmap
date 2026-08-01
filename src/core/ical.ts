@@ -87,10 +87,6 @@ export function icalFeedLinkText(url: string, label?: string): string {
   return `[${label ?? url}](${calendarFeedHref(url)})`;
 }
 
-// The one display-text rule for the feed-link form, shared by every
-// renderer — editor display, suggestion and reference labels — and
-// mirroring the Dart side's nodeDisplayText: feed links read by their
-// label everywhere; the URL belongs to edit mode.
 export function displayTextOf(text: string): string {
   return icalFeedLinkPartsOf(text)?.label ?? text;
 }

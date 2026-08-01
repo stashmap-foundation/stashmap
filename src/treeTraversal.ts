@@ -6,7 +6,6 @@ import {
   addNodesToLastElement,
   getParentView,
   getViewForNode,
-  isEmbedRow,
   isEmptyViewPathID,
   isFileRow,
   viewPathToString,
@@ -19,8 +18,7 @@ import {
   itemPassesFilters,
   nodePathLabel as nodePathLabelOf,
 } from "./core/connections";
-import { isCanonicalId } from "./core/entityRecognition";
-import { getAllLinks, linkSpan, nodeText, plainSpans } from "./core/nodeSpans";
+import { linkSpan, nodeText, plainSpans } from "./core/nodeSpans";
 import {
   IcalEntry,
   calendarEntryTarget,
@@ -30,23 +28,11 @@ import {
   icalEntryDisplayText,
   mergeProjectedEntries,
 } from "./core/ical";
-import {
-  getDocumentByIdOrFilePath,
-  getDocumentForNode,
-  type Document,
-} from "./core/Document";
+import { getDocumentByIdOrFilePath, type Document } from "./core/Document";
 import { DEFAULT_TYPE_FILTERS } from "./core/constants";
-import {
-  getAlternativeFooterData,
-  getIncomingCrefsForNode,
-} from "./semanticProjection";
+import { getIncomingCrefsForNode } from "./semanticProjection";
 import { buildReferenceItem } from "./buildReferenceRow";
 import { referenceToText } from "./editor/referenceText";
-import {
-  RELATED_SOURCE_MIN_OVERLAP,
-  localDocumentTags,
-  nodeRelatedTags,
-} from "./pullSources";
 import type { AddToParentTarget } from "./core/plan";
 import {
   GraphLookup,
@@ -67,7 +53,6 @@ type TreeTraversalOptions = {
 
 const EMPTY_TREE_RESULT: TreeResult = { rows: List<Row>() };
 const INCOMING_GROUP_THRESHOLD = 3;
-const RELATED_SOURCE_INLINE_LIMIT = 7;
 
 function emptyTreeResult(rows: List<Row> = List<Row>()): TreeResult {
   return { rows };
@@ -98,23 +83,6 @@ type VirtualFooterInput = {
   parentRoot: ID;
   parentUpdated: number;
   incomingCrefs: List<NodeRef>;
-  suggestions: List<ID>;
-  versionMetas: Map<
-    ID,
-    {
-      updated: number;
-      addCount: number;
-      removeCount: number;
-    }
-  >;
-  renames: List<{
-    versionId: ID;
-    theirs: string;
-    sourceId: SourceId;
-    snapshotId: string;
-    baselineNodeId: ID;
-  }>;
-  relatedSourceRefs: List<NodeRef>;
 };
 
 function nodePathLabel(
@@ -138,22 +106,15 @@ function createRow(
   parentRef: NodeRef | undefined,
   childIndex: number | undefined,
   isFirstVirtual: boolean,
-  virtualType: Row["virtualType"] | undefined,
-  versionMeta: Row["versionMeta"] | undefined
+  virtualType: Row["virtualType"] | undefined
 ): Row {
   const nodeID = node.id;
   const inheritedVirtualType =
-    parentRow?.virtualType === "search" ||
-    parentRow?.virtualType === "suggestion"
-      ? parentRow.virtualType
-      : undefined;
+    parentRow?.virtualType === "search" ? parentRow.virtualType : undefined;
   const rowVirtualType =
     virtualType ?? (isSearchId(nodeID) ? "search" : inheritedVirtualType);
   const provenance =
-    rowVirtualType === "suggestion" ||
-    rowVirtualType === "incoming" ||
-    rowVirtualType === "version" ||
-    rowVirtualType === "related-source"
+    rowVirtualType === "incoming"
       ? { kind: rowVirtualType, sourceId }
       : undefined;
   const pane = data.panes[viewPath[0]];
@@ -208,7 +169,6 @@ function createRow(
     isFirstVirtual,
     virtualType: rowVirtualType,
     provenance,
-    versionMeta,
     reference,
   };
 }
@@ -281,7 +241,6 @@ function resolveRowForPath(
       undefined,
       undefined,
       false,
-      undefined,
       undefined
     );
     return { ...row, materialize: { precededBy: [], root: true } };
@@ -330,7 +289,6 @@ function resolveRowForPath(
     resolvedParentRow?.ref,
     childIndex,
     false,
-    undefined,
     undefined
   );
 }
@@ -363,7 +321,6 @@ function createChildRow(
           parentRef,
           childIndex,
           false,
-          undefined,
           undefined
         )
       : undefined;
@@ -384,7 +341,6 @@ function createChildRow(
         parentRef,
         childIndex,
         false,
-        undefined,
         undefined
       )
     : undefined;
@@ -394,63 +350,17 @@ function createVirtualRowNode(
   data: Data,
   graph: GraphLookup,
   input: VirtualFooterInput,
-  rowRef: NodeRef,
-  virtualType: Row["virtualType"]
+  rowRef: NodeRef
 ): { node: GraphNode; sourceId: SourceId } {
-  const sourceNodeID = rowRef.id;
-  const sourceRow =
-    virtualType === "suggestion"
-      ? lookupNode(graph, sourceNodeID, graph.localSourceId)
-      : undefined;
-  const incomingRow =
-    virtualType === "incoming" ? getNodeInSource(graph, rowRef) : undefined;
-  const versionRow =
-    virtualType === "version"
-      ? lookupNode(graph, sourceNodeID, graph.localSourceId)
-      : undefined;
-  const relatedSourceRow =
-    virtualType === "related-source"
-      ? getNodeInSource(graph, rowRef)
-      : undefined;
-  const resolvedSource =
-    sourceRow ?? incomingRow ?? versionRow ?? relatedSourceRow;
-  const sourceNode = resolvedSource?.node;
-  if (virtualType === "related-source") {
-    return {
-      node: {
-        children: List<ID>(),
-        id: sourceNodeID,
-        spans: [linkSpan(sourceNodeID, sourceNode ? nodeText(sourceNode) : "")],
-        parent: input.parentID,
-        updated: sourceNode?.updated ?? input.parentUpdated,
-        root: sourceNode?.root ?? sourceNodeID,
-        relevance: undefined,
-        argument: undefined,
-      },
-      sourceId: resolvedSource?.ref.sourceId ?? rowRef.sourceId,
-    };
-  }
-  if (virtualType !== "incoming") {
-    return {
-      node: sourceNode ?? {
-        children: List<ID>(),
-        id: sourceNodeID,
-        spans: plainSpans(""),
-        parent: input.parentID,
-        updated: input.parentUpdated,
-        root: input.parentRoot,
-        relevance: undefined,
-      },
-      sourceId: resolvedSource?.ref.sourceId ?? input.parentSourceId,
-    };
-  }
+  const incomingRow = getNodeInSource(graph, rowRef);
+  const sourceNode = incomingRow?.node;
   return {
     node: {
       children: List<ID>(),
-      id: sourceNodeID,
+      id: rowRef.id,
       spans: [
         linkSpan(
-          sourceNodeID,
+          rowRef.id,
           nodePathLabel(data.knowledgeDBs, incomingRow) ?? ""
         ),
       ],
@@ -460,7 +370,7 @@ function createVirtualRowNode(
       relevance: undefined,
       argument: undefined,
     },
-    sourceId: resolvedSource?.ref.sourceId ?? input.parentSourceId,
+    sourceId: incomingRow?.ref.sourceId ?? input.parentSourceId,
   };
 }
 
@@ -531,432 +441,21 @@ function withIncomingGroupChildren(row: Row, refs: NodeRef[]): Row {
   };
 }
 
-function tagWeightMap(
-  weights: readonly RelatedSourceTagWeight[]
-): globalThis.Map<string, number> {
-  return weights.reduce(
-    (acc, weight) => new globalThis.Map(acc).set(weight.tag, weight.weight),
-    new globalThis.Map<string, number>()
-  );
-}
-
-function addContextTags(
-  weights: readonly RelatedSourceTagWeight[],
-  tags: readonly string[],
-  weight: number
-): RelatedSourceTagWeight[] {
-  const merged = tags.reduce(
-    (acc, tag) =>
-      new globalThis.Map(acc).set(tag, (acc.get(tag) ?? 0) + weight),
-    tagWeightMap(weights)
-  );
-  return [...merged.entries()].map(([tag, value]) => ({ tag, weight: value }));
-}
-
-function visibleRelatedContextResultForNode(
-  data: Data,
-  graph: GraphLookup,
-  node: GraphNode,
-  sourceId: SourceId,
-  viewPath: ViewPath,
-  rootIds: ReadonlySet<ID>,
-  pathRefs: readonly NodeRef[],
-  weights: readonly RelatedSourceTagWeight[]
-): { contexts: RelatedSourceContext[]; subtreeTags: string[] } {
-  const ref = { sourceId, id: node.id };
-  const ownTags = nodeRelatedTags(data, node, sourceId, rootIds);
-  const nextPathRefs = [...pathRefs, ref];
-  const nextWeights = addContextTags(weights, ownTags, nextPathRefs.length);
-  const childResults = node.children.toArray().flatMap((childId, index) => {
-    const child = getNodeInSource(graph, { sourceId, id: childId })?.node;
-    if (!child) {
-      return [];
-    }
-    return [
-      visibleRelatedContextResultForNode(
-        data,
-        graph,
-        child,
-        sourceId,
-        addNodeToPathWithNodes(viewPath, node, index),
-        rootIds,
-        nextPathRefs,
-        nextWeights
-      ),
-    ];
-  });
-  const subtreeTags = [
-    ...ownTags,
-    ...childResults.flatMap((childResult) => childResult.subtreeTags),
-  ].sort();
-  const context = {
-    targetRef: ref,
-    pathRefs: nextPathRefs,
-    weightedTags: addContextTags(nextWeights, subtreeTags, 1),
-  };
-  const view = getViewForNode(data, viewPath, node.id);
-  return {
-    contexts: view.expanded
-      ? [
-          context,
-          ...childResults.flatMap((childResult) => childResult.contexts),
-        ]
-      : [context],
-    subtreeTags,
-  };
-}
-
-function visibleRelatedContextsForRow(
-  data: Data,
-  graph: GraphLookup,
-  row: Row
-): RelatedSourceContext[] {
-  if (row.sourceId !== LOCAL) {
-    return [];
-  }
-  const topId = row.viewPath[1];
-  const top = getNodeInSource(graph, {
-    sourceId: row.sourceId,
-    id: topId,
-  })?.node;
-  if (!top) {
-    return [];
-  }
-  const topPath: ViewPath = [row.viewPath[0], topId];
-  const rootIds = new globalThis.Set<ID>([top.root ?? top.id]);
-  return visibleRelatedContextResultForNode(
-    data,
-    graph,
-    top,
-    row.sourceId,
-    topPath,
-    rootIds,
-    [],
-    []
-  ).contexts;
-}
-
-function sourceRootRef(
-  data: Data,
-  graph: GraphLookup,
-  sourceId: SourceId
-): NodeRef | undefined {
-  const rootId = data.pull?.metadataBySourceId.get(sourceId)?.rootIds[0];
-  if (!rootId) {
-    return undefined;
-  }
-  return getNodeInSource(graph, { sourceId, id: rootId })?.ref;
-}
-
-function pulledRelatedSourceCandidates(
-  data: Data,
-  graph: GraphLookup,
-  pane: Pane | undefined
-): RelatedSourceCandidate[] {
-  const relatedSourceIds = pane
-    ? data.pull?.relatedSourceIdsByPaneId.get(pane.id) ?? []
-    : [];
-  return relatedSourceIds.flatMap((sourceId) => {
-    const metadata = data.pull?.metadataBySourceId.get(sourceId);
-    const rootRef = sourceRootRef(data, graph, sourceId);
-    return metadata && rootRef
-      ? [
-          {
-            rootRef,
-            sTags: metadata.sTags,
-            ms: metadata.ms,
-            title: metadata.title,
-          },
-        ]
-      : [];
-  });
-}
-
-function currentDocumentForRow(
-  data: Data,
-  graph: GraphLookup,
-  row: Row
-): Document | undefined {
-  const pane = data.panes[row.viewPath[0]];
-  const paneDocument = pane?.documentId
-    ? getDocumentByIdOrFilePath(
-        data.documents,
-        data.documentByFilePath,
-        LOCAL,
-        pane.documentId
-      )
-    : undefined;
-  if (paneDocument) {
-    return paneDocument;
-  }
-  const topId = row.viewPath[1];
-  const top = getNodeInSource(graph, {
-    sourceId: row.sourceId,
-    id: topId,
-  })?.node;
-  return top
-    ? getDocumentForNode(data.knowledgeDBs, data.documents, top, row.sourceId)
-    : undefined;
-}
-
-function localSourceCandidateTags(data: Data, document: Document): string[] {
-  const rootIds = new globalThis.Set(document.topNodeShortIds);
-  return localDocumentTags(document).filter(
-    (tag) => !rootIds.has(tag) || isCanonicalId(tag)
-  );
-}
-
-function localRelatedSourceCandidates(
-  data: Data,
-  graph: GraphLookup,
-  rows: List<Row>
-): RelatedSourceCandidate[] {
-  const currentDocIds = new globalThis.Set(
-    rows
-      .map((row) => currentDocumentForRow(data, graph, row)?.docId)
-      .filter((docId): docId is string => docId !== undefined)
-      .toArray()
-  );
-  const currentRootIds = new globalThis.Set(
-    rows
-      .map((row) => row.viewPath[1])
-      .filter((rootId): rootId is ID => rootId !== undefined)
-      .toArray()
-  );
-  return data.documents
-    .valueSeq()
-    .toArray()
-    .flatMap((document) => {
-      const rootId = document.topNodeShortIds[0];
-      if (
-        document.sourceId !== LOCAL ||
-        currentDocIds.has(document.docId) ||
-        (rootId !== undefined && currentRootIds.has(rootId))
-      ) {
-        return [];
-      }
-      const root = rootId
-        ? getNodeInSource(graph, { sourceId: LOCAL, id: rootId })
-        : undefined;
-      const sTags = localSourceCandidateTags(data, document);
-      return root &&
-        sTags.length >= RELATED_SOURCE_MIN_OVERLAP &&
-        sTags.some(isCanonicalId)
-        ? [
-            {
-              rootRef: root.ref,
-              sTags,
-              ms: document.updatedMs,
-              title: document.title,
-            },
-          ]
-        : [];
-    });
-}
-
-function rowAlreadyLinksSourceRoot(
-  graph: GraphLookup,
-  row: Row,
-  rootRef: NodeRef
-): boolean {
-  if (row.node.id === rootRef.id) {
-    return true;
-  }
-  if (getAllLinks(row.node).some((link) => link.targetID === rootRef.id)) {
-    return true;
-  }
-  return row.node.children.some((childId) => {
-    if (childId === rootRef.id) {
-      return true;
-    }
-    const child = getNodeInSource(graph, {
-      sourceId: row.sourceId,
-      id: childId,
-    })?.node;
-    return child
-      ? getAllLinks(child).some((link) => link.targetID === rootRef.id)
-      : false;
-  });
-}
-
-function compareRelatedCandidatePlacement(
-  left: {
-    candidate: RelatedSourceCandidate;
-    placement: RelatedSourcePlacement;
-  },
-  right: {
-    candidate: RelatedSourceCandidate;
-    placement: RelatedSourcePlacement;
-  }
-): number {
-  const leftWidth = left.candidate.sTags.length || 1;
-  const rightWidth = right.candidate.sTags.length || 1;
-  return (
-    right.placement.score - left.placement.score ||
-    right.placement.overlapTags.length - left.placement.overlapTags.length ||
-    right.placement.overlapTags.length / rightWidth -
-      left.placement.overlapTags.length / leftWidth ||
-    right.candidate.ms - left.candidate.ms ||
-    left.candidate.title.localeCompare(right.candidate.title) ||
-    nodeRefKey(left.candidate.rootRef).localeCompare(
-      nodeRefKey(right.candidate.rootRef)
-    )
-  );
-}
-
-function relatedContextEntriesByTag(
-  contexts: readonly RelatedSourceContext[]
-): globalThis.Map<string, { context: RelatedSourceContext; weight: number }[]> {
-  return contexts.reduce(
-    (acc, context) =>
-      context.weightedTags.reduce((tagAcc, tagWeight) => {
-        const entries = tagAcc.get(tagWeight.tag) ?? [];
-        return tagAcc.set(tagWeight.tag, [
-          ...entries,
-          { context, weight: tagWeight.weight },
-        ]);
-      }, acc),
-    new globalThis.Map<
-      string,
-      { context: RelatedSourceContext; weight: number }[]
-    >()
-  );
-}
-
-function relatedSourcePlacementsForCandidate(
-  entriesByTag: globalThis.Map<
-    string,
-    { context: RelatedSourceContext; weight: number }[]
-  >,
-  candidate: RelatedSourceCandidate
-): {
-  candidate: RelatedSourceCandidate;
-  placement: RelatedSourcePlacement;
-}[] {
-  const sourceWidth = candidate.sTags.length || 1;
-  const hits = candidate.sTags.reduce(
-    (candidateAcc, tag) =>
-      (entriesByTag.get(tag) ?? []).reduce((entryAcc, entry) => {
-        const key = nodeRefKey(entry.context.targetRef);
-        const existing = entryAcc.get(key);
-        return entryAcc.set(key, {
-          context: entry.context,
-          score: (existing?.score ?? 0) + entry.weight,
-          overlapCount: (existing?.overlapCount ?? 0) + 1,
-        });
-      }, candidateAcc),
-    new globalThis.Map<
-      string,
-      {
-        context: RelatedSourceContext;
-        score: number;
-        overlapCount: number;
-      }
-    >()
-  );
-  return [...hits.values()]
-    .filter((hit) => hit.overlapCount >= RELATED_SOURCE_MIN_OVERLAP)
-    .map((hit) => ({
-      candidate,
-      placement: {
-        sourceId: candidate.rootRef.sourceId,
-        targetRef: hit.context.targetRef,
-        score: hit.score + hit.overlapCount / sourceWidth,
-        overlapTags: new Array(hit.overlapCount).fill(""),
-      },
-    }));
-}
-
-function relatedSourceRefsByRow(
-  data: Data,
-  graph: GraphLookup,
-  rows: List<Row>
-): Map<string, List<NodeRef>> {
-  const localRows = rows.filter((row) => row.sourceId === LOCAL).toList();
-  if (localRows.size === 0) {
-    return Map<string, List<NodeRef>>();
-  }
-  const pane = data.panes[localRows.first()?.viewPath[0] ?? 0];
-  const contexts = localRows
-    .toArray()
-    .flatMap((row) => visibleRelatedContextsForRow(data, graph, row));
-  const entriesByTag = relatedContextEntriesByTag(contexts);
-  const candidates = [
-    ...pulledRelatedSourceCandidates(data, graph, pane),
-    ...localRelatedSourceCandidates(data, graph, localRows),
-  ];
-  const placements = candidates.flatMap((candidate) =>
-    relatedSourcePlacementsForCandidate(entriesByTag, candidate)
-  );
-  const grouped = placements.reduce(
-    (acc, placement) => {
-      const key = nodeRefKey(placement.placement.targetRef);
-      return acc.set(key, [...(acc.get(key) ?? []), placement]);
-    },
-    Map<
-      string,
-      {
-        candidate: RelatedSourceCandidate;
-        placement: RelatedSourcePlacement;
-      }[]
-    >()
-  );
-  return grouped.map((placementsForRow) =>
-    List(
-      placementsForRow
-        .slice()
-        .sort(compareRelatedCandidatePlacement)
-        .map(({ candidate }) => candidate.rootRef)
-    )
-  );
-}
-
-function relatedSourceRefsForRow(
-  graph: GraphLookup,
-  row: Row,
-  incomingCrefs: List<NodeRef>,
-  refsByRow: Map<string, List<NodeRef>>
-): List<NodeRef> {
-  if (row.sourceId !== LOCAL) {
-    return List<NodeRef>();
-  }
-  const incomingRootKeys = new globalThis.Set(
-    incomingCrefs
-      .map((ref) => nodeRefKey(incomingSourceRootRef(graph, ref)))
-      .toArray()
-  );
-  return (refsByRow.get(nodeRefKey(row.ref)) ?? List<NodeRef>()).filter(
-    (rootRef) =>
-      !incomingRootKeys.has(nodeRefKey(rootRef)) &&
-      !rowAlreadyLinksSourceRoot(graph, row, rootRef)
-  );
-}
-
 function createVirtualRow(
   data: Data,
   graph: GraphLookup,
   input: VirtualFooterInput,
   rowRef: NodeRef,
-  virtualType: Row["virtualType"],
   isFirstVirtual: boolean,
   priorAnchors: ID[] = []
 ): Row {
   const sourceNodeID = rowRef.id;
-  const { node, sourceId } = createVirtualRowNode(
-    data,
-    graph,
-    input,
-    rowRef,
-    virtualType
-  );
+  const { node, sourceId } = createVirtualRowNode(data, graph, input, rowRef);
   const parentPath =
     input.parentID === undefined
       ? input.parentPath
       : addNodesToLastElement(input.parentPath, input.parentID);
-  const viewNodeID =
-    virtualType === "incoming" || virtualType === "related-source"
-      ? (`${virtualType}:${sourceId}:${sourceNodeID}` as ID)
-      : node.id;
+  const viewNodeID = `incoming:${sourceId}:${sourceNodeID}` as ID;
   const viewPath =
     input.parentID === undefined
       ? addNodesToLastElement(parentPath, viewNodeID)
@@ -964,10 +463,6 @@ function createVirtualRow(
   const parentRef = input.parentID
     ? { sourceId: input.parentSourceId, id: input.parentID }
     : undefined;
-  const versionMeta =
-    virtualType === "version"
-      ? input.versionMetas.get(sourceNodeID)
-      : undefined;
   const row = createRow(
     data,
     graph,
@@ -979,12 +474,8 @@ function createVirtualRow(
     parentRef,
     undefined,
     isFirstVirtual,
-    virtualType,
-    versionMeta
+    "incoming"
   );
-  if (virtualType !== "incoming" && virtualType !== "related-source") {
-    return row;
-  }
   const parentChildren = input.parentID
     ? getNodeInSource(graph, {
         sourceId: input.parentSourceId,
@@ -1001,9 +492,8 @@ function createVirtualRow(
       precededBy: [...priorAnchors, ...([...parentChildren].reverse() as ID[])],
       take: incomingTakeTarget(graph, sourceNodeID, sourceId),
       defaults: {
-        relevance:
-          virtualType === "incoming" ? inherited?.relevance : undefined,
-        argument: virtualType === "incoming" ? inherited?.argument : undefined,
+        relevance: inherited?.relevance,
+        argument: inherited?.argument,
       },
       ...(input.parentRow?.materialize
         ? {
@@ -1052,10 +542,15 @@ function createProjectionRow(
     { sourceId: parentSourceId, id: parentNode.id },
     undefined,
     false,
-    undefined,
     undefined
   );
-  return { ...row, materialize: { precededBy } };
+  return {
+    ...row,
+    materialize: {
+      precededBy,
+      take: createRefTarget(entry.id as ID, icalEntryDisplayText(entry)),
+    },
+  };
 }
 
 // The action row: a full-text, clickable, button-shaped thing in row
@@ -1095,7 +590,6 @@ function createFooterActionRow(
     { sourceId: parentSourceId, id: parentNode.id },
     undefined,
     false,
-    undefined,
     undefined
   );
   return { ...row, action };
@@ -1117,25 +611,6 @@ function createPastDatesActionRow(
     `action:past:${parentNode.id}` as ID,
     "past dates",
     "toggle-past-entries"
-  );
-}
-
-function createMoreRelatedSourcesActionRow(
-  data: Data,
-  graph: GraphLookup,
-  parentRow: Row,
-  parentNode: GraphNode,
-  parentSourceId: SourceId
-): Row {
-  return createFooterActionRow(
-    data,
-    graph,
-    parentRow,
-    parentNode,
-    parentSourceId,
-    `action:related:${parentNode.id}` as ID,
-    "Open to see more related sources",
-    "open-related-sources"
   );
 }
 
@@ -1284,7 +759,6 @@ function appendVirtualFooterRows(
         graph,
         input,
         grouped ? group.rootRef : rowRef,
-        "incoming",
         acc.rows.length === 0,
         acc.priorAnchors
       );
@@ -1301,141 +775,7 @@ function appendVirtualFooterRows(
     },
     { rows: [], priorAnchors: [], emittedGroupKeys: ImmutableSet<string>() }
   ).rows;
-  const capRelatedSources = (input.parentRow?.depth ?? 1) > 1;
-  const visibleRelatedSourceRefs = capRelatedSources
-    ? input.relatedSourceRefs.take(RELATED_SOURCE_INLINE_LIMIT)
-    : input.relatedSourceRefs;
-  const hiddenRelatedSourceCount =
-    input.relatedSourceRefs.size - visibleRelatedSourceRefs.size;
-  const relatedRows = visibleRelatedSourceRefs.map((rowRef, index) =>
-    createVirtualRow(
-      data,
-      graph,
-      input,
-      rowRef,
-      "related-source",
-      incomingRows.length + index === 0,
-      []
-    )
-  );
-  const moreRelatedSourcesRow =
-    hiddenRelatedSourceCount > 0 && input.parentRow
-      ? createMoreRelatedSourcesActionRow(
-          data,
-          graph,
-          input.parentRow,
-          input.parentRow.node,
-          input.parentSourceId
-        )
-      : undefined;
-  const relatedActionRows = moreRelatedSourcesRow
-    ? List<Row>([
-        {
-          ...moreRelatedSourcesRow,
-          isFirstVirtual: incomingRows.length + relatedRows.size === 0,
-        },
-      ])
-    : List<Row>();
-  const suggestionOffset =
-    incomingRows.length + relatedRows.size + relatedActionRows.size;
-  const suggestionRows = input.suggestions.map((nodeID, index) =>
-    createVirtualRow(
-      data,
-      graph,
-      input,
-      { sourceId: graph.localSourceId, id: nodeID },
-      "suggestion",
-      suggestionOffset + index === 0
-    )
-  );
-  const versionOffset = suggestionOffset + suggestionRows.size;
-  const versionRows = input.versionMetas
-    .keySeq()
-    .toList()
-    .map((nodeID, index) =>
-      createVirtualRow(
-        data,
-        graph,
-        input,
-        { sourceId: graph.localSourceId, id: nodeID },
-        "version",
-        versionOffset + index === 0
-      )
-    );
-
-  // Rename suggestions: replacement-shaped rows (strikethrough old, new
-  // beside it). They ride the suggestion vocabulary — @ gutter, the
-  // suggestions filter — but carry their own take/dismiss semantics.
-  const renameOffset = versionOffset + versionRows.size;
-  const parentText = input.parentRow ? nodeText(input.parentRow.node) : "";
-  const renameRows = input.renames.map((rename, index) => {
-    const base = createVirtualRow(
-      data,
-      graph,
-      input,
-      { sourceId: rename.sourceId, id: rename.versionId },
-      "suggestion",
-      renameOffset + index === 0
-    );
-    const renamePath = [
-      ...base.viewPath.slice(0, -1),
-      `rename:${rename.versionId}` as ID,
-    ] as unknown as ViewPath;
-    return {
-      ...base,
-      viewPath: renamePath,
-      viewKey: viewPathToString(renamePath),
-      // Replacement-shaped: the row is about text, not a subtree — it
-      // never expands.
-      hasChildren: false,
-      renameSuggestion: {
-        theirs: rename.theirs,
-        mine: parentText,
-        versionId: rename.versionId,
-        snapshotId: rename.snapshotId,
-        baselineNodeId: rename.baselineNodeId,
-      },
-    };
-  });
-
-  return {
-    rows: initial.rows
-      .concat(incomingRows)
-      .concat(relatedRows)
-      .concat(relatedActionRows)
-      .concat(suggestionRows)
-      .concat(versionRows)
-      .concat(renameRows),
-  };
-}
-
-// The embed seam (idea.md): the target's subtree as a computed, read-only
-// block. One embed exists today — the suggestion preview.
-function getEmbedChildren(
-  data: Data,
-  graph: GraphLookup,
-  parentRow: Row
-): TreeResult {
-  const source = getNodeInSource(graph, parentRow.ref);
-  if (!source || source.node.children.size === 0) {
-    return EMPTY_TREE_RESULT;
-  }
-  return {
-    rows: source.node.children
-      .map((childID, index) =>
-        createChildRow(
-          data,
-          graph,
-          parentRow,
-          source.node,
-          source.ref,
-          childID,
-          index
-        )
-      )
-      .filter((row): row is Row => row !== undefined)
-      .toList(),
-  };
+  return { rows: initial.rows.concat(incomingRows) };
 }
 
 function shortIncomingReference(reference: Row["reference"]): Row["reference"] {
@@ -1494,8 +834,7 @@ function createIncomingGroupChildRow(
     parentRow.parentRef,
     undefined,
     false,
-    "incoming",
-    undefined
+    "incoming"
   );
   const priorChildIds = parentRow.node.children.slice(0, index).reverse();
   return {
@@ -1540,7 +879,6 @@ function getChildrenForRegularNode(
   rootNode: ID | undefined,
   author: SourceId,
   typeFilters: Pane["typeFilters"],
-  refsByRow: Map<string, List<NodeRef>>,
   options?: TreeTraversalOptions
 ): TreeResult {
   const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
@@ -1587,10 +925,6 @@ function getChildrenForRegularNode(
     return { rows: childRows };
   }
 
-  // Overlays attach to file rows only: a proposal is a leaf of the
-  // proposal system, not a node in it. No projections, no footers, no
-  // feed fetches under suggested/version/incoming rows — their children
-  // render as the plain preview they are.
   if (!isFileRow(parentRow)) {
     return { rows: childRows };
   }
@@ -1627,24 +961,6 @@ function getChildrenForRegularNode(
   const visibleIncomingCrefs = activeFilters.includes("incoming")
     ? incomingCrefs
     : List<NodeRef>();
-  const relatedSourceRefs = activeFilters.includes("incoming")
-    ? relatedSourceRefsForRow(graph, parentRow, visibleIncomingCrefs, refsByRow)
-    : List<NodeRef>();
-
-  const isOwnContent = nodeSourceId === LOCAL;
-  const {
-    suggestions: diffItems,
-    versionMetas,
-    renames,
-  } = getAlternativeFooterData(
-    graph,
-    visibleAuthors,
-    activeFilters,
-    directNode,
-    isOwnContent,
-    data.snapshotNodes
-  );
-
   const footerResult = appendVirtualFooterRows(data, graph, {
     parentPath: parentRow.viewPath,
     parentRow,
@@ -1653,10 +969,6 @@ function getChildrenForRegularNode(
     parentRoot: nodes.root ?? rootNode ?? nodes.id,
     parentUpdated: nodes.updated ?? Date.now(),
     incomingCrefs: visibleIncomingCrefs,
-    suggestions: diffItems,
-    versionMetas,
-    renames,
-    relatedSourceRefs,
   });
 
   // The action row leads the footer block: it carries the dotted
@@ -1682,12 +994,8 @@ function getTreeChildrenForResolvedRow(
   rootNode: ID | undefined,
   author: SourceId,
   typeFilters: Pane["typeFilters"],
-  refsByRow: Map<string, List<NodeRef>>,
   options?: TreeTraversalOptions
 ): TreeResult {
-  if (isEmbedRow(parentRow)) {
-    return getEmbedChildren(data, graph, parentRow);
-  }
   if (
     parentRow.virtualType === "incoming" &&
     parentRow.node.children.size > 0
@@ -1702,7 +1010,6 @@ function getTreeChildrenForResolvedRow(
     rootNode,
     author,
     typeFilters,
-    refsByRow,
     options
   );
 }
@@ -1726,10 +1033,6 @@ export function getTreeChildren(
   if (!parentRow) {
     return EMPTY_TREE_RESULT;
   }
-  const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
-  const refsByRow = activeFilters.includes("incoming")
-    ? relatedSourceRefsByRow(data, graph, List<Row>([parentRow]))
-    : Map<string, List<NodeRef>>();
   return {
     rows: reindexRows(
       getTreeChildrenForResolvedRow(
@@ -1739,7 +1042,6 @@ export function getTreeChildren(
         rootNode,
         author,
         typeFilters,
-        refsByRow,
         options
       ).rows
     ),
@@ -1775,7 +1077,6 @@ function getNodesInRows(
   rootNode: ID | undefined,
   author: SourceId,
   typeFilters: Pane["typeFilters"],
-  refsByRow: Map<string, List<NodeRef>>,
   options?: TreeTraversalOptions
 ): TreeResult {
   return rootRows.reduce<TreeResult>((result, rootRow) => {
@@ -1786,21 +1087,14 @@ function getNodesInRows(
       rootNode,
       author,
       typeFilters,
-      refsByRow,
       options
     );
     const row = {
       ...rootRow,
-      // A calendar feed whose entries are all hidden past still expands
-      // (and keeps its triangle): the children exist, they're behind the
-      // past chip. File rows only — proposals don't host the feed.
-      // Rename suggestions are replacement-shaped: about text, not a
-      // subtree — they never expand.
       hasChildren:
-        !rootRow.renameSuggestion &&
-        (childResult.rows.size > 0 ||
-          (isFileRow(rootRow) &&
-            hasHiddenPastEntries(data, graph, rootRow.node, rootRow.sourceId))),
+        childResult.rows.size > 0 ||
+        (isFileRow(rootRow) &&
+          hasHiddenPastEntries(data, graph, rootRow.node, rootRow.sourceId)),
     };
     const withRoot = {
       rows: result.rows.push(row),
@@ -1820,7 +1114,6 @@ function getNodesInRows(
       rootNode,
       author,
       typeFilters,
-      refsByRow,
       options
     );
   }, emptyTreeResult(ctx));
@@ -1846,10 +1139,6 @@ export function getNodesInTree(
     .map((path) => resolveRowForPath(data, graph, path, undefined, options))
     .filter((row): row is Row => row !== undefined)
     .toList();
-  const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
-  const refsByRow = activeFilters.includes("incoming")
-    ? relatedSourceRefsByRow(data, graph, rootRows)
-    : Map<string, List<NodeRef>>();
   return {
     rows: reindexRows(
       getNodesInRows(
@@ -1860,7 +1149,6 @@ export function getNodesInTree(
         rootNode,
         author,
         typeFilters,
-        refsByRow,
         options
       ).rows
     ),
@@ -1885,9 +1173,6 @@ export function getNodesInDocument(
     .filter((row): row is Row => row !== undefined)
     .toList();
   const topNodes = topRows.map((row) => row.node);
-  const refsByRow = activeFilters.includes("incoming")
-    ? relatedSourceRefsByRow(data, graph, topRows)
-    : Map<string, List<NodeRef>>();
   const treeResult = {
     rows: reindexRows(
       getNodesInRows(
@@ -1897,8 +1182,7 @@ export function getNodesInDocument(
         List<Row>(),
         undefined,
         document.sourceId,
-        activeFilters,
-        refsByRow
+        activeFilters
       ).rows
     ),
   };
@@ -1928,19 +1212,6 @@ export function getNodesInDocument(
     parentRoot: topNodes.first()?.root ?? EMPTY_NODE_ID,
     parentUpdated: document.updatedMs,
     incomingCrefs,
-    suggestions: List<ID>(),
-    versionMetas: Map<
-      ID,
-      { updated: number; addCount: number; removeCount: number }
-    >(),
-    renames: List<{
-      versionId: ID;
-      theirs: string;
-      sourceId: SourceId;
-      snapshotId: string;
-      baselineNodeId: ID;
-    }>(),
-    relatedSourceRefs: List<NodeRef>(),
   });
   const secondTopRow = topRows.get(1);
   const footerIndex = secondTopRow

@@ -52,7 +52,6 @@ function indexedData(entries: ReadonlyArray<[PublicKey, GraphNode[]]>): Data {
   return {
     user: { publicKey: LOCAL },
     knowledgeDBs,
-    snapshotNodes: Map<string, Map<string, GraphNode>>(),
     graphIndex,
     documents: Map(),
     documentByFilePath: Map(),

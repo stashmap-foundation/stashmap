@@ -18,7 +18,6 @@ export function createHeadlessPlan(
     documents: Map(),
     documentByFilePath: Map(),
     relaysInfos: Map(),
-    snapshotNodes: Map(),
     relays: EMPTY_RELAYS,
   });
 }

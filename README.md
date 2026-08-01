@@ -6,10 +6,10 @@ Planning docs (idea.md, implementation.md, spaces-protocol.md) live in the share
 
 # Build cli
 
-  npx esbuild src/cli/index.ts \
-    --bundle --platform=node --target=node20 --format=cjs \
-    --outfile=dist/knowstr.js \
-    --loader:.css=empty
+npx esbuild src/cli/index.ts \
+ --bundle --platform=node --target=node20 --format=cjs \
+ --outfile=dist/knowstr.js \
+ --loader:.css=empty
 
 ### Build workspaces
 

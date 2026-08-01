@@ -45,20 +45,6 @@ const RELEVANCE_FILTERS: {
   },
 ];
 
-const SUGGESTIONS_FILTER = {
-  id: "suggestions" as const,
-  label: "Suggestions",
-  color: TYPE_COLORS.proposal,
-  symbol: "@",
-};
-
-const VERSIONS_FILTER = {
-  id: "versions" as const,
-  label: "Versions",
-  color: TYPE_COLORS.proposal,
-  symbol: "\u2225",
-};
-
 // The filter button wears the same symbol as the rows it controls.
 const INCOMING_FILTER = {
   id: "incoming" as const,
@@ -67,12 +53,7 @@ const INCOMING_FILTER = {
   symbol: "\u21a9",
 };
 
-export type FilterId =
-  | Relevance
-  | "suggestions"
-  | "versions"
-  | "incoming"
-  | "contains";
+export type FilterId = Relevance | "incoming" | "contains";
 
 export function useToggleFilter(): (id: FilterId) => void {
   const pane = useCurrentPane();
@@ -122,12 +103,7 @@ function ClickableFilterSymbol({
   );
 }
 
-const ALL_FILTERS = [
-  ...RELEVANCE_FILTERS,
-  SUGGESTIONS_FILTER,
-  VERSIONS_FILTER,
-  INCOMING_FILTER,
-];
+const ALL_FILTERS = [...RELEVANCE_FILTERS, INCOMING_FILTER];
 
 function FilterPopover({
   currentFilters,
@@ -196,22 +172,6 @@ export function InlineFilterDots(): JSX.Element {
           />
         ))}
       </span>
-      <ClickableFilterSymbol
-        id={SUGGESTIONS_FILTER.id}
-        label={SUGGESTIONS_FILTER.label}
-        color={SUGGESTIONS_FILTER.color}
-        symbol={SUGGESTIONS_FILTER.symbol}
-        isActive={isFilterActive(SUGGESTIONS_FILTER.id)}
-        onClick={handleFilterToggle}
-      />
-      <ClickableFilterSymbol
-        id={VERSIONS_FILTER.id}
-        label={VERSIONS_FILTER.label}
-        color={VERSIONS_FILTER.color}
-        symbol={VERSIONS_FILTER.symbol}
-        isActive={isFilterActive(VERSIONS_FILTER.id)}
-        onClick={handleFilterToggle}
-      />
       <ClickableFilterSymbol
         id={INCOMING_FILTER.id}
         label={INCOMING_FILTER.label}

@@ -29,8 +29,6 @@ const PREFIX_RE = /^(\([!?~x+-]{1,2}\)\s*)+/;
 
 type ParsedComment = {
   uuid: string;
-  basedOn: string | undefined;
-  snapshotId: string | undefined;
   extraAttrs: Record<string, string> | undefined;
   systemRole: RootSystemRole | undefined;
 };
@@ -46,26 +44,13 @@ function parseIdComment(content: string): ParsedComment | undefined {
   }
   const rest = match[2];
 
-  const { attrsMap, extraAttrs } = [...rest.matchAll(ATTR_RE)].reduce<{
-    attrsMap: Record<string, string>;
-    extraAttrs: Record<string, string>;
-  }>(
-    (attrs, [, key, value]) => ({
-      attrsMap: { ...attrs.attrsMap, [key]: value },
-      extraAttrs:
-        key === "basedOn" || key === "snapshot"
-          ? attrs.extraAttrs
-          : { ...attrs.extraAttrs, [key]: value },
-    }),
-    { attrsMap: {}, extraAttrs: {} }
+  const extraAttrs = [...rest.matchAll(ATTR_RE)].reduce<Record<string, string>>(
+    (attrs, [, key, value]) => ({ ...attrs, [key]: value }),
+    {}
   );
 
-  const basedOn = attrsMap.basedOn || undefined;
-  const snapshotId = attrsMap.snapshot || undefined;
   return {
     uuid,
-    basedOn,
-    snapshotId,
     extraAttrs: Object.keys(extraAttrs).length > 0 ? extraAttrs : undefined,
     systemRole: undefined,
   };
@@ -255,8 +240,6 @@ export type MarkdownTreeNode = {
   headingLevel?: number;
   listOrdered?: boolean;
   listStart?: number;
-  basedOn?: string;
-  snapshotId?: string;
   extraAttrs?: Record<string, string>;
   systemRole?: RootSystemRole;
 };
@@ -313,12 +296,6 @@ function commentNodeAttrs(
 ): Partial<MarkdownTreeNode> {
   return {
     ...(commentAttrs?.uuid !== undefined && { uuid: commentAttrs.uuid }),
-    ...(commentAttrs?.basedOn !== undefined && {
-      basedOn: commentAttrs.basedOn,
-    }),
-    ...(commentAttrs?.snapshotId !== undefined && {
-      snapshotId: commentAttrs.snapshotId,
-    }),
     ...(commentAttrs?.extraAttrs !== undefined && {
       extraAttrs: commentAttrs.extraAttrs,
     }),

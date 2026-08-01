@@ -3,7 +3,6 @@ import userEvent from "@testing-library/user-event";
 import {
   ALICE,
   expectTree,
-  navigateToNodeViaSearch,
   renderApp,
   setDropIndentLevel,
   setup,
@@ -90,69 +89,6 @@ Root
     fireEvent.drop(screen.getByRole("treeitem", { name: "Target" }));
 
     await expectNoTargets();
-  });
-
-  test("Alt+drag selected rows creates references for all", async () => {
-    const [alice] = setup([ALICE]);
-    renderApp(alice());
-    await type("Root{Enter}{Tab}A{Enter}B{Enter}Target{Escape}");
-
-    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
-    await navigateToNodeViaSearch(1, "Target");
-
-    await clickRow("A");
-    await userEvent.keyboard("{Shift>}j{/Shift}");
-    await expectTargets("A", "B");
-
-    const targetItems = screen.getAllByRole("treeitem", { name: "Target" });
-    const targetInPane1 = targetItems[targetItems.length - 1];
-
-    await userEvent.keyboard("{Alt>}");
-    fireEvent.dragStart(screen.getAllByText("A")[0]);
-    fireEvent.dragOver(targetInPane1, { altKey: true });
-    fireEvent.drop(targetInPane1, { altKey: true });
-    await userEvent.keyboard("{/Alt}");
-
-    await expectTree(`
-Root
-  A
-  B
-  Target
-Target
-  A
-  B
-    `);
-  });
-
-  test("drag selected rows to different pane copies them", async () => {
-    const [alice] = setup([ALICE]);
-    renderApp(alice());
-    await type("Root{Enter}{Tab}A{Enter}B{Enter}C{Enter}Target{Escape}");
-
-    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
-    await navigateToNodeViaSearch(1, "Target");
-
-    const pane0Items = screen.getAllByLabelText("A");
-    await userEvent.click(pane0Items[0]);
-    await userEvent.keyboard("{Shift>}j{/Shift}");
-    await expectTargets("A", "B");
-
-    const targetItems = screen.getAllByRole("treeitem", { name: "Target" });
-    const targetInPane1 = targetItems[targetItems.length - 1];
-
-    fireEvent.dragStart(screen.getAllByText("A")[0]);
-    fireEvent.drop(targetInPane1);
-
-    await expectTree(`
-Root
-  A
-  B
-  C
-  Target
-Target
-  A
-  B
-    `);
   });
 
   test("non-contiguous selection (Cmd+click) reorders preserving original order", async () => {
@@ -373,47 +309,6 @@ Root
 });
 
 describe("Cross-depth DnD edge cases", () => {
-  test("cross-pane drag with cross-depth selection copies all selected children", async () => {
-    const [alice] = setup([ALICE]);
-    renderApp(alice());
-    await type(
-      "Root{Enter}{Tab}Parent{Enter}{Tab}Deep{Enter}{Enter}Shallow{Enter}Last{Escape}"
-    );
-
-    await expectTree(`
-Root
-  Parent
-    Deep
-  Shallow
-  Last
-    `);
-
-    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
-    await navigateToNodeViaSearch(1, "Last");
-
-    await clickRow("Deep");
-    await userEvent.keyboard("{Shift>}jj{/Shift}");
-    await expectTargets("Deep", "Shallow", "Last");
-
-    const targetItems = screen.getAllByRole("treeitem", { name: "Last" });
-    const targetInPane1 = targetItems[targetItems.length - 1];
-
-    fireEvent.dragStart(screen.getAllByText("Deep")[0]);
-    fireEvent.drop(targetInPane1);
-
-    await expectTree(`
-Root
-  Parent
-    Deep
-  Shallow
-  Last
-Last
-  Deep
-  Shallow
-  Last
-    `);
-  });
-
   test("same-pane move with cross-depth selection moves all selected children", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
@@ -443,121 +338,6 @@ Root
   Target
     Deep
     Shallow
-    `);
-  });
-
-  test("cross-depth Cmd+click selection: cross-pane drag copies all", async () => {
-    const [alice] = setup([ALICE]);
-    renderApp(alice());
-    await type(
-      "Root{Enter}{Tab}Parent{Enter}{Tab}Deep{Enter}{Enter}Shallow{Escape}"
-    );
-
-    await expectTree(`
-Root
-  Parent
-    Deep
-  Shallow
-    `);
-
-    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
-    await navigateToNodeViaSearch(1, "Shallow");
-
-    const deepElements = screen.getAllByLabelText("Deep");
-    const shallowElements = screen.getAllByLabelText("Shallow");
-    modClick(deepElements[0], { metaKey: true });
-    modClick(shallowElements[0], { metaKey: true });
-    await expectTargets("Deep", "Shallow");
-
-    const targetItems = screen.getAllByRole("treeitem", { name: "Shallow" });
-    const targetInPane1 = targetItems[targetItems.length - 1];
-
-    fireEvent.dragStart(screen.getAllByText("Deep")[0]);
-    fireEvent.drop(targetInPane1);
-
-    await expectTree(`
-Root
-  Parent
-    Deep
-  Shallow
-Shallow
-  Deep
-  Shallow
-    `);
-  });
-
-  test("cross-depth selection: Alt+drag creates references for all levels", async () => {
-    const [alice] = setup([ALICE]);
-    renderApp(alice());
-    await type(
-      "Root{Enter}{Tab}Parent{Enter}{Tab}Deep{Enter}{Enter}Shallow{Enter}Target{Escape}"
-    );
-
-    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
-    await navigateToNodeViaSearch(1, "Target");
-
-    await clickRow("Deep");
-    await userEvent.keyboard("{Shift>}j{/Shift}");
-    await expectTargets("Deep", "Shallow");
-
-    const targetItems = screen.getAllByRole("treeitem", { name: "Target" });
-    const targetInPane1 = targetItems[targetItems.length - 1];
-
-    await userEvent.keyboard("{Alt>}");
-    fireEvent.dragStart(screen.getAllByText("Deep")[0]);
-    fireEvent.dragOver(targetInPane1, { altKey: true });
-    fireEvent.drop(targetInPane1, { altKey: true });
-    await userEvent.keyboard("{/Alt}");
-
-    await expectTree(`
-Root
-  Parent
-    Deep
-  Shallow
-  Target
-Target
-  Deep
-  Shallow
-    `);
-  });
-
-  test("three levels deep: drag deepest with shallow siblings to other pane", async () => {
-    const [alice] = setup([ALICE]);
-    renderApp(alice());
-    await type(
-      "Root{Enter}{Tab}A{Enter}{Tab}B{Enter}{Tab}C{Enter}{Enter}{Enter}D{Escape}"
-    );
-
-    await expectTree(`
-Root
-  A
-    B
-      C
-  D
-    `);
-
-    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
-    await navigateToNodeViaSearch(1, "D");
-
-    await clickRow("C");
-    await userEvent.keyboard("{Shift>}j{/Shift}");
-    await expectTargets("C", "D");
-
-    const targetItems = screen.getAllByRole("treeitem", { name: "D" });
-    const targetInPane1 = targetItems[targetItems.length - 1];
-
-    fireEvent.dragStart(screen.getAllByText("C")[0]);
-    fireEvent.drop(targetInPane1);
-
-    await expectTree(`
-Root
-  A
-    B
-      C
-  D
-D
-  C
-  D
     `);
   });
 
@@ -656,52 +436,6 @@ Root
     `);
   });
 
-  test("cross-pane drag: children from 3 different parents", async () => {
-    const [alice] = setup([ALICE]);
-    renderApp(alice());
-    await type(
-      "Root{Enter}{Tab}A{Enter}{Tab}A1{Enter}{Enter}B{Enter}{Tab}B1{Enter}{Enter}C{Enter}{Tab}C1{Escape}"
-    );
-
-    await expectTree(`
-Root
-  A
-    A1
-  B
-    B1
-  C
-    C1
-    `);
-
-    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
-    await navigateToNodeViaSearch(1, "C1");
-
-    const a1Elements = screen.getAllByLabelText("A1");
-    const b1Elements = screen.getAllByLabelText("B1");
-    modClick(a1Elements[0], { metaKey: true });
-    modClick(b1Elements[0], { metaKey: true });
-    await expectTargets("A1", "B1");
-
-    const targetItems = screen.getAllByRole("treeitem", { name: "C1" });
-    const targetInPane1 = targetItems[targetItems.length - 1];
-
-    fireEvent.dragStart(screen.getAllByText("A1")[0]);
-    fireEvent.drop(targetInPane1);
-
-    await expectTree(`
-Root
-  A
-    A1
-  B
-    B1
-  C
-    C1
-C1
-  A1
-  B1
-    `);
-  });
-
   test("cross-depth reorder: siblings at same level reorder normally", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
@@ -786,72 +520,6 @@ Root
   A2
   A
   B
-    `);
-  });
-
-  test("cross-pane: parent+child selection copies only parent (child follows)", async () => {
-    const [alice] = setup([ALICE]);
-    renderApp(alice());
-    await type(
-      "Root{Enter}{Tab}Parent{Enter}{Tab}Deep{Enter}{Enter}Target{Escape}"
-    );
-
-    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
-    await navigateToNodeViaSearch(1, "Target");
-
-    modClick(await screen.findByLabelText("Parent"), { metaKey: true });
-    modClick(await screen.findByLabelText("Deep"), { metaKey: true });
-    await expectTargets("Parent", "Deep");
-
-    const targetItems = screen.getAllByRole("treeitem", { name: "Target" });
-    const targetInPane1 = targetItems[targetItems.length - 1];
-
-    fireEvent.dragStart(screen.getAllByText("Parent")[0]);
-    fireEvent.drop(targetInPane1);
-
-    await expectTree(`
-Root
-  Parent
-    Deep
-  Target
-Target
-  Parent
-    Deep
-    `);
-  });
-
-  test("cross-pane: non-contiguous selection at varied depths copies in DOM order", async () => {
-    const [alice] = setup([ALICE]);
-    renderApp(alice());
-    await type(
-      "Root{Enter}{Tab}A{Enter}{Tab}A1{Enter}{Enter}B{Enter}{Tab}B1{Escape}"
-    );
-
-    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
-    await navigateToNodeViaSearch(1, "B1");
-
-    const aElements = screen.getAllByLabelText("A");
-    const b1Elements = screen.getAllByLabelText("B1");
-    modClick(aElements[0], { metaKey: true });
-    modClick(b1Elements[0], { metaKey: true });
-    await expectTargets("A", "B1");
-
-    const targetItems = screen.getAllByRole("treeitem", { name: "B1" });
-    const targetInPane1 = targetItems[targetItems.length - 1];
-
-    fireEvent.dragStart(screen.getAllByText("A")[0]);
-    fireEvent.drop(targetInPane1);
-
-    await expectTree(`
-Root
-  A
-    A1
-  B
-    B1
-B1
-  A
-    A1
-  B1
     `);
   });
 
@@ -1325,54 +993,6 @@ Root
     `);
     await screen.findByLabelText("collapse A");
     await screen.findByLabelText("collapse A1");
-  });
-
-  test("cross-pane copy of multi-selection preserves expanded state", async () => {
-    const [alice] = setup([ALICE]);
-    renderApp(alice());
-    await type("Root{Enter}{Tab}A{Enter}{Tab}A1{Escape}");
-    await userEvent.click(await screen.findByLabelText("collapse A"));
-    await userEvent.click(await screen.findByLabelText("edit A"));
-    await userEvent.keyboard("{Enter}");
-    await type("B{Enter}{Tab}B1{Escape}");
-    await userEvent.click(await screen.findByLabelText("expand A"));
-    await userEvent.click(await screen.findByLabelText("collapse B"));
-    await userEvent.click(await screen.findByLabelText("edit B"));
-    await userEvent.keyboard("{Enter}");
-    await type("Target{Escape}");
-    await userEvent.click(await screen.findByLabelText("expand B"));
-
-    await expectTree(`
-Root
-  A
-    A1
-  B
-    B1
-  Target
-    `);
-    await screen.findByLabelText("collapse A");
-    await screen.findByLabelText("collapse B");
-
-    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
-    await navigateToNodeViaSearch(1, "Target");
-
-    const pane0Items = screen.getAllByLabelText("A");
-    await userEvent.click(pane0Items[0]);
-    modClick(screen.getAllByLabelText("B")[0], { metaKey: true });
-
-    const targetItems = screen.getAllByRole("treeitem", { name: "Target" });
-    const targetInPane1 = targetItems[targetItems.length - 1];
-
-    fireEvent.dragStart(screen.getAllByText("A")[0]);
-    fireEvent.drop(targetInPane1);
-
-    await screen.findByText(/syncing/);
-    await screen.findByText("synced");
-
-    const collapseA = screen.getAllByLabelText("collapse A");
-    expect(collapseA.length).toBeGreaterThanOrEqual(2);
-    const collapseB = screen.getAllByLabelText("collapse B");
-    expect(collapseB.length).toBeGreaterThanOrEqual(2);
   });
 });
 

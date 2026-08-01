@@ -208,7 +208,7 @@ function entityLinkedTrees(
     const feedWrap =
       !tree.uuid && !entityId && isBareIcalFeedUrl(text)
         ? { spans: plainSpans(icalFeedLinkText(text.trim())) }
-        : {};
+        : undefined;
     return {
       ...tree,
       ...(entityId
@@ -216,6 +216,9 @@ function entityLinkedTrees(
             spans: [linkSpan(entityId, home ? nodeText(home) : text.trim())],
           }
         : feedWrap),
+      ...((entityId || feedWrap) && {
+        extraAttrs: { ...tree.extraAttrs, embed: "true" },
+      }),
       children: entityLinkedTrees(plan, tree.children),
     };
   });

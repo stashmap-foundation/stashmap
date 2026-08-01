@@ -117,7 +117,6 @@ export function NostrDataProvider({
       documentByFilePath={Map()}
       relaysInfos={Map<string, RelayInformation | undefined>()}
       publishEventsStatus={session.publishStatus}
-      snapshotNodes={Map()}
       views={session.views}
       panes={session.panes}
     >

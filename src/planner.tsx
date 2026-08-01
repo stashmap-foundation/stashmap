@@ -1,11 +1,10 @@
 /* eslint-disable @typescript-eslint/no-use-before-define, functional/no-let, functional/immutable-data, no-continue, no-nested-ternary */
 import React, { Dispatch, SetStateAction, useRef } from "react";
-import { List, Map, OrderedSet } from "immutable";
+import { List, OrderedSet } from "immutable";
 import { UnsignedEvent } from "nostr-tools";
 import {
   KIND_DELETE,
   KIND_KNOWLEDGE_DOCUMENT,
-  KIND_KNOWLEDGE_DEPOSIT,
   newTimestamp,
   msTag,
 } from "./nostr";
@@ -17,20 +16,11 @@ import {
   withDocumentRealWorldEntities,
 } from "./core/Document";
 import { renderDocumentMarkdown } from "./documentRenderer";
-import {
-  buildDepositEvent,
-  buildDocumentEvent,
-  buildSnapshotEvent,
-  depositEntityTags,
-  depositWriteRelayConf,
-  snapshotIdForContent,
-} from "./nodesDocumentEvent";
-import { publishStateOf } from "./core/knowstrFrontmatter";
+import { buildDocumentEvent } from "./nodesDocumentEvent";
 import { newStorageKey } from "./storageEncryption";
 import {
   EMPTY_NODE_ID,
   isEmptyNodeID,
-  getNode,
   computeEmptyNodeMetadata,
   isSearchId,
 } from "./core/connections";
@@ -40,8 +30,6 @@ import {
   GraphPlan,
   createGraphPlan,
   planAddTargetsToNode,
-  planClearDocumentPublishState,
-  planCopyDescendantNodes,
   planUpsertNodes,
   withDocumentRoot,
 } from "./core/plan";
@@ -51,15 +39,12 @@ import {
   updateView,
   getParentView,
   bulkUpdateViewPathsAfterAddNode,
-  copyViewsWithNodesMapping,
-  viewPathToString,
-  addNodeToPathWithNodes,
 } from "./rowModel";
 import { plainSpans, spansText, spansToMarkdown } from "./core/nodeSpans";
 import { calendarEntryEditedSpans } from "./core/ical";
 import { LOCAL } from "./core/nodeRef";
 import { entityIdForText } from "./core/entityRecognition";
-import { getWorkspaceNode, newDB } from "./core/knowledge";
+import { getWorkspaceNode } from "./core/knowledge";
 import { useRelaysToCreatePlan } from "./relays";
 import {
   MultiSelectionState,
@@ -90,6 +75,14 @@ type WorkspacePlan = GraphPlan &
 
 export type Plan = WorkspacePlan;
 
+function isStandaloneInternalLink(spans: InlineSpan[]): boolean {
+  return (
+    spans.length === 1 &&
+    spans[0]?.kind === "link" &&
+    spans[0].href.startsWith("#")
+  );
+}
+
 export function planUpdateNodeSpans(
   plan: Plan,
   nodeID: ID,
@@ -105,6 +98,9 @@ export function planUpdateNodeSpans(
   return planUpsertNodes(plan, {
     ...currentNode,
     spans,
+    ...(isStandaloneInternalLink(spans) && {
+      extraAttrs: { ...currentNode.extraAttrs, embed: "true" },
+    }),
     updated: Date.now(),
   });
 }
@@ -339,12 +335,17 @@ export function planAddSpansToParent(
       argument
     )[0];
   }
-  const node = newGraphNode(spans, {
-    root: parentNode.root,
-    parent: parentNode.id,
-    relevance,
-    argument,
-  });
+  const node = {
+    ...newGraphNode(spans, {
+      root: parentNode.root,
+      parent: parentNode.id,
+      relevance,
+      argument,
+    }),
+    ...(isStandaloneInternalLink(spans) && {
+      extraAttrs: { embed: "true" },
+    }),
+  };
   return planAddToParent(
     planUpsertNodes(plan, node),
     node.id,
@@ -353,135 +354,6 @@ export function planAddSpansToParent(
     relevance,
     argument
   )[0];
-}
-
-type NodesIdMapping = Map<ID, ID>;
-
-function updateViewsWithNodesMapping(
-  views: Views,
-  nodesIdMapping: Map<ID, ID>
-): Views {
-  return views.mapEntries(([key, view]) => {
-    const newKey = nodesIdMapping.reduce(
-      (k, newId, oldId) => k.split(oldId).join(newId),
-      key
-    );
-    return [newKey, view];
-  });
-}
-
-export function planForkPane(
-  plan: Plan,
-  paneIndex: number,
-  pane: Pane,
-  sourceNode: GraphNode
-): Plan {
-  const [planWithNodes, nodesIdMapping] = planCopyDescendantNodes(
-    plan,
-    plan.knowledgeDBs.get(pane.sourceId, newDB()),
-    sourceNode
-  );
-  const updatedViews = updateViewsWithNodesMapping(
-    planWithNodes.views,
-    nodesIdMapping
-  );
-  const planWithUpdatedViews = planUpdateViews(planWithNodes, updatedViews);
-  const newRootNodeId = pane.rootNodeId
-    ? nodesIdMapping.get(pane.rootNodeId)
-    : nodesIdMapping.get(sourceNode.id);
-  const newPanes = planWithUpdatedViews.panes.map((p, i) =>
-    i === paneIndex
-      ? {
-          ...p,
-          author: LOCAL,
-          sourceId: LOCAL,
-          rootNodeId: newRootNodeId,
-        }
-      : p
-  );
-  return planUpdatePanes(planWithUpdatedViews, newPanes);
-}
-
-function copyDeepNodeViewState(
-  planWithCopy: Plan,
-  nodesIdMapping: NodesIdMapping,
-  sourceViewPath: ViewPath,
-  targetParentNode: GraphNode,
-  targetParentViewPath: ViewPath,
-  insertAtIndex?: number
-): Plan {
-  const nodes =
-    getNode(planWithCopy.knowledgeDBs, targetParentNode.id, LOCAL) ??
-    targetParentNode;
-  if (nodes.children.size === 0) {
-    return planWithCopy;
-  }
-
-  const targetIndex = insertAtIndex ?? nodes.children.size - 1;
-  const targetViewPath = addNodeToPathWithNodes(
-    targetParentViewPath,
-    nodes,
-    targetIndex
-  );
-
-  const sourceKey = viewPathToString(sourceViewPath);
-  const targetKey = viewPathToString(targetViewPath);
-
-  const updatedViews = copyViewsWithNodesMapping(
-    planWithCopy.views,
-    sourceKey,
-    targetKey,
-    nodesIdMapping
-  );
-
-  return planUpdateViews(planWithCopy, updatedViews);
-}
-
-export function planDeepCopyNode(
-  plan: Plan,
-  sourceId: SourceId,
-  resolvedNode: GraphNode,
-  targetParentID: ID,
-  sourceViewPath: ViewPath,
-  targetParentViewPath: ViewPath,
-  insertAtIndex?: number,
-  relevance?: Relevance,
-  argument?: Argument
-): Plan {
-  const targetParentNode = getWorkspaceNode(plan.knowledgeDBs, targetParentID);
-  if (!targetParentNode) {
-    return plan;
-  }
-  const [planWithCopiedNodes, mapping] = planCopyDescendantNodes(
-    plan,
-    plan.knowledgeDBs.get(sourceId, newDB()),
-    resolvedNode,
-    targetParentNode.id,
-    targetParentNode.root
-  );
-
-  const copiedTopNodeID = mapping.get(resolvedNode.id);
-  if (!copiedTopNodeID) {
-    return planWithCopiedNodes;
-  }
-
-  const [finalPlan] = planAddToParent(
-    planWithCopiedNodes,
-    copiedTopNodeID,
-    targetParentID,
-    insertAtIndex,
-    relevance,
-    argument
-  );
-
-  return copyDeepNodeViewState(
-    finalPlan,
-    mapping,
-    sourceViewPath,
-    targetParentNode,
-    targetParentViewPath,
-    insertAtIndex
-  );
 }
 
 /**
@@ -556,9 +428,14 @@ export function planCreateNoteAtRoot(
     };
   }
 
-  const createdNode = withDocumentRoot(
-    newGraphNode(spans, entityId ? { uuid: entityId } : {})
-  );
+  const createdNode = {
+    ...withDocumentRoot(
+      newGraphNode(spans, entityId ? { uuid: entityId } : {})
+    ),
+    ...(isStandaloneInternalLink(spans) && {
+      extraAttrs: { embed: "true" },
+    }),
+  };
   const planWithNode = planUpsertNodes(plan, createdNode);
 
   const newPanes = planWithNode.panes.map((p, i) =>
@@ -582,10 +459,6 @@ export function planCreateNoteAtRoot(
   return { plan: resultPlan, viewPath: newViewPath, node: createdNode };
 }
 
-/**
- * Save node text - either materialize an empty node or create a version for existing node.
- * Returns the updated plan and the viewPath of the saved node.
- */
 export function planSaveNodeAndEnsureNodes(
   plan: Plan,
   spans: InlineSpan[],
@@ -694,81 +567,9 @@ const PlanningContext = React.createContext<PlanningContextValue | undefined>(
   undefined
 );
 
-// Filter out empty placeholder nodes from events before publishing
-// Empty nodes are injected at read time via injectEmptyNodesIntoKnowledgeDBs,
-// so any nodes modification will include them - we need to filter before publishing
-function resolveBasedOnNode(
-  knowledgeDBs: KnowledgeDBs,
-  nodeID: ID,
-  myself: SourceId
-): { node: GraphNode; sourceId: SourceId } | undefined {
-  const own = getNode(knowledgeDBs, nodeID, myself);
-  if (own) {
-    return { node: own, sourceId: myself };
-  }
-  return knowledgeDBs
-    .keySeq()
-    .sort()
-    .map((sourceId) => {
-      const node = getNode(knowledgeDBs, nodeID, sourceId);
-      return node ? { node, sourceId } : undefined;
-    })
-    .find((resolved) => resolved !== undefined);
-}
-
-function getSnapshotSourceRoot(
-  knowledgeDBs: KnowledgeDBs,
-  snapshotAnchorNode: GraphNode | undefined,
-  fallbackAuthor: SourceId
-): { node: GraphNode; sourceId: SourceId } | undefined {
-  if (!snapshotAnchorNode?.basedOn) {
-    return undefined;
-  }
-  const source = resolveBasedOnNode(
-    knowledgeDBs,
-    snapshotAnchorNode.basedOn,
-    fallbackAuthor
-  );
-  const root = source
-    ? getNode(knowledgeDBs, source.node.root, source.sourceId)
-    : undefined;
-  return root && source ? { node: root, sourceId: source.sourceId } : undefined;
-}
-
-// Every node of the document holding basedOn without a baseline — the fork
-// shape is irrelevant (root fork, child fork, fork into another document)
-// and so is the fork's age: the same predicate captures fresh forks and
-// repairs legacy ones at their next save. Existing snapshotIds are never
-// touched (absence is repaired, breakage is waited out).
-function collectUnbaselinedForks(
-  knowledgeDBs: KnowledgeDBs,
-  topNodes: readonly GraphNode[]
-): GraphNode[] {
-  type Acc = { seen: Map<ID, boolean>; forks: GraphNode[] };
-  const visit = (acc: Acc, node: GraphNode): Acc => {
-    if (acc.seen.get(node.id)) {
-      return acc;
-    }
-    const withSelf: Acc = {
-      seen: acc.seen.set(node.id, true),
-      forks:
-        node.basedOn && !node.snapshotId ? [...acc.forks, node] : acc.forks,
-    };
-    return node.children.reduce((childAcc, childID) => {
-      const child = getNode(knowledgeDBs, childID, LOCAL);
-      return child ? visit(childAcc, child) : childAcc;
-    }, withSelf);
-  };
-  return topNodes.reduce(visit, {
-    seen: Map<ID, boolean>(),
-    forks: [] as GraphNode[],
-  }).forks;
-}
-
 export function buildDocumentWrites(plan: GraphPlan): {
   document: KnowstrDocument;
   content: string;
-  snapshotContents: string[];
 }[] {
   return plan.affectedDocuments.toArray().flatMap((docId) => {
     const rawDocument = plan.documents.get(documentKeyOf(LOCAL, docId));
@@ -781,148 +582,13 @@ export function buildDocumentWrites(plan: GraphPlan): {
       plan.documentByFilePath,
       rawDocument
     );
-    const topNodes = document.topNodeShortIds
-      .map((topNodeShortId) =>
-        plan.knowledgeDBs.get(LOCAL)?.nodes.get(topNodeShortId)
-      )
-      .filter((node): node is GraphNode => node !== undefined);
-    const forkNodes = collectUnbaselinedForks(plan.knowledgeDBs, topNodes);
-    // One snapshot per source document, however many forks came from it;
-    // forks from several sources stamp several snapshotIds in one write.
-    const baselines = forkNodes.reduce(
-      (acc, forkNode) => {
-        const sourceRoot = getSnapshotSourceRoot(
-          plan.knowledgeDBs,
-          forkNode,
-          LOCAL
-        );
-        const sourceDocKey = sourceRoot?.node.docId
-          ? documentKeyOf(sourceRoot.sourceId, sourceRoot.node.docId)
-          : undefined;
-        const sourceDocument = sourceDocKey
-          ? plan.documents.get(sourceDocKey)
-          : undefined;
-        if (!sourceDocKey || !sourceDocument) {
-          return acc;
-        }
-        const content =
-          acc.contentByDoc.get(sourceDocKey) ??
-          renderDocumentMarkdown(plan.knowledgeDBs, sourceDocument);
-        return {
-          contentByDoc: acc.contentByDoc.set(sourceDocKey, content),
-          snapshotIds: acc.snapshotIds.set(
-            forkNode.id,
-            snapshotIdForContent(content)
-          ),
-        };
-      },
-      { contentByDoc: Map<string, string>(), snapshotIds: Map<ID, string>() }
-    );
     return [
       {
         document,
-        content: renderDocumentMarkdown(plan.knowledgeDBs, document, {
-          snapshotIds: baselines.snapshotIds,
-        }),
-        snapshotContents: [
-          ...baselines.contentByDoc.valueSeq().toArray(),
-          ...(plan.extraSnapshots?.toArray() ?? []),
-        ],
+        content: renderDocumentMarkdown(plan.knowledgeDBs, document),
       },
     ];
   });
-}
-
-// Published, unpaused documents emit a deposit: same content as storage,
-// kind 34774, entity-tagged, with per-event relay routing. Paused documents
-// emit none, so the paused flag never reaches a deposit.
-function depositEventFor(
-  plan: GraphPlan,
-  pubkey: PublicKey,
-  write: { document: KnowstrDocument; content: string }
-): (UnsignedEvent & EventAttachment) | undefined {
-  const publishState = publishStateOf(write.document.frontMatter);
-  if (!publishState || publishState.paused) {
-    return undefined;
-  }
-  const tags = depositEntityTags(write.document);
-  return {
-    ...buildDepositEvent(write.document, pubkey, write.content, tags),
-    writeRelayConf: depositWriteRelayConf(
-      write.document,
-      plan.relays.userRelays,
-      tags
-    ),
-  } as UnsignedEvent & EventAttachment;
-}
-
-export function buildDepositEvents(
-  plan: GraphPlan
-): List<UnsignedEvent & EventAttachment> {
-  const explicit = plan.publishEvents.filter(
-    (event) =>
-      event.kind === KIND_KNOWLEDGE_DEPOSIT || event.kind === KIND_DELETE
-  );
-  if (!plan.user) {
-    return explicit;
-  }
-  const pubkey = plan.user.publicKey;
-  return buildDocumentWrites(plan).reduce((events, write) => {
-    const deposit = depositEventFor(plan, pubkey, write);
-    return deposit ? events.push(deposit) : events;
-  }, explicit);
-}
-
-// Undo publishing (idea.md, M7 retract): a kind-5 on the deposit
-// coordinate PLUS an empty replacement at the same (pubkey, d) — relays
-// that ignore deletion requests still lose content and rendezvous — and
-// the document drops knowstr_publish. Copies and takes others made remain
-// theirs; that is the honest limit of retraction.
-export function planRetractDocument<T extends GraphPlan>(
-  plan: T,
-  document: KnowstrDocument
-): T {
-  if (!plan.user) {
-    return plan;
-  }
-  const pubkey = plan.user.publicKey;
-  const documentWithTags = withDocumentRealWorldEntities(
-    plan.knowledgeDBs,
-    plan.documents,
-    plan.documentByFilePath,
-    document
-  );
-  const tags = depositEntityTags(documentWithTags);
-  const writeRelayConf = depositWriteRelayConf(
-    document,
-    plan.relays.userRelays,
-    tags
-  );
-  const retraction = {
-    kind: KIND_DELETE,
-    pubkey,
-    created_at: newTimestamp(),
-    tags: [
-      ["a", `${KIND_KNOWLEDGE_DEPOSIT}:${pubkey}:${document.docId}`],
-      ["k", `${KIND_KNOWLEDGE_DEPOSIT}`],
-      msTag(),
-    ],
-    content: "",
-    writeRelayConf,
-  };
-  const emptyReplacement = {
-    kind: KIND_KNOWLEDGE_DEPOSIT,
-    pubkey,
-    created_at: newTimestamp(),
-    tags: [["d", document.docId], msTag()],
-    content: "",
-    writeRelayConf,
-  };
-  const cleared = planClearDocumentPublishState(plan, document.docId);
-  return {
-    ...cleared,
-    publishEvents: cleared.publishEvents.push(retraction, emptyReplacement),
-  };
 }
 
 export function buildDocumentEvents(
@@ -933,27 +599,12 @@ export function buildDocumentEvents(
   }
   const pubkey = plan.user.publicKey;
   const withUpserts = buildDocumentWrites(plan).reduce((events, write) => {
-    // One storage key per write, shared by the document and its fork
-    // snapshots: whoever can open the fork can diff against its baseline.
     const documentWithKey = {
       ...write.document,
       storageKey: write.document.storageKey ?? newStorageKey(),
     };
     const event = buildDocumentEvent(documentWithKey, pubkey, write.content);
-    const depositEvent = depositEventFor(plan, pubkey, write);
-    const withSnapshots = write.snapshotContents.reduce(
-      (acc, snapshotContent) =>
-        acc.push(
-          buildSnapshotEvent(
-            pubkey,
-            snapshotContent,
-            documentWithKey.storageKey
-          )
-        ),
-      events
-    );
-    const withDocument = withSnapshots.push(event);
-    return depositEvent ? withDocument.push(depositEvent) : withDocument;
+    return events.push(event);
   }, plan.publishEvents);
   return plan.deletedDocs.reduce((events, docId) => {
     const deleteEvent = {

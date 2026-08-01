@@ -5,15 +5,12 @@ import {
   BOB,
   copySecretLinkViaChip,
   expectTree,
-  forkOwnRoot,
-  forkReadonlyRoot,
   getPane,
   navigateToNodeViaSearch,
   renderApp,
   renderTree,
   setup,
   type,
-  requireUser,
 } from "../utils.test";
 
 describe("References", () => {
@@ -31,152 +28,6 @@ Knowstr
     Which AIs would I personally want?
       Project Specific AIs
         Knowstr
-    `);
-  });
-
-  test("Fork's version shows as suggestion and version entry", async () => {
-    const [alice] = setup([ALICE]);
-
-    renderTree(alice);
-    await type(
-      "Notes{Enter}Cities{Enter}{Tab}Barcelona{Enter}{Tab}Alice child{Escape}"
-    );
-    cleanup();
-
-    await forkOwnRoot(alice, "Notes", "My Fork");
-    renderTree(alice);
-    await navigateToNodeViaSearch(0, "My Fork");
-    await userEvent.click(
-      await screen.findByLabelText("open Cities in fullscreen")
-    );
-    await userEvent.click(
-      await screen.findByLabelText("open Barcelona in fullscreen")
-    );
-    await userEvent.click(await screen.findByLabelText("edit Barcelona"));
-    await userEvent.keyboard("{Enter}");
-    await type("Bob child{Escape}");
-    cleanup();
-
-    window.history.pushState({}, "", "/");
-    renderTree(alice);
-    await navigateToNodeViaSearch(0, "Notes");
-    await expectTree(`
-Notes
-  Cities
-    Barcelona
-      Alice child
-      [S] Bob child
-  [S] Notes My Fork
-    `);
-  });
-
-  test("Clicking version fullscreen opens with the fork's content", async () => {
-    const [alice] = setup([ALICE]);
-
-    renderTree(alice);
-    await type(
-      "Notes{Enter}Cities{Enter}{Tab}Barcelona{Enter}{Tab}Alice child{Escape}"
-    );
-    cleanup();
-
-    await forkOwnRoot(alice, "Notes", "My Fork");
-    renderTree(alice);
-    await navigateToNodeViaSearch(0, "My Fork");
-    await userEvent.click(
-      await screen.findByLabelText("open Cities in fullscreen")
-    );
-    await userEvent.click(
-      await screen.findByLabelText("open Barcelona in fullscreen")
-    );
-    await userEvent.click(await screen.findByLabelText("edit Barcelona"));
-    await userEvent.keyboard("{Enter}");
-    await type("Bob child{Enter}Bob2{Enter}Bob3{Enter}Bob4{Escape}");
-    cleanup();
-
-    window.history.pushState({}, "", "/");
-    renderTree(alice);
-    await navigateToNodeViaSearch(0, "Notes");
-    await userEvent.click(
-      await screen.findByLabelText(/open .* \+4 in fullscreen/)
-    );
-
-    await expectTree(`
-Barcelona
-  Bob child
-  Bob2
-  Bob3
-  Bob4
-  Alice child
-    `);
-  });
-
-  test("Descendant versions appear when viewing the base version", async () => {
-    const [alice] = setup([ALICE]);
-
-    renderTree(alice);
-    await type(
-      "Notes{Enter}Cities{Enter}{Tab}Barcelona{Enter}{Tab}Alice child{Escape}"
-    );
-    cleanup();
-
-    await forkOwnRoot(alice, "Notes", "My Fork");
-    renderTree(alice);
-    await navigateToNodeViaSearch(0, "My Fork");
-    await userEvent.click(
-      await screen.findByLabelText("open Cities in fullscreen")
-    );
-    await userEvent.click(
-      await screen.findByLabelText("open Barcelona in fullscreen")
-    );
-    await userEvent.click(await screen.findByLabelText("edit Barcelona"));
-    await userEvent.keyboard("{Enter}");
-    await type("Bob child{Enter}Bob2{Enter}Bob3{Enter}Bob4{Escape}");
-    cleanup();
-
-    window.history.pushState({}, "", "/");
-    renderTree(alice);
-    await navigateToNodeViaSearch(0, "Notes");
-
-    await expectTree(`
-Notes
-  Cities
-    Barcelona
-      Alice child
-      [S] Bob child
-      [S] Bob2
-      [S] Bob3
-      [V] +4
-  [S] Notes My Fork
-    `);
-  });
-
-  test("Ancestor versions appear when viewing a fork", async () => {
-    const [alice, bob] = setup([ALICE, BOB]);
-
-    renderTree(alice);
-    await type(
-      "Notes{Enter}Cities{Enter}{Tab}Barcelona{Enter}{Tab}Alice child{Escape}"
-    );
-    cleanup();
-
-    await forkReadonlyRoot(bob(), requireUser(alice()).publicKey, "Notes");
-    await userEvent.click(
-      await screen.findByLabelText("open Cities in fullscreen")
-    );
-    await userEvent.click(
-      await screen.findByLabelText("open Barcelona in fullscreen")
-    );
-    await userEvent.click(await screen.findByLabelText("edit Barcelona"));
-    await userEvent.keyboard("{Enter}");
-    await type("Bob child{Enter}Bob2{Enter}Bob3{Enter}Bob4{Escape}");
-
-    await expectTree(`
-Barcelona
-  Bob child
-  Bob2
-  Bob3
-  Bob4
-  Alice child
     `);
   });
 

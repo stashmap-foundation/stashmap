@@ -43,11 +43,10 @@ export function EvidenceSelector(): JSX.Element | null {
   const { currentArgument, isVisible } = useUpdateArgument();
   const row = useRow();
   const { virtualType } = row;
-  const isAcceptableVirtual =
-    virtualType === "incoming" || virtualType === "version";
+  const isAcceptableVirtual = virtualType === "incoming";
   const { viewKey } = row;
   const currentNode = useCurrentNode();
-  const versionedDisplayText = useDisplayText();
+  const nodeDisplayText = useDisplayText();
   const editorTextContext = useEditorText();
   const editorSpans = editorTextContext?.spans;
   const editorText = spansText(editorSpans ?? []);
@@ -59,7 +58,7 @@ export function EvidenceSelector(): JSX.Element | null {
 
   const nodeName =
     editorText.trim() ||
-    versionedDisplayText ||
+    nodeDisplayText ||
     (currentNode ? nodeText(currentNode) : "") ||
     "row";
 

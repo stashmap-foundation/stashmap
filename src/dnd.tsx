@@ -5,14 +5,12 @@ import { HTML5Backend } from "react-dnd-html5-backend";
 import { LOCAL } from "./core/nodeRef";
 import { moveNodes, createRefTarget, getNode } from "./core/connections";
 import { nodeText } from "./core/nodeSpans";
-import { isCanonicalId } from "./core/entityRecognition";
 import { calendarEntryTarget } from "./core/ical";
 import { getIndependentRows, updateViewPathsAfterMoveNodes } from "./rowModel";
-import { getDocumentByIdOrFilePath } from "./core/Document";
+import { getDocumentForNode } from "./core/Document";
 import {
   Plan,
   planUpdateViews,
-  planDeepCopyNode,
   planExpandNode,
   planAddToParent,
   planUpsertNodes,
@@ -26,12 +24,9 @@ type DragSource = {
   draggedRows: Row[];
   sourcePaneIndex: number;
   text?: string;
-  isSuggestion?: boolean;
   isCopyDrag?: boolean;
-  virtualType: Row["virtualType"];
   nodeId?: ID;
   targetId?: ID;
-  linkText?: string;
   insertTarget?: AddToParentTarget;
 };
 
@@ -275,24 +270,17 @@ export function getDropDestinationFromRows(
   return getDropBeforeParentDestination(rows, dropBefore);
 }
 
-function resolveDeepCopySource(row: Row): {
-  node: GraphNode;
-  sourceId: SourceId;
-} {
-  return { node: row.node, sourceId: row.sourceId };
-}
-
 export function dnd(
   basePlan: Plan,
   sourceDrag: DragSource,
   targetPaneIndex: number,
   targetParentRow: Row,
-  dropIndex: number,
-  invertCopyMode: boolean
+  dropIndex: number
 ): Plan {
-  // Dropping INTO a computed row takes it first — the drop target must
-  // exist before anything can attach to it.
-  const [plan] = planMaterializeComputedRow(basePlan, targetParentRow);
+  const [plan, targetParentNode] = planMaterializeComputedRow(
+    basePlan,
+    targetParentRow
+  );
   const source = sourceDrag.row.viewKey;
   const sources = sourceDrag.draggedRows.length
     ? sourceDrag.draggedRows
@@ -304,27 +292,33 @@ export function dnd(
   if (!sourcePane || !targetPane) {
     return plan;
   }
-  const isSamePane = sourcePane.id === targetPane.id;
-  const sourceDocument = sourcePane.documentId
-    ? getDocumentByIdOrFilePath(
-        plan.documents,
-        plan.documentByFilePath,
-        sourcePane.sourceId,
-        sourcePane.documentId
-      )
-    : undefined;
   const sourceDocumentNode = sourceDrag.row.node;
+  const sourceDocument = getDocumentForNode(
+    plan.knowledgeDBs,
+    plan.documents,
+    sourceDocumentNode,
+    sourceDrag.row.sourceId
+  );
+  const targetSourceId = targetParentRow.materialize
+    ? LOCAL
+    : targetParentRow.sourceId;
+  const targetDocument = getDocumentForNode(
+    plan.knowledgeDBs,
+    plan.documents,
+    targetParentNode,
+    targetSourceId
+  );
+  const isSameDocument =
+    sourceDocument !== undefined &&
+    targetDocument !== undefined &&
+    sourceDocument.sourceId === targetDocument.sourceId &&
+    sourceDocument.docId === targetDocument.docId;
   const isDocumentTopLevelSource =
     sourceDocument !== undefined &&
     sourceDocument.sourceId === sourceDrag.row.sourceId &&
     sourceDocument.topNodeShortIds.includes(sourceDocumentNode.id);
 
-  if (
-    isDocumentTopLevelSource &&
-    isSamePane &&
-    !invertCopyMode &&
-    !sourceDrag.isCopyDrag
-  ) {
+  if (isDocumentTopLevelSource && isSameDocument && !sourceDrag.isCopyDrag) {
     return plan;
   }
 
@@ -332,11 +326,12 @@ export function dnd(
   const allSourcesSameParent =
     sourceParentRef !== undefined &&
     independentRows.every((row) => refsEqual(row.parentRef, sourceParentRef));
+  const targetParentRef = { sourceId: targetSourceId, id: targetParentNode.id };
   const sameNode =
-    allSourcesSameParent && refsEqual(sourceParentRef, targetParentRow.ref);
+    allSourcesSameParent && refsEqual(sourceParentRef, targetParentRef);
 
-  const skipMoveLogic = sourceDrag.isSuggestion || sourceDrag.isCopyDrag;
-  const reorder = isSamePane && !skipMoveLogic && sameNode;
+  const skipMoveLogic = sourceDrag.isCopyDrag;
+  const reorder = isSameDocument && !skipMoveLogic && sameNode;
 
   const addProjectedSourceAsReference = (
     accPlan: Plan,
@@ -350,7 +345,7 @@ export function dnd(
     if (sourceRow.materialize) {
       const [materializedPlan, materializedNode, materializedNow] =
         planMaterializeComputedRow(accPlan, sourceRow, undefined, {
-          parentID: targetParentRow.node.id,
+          parentID: targetParentNode.id,
           insertIndex: insertAt,
         });
       if (materializedNow || !sourceRow.parentRef) {
@@ -358,10 +353,10 @@ export function dnd(
       }
       // Same-parent: an in-place reorder (planMoveNode is add-then-
       // disconnect and not same-parent-safe). Cross-parent: a move.
-      if (sourceRow.parentRef.id === targetParentRow.node.id) {
+      if (sourceRow.parentRef.id === targetParentNode.id) {
         const parentNode = getCurrentPlanNode(
           materializedPlan,
-          targetParentRow.node
+          targetParentNode
         );
         const fromIndex = parentNode.children.indexOf(materializedNode.id);
         if (fromIndex < 0) {
@@ -382,7 +377,7 @@ export function dnd(
         materializedNode.id,
         sourceRow.parentRef.id,
         sourceRow.viewPath,
-        targetParentRow.node.id,
+        targetParentNode.id,
         targetParentRow.viewPath,
         insertAt
       );
@@ -393,7 +388,7 @@ export function dnd(
         calendarEntryTarget(sourceRow.node) ?? sourceRow.node.id,
         nodeText(sourceRow.node)
       ),
-      targetParentRow.node.id,
+      targetParentNode.id,
       insertAt
     )[0];
   };
@@ -408,7 +403,7 @@ export function dnd(
     const sourceIndices = realRows.flatMap((row) =>
       row.childIndex === undefined ? [] : [row.childIndex]
     );
-    const targetNode = getCurrentPlanNode(plan, targetParentRow.node);
+    const targetNode = getCurrentPlanNode(plan, targetParentNode);
     const updatedNodesPlan = planUpsertNodes(
       plan,
       moveNodes(targetNode, sourceIndices, dropIndex)
@@ -421,10 +416,9 @@ export function dnd(
     }, reorderedPlan);
   }
 
-  const samePaneMove =
-    isSamePane && !skipMoveLogic && !invertCopyMode && !sameNode;
+  const sameDocumentMove = isSameDocument && !skipMoveLogic && !sameNode;
 
-  if (samePaneMove) {
+  if (sameDocumentMove) {
     const isDropIntoOwnDescendant = independentRows.some(
       (row) =>
         targetParentRow.viewKey === row.viewKey ||
@@ -453,7 +447,7 @@ export function dnd(
         sourceRow.node.id,
         sourceRow.parentNode.id,
         sourceRow.viewPath,
-        targetParentRow.node.id,
+        targetParentNode.id,
         targetParentRow.viewPath,
         insertAt
       );
@@ -468,28 +462,11 @@ export function dnd(
     ? plan
     : planExpandNode(plan, targetParentRow.view, targetParentRow.viewPath);
 
-  const shouldCreateReference = (): boolean => {
-    if (sourceDrag.isSuggestion) {
-      return invertCopyMode;
-    }
-    return sourceDrag.isCopyDrag || invertCopyMode;
-  };
-
   const toReferenceTarget = (sourceRow: Row): AddToParentTarget =>
     createRefTarget(
       calendarEntryTarget(sourceRow.node) ?? sourceRow.node.id,
       nodeText(sourceRow.node)
     );
-
-  const getSuggestionTargetID = (
-    isPrimarySource: boolean,
-    sourceNode: GraphNode
-  ): ID | undefined => {
-    if (isPrimarySource) {
-      return sourceDrag.targetId || sourceDrag.nodeId;
-    }
-    return sourceNode.id;
-  };
 
   return independentRows.reduce((accPlan: Plan, sourceRow, idx) => {
     const sourceNode = sourceRow.node;
@@ -497,91 +474,41 @@ export function dnd(
     const sourceEdgeArgument = sourceNode.argument;
     const insertAt = dropIndex + idx;
     const isPrimarySource = sourceRow.viewKey === source;
-    const targetNode = getCurrentPlanNode(accPlan, targetParentRow.node);
-    if (shouldCreateReference()) {
-      if (sourceDrag.isSuggestion) {
-        const insertTarget =
-          sourceRow.materialize?.take ??
-          (isPrimarySource ? sourceDrag.insertTarget : undefined);
-        if (insertTarget) {
-          return planAddToParent(
-            accPlan,
-            addFallbackLinkText(insertTarget, sourceDrag.text),
-            targetNode.id,
-            insertAt,
-            sourceEdgeRelevance,
-            sourceEdgeArgument
-          )[0];
-        }
-        const sourceTargetID = getSuggestionTargetID(
-          isPrimarySource,
-          sourceNode
-        );
-        if (sourceTargetID) {
-          return planAddToParent(
-            accPlan,
-            createRefTarget(sourceTargetID, sourceDrag.text),
-            targetNode.id,
-            insertAt
-          )[0];
-        }
-      }
-      const insertTarget =
-        sourceRow.materialize?.take ??
-        (isPrimarySource ? sourceDrag.insertTarget : undefined);
-      const dragTargetID = isPrimarySource
-        ? sourceDrag.targetId || sourceDrag.nodeId
-        : undefined;
-      if (insertTarget) {
-        return planAddToParent(
-          accPlan,
-          addFallbackLinkText(insertTarget, sourceDrag.text),
-          targetNode.id,
-          insertAt,
-          sourceEdgeRelevance,
-          sourceEdgeArgument
-        )[0];
-      }
-      if (dragTargetID) {
-        return planAddToParent(
-          accPlan,
-          createRefTarget(dragTargetID, nodeText(sourceNode)),
-          targetNode.id,
-          insertAt,
-          sourceEdgeRelevance,
-          sourceEdgeArgument
-        )[0];
-      }
+    const targetNode = getCurrentPlanNode(accPlan, targetParentNode);
+    const insertTarget =
+      sourceRow.materialize?.take ??
+      (isPrimarySource ? sourceDrag.insertTarget : undefined);
+    const dragTargetID = isPrimarySource
+      ? sourceDrag.targetId || sourceDrag.nodeId
+      : undefined;
+    if (insertTarget) {
       return planAddToParent(
         accPlan,
-        toReferenceTarget(sourceRow),
+        addFallbackLinkText(insertTarget, sourceDrag.text),
         targetNode.id,
         insertAt,
         sourceEdgeRelevance,
         sourceEdgeArgument
       )[0];
     }
-
-    const deepCopySource = resolveDeepCopySource(sourceRow);
-    if (isCanonicalId(deepCopySource.node.id)) {
+    if (dragTargetID) {
       return planAddToParent(
         accPlan,
-        createRefTarget(deepCopySource.node.id, nodeText(deepCopySource.node)),
+        createRefTarget(dragTargetID, nodeText(sourceNode)),
         targetNode.id,
         insertAt,
         sourceEdgeRelevance,
         sourceEdgeArgument
       )[0];
     }
-    return planDeepCopyNode(
+    return planAddToParent(
       accPlan,
-      deepCopySource.sourceId,
-      deepCopySource.node,
+      toReferenceTarget(sourceRow),
       targetNode.id,
-      sourceRow.viewPath,
-      targetParentRow.viewPath,
-      insertAt
-    );
+      insertAt,
+      sourceEdgeRelevance,
+      sourceEdgeArgument
+    )[0];
   }, expandedPlan);
 }
 

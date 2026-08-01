@@ -1,17 +1,10 @@
 /* eslint-disable testing-library/no-unnecessary-act, @typescript-eslint/require-await */
-import {
-  act,
-  cleanup,
-  fireEvent,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   ALICE,
   expectTree,
   findNewNodeEditor,
-  navigateToNodeViaSearch,
   renderApp,
   renderTree,
   setup,
@@ -31,16 +24,6 @@ const maybeExpand = async (label: string): Promise<void> => {
   if (btn) {
     await userEvent.click(btn);
   }
-};
-
-const getDropTargets = (nodeName: string): HTMLElement[] => {
-  const toggleTargets = screen.queryAllByLabelText(
-    new RegExp(`(?:expand|collapse) ${nodeName}`)
-  );
-  if (toggleTargets.length > 0) {
-    return toggleTargets as HTMLElement[];
-  }
-  return screen.getAllByRole("treeitem", { name: nodeName }) as HTMLElement[];
 };
 
 describe("View State Preservation - Reorder Within Same List", () => {
@@ -299,159 +282,6 @@ My Notes
 
     await screen.findByLabelText("collapse A");
     await screen.findByLabelText("collapse C");
-  });
-});
-
-describe("View State Preservation - Cross-Pane DnD (Copy)", () => {
-  test("Cross-pane copy of expanded item preserves expanded state", async () => {
-    const [alice] = setup([ALICE]);
-    renderApp(alice());
-
-    await type("My Notes{Enter}{Tab}Source{Enter}{Tab}Child{Escape}");
-
-    await userEvent.click(await screen.findByLabelText("collapse Source"));
-    const sourceEditor = await screen.findByLabelText("edit Source");
-    await userEvent.click(sourceEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Target{Escape}");
-    await userEvent.click(await screen.findByLabelText("expand Source"));
-    await maybeExpand("expand Target");
-
-    await expectTree(`
-My Notes
-  Source
-    Child
-  Target
-    `);
-
-    await screen.findByLabelText("collapse Source");
-
-    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
-    await navigateToNodeViaSearch(1, "Target");
-
-    // Use toggle buttons as drop targets - they only exist in tree children, not breadcrumbs
-    const targetDropTargets = getDropTargets("Target");
-    fireEvent.dragStart(screen.getAllByText("Source")[0]);
-    await act(async () => {
-      fireEvent.drop(targetDropTargets[1]);
-    });
-
-    const collapseButtons = screen.getAllByLabelText("collapse Source");
-    expect(collapseButtons.length).toBeGreaterThanOrEqual(2);
-  });
-
-  test("Cross-pane copy of deeply nested expanded tree", async () => {
-    const [alice] = setup([ALICE]);
-    renderApp(alice());
-
-    await type(
-      "My Notes{Enter}{Tab}Parent{Enter}{Tab}Child{Enter}{Tab}GrandChild{Escape}"
-    );
-
-    await userEvent.click(await screen.findByLabelText("collapse Parent"));
-    const parentEditor = await screen.findByLabelText("edit Parent");
-    await userEvent.click(parentEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Target{Escape}");
-    await userEvent.click(await screen.findByLabelText("expand Parent"));
-    await maybeExpand("expand Target");
-
-    await expectTree(`
-My Notes
-  Parent
-    Child
-      GrandChild
-  Target
-    `);
-
-    await screen.findByLabelText("collapse Parent");
-    await screen.findByLabelText("collapse Child");
-
-    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
-
-    await expectTree(`
-My Notes
-  Parent
-    Child
-      GrandChild
-  Target
-My Notes
-  Parent
-  Target
-    `);
-
-    await navigateToNodeViaSearch(1, "Target");
-
-    await expectTree(`
-My Notes
-  Parent
-    Child
-      GrandChild
-  Target
-Target
-    `);
-
-    // Use toggle buttons as drop targets - they only exist in tree children, not breadcrumbs
-    const targetDropTargets = getDropTargets("Target");
-    fireEvent.dragStart(screen.getAllByText("Parent")[0]);
-    await act(async () => {
-      fireEvent.drop(targetDropTargets[1]);
-    });
-
-    await expectTree(`
-My Notes
-  Parent
-    Child
-      GrandChild
-  Target
-Target
-  Parent
-    Child
-      GrandChild
-    `);
-
-    const collapseParentButtons = screen.getAllByLabelText("collapse Parent");
-    expect(collapseParentButtons.length).toBeGreaterThanOrEqual(2);
-
-    const collapseChildButtons = screen.getAllByLabelText("collapse Child");
-    expect(collapseChildButtons.length).toBeGreaterThanOrEqual(2);
-  });
-
-  test("Cross-pane copy doesn't affect source expanded states", async () => {
-    const [alice] = setup([ALICE]);
-    renderApp(alice());
-
-    await type("My Notes{Enter}{Tab}Source{Enter}{Tab}Child{Escape}");
-
-    await userEvent.click(await screen.findByLabelText("collapse Source"));
-    const sourceEditor = await screen.findByLabelText("edit Source");
-    await userEvent.click(sourceEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Target{Escape}");
-    await userEvent.click(await screen.findByLabelText("expand Source"));
-    await maybeExpand("expand Target");
-
-    await expectTree(`
-My Notes
-  Source
-    Child
-  Target
-    `);
-
-    await screen.findByLabelText("collapse Source");
-
-    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
-    await navigateToNodeViaSearch(1, "Target");
-
-    // Use toggle buttons as drop targets - they only exist in tree children, not breadcrumbs
-    const targetDropTargets = getDropTargets("Target");
-    fireEvent.dragStart(screen.getAllByText("Source")[0]);
-    await act(async () => {
-      fireEvent.drop(targetDropTargets[1]);
-    });
-
-    const collapseSourceButtons = screen.getAllByLabelText("collapse Source");
-    expect(collapseSourceButtons.length).toBeGreaterThanOrEqual(2);
   });
 });
 

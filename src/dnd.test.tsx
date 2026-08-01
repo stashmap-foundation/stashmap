@@ -1,9 +1,8 @@
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   ALICE,
   expectTree,
-  forkOwnRoot,
   findNewNodeEditor,
   getPane,
   navigateToNodeViaSearch,
@@ -16,6 +15,7 @@ import {
   setDropIndentLevel,
   expectIndentationLimits,
 } from "./utils.test";
+import { KIND_KNOWLEDGE_DOCUMENT } from "./nostr";
 
 test("Drag node within tree view", async () => {
   const [alice] = setup([ALICE]);
@@ -83,221 +83,6 @@ Root
     Child A
 Parent
   Child A
-  `);
-});
-
-test("Alt-dragged concrete ref survives move and shows children", async () => {
-  const [alice] = setup([ALICE]);
-  renderApp(alice());
-
-  await type("Root{Enter}Source{Enter}Target{Enter}OtherParent{Escape}");
-
-  await expectTree(`
-Root
-  Source
-  Target
-  OtherParent
-  `);
-
-  await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
-  await navigateToNodeViaSearch(1, "Target");
-  await openNodeInFullscreen(1, "Target");
-
-  const targetTreeItems = screen.getAllByRole("treeitem", { name: "Target" });
-  const targetInPane1 = targetTreeItems[targetTreeItems.length - 1];
-
-  await userEvent.keyboard("{Alt>}");
-  fireEvent.dragStart(screen.getAllByText("Source")[0]);
-  fireEvent.dragOver(targetInPane1, { altKey: true });
-  fireEvent.drop(targetInPane1, { altKey: true });
-  await userEvent.keyboard("{/Alt}");
-
-  await expectTree(`
-Root
-  Source
-  Target
-  OtherParent
-Target
-  Source
-  `);
-  expect(
-    getPane(1).getByRole("textbox", { name: "edit Source" }).textContent
-  ).toBe("Source\u00a0");
-
-  cleanup();
-  renderApp(alice());
-
-  await expectTree(`
-Root
-  Source
-  Target
-  OtherParent
-Target
-  Source
-  `);
-
-  const source = screen.getAllByRole("treeitem", { name: "Source" })[0];
-  const otherParent = screen.getAllByRole("treeitem", {
-    name: "OtherParent",
-  })[0];
-  fireEvent.dragStart(source);
-  setDropIndentLevel("Source", "OtherParent", 3);
-  fireEvent.dragOver(otherParent);
-  fireEvent.drop(otherParent);
-
-  await expectTree(`
-Root
-  Target
-  OtherParent
-    Source
-Target
-  Source
-  `);
-
-  const sourceEditors = await screen.findAllByLabelText("edit Source");
-  sourceEditors[0].focus();
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(
-    await findNewNodeEditor(),
-    "{Tab}Child1{Enter}Child2{Escape}"
-  );
-
-  await expectTree(`
-Root
-  Target
-  OtherParent
-    Source
-      Child1
-      Child2
-      [I] Root / Target ↩
-Target
-  Source
-  `);
-
-  await userEvent.click(
-    (
-      await screen.findAllByLabelText("open Source in fullscreen")
-    )[0]
-  );
-
-  await expectTree(`
-Source
-  Child1
-  Child2
-  [I] Root / Target ↩
-Target
-  Source
-  `);
-});
-
-test("Deep copy preserves all children when forked duplicate nodes exist", async () => {
-  const [alice] = setup([ALICE]);
-
-  renderTree(alice);
-  await type(
-    "Holiday Destinations{Enter}{Tab}Spain{Enter}{Tab}Valencia{Enter}Malaga{Escape}"
-  );
-  cleanup();
-
-  await forkOwnRoot(alice, "Holiday Destinations", "My Fork");
-  renderTree(alice);
-  await navigateToNodeViaSearch(0, "My Fork");
-  await userEvent.click(
-    await screen.findByLabelText("open Spain in fullscreen")
-  );
-  await userEvent.click(await screen.findByLabelText("edit Spain"));
-  await userEvent.keyboard("{Enter}");
-  await type("Sevilla{Enter}Barcelona{Enter}Madrid{Enter}Granada{Escape}");
-  cleanup();
-  window.history.pushState({}, "", "/");
-
-  renderApp({
-    ...alice(),
-    initialRoute: "/n/Holiday%20Destinations",
-  });
-  await userEvent.click(
-    await screen.findByLabelText("open Spain in fullscreen")
-  );
-
-  await expectTree(`
-Spain
-  Valencia
-  Malaga
-  [S] Sevilla
-  [S] Barcelona
-  [S] Madrid
-  [V] +4
-  `);
-
-  cleanup();
-  renderApp({
-    ...alice(),
-    initialRoute: "/n/Holiday%20Destinations",
-  });
-
-  await userEvent.click(
-    await screen.findByLabelText("edit Holiday Destinations")
-  );
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "Target{Escape}");
-
-  await userEvent.click(
-    await screen.findByLabelText("open Spain in fullscreen")
-  );
-
-  await expectTree(`
-Spain
-  Valencia
-  Malaga
-  [S] Sevilla
-  [S] Barcelona
-  [S] Madrid
-  [V] +4
-  `);
-
-  const versionFullscreenBtns = await screen.findAllByLabelText(
-    /open .* \+4 in fullscreen/
-  );
-  await userEvent.click(versionFullscreenBtns[0]);
-
-  await expectTree(`
-Spain
-  Sevilla
-  Barcelona
-  Madrid
-  Granada
-  Valencia
-  Malaga
-  `);
-
-  await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
-  await navigateToNodeViaSearch(1, "Target");
-  await openNodeInFullscreen(1, "Target");
-
-  const spainTreeItems = screen.getAllByRole("treeitem", { name: "Spain" });
-  const targetDropTargets = screen.getAllByRole("treeitem", { name: "Target" });
-  fireEvent.dragStart(spainTreeItems[0]);
-  fireEvent.drop(targetDropTargets[targetDropTargets.length - 1]);
-
-  const expandButtons = await screen.findAllByLabelText("expand Spain");
-  await userEvent.click(expandButtons[expandButtons.length - 1]);
-
-  await expectTree(`
-Spain
-  Sevilla
-  Barcelona
-  Madrid
-  Granada
-  Valencia
-  Malaga
-Target
-  Spain
-    Sevilla
-    Barcelona
-    Madrid
-    Granada
-    Valencia
-    Malaga
   `);
 });
 
@@ -429,6 +214,83 @@ Search: Source
 Target
   My Notes / Source
   `);
+});
+
+test("different documents create one embed placement without descendants", async () => {
+  const [alice] = setup([ALICE]);
+  const { relayPool } = renderApp(alice());
+
+  await type("Source Document{Enter}{Tab}Source{Enter}{Tab}Descendant{Escape}");
+  await userEvent.click(await screen.findByLabelText("Create new note"));
+  await type("Target Document{Enter}{Tab}Target{Escape}");
+
+  await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+  await navigateToNodeViaSearch(0, "Source");
+  await openNodeInFullscreen(0, "Source");
+  await navigateToNodeViaSearch(1, "Target");
+  await openNodeInFullscreen(1, "Target");
+
+  const sourceBefore = relayPool
+    .getDecryptedEvents()
+    .filter(
+      (event) =>
+        event.kind === KIND_KNOWLEDGE_DOCUMENT &&
+        event.content.includes("- Source Document")
+    )
+    .at(-1)?.content;
+  if (!sourceBefore) {
+    throw new Error("Missing source document event");
+  }
+
+  const source = getPane(0).getByRole("treeitem", { name: "Source" });
+  const target = getPane(1).getByRole("treeitem", { name: "Target" });
+  await userEvent.keyboard("{Alt>}");
+  fireEvent.dragStart(source);
+  fireEvent.dragOver(target, { altKey: true });
+  fireEvent.drop(target, { altKey: true });
+  await userEvent.keyboard("{/Alt}");
+
+  await expectTree(`
+Source
+  Descendant
+  [I] Target Document / Target ↩
+Target
+  Source
+  `);
+
+  await waitFor(() => {
+    const events = relayPool.getDecryptedEvents();
+    const sourceAfter = events
+      .filter(
+        (event) =>
+          event.kind === KIND_KNOWLEDGE_DOCUMENT &&
+          event.content.includes("- Source Document")
+      )
+      .at(-1)?.content;
+    const targetContent = events
+      .filter(
+        (event) =>
+          event.kind === KIND_KNOWLEDGE_DOCUMENT &&
+          event.content.includes("- Target Document")
+      )
+      .at(-1)?.content;
+    const sourceId = sourceBefore.match(/- Source <!-- id:([^ ]+) -->/u)?.[1];
+    if (!sourceId || !targetContent) {
+      throw new Error("Missing serialized documents");
+    }
+    const placements = [
+      ...targetContent.matchAll(
+        new RegExp(
+          `- \\[Source\\]\\(#${sourceId}\\) <!-- id:([^ ]+) embed="true" -->`,
+          "gu"
+        )
+      ),
+    ];
+    expect(sourceAfter).toBe(sourceBefore);
+    expect(placements).toHaveLength(1);
+    expect(placements[0]?.[1]).not.toBe(sourceId);
+    expect(targetContent).not.toContain("Descendant");
+  });
 });
 
 test("Depth drop: depth 3 on collapsed sibling inserts as its child", async () => {
@@ -797,7 +659,7 @@ Root
   `);
 });
 
-test("Cross-pane drag to same parent copies instead of reordering", async () => {
+test("same document in two panes moves without creating a link", async () => {
   const [alice] = setup([ALICE]);
   renderApp(alice());
 
@@ -821,20 +683,20 @@ Root
   const itemCElements = screen.getAllByRole("treeitem", { name: "Item C" });
   const rootElements = screen.getAllByLabelText("collapse Root");
 
+  await userEvent.keyboard("{Alt>}");
   fireEvent.dragStart(itemCElements[0]);
-  fireEvent.drop(rootElements[1]);
+  fireEvent.drop(rootElements[1], { altKey: true });
+  await userEvent.keyboard("{/Alt}");
 
   await expectTree(`
 Root
   Item C
   Item A
   Item B
-  Item C
 Root
   Item C
   Item A
   Item B
-  Item C
   `);
 });
 

@@ -51,7 +51,6 @@ type KnowledgeNodeCardProps = {
   style?: CSSProperties | undefined;
   className?: string;
   cardBodyClassName?: string;
-  "data-suggestion"?: string;
   "data-virtual-type"?: string;
   "data-other-user"?: string;
   "data-deleted"?: string;
@@ -64,7 +63,6 @@ export function NodeCard({
   style,
   className,
   cardBodyClassName,
-  "data-suggestion": dataSuggestion,
   "data-virtual-type": dataVirtualType,
   "data-other-user": dataOtherUser,
   "data-deleted": dataDeleted,
@@ -74,7 +72,6 @@ export function NodeCard({
     <Card
       className={`inner-node ${className || ""}`}
       style={style}
-      data-suggestion={dataSuggestion}
       data-virtual-type={dataVirtualType}
       data-other-user={dataOtherUser}
       data-deleted={dataDeleted}

@@ -220,7 +220,7 @@ test("relay results appear after queue flushes pending outbox events on reload",
 
   await screen.findByText("2 pending");
 
-  await userEvent.click(await screen.findByLabelText("publishing status"));
+  await userEvent.click(await screen.findByLabelText("sync status"));
   await screen.findByText("relay.test.first.success/");
 
   await screen.findByText("synced", {}, { timeout: 10000 });
@@ -271,7 +271,7 @@ test("partial relay failure shows correct per-relay counts", async () => {
 
   await screen.findByText(/pending.*3\/4 relays/, {}, { timeout: 10000 });
 
-  await userEvent.click(await screen.findByLabelText("publishing status"));
+  await userEvent.click(await screen.findByLabelText("sync status"));
   await screen.findByText("relay.test.second.fail/");
   await screen.findByText("relay.test.first.success/");
   await screen.findAllByText("0/2");

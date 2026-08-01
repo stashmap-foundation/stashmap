@@ -1,10 +1,6 @@
 import { Event } from "nostr-tools";
 import type { StashmapDB } from "./infra/nostr/cache/indexedDB";
-import {
-  KIND_DELETE,
-  KIND_KNOWLEDGE_DOCUMENT,
-  KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
-} from "./nostr";
+import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "./nostr";
 import {
   applyStoredDelete,
   applyStoredDocument,
@@ -54,7 +50,7 @@ test("buildPermanentSyncFilters creates broad document and delete filters", () =
   expect(buildPermanentSyncFilters([ALICE, BOB])).toEqual([
     {
       authors: [ALICE, BOB],
-      kinds: [KIND_KNOWLEDGE_DOCUMENT, KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT],
+      kinds: [KIND_KNOWLEDGE_DOCUMENT],
       limit: 0,
     },
     {
@@ -385,7 +381,7 @@ test("startPermanentDocumentSync uses live limit-0 subscription and catch-up sub
     [
       {
         authors: [ALICE],
-        kinds: [KIND_KNOWLEDGE_DOCUMENT, KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT],
+        kinds: [KIND_KNOWLEDGE_DOCUMENT],
         limit: 0,
       },
       {

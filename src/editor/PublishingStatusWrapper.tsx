@@ -82,7 +82,7 @@ export function PublishingStatusWrapper(): JSX.Element {
       <Dropdown.Toggle
         as="div"
         className={`status-segment ${segmentClass}`}
-        aria-label="publishing status"
+        aria-label="sync status"
         role="button"
       >
         {text}

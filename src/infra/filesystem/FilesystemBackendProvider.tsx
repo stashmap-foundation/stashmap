@@ -5,7 +5,6 @@ import { Backend, BackendProvider, WorkspaceState } from "../../BackendContext";
 import { LoadedCliProfile } from "../../cli/config";
 import type {
   WorkspaceMarkdownFile,
-  WorkspaceSnapshotFile,
   WorkspaceWriteRequest,
 } from "./workspaceBackend";
 import { DEFAULT_RELAYS } from "../../nostr";
@@ -14,7 +13,6 @@ import type { FsEventHandler } from "./workspaceWatcher";
 export type WorkspaceLoaded = {
   profile: LoadedCliProfile;
   files: WorkspaceMarkdownFile[];
-  snapshots?: WorkspaceSnapshotFile[];
   // Hex private key from the profile's nsec file, when present. Publishing
   // signs deposits in the renderer; local work needs no key.
   privateKey?: string;
@@ -31,7 +29,6 @@ export type WorkspaceIpc = {
     deletedPaths?: ReadonlyArray<string>
   ) => Promise<{ changed_paths: string[]; removed_paths: string[] }>;
   ready?: () => Promise<void>;
-  loadSnapshots: () => Promise<ReadonlyArray<WorkspaceSnapshotFile>>;
   subscribeFsEvents: (handler: FsEventHandler) => () => void;
 };
 
@@ -102,7 +99,6 @@ export function FilesystemBackendProvider({
     const workspace: WorkspaceState = {
       profile,
       files,
-      snapshots: data?.snapshots ?? [],
       pickFolder: () => ipc.pickFolder(),
       isInitialised: (folder) => ipc.isInitialised(folder),
       open: async (folder) => {
@@ -114,7 +110,6 @@ export function FilesystemBackendProvider({
         refresh();
       },
       save: (writes, deletedPaths) => ipc.save(writes, deletedPaths),
-      loadSnapshots: () => ipc.loadSnapshots(),
       subscribeFsEvents: (handler) => ipc.subscribeFsEvents(handler),
     };
     return {

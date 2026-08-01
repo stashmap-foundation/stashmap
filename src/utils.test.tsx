@@ -28,9 +28,6 @@ import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 import { sha256 } from "@noble/hashes/sha256";
 import { schnorr } from "@noble/curves/secp256k1";
 import { LOCAL } from "./core/nodeRef";
-import { createPlan, planUpdateNodeText } from "./planner";
-import { planCopyDescendantNodes } from "./core/plan";
-import { execute } from "./infra/nostr/executor";
 import { ApiProvider, Apis, FinalizeEvent } from "./Apis";
 import { Backend } from "./BackendContext";
 import { NostrBackendProvider } from "./infra/nostr/NostrBackendProvider";
@@ -56,7 +53,7 @@ import {
 import { UserRelayContextProvider } from "./UserRelayContext";
 import { StashmapDB } from "./infra/nostr/cache/indexedDB";
 import { createEmptyGraphIndex } from "./graphIndex";
-import { buildNodeRouteUrl, parseStorageKeyFromHash } from "./navigationUrl";
+import { buildNodeRouteUrl } from "./navigationUrl";
 import { decodePublicKeyInputSync } from "./infra/nostr/publicKeys";
 import { processEvents } from "./eventProcessing";
 import { KIND_KNOWLEDGE_DOCUMENT } from "./nostr";
@@ -278,7 +275,6 @@ const DEFAULT_DATA_CONTEXT_PROPS: TestDataProps = {
     },
     temporaryEvents: List(),
   },
-  snapshotNodes: Map(),
   views: Map<string, View>(),
   relays: {
     defaultRelays: [{ url: "wss://default.relay", read: true, write: true }],
@@ -521,7 +517,6 @@ export function readonlyRoute(author: string, ...segments: string[]): string {
 }
 
 // The sharing flow as the author performs it: open the document, tap the
-// audience chip, copy the secret link. Returns the copied URL.
 export async function copySecretLinkViaChip(
   author: RenderApis,
   rootText: string
@@ -538,7 +533,6 @@ export async function copySecretLinkViaChip(
     ...author,
     initialRoute: `/n/${encodeURIComponent(rootText)}`,
   });
-  await userEvent.click(await screen.findByLabelText("audience options"));
   await userEvent.click(await screen.findByLabelText("copy secret link"));
   const url = writeText.mock.calls[0]?.[0];
   if (typeof url !== "string") {
@@ -546,94 +540,6 @@ export async function copySecretLinkViaChip(
   }
   cleanup();
   return url;
-}
-
-export async function forkReadonlyRoot(
-  viewer: RenderApis,
-  author: string,
-  ...segments: string[]
-): Promise<void> {
-  cleanup();
-  const [rootSegment] = segments;
-  // The viewer's capability comes from the author's own share gesture.
-  const authorUser = [ALICE, BOB, CAROL].find(
-    (user) => user.publicKey === author
-  );
-  const capabilityKey =
-    rootSegment && authorUser
-      ? parseStorageKeyFromHash(
-          new URL(
-            await copySecretLinkViaChip(
-              { ...viewer, user: authorUser },
-              rootSegment
-            )
-          ).hash
-        )
-      : undefined;
-  renderApp({
-    ...viewer,
-    initialRoute: rootSegment ? readonlyRoute(author, rootSegment) : "/",
-    ...(capabilityKey !== undefined && { capabilityKey }),
-  });
-  await screen.findByText("READONLY");
-  const copyAction = await screen.findByLabelText(
-    /copy root to edit|Open root to make a copy/
-  );
-  if (copyAction.getAttribute("aria-label") === "copy root to edit") {
-    await userEvent.click(copyAction);
-    return;
-  }
-  await userEvent.click(copyAction);
-  await screen.findByText("READONLY");
-  await userEvent.click(await screen.findByLabelText("copy root to edit"));
-}
-
-export async function forkOwnRoot(
-  cU: UpdateState,
-  rootText: string,
-  forkText: string
-): Promise<void> {
-  const utils = cU();
-  const author = utils.user?.publicKey;
-  if (!author) {
-    throw new Error("forkOwnRoot requires a logged-in user");
-  }
-  const parsedDB = processEvents(
-    List(utils.relayPool.getDecryptedEvents())
-  ).get(author)?.knowledgeDB;
-  const knowledgeDB = parsedDB
-    ? {
-        ...parsedDB,
-        nodes: parsedDB.nodes.map((n) => ({ ...n, author: LOCAL })),
-      }
-    : undefined;
-  const rootNode = knowledgeDB?.nodes
-    .valueSeq()
-    .find(
-      (candidate) =>
-        nodeText(candidate) === rootText && candidate.parent === undefined
-    );
-  if (!knowledgeDB || !rootNode) {
-    throw new Error(`forkOwnRoot: root not found: ${rootText}`);
-  }
-  const knowledgeDBs = Map<SourceId, KnowledgeData>([[LOCAL, knowledgeDB]]);
-  const plan = createPlan({ ...utils, knowledgeDBs });
-  const [forkPlan, mapping] = planCopyDescendantNodes(
-    plan,
-    knowledgeDB,
-    rootNode
-  );
-  const forkRootID = mapping.get(rootNode.id);
-  const forkRoot = forkRootID
-    ? forkPlan.knowledgeDBs.get(LOCAL)?.nodes.get(forkRootID)
-    : undefined;
-  if (!forkRoot) {
-    throw new Error(`forkOwnRoot: fork failed for: ${rootText}`);
-  }
-  await execute({
-    ...utils,
-    plan: planUpdateNodeText(forkPlan, forkRoot.id, forkText),
-  });
 }
 
 export async function openReadonlyRoute(nodeLabel: string): Promise<string> {
@@ -781,11 +687,8 @@ function getItemPrefix(innerNode: Element | null, isRef: boolean): string {
   if (isDeleted) return "[D] ";
   const virtualType = innerNode?.getAttribute("data-virtual-type");
   const isOtherUser = innerNode?.getAttribute("data-other-user") === "true";
-  if (virtualType === "suggestion") return "[S] ";
-  if (virtualType === "version") return isOtherUser ? "[VO] " : "[V] ";
   const typeCharMap: Record<string, string> = {
     incoming: "I",
-    "related-source": "↝",
   };
   const typeChar = typeCharMap[virtualType ?? ""] ?? (isRef ? "R" : "");
   if (isOtherUser && typeChar) return `[O${typeChar}] `;

@@ -1,7 +1,6 @@
 import React from "react";
-import { List, Map as ImmutableMap } from "immutable";
+import { List } from "immutable";
 import { LOCAL, nodeRefKey } from "../core/nodeRef";
-import { isCanonicalId } from "../core/entityRecognition";
 import {
   ViewPath,
   useSearchDepth,
@@ -50,11 +49,7 @@ import { linkStyleForHref } from "./editorDom";
 import { useOnToggleExpanded } from "./SelectNodes";
 import { useApis } from "../Apis";
 import { useData } from "../DataContext";
-import {
-  planMaterializeComputedRow,
-  planSetDocumentPublishState,
-} from "../core/plan";
-import { publishStateOf } from "../core/knowstrFrontmatter";
+import { planMaterializeComputedRow } from "../core/plan";
 import { getWorkspaceNode } from "../core/knowledge";
 import {
   Plan,
@@ -72,11 +67,8 @@ import { parsedLinesToTrees, planPasteMarkdownTrees } from "./FileDropZone";
 import { planDisconnectFromParent } from "../treeMutations";
 import { useNodeIsLoading } from "../LoadingStatus";
 import { NodeCard } from "../commons/Ui";
-import { buildNodeRouteUrl } from "../navigationUrl";
 import { usePaneIndex, useNavigatePane } from "../SplitPanesContext";
-import { RightMenu, usePublishedPaneDocument } from "./RightMenu";
-import { OpenInSplitPaneButton } from "./OpenInSplitPaneButton";
-import { unpublishedLinkTargetForHref } from "./publishReach";
+import { RightMenu } from "./RightMenu";
 import { useItemStyle } from "./useItemStyle";
 import {
   ResolvedNode,
@@ -189,77 +181,12 @@ function PastDatesActionRow(): JSX.Element {
   );
 }
 
-function MoreRelatedSourcesActionRow(): JSX.Element | null {
-  const row = useRow();
-  const navigatePane = useNavigatePane();
-  if (!row.parentRef || !row.parentNode) {
-    return null;
-  }
-  const label = "Open to see more related sources";
-  const href = buildNodeRouteUrl(row.parentNode.id, row.parentRef.sourceId, {
-    scrollToId: undefined,
-    fallbackLabel: isCanonicalId(row.parentNode.id)
-      ? spansText(row.parentNode.spans)
-      : undefined,
-  });
-  return (
-    <button
-      type="button"
-      className="action-row-btn"
-      onClick={() => navigatePane(href)}
-      onMouseDown={preventEditorBlur}
-      aria-label={label}
-    >
-      {label}
-    </button>
-  );
-}
-
 function LoadingNode(): JSX.Element {
   return <span className="skeleton-bar" />;
 }
 
 function ErrorContent(): JSX.Element {
   return <span className="text-danger">Error: Node not found</span>;
-}
-
-function VersionContent({
-  sourceId,
-  meta,
-}: {
-  sourceId: SourceId;
-  meta: Row["versionMeta"];
-}): JSX.Element {
-  const isOtherUser = sourceId !== LOCAL;
-  const dateStr = meta ? new Date(meta.updated).toLocaleString() : "";
-  return (
-    <span className="break-word" data-testid="reference-row">
-      {dateStr}
-      <span style={{ fontStyle: "normal" }}>
-        {isOtherUser && " \u{1F464}"}
-        {meta && meta.direct && (
-          <>
-            {" "}
-            <span style={{ color: "var(--yellow)" }}>
-              ±{meta.addCount + meta.removeCount}
-            </span>
-          </>
-        )}
-        {meta && !meta.direct && meta.addCount > 0 && (
-          <>
-            {" "}
-            <span style={{ color: "var(--green)" }}>+{meta.addCount}</span>
-          </>
-        )}
-        {meta && !meta.direct && meta.removeCount > 0 && (
-          <>
-            {" "}
-            <span style={{ color: "var(--red)" }}>-{meta.removeCount}</span>
-          </>
-        )}
-      </span>
-    </span>
-  );
 }
 
 function ReferenceContent({
@@ -300,86 +227,6 @@ function ReferenceContent({
     >
       <ReferenceDisplay reference={reference} />
     </a>
-  );
-}
-
-type LinkReachChipEntry = {
-  key: string;
-  span: Extract<InlineSpan, { kind: "link" }>;
-};
-
-function linkReachChipEntries(spans: InlineSpan[]): LinkReachChipEntry[] {
-  return spans
-    .reduce(
-      (state, span) => {
-        const start = state.textOffset;
-        const textOffset = start + span.text.length;
-        if (span.kind !== "link") {
-          return { ...state, textOffset };
-        }
-        const baseKey = `${start}-${span.href}-${span.text}`;
-        const count = state.keyCounts.get(baseKey, 0);
-        return {
-          textOffset,
-          keyCounts: state.keyCounts.set(baseKey, count + 1),
-          entries: state.entries.push({
-            key: count === 0 ? baseKey : `${baseKey}-${count}`,
-            span,
-          }),
-        };
-      },
-      {
-        textOffset: 0,
-        keyCounts: ImmutableMap<string, number>(),
-        entries: List<LinkReachChipEntry>(),
-      }
-    )
-    .entries.toArray();
-}
-
-function LinkReachChip({
-  span,
-  node,
-  sourceId,
-}: {
-  span: Extract<InlineSpan, { kind: "link" }>;
-  node: GraphNode;
-  sourceId: SourceId;
-}): JSX.Element | null {
-  const data = useData();
-  const paneDocument = usePublishedPaneDocument();
-  const { createPlan, executePlan } = usePlanner();
-  const target = unpublishedLinkTargetForHref(
-    data.knowledgeDBs,
-    data.documents,
-    data.documentByFilePath,
-    paneDocument,
-    node,
-    sourceId,
-    span.href
-  );
-  if (!paneDocument || !target) return null;
-  const grant = (): void => {
-    const paneState = publishStateOf(paneDocument.frontMatter);
-    executePlan(
-      planSetDocumentPublishState(createPlan(), target.docId, {
-        relays: paneState?.relays,
-        paused: false,
-      })
-    );
-  };
-  return (
-    <button
-      type="button"
-      className="publish-reach-chip"
-      onClick={(event) => {
-        event.stopPropagation();
-        grant();
-      }}
-      aria-label={`publish linked document ${target.title || target.docId}`}
-    >
-      not published
-    </button>
   );
 }
 
@@ -505,7 +352,6 @@ function InlineLinkSpan({
             ariaHidden
           />
         )}
-        <LinkReachChip span={span} node={node} sourceId={sourceId} />
       </>
     );
   }
@@ -535,7 +381,6 @@ function InlineLinkSpan({
             ariaHidden
           />
         )}
-        <LinkReachChip span={span} node={node} sourceId={sourceId} />
       </>
     );
   }
@@ -582,7 +427,6 @@ function InlineLinkSpan({
           ariaHidden
         />
       )}
-      <LinkReachChip span={span} node={node} sourceId={sourceId} />
     </>
   );
 }
@@ -627,33 +471,6 @@ function NodeContent(): JSX.Element {
   const row = useRow();
   const { reference } = row;
   const displayText = useDisplayText();
-
-  // A rename suggestion: replacement-shaped — my text on the way out
-  // (strikethrough, the (x) treatment reused), theirs beside it.
-  if (row.renameSuggestion) {
-    return (
-      <span className="break-word" data-testid="reference-row">
-        {row.sourceId !== LOCAL && "\u{1F464} "}
-        <span style={{ textDecoration: "line-through" }}>
-          {row.renameSuggestion.mine}
-        </span>{" "}
-        {row.renameSuggestion.theirs}
-      </span>
-    );
-  }
-
-  // Footer proposals render straight from their node — no parallel
-  // presentation blob. A suggestion is its label; a version is its meta.
-  if (row.virtualType === "suggestion") {
-    return (
-      <span className="break-word" data-testid="reference-row">
-        {displayTextOf(displayText)}
-      </span>
-    );
-  }
-  if (row.virtualType === "version") {
-    return <VersionContent sourceId={row.sourceId} meta={row.versionMeta} />;
-  }
 
   if (row.virtualType === undefined && hasInlineLinks(row.node)) {
     return <InlineSpans node={row.node} sourceId={row.sourceId} />;
@@ -1113,14 +930,6 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
         onActivateLink={handleActivateLink}
         entityPicker={{ fetchEntityMetadata }}
       />
-      {linkReachChipEntries(editorSpans).map(({ key, span }) => (
-        <LinkReachChip
-          key={key}
-          span={span}
-          node={row.node}
-          sourceId={row.sourceId}
-        />
-      ))}
     </>
   );
 }
@@ -1193,18 +1002,6 @@ function Indent({
   );
 }
 
-function SuggestionIndicator(): JSX.Element {
-  return (
-    <span
-      className="suggestion-indicator"
-      title="Suggestion — a version of this list has this row"
-      aria-hidden="true"
-    >
-      @
-    </span>
-  );
-}
-
 // Incoming references speak ↩ everywhere — the gutter, the filter button,
 // the link cluster. Never a judgment symbol: nobody judged anything.
 function IncomingRefGutterIndicator(): JSX.Element {
@@ -1219,45 +1016,13 @@ function IncomingRefGutterIndicator(): JSX.Element {
   );
 }
 
-function RelatedSourceIndicator(): JSX.Element {
-  return (
-    <span
-      className="related-source-indicator"
-      title="Related source — judge it (! ? ~ + -) to link it here"
-      aria-hidden="true"
-    >
-      ↝
-    </span>
-  );
-}
-
-function VersionIndicator({
-  isOtherUser,
-}: {
-  isOtherUser: boolean;
-}): JSX.Element {
-  return (
-    <span
-      className={
-        isOtherUser ? "version-indicator-other" : "version-indicator-own"
-      }
-      title="Alternative version of this list"
-      aria-hidden="true"
-    >
-      ∥
-    </span>
-  );
-}
-
 export function Node({
   className,
   cardBodyClassName,
-  isSuggestion,
   rows,
 }: {
   className?: string;
   cardBodyClassName?: string;
-  isSuggestion?: boolean;
   rows: List<Row>;
 }): JSX.Element | null {
   const row = useRow();
@@ -1271,7 +1036,7 @@ export function Node({
   const { virtualType } = row;
   const currentNode = useCurrentNode();
   const calendarType = (() => {
-    if (isSuggestion || virtualType !== undefined) return undefined;
+    if (virtualType !== undefined) return undefined;
     if (calendarFeedUrl(currentNode) !== undefined) return "Calendar";
     return isCalendarEntryId(row.standsFor?.id ?? currentNode.id)
       ? "Date"
@@ -1279,19 +1044,11 @@ export function Node({
   })();
   const isViewingOtherUser = useIsViewingOtherUserContent();
   const node = row.reference;
-  const isVersion = virtualType === "version";
-  const isRelatedSource = virtualType === "related-source";
-  const isOtherUser =
-    (node && node.sourceId !== LOCAL) ||
-    isViewingOtherUser ||
-    (isRelatedSource && row.sourceId !== LOCAL);
+  const isOtherUser = (node && node.sourceId !== LOCAL) || isViewingOtherUser;
 
-  const isSuggestionWithChildren = isSuggestion && !!currentNode;
-  const showExpandCollapse =
-    (!isSuggestion && !isVersion) || isSuggestionWithChildren;
   const { hasChildren } = row;
 
-  const contentClass = isSuggestion ? "content-suggestion" : "";
+  const contentClass = "";
 
   if (row.action) {
     // Footer-row dress: gutter mark, marker, node-size text — laid out by
@@ -1315,18 +1072,12 @@ export function Node({
           data-testid="node-marker"
         />
         <div className="w-100 node-content-wrapper">
-          {row.action === "toggle-past-entries" ? (
-            <PastDatesActionRow />
-          ) : (
-            <MoreRelatedSourcesActionRow />
-          )}
+          <PastDatesActionRow />
         </div>
         <div className="right-menu">
           <div className="relevance-slot" />
           <div className="evidence-slot" />
-          <div className="action-slot">
-            {row.action === "open-related-sources" && <OpenInSplitPaneButton />}
-          </div>
+          <div className="action-slot" />
         </div>
       </NodeCard>
     );
@@ -1337,16 +1088,12 @@ export function Node({
       className={cls}
       cardBodyClassName={clsBody}
       style={cardStyle}
-      data-suggestion={isSuggestion ? "true" : undefined}
-      data-virtual-type={virtualType || (isVersion ? "version" : undefined)}
+      data-virtual-type={virtualType}
       data-other-user={isOtherUser ? "true" : undefined}
     >
       <div className="indicator-gutter">
-        {isSuggestion && <SuggestionIndicator />}
-        {isVersion && <VersionIndicator isOtherUser={!!isOtherUser} />}
         {virtualType === "incoming" && <IncomingRefGutterIndicator />}
-        {isRelatedSource && <RelatedSourceIndicator />}
-        {relevance === "relevant" && !isSuggestion && (
+        {relevance === "relevant" && (
           <span
             className="relevant-indicator"
             title="Relevant"
@@ -1355,7 +1102,7 @@ export function Node({
             !
           </span>
         )}
-        {relevance === "maybe_relevant" && !isSuggestion && (
+        {relevance === "maybe_relevant" && (
           <span
             className="maybe-relevant-indicator"
             title="Maybe Relevant"
@@ -1364,7 +1111,7 @@ export function Node({
             ?
           </span>
         )}
-        {relevance === "little_relevant" && !isSuggestion && (
+        {relevance === "little_relevant" && (
           <span
             className="little-relevant-indicator"
             title="Little Relevant"
@@ -1375,9 +1122,8 @@ export function Node({
         )}
       </div>
       {levels > 0 && <Indent levels={levels} colorLevels={searchDepth} />}
-      {showExpandCollapse && hasChildren && <ExpandCollapseToggle />}
-      {((showExpandCollapse && !hasChildren) ||
-        (isSuggestion && !showExpandCollapse)) && (
+      {hasChildren && <ExpandCollapseToggle />}
+      {!hasChildren && (
         <span
           className="node-marker"
           aria-hidden="true"

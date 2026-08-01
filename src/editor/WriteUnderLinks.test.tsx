@@ -409,11 +409,14 @@ Book Club
 Favorite Authors
   Book Club↩
   `);
+  const favoriteAuthors = fs.readFileSync(
+    path.join(workspacePath, "favorite-authors.md"),
+    "utf8"
+  );
   expect(
-    fs
-      .readFileSync(path.join(workspacePath, "favorite-authors.md"), "utf8")
-      .match(/<!-- id:(?!\.\.\.)[^ ]+ -->/gu)
+    favoriteAuthors.match(/<!-- id:(?!\.\.\.)[^ ]+(?: embed="true")? -->/gu)
   ).toHaveLength(2);
+  expect(favoriteAuthors).toContain('embed="true"');
 
   await userEvent.click(await screen.findByLabelText("edit Book Club"));
   await userEvent.keyboard("{Escape}{Delete}");

@@ -10,7 +10,6 @@ import {
   write,
 } from "../testFixtures/workspace";
 import { findNewNodeEditor } from "../utils.test";
-import { KIND_KNOWLEDGE_DEPOSIT } from "../nostr";
 
 function wikidataResponse(payload: unknown): Response {
   return new Response(JSON.stringify(payload), { status: 200 });
@@ -142,12 +141,12 @@ async function openNotesChildEditor(): Promise<HTMLElement> {
   return findNewNodeEditor();
 }
 
-test("entity picker inserts a Wikidata link in an empty row and publish tags derive from it", async () => {
+test("entity picker inserts a Wikidata link in an empty row", async () => {
   const workspace = knowstrInit({ relays: ["wss://relay.test.example"] }).path;
   write(workspace, "notes.md", "# Notes <!-- id:notes-root -->\n");
   await knowstrSave(workspace);
   const fetchEntityMetadata = wikidataFetch();
-  const { relayPool } = await renderAppTree({
+  await renderAppTree({
     path: workspace,
     initialRoute: buildDocumentRouteUrl(LOCAL, "notes.md"),
     fetchEntityMetadata,
@@ -160,24 +159,8 @@ test("entity picker inserts a Wikidata link in an empty row and publish tags der
   await expectMarkdown(
     workspace,
     "notes.md",
-    "# Notes <!-- id:... -->\n\n- [Barcelona](#wd:Q1492) <!-- id:... -->\n"
+    '# Notes <!-- id:... -->\n\n- [Barcelona](#wd:Q1492) <!-- id:... embed="true" -->\n'
   );
-
-  await userEvent.click(await screen.findByLabelText("audience options"));
-  await userEvent.click(await screen.findByLabelText("publish document"));
-  await waitFor(() => {
-    const deposit = relayPool
-      .getEvents()
-      .find(
-        (event) =>
-          event.kind === KIND_KNOWLEDGE_DEPOSIT &&
-          event.content.includes("[Barcelona](#wd:Q1492)")
-      );
-    expect(deposit?.tags.filter(([name]) => name === "S")).toEqual([
-      ["S", "notes-root"],
-      ["S", "wd:Q1492"],
-    ]);
-  });
 });
 
 test("entity picker inserts a Wikidata link inside existing row text", async () => {

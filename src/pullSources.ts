@@ -2,18 +2,11 @@ import { Map as ImmutableMap } from "immutable";
 import { Event } from "nostr-tools";
 import {
   Document as KnowstrDocument,
-  documentAudienceTags,
-  getDocumentByIdOrFilePath,
-  getDocumentForNode,
-  nodeLinkContainerTags,
   parseToDocumentPreservingExplicitIds,
 } from "./core/Document";
-import { publishStateOf } from "./core/knowstrFrontmatter";
-import { getNode } from "./core/connections";
 import { isCanonicalId } from "./core/entityRecognition";
 import { KIND_KNOWLEDGE_DEPOSIT, ASSET_ENTITY_RELAY } from "./nostr";
 import { findTag } from "./nostrEvents";
-import { snapshotIdForContent } from "./nodesDocumentEvent";
 import { getReadRelays, sanitizeRelayUrl } from "./relayUtils";
 import { routeCoordinateSourceId } from "./navigationUrl";
 import { LOCAL } from "./core/nodeRef";
@@ -21,11 +14,9 @@ import { LOCAL } from "./core/nodeRef";
 export type PullInterest =
   | {
       kind: "tag";
-      purpose: "footer" | "related-source";
       paneId: string;
       interestKey: string;
       tags: string[];
-      rankTags: string[];
       relays: string[];
     }
   | {
@@ -49,8 +40,6 @@ export type PullSourceRecord =
       matchedInterestKeys: string[];
       document: KnowstrDocument;
       nodes: ImmutableMap<string, GraphNode>;
-      content: string;
-      snapshotId: string;
     }
   | {
       status: "unavailable";
@@ -64,9 +53,6 @@ export type PullSourceRecord =
     };
 
 export type PullRecordMap = ReadonlyMap<SourceId, PullSourceRecord>;
-
-export const RELATED_SOURCE_QUERY_TAG_LIMIT = 100;
-export const RELATED_SOURCE_MIN_OVERLAP = 2;
 
 function sortedUnique(values: readonly string[]): string[] {
   return [...new Set(values)].sort();
@@ -90,189 +76,15 @@ function schemeRelays(tags: readonly string[]): string[] {
     : [];
 }
 
-export function localDocumentTags(document: KnowstrDocument): string[] {
-  return documentAudienceTags(document);
-}
-
-function localGraphTags(data: Data): string[] {
-  return sortedUnique(
-    data.documents
-      .valueSeq()
-      .toArray()
-      .flatMap((document) => localDocumentTags(document))
-  );
-}
-
-export function nodeRelatedTags(
-  data: Data,
-  node: GraphNode,
-  sourceId: SourceId,
-  rootIds: ReadonlySet<ID>
-): string[] {
-  return sortedUnique([
-    ...(rootIds.has(node.id) || isCanonicalId(node.id) ? [node.id] : []),
-    ...nodeLinkContainerTags(
-      data.knowledgeDBs,
-      data.documents,
-      data.documentByFilePath,
-      node,
-      sourceId
-    ),
-  ]);
-}
-
-function weightedTags(tags: readonly string[]): RelatedSourceTagWeight[] {
-  const counts = tags.reduce(
-    (acc, tag) => new Map(acc).set(tag, (acc.get(tag) ?? 0) + 1),
-    new Map<string, number>()
-  );
-  return [...counts.entries()].map(([tag, count]) => ({
-    tag,
-    weight: Math.log1p(count),
-  }));
-}
-
-function relatedQueryTags(
-  weights: readonly RelatedSourceTagWeight[]
-): string[] {
-  return weights
-    .slice()
-    .sort(
-      (left, right) =>
-        right.weight - left.weight || left.tag.localeCompare(right.tag)
-    )
-    .slice(0, RELATED_SOURCE_QUERY_TAG_LIMIT)
-    .map((weight) => weight.tag);
-}
-
-function countTags(
-  counts: ReadonlyMap<string, number>,
-  tags: readonly string[]
-): ReadonlyMap<string, number> {
-  return tags.reduce(
-    (acc, tag) => new Map(acc).set(tag, (acc.get(tag) ?? 0) + 1),
-    counts
-  );
-}
-
-function subtreeTagCounts(
-  data: Data,
-  nodes: ImmutableMap<string, GraphNode>,
-  rootIds: ReadonlySet<ID>,
-  nodeId: ID,
-  counts: ReadonlyMap<string, number>
-): ReadonlyMap<string, number> {
-  const node = nodes.get(nodeId);
-  if (!node) {
-    return counts;
-  }
-  const withNode = countTags(
-    counts,
-    nodeRelatedTags(data, node, LOCAL, rootIds)
-  );
-  return node.children.reduce(
-    (acc, childId) => subtreeTagCounts(data, nodes, rootIds, childId, acc),
-    withNode
-  );
-}
-
-function countsToWeights(
-  counts: ReadonlyMap<string, number>
-): RelatedSourceTagWeight[] {
-  return [...counts.entries()].map(([tag, count]) => ({
-    tag,
-    weight: Math.log1p(count),
-  }));
-}
-
-function documentRelatedTags(data: Data, document: KnowstrDocument): string[] {
-  const nodes = data.knowledgeDBs.get(LOCAL)?.nodes;
-  if (!nodes) {
-    return [];
-  }
-  const rootIds = new Set<ID>(document.topNodeShortIds);
-  const counts = document.topNodeShortIds.reduce<ReadonlyMap<string, number>>(
-    (acc, id) => subtreeTagCounts(data, nodes, rootIds, id, acc),
-    new Map<string, number>()
-  );
-  return relatedQueryTags(countsToWeights(counts));
-}
-
-function pathToRoot(
-  nodes: ImmutableMap<string, GraphNode>,
-  node: GraphNode
-): GraphNode[] {
-  const parent = node.parent ? nodes.get(node.parent) : undefined;
-  return parent ? [...pathToRoot(nodes, parent), node] : [node];
-}
-
-function nodeContextRelatedTags(data: Data, node: GraphNode): string[] {
-  const nodes = data.knowledgeDBs.get(LOCAL)?.nodes;
-  if (!nodes) {
-    return [];
-  }
-  const path = pathToRoot(nodes, node);
-  const rootId = path[0]?.id;
-  const rootIds = new Set<ID>(rootId ? [rootId] : []);
-  const pathCounts = path.reduce<ReadonlyMap<string, number>>(
-    (acc, pathNode) =>
-      countTags(acc, nodeRelatedTags(data, pathNode, LOCAL, rootIds)),
-    new Map<string, number>()
-  );
-  return relatedQueryTags(
-    countsToWeights(subtreeTagCounts(data, nodes, rootIds, node.id, pathCounts))
-  );
-}
-
-function paneRelatedTags(
-  data: Data,
-  pane: Pane,
-  paneTags: readonly string[]
-): string[] {
-  if (pane.documentId) {
-    const document = getDocumentByIdOrFilePath(
-      data.documents,
-      data.documentByFilePath,
-      LOCAL,
-      pane.documentId
-    );
-    return document
-      ? documentRelatedTags(data, document)
-      : relatedQueryTags(weightedTags(paneTags));
-  }
-  if (!pane.rootNodeId) {
-    return [];
-  }
-  const node = getNode(data.knowledgeDBs, pane.rootNodeId, LOCAL);
-  if (!node) {
-    return relatedQueryTags(weightedTags(paneTags));
-  }
-  if (node.parent) {
-    return nodeContextRelatedTags(data, node);
-  }
-  const document = getDocumentForNode(
-    data.knowledgeDBs,
-    data.documents,
-    node,
-    LOCAL
-  );
-  return document
-    ? documentRelatedTags(data, document)
-    : nodeContextRelatedTags(data, node);
-}
-
 function relaysForTags(
   tags: readonly string[],
   defaultRelays: Relays,
-  userRelays: Relays,
-  document: KnowstrDocument | undefined
+  userRelays: Relays
 ): string[] {
-  const declared = publishStateOf(document?.frontMatter)?.relays ?? [];
   return normalizedRelayUrls([
     ...readRelayUrls(defaultRelays),
     ...readRelayUrls(userRelays),
     ...schemeRelays(tags),
-    ...declared,
   ]);
 }
 
@@ -295,7 +107,6 @@ export function derivePullInterests(
   defaultRelays: Relays,
   userRelays: Relays
 ): PullInterest[] {
-  const graphTags = localGraphTags(data);
   return data.panes.flatMap((pane): PullInterest[] => {
     if (pane.sourceId !== LOCAL) {
       const coordinate = pane.routeCoordinate;
@@ -326,89 +137,21 @@ export function derivePullInterests(
       ];
     }
 
-    const tags = (() => {
-      if (pane.documentId) {
-        const document = getDocumentByIdOrFilePath(
-          data.documents,
-          data.documentByFilePath,
-          LOCAL,
-          pane.documentId
-        );
-        return document ? localDocumentTags(document) : [];
-      }
-      if (!pane.rootNodeId) {
-        return [];
-      }
-      if (isCanonicalId(pane.rootNodeId)) {
-        return [pane.rootNodeId];
-      }
-      const node = getNode(data.knowledgeDBs, pane.rootNodeId, LOCAL);
-      const document = node
-        ? getDocumentForNode(data.knowledgeDBs, data.documents, node, LOCAL)
-        : undefined;
-      return document ? localDocumentTags(document) : [pane.rootNodeId];
-    })();
-
-    const normalizedTags = sortedUnique(tags.filter((tag) => tag !== ""));
-    if (normalizedTags.length === 0) {
+    if (!pane.rootNodeId || !isCanonicalId(pane.rootNodeId)) {
       return [];
     }
-    const document = pane.documentId
-      ? getDocumentByIdOrFilePath(
-          data.documents,
-          data.documentByFilePath,
-          LOCAL,
-          pane.documentId
-        )
-      : undefined;
-    const relays = relaysForTags(
-      normalizedTags,
-      defaultRelays,
-      userRelays,
-      document
-    );
+    const tags = [pane.rootNodeId];
+    const relays = relaysForTags(tags, defaultRelays, userRelays);
     if (relays.length === 0) {
       return [];
     }
-    const footerInterest: PullInterest = {
-      kind: "tag",
-      purpose: "footer",
-      paneId: pane.id,
-      tags: normalizedTags,
-      rankTags: sortedUnique([...normalizedTags, ...graphTags]),
-      relays,
-      interestKey: interestKey(pane.id, "tag", normalizedTags, relays),
-    };
-    const relatedTags = sortedUnique(
-      paneRelatedTags(data, pane, normalizedTags).filter((tag) => tag !== "")
-    );
-    if (relatedTags.length < RELATED_SOURCE_MIN_OVERLAP) {
-      return [footerInterest];
-    }
-    const relatedRelays = relaysForTags(
-      relatedTags,
-      defaultRelays,
-      userRelays,
-      document
-    );
-    if (relatedRelays.length === 0) {
-      return [footerInterest];
-    }
     return [
-      footerInterest,
       {
         kind: "tag",
-        purpose: "related-source",
         paneId: pane.id,
-        tags: relatedTags,
-        rankTags: sortedUnique([...relatedTags, ...graphTags]),
-        relays: relatedRelays,
-        interestKey: interestKey(
-          pane.id,
-          "related",
-          relatedTags,
-          relatedRelays
-        ),
+        tags,
+        relays,
+        interestKey: interestKey(pane.id, "tag", tags, relays),
       },
     ];
   });
@@ -546,8 +289,6 @@ export function recordFromDepositEvent(
       matchedInterestKeys: [],
       document: parsed.document,
       nodes: parsed.nodes,
-      content: event.content,
-      snapshotId: snapshotIdForContent(event.content),
     };
     return {
       ...record,

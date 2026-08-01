@@ -142,7 +142,6 @@ My Notes
     // Inline filter dots should exist in pane header
     expect(screen.getByLabelText("toggle Relevant filter")).toBeDefined();
     expect(screen.getByLabelText("toggle Contains filter")).toBeDefined();
-    expect(screen.getByLabelText("toggle Suggestions filter")).toBeDefined();
   });
 
   test("filter state persists across interactions", async () => {
@@ -171,26 +170,6 @@ My Notes
 
     // Item should reappear
     await screen.findByText("Test Item");
-  });
-});
-
-describe("Suggestions filter", () => {
-  test("DEFAULT_TYPE_FILTERS includes suggestions", () => {
-    expect(DEFAULT_TYPE_FILTERS).toContain("suggestions");
-  });
-
-  test("TYPE_COLORS has other_user color for suggestions", () => {
-    expect(TYPE_COLORS.other_user).toBe("#6c71c4");
-  });
-
-  test("inline filter dots include Suggestions option", async () => {
-    const [alice] = setup([ALICE]);
-    renderTree(alice);
-
-    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Child{Escape}");
-
-    // Suggestions filter dot should be visible in pane header
-    expect(screen.getByLabelText("toggle Suggestions filter")).toBeDefined();
   });
 });
 

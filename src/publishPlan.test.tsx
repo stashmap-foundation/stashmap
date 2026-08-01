@@ -19,9 +19,7 @@ import {
   planPasteMarkdownTrees,
 } from "./editor/FileDropZone";
 import { entityIdForText } from "./core/entityRecognition";
-import { planSetDocumentPublishState } from "./core/plan";
-import { KIND_KNOWLEDGE_DEPOSIT, KIND_KNOWLEDGE_DOCUMENT } from "./nostr";
-import { parseFrontMatter, publishStateOf } from "./core/knowstrFrontmatter";
+import { KIND_KNOWLEDGE_DOCUMENT } from "./nostr";
 import { ALICE, setup } from "./utils.test";
 
 function planWithEssay(): { plan: Plan; docId: string; rootId: string } {
@@ -39,11 +37,6 @@ function planWithEssay(): { plan: Plan; docId: string; rootId: string } {
     docId: document.docId,
     rootId: document.topNodeShortIds[0],
   };
-}
-
-function frontMatterOf(content: string): FrontMatter {
-  const match = content.match(/^---\n([\s\S]*?)---\n/u);
-  return match ? parseFrontMatter(match[1]) : {};
 }
 
 function documentByRoot(plan: Plan, rootId: ID): Document {
@@ -65,108 +58,14 @@ function realWorldEntities(plan: Plan, document: Document): string[] {
   ).realWorldEntities;
 }
 
-test("publishing a document emits a deposit beside its storage event", () => {
-  const { plan, docId, rootId } = planWithEssay();
-  const parent = plan.knowledgeDBs.get(LOCAL)?.nodes.get(rootId);
-  if (!parent) {
-    throw new Error("parent missing");
-  }
-  const linked = planPasteMarkdownTrees(
-    plan,
-    parseTextToTrees("[Asset](#asset:rgb:test-contract)"),
-    parent,
-    0
-  );
-  const published = planSetDocumentPublishState(linked, docId, {
-    relays: ["wss://salon.example"],
-    paused: false,
-  });
+test("document writes emit storage events only", () => {
+  const { plan } = planWithEssay();
+  const events = buildDocumentEvents(plan);
 
-  const events = buildDocumentEvents(published);
-  const storage = events.find((e) => e.kind === KIND_KNOWLEDGE_DOCUMENT);
-  const deposit = events.find((e) => e.kind === KIND_KNOWLEDGE_DEPOSIT);
-
-  expect(storage).toBeDefined();
-  expect(deposit).toBeDefined();
-  expect(deposit?.content).toBe(storage?.content);
-  expect(deposit?.tags.filter(([name]) => name === "S")).toEqual([
-    ["S", rootId],
-    ["S", "asset:rgb:test-contract"],
-  ]);
-  expect(storage?.tags.some(([name]) => name === "S")).toBe(false);
-  expect(deposit?.writeRelayConf).toEqual({
-    extraRelays: [
-      { url: "wss://salon.example", read: false, write: true },
-      { url: "wss://nostr.nodesmap.com/", read: false, write: true },
-    ],
-  });
-});
-
-test("the deposit's S set equals roots plus graph-derived tags", () => {
-  const { plan, docId, rootId } = planWithEssay();
-  const parent = plan.knowledgeDBs.get(LOCAL)?.nodes.get(rootId);
-  if (!parent) {
-    throw new Error("parent missing");
-  }
-  const linked = planPasteMarkdownTrees(
-    plan,
-    parseTextToTrees("[Barcelona](#wd:Q1492)"),
-    parent,
-    0
-  );
-  const published = planSetDocumentPublishState(linked, docId, {
-    paused: false,
-  });
-
-  const deposit = buildDocumentEvents(published).find(
-    (e) => e.kind === KIND_KNOWLEDGE_DEPOSIT
-  );
-  const state = publishStateOf(frontMatterOf(deposit?.content ?? ""));
-
-  expect(state).toEqual({ paused: false });
-  expect(deposit?.tags.filter(([name]) => name === "S")).toEqual([
-    ["S", rootId],
-    ["S", "wd:Q1492"],
-  ]);
-});
-
-test("paused documents emit storage but no deposit; the flag rides the file", () => {
-  const { plan, docId } = planWithEssay();
-  const paused = planSetDocumentPublishState(plan, docId, {
-    paused: true,
-  });
-
-  const events = buildDocumentEvents(paused);
-  const storage = events.find((e) => e.kind === KIND_KNOWLEDGE_DOCUMENT);
-
-  expect(events.some((e) => e.kind === KIND_KNOWLEDGE_DEPOSIT)).toBe(false);
-  expect(publishStateOf(frontMatterOf(storage?.content ?? ""))?.paused).toBe(
+  expect(events.size).toBeGreaterThan(0);
+  expect(events.every((event) => event.kind === KIND_KNOWLEDGE_DOCUMENT)).toBe(
     true
   );
-});
-
-test("unpausing emits a clean deposit without the paused flag", () => {
-  const { plan, docId } = planWithEssay();
-  const paused = planSetDocumentPublishState(plan, docId, {
-    paused: true,
-  });
-  const unpaused = planSetDocumentPublishState(paused, docId, {
-    paused: false,
-  });
-
-  const deposit = buildDocumentEvents(unpaused).find(
-    (e) => e.kind === KIND_KNOWLEDGE_DEPOSIT
-  );
-
-  expect(deposit).toBeDefined();
-  expect(deposit?.content.includes("paused")).toBe(false);
-});
-
-test("unpublished documents emit no deposit", () => {
-  const { plan } = planWithEssay();
-  expect(
-    buildDocumentEvents(plan).some((e) => e.kind === KIND_KNOWLEDGE_DEPOSIT)
-  ).toBe(false);
 });
 
 const CONTRACT_ID = "rgb:cdtFZh2Q-YTY1rYW-yBdMlZb-GbkThw~-ArYpJ72-eXiti5Y";
@@ -189,7 +88,7 @@ test("clipboard Markdown survives empty-row materialization and document renderi
     ...newGraphNode(plainSpans(""), { root: rootId, parent: rootId }),
     id: EMPTY_NODE_ID,
   };
-  const markdown = `[A fork of Hello](#e834645e-8bb5-44f7-89b2-41d5054746af)`;
+  const markdown = `[A link to Hello](#e834645e-8bb5-44f7-89b2-41d5054746af)`;
   const result = planSaveNodeAndEnsureNodes(
     plan,
     parseInlineSpans(markdown),
@@ -264,7 +163,7 @@ test("marker created under a parent becomes a link row, never a duplicate", () =
   ).toBeUndefined();
 });
 
-test("link placements feed the publish tags", () => {
+test("link placements contribute real-world entities", () => {
   const { plan, docId, rootId } = planWithEssay();
   const parent = plan.knowledgeDBs.get(LOCAL)?.nodes.get(rootId);
   if (!parent) {
@@ -283,7 +182,7 @@ test("link placements feed the publish tags", () => {
   expect(realWorldEntities(pasted, document)).toContain(`asset:${CONTRACT_ID}`);
 });
 
-test("tags derive through link targets, one bare tag per linked entity", () => {
+test("real-world entities derive through link targets", () => {
   const [alice] = setup([ALICE]);
   const [plan] = planCreateNodesFromMarkdown(
     createPlan(alice()),
@@ -303,7 +202,7 @@ test("tags derive through link targets, one bare tag per linked entity", () => {
   expect(realWorldEntities(plan, document)).toEqual(["wd:Q1492", "wd:Q48435"]);
 });
 
-test("repeated entities dedupe to one tag", () => {
+test("repeated entities dedupe", () => {
   const [alice] = setup([ALICE]);
   const [plan] = planCreateNodesFromMarkdown(
     createPlan(alice()),
@@ -321,7 +220,7 @@ test("repeated entities dedupe to one tag", () => {
   expect(realWorldEntities(plan, document)).toEqual(["wd:Q1492"]);
 });
 
-test("deep links tag the target container root", () => {
+test("deep links include the target container root", () => {
   const [alice] = setup([ALICE]);
   const [targetPlan] = planCreateNodesFromMarkdown(
     createPlan(alice()),
@@ -345,7 +244,7 @@ test("deep links tag the target container root", () => {
   expect(realWorldEntities(plan, document)).toEqual(["lviv-life"]);
 });
 
-test("direct link tags are source-local and directional", () => {
+test("direct link entities are source-local and directional", () => {
   const [alice] = setup([ALICE]);
   const [misesPlan] = planCreateNodesFromMarkdown(
     createPlan(alice()),
@@ -361,25 +260,10 @@ test("direct link tags are source-local and directional", () => {
     hayekPlan,
     "# Wittgenstein <!-- id:wittgenstein -->"
   );
-  const publish = (document: Document): string[][] => {
-    const next = planSetDocumentPublishState(plan, document.docId, {
-      paused: false,
-    });
-    const deposit = buildDocumentEvents(next).find(
-      (event) => event.kind === KIND_KNOWLEDGE_DEPOSIT
-    );
-    if (!deposit) {
-      throw new Error("deposit missing");
-    }
-    return deposit.tags.filter(([name]) => name === "S");
-  };
-
-  expect(publish(documentByRoot(plan, "mises"))).toEqual([
-    ["S", "mises"],
-    ["S", "hayek"],
+  expect(realWorldEntities(plan, documentByRoot(plan, "mises"))).toEqual([
+    "hayek",
   ]);
-  expect(publish(documentByRoot(plan, "hayek"))).toEqual([
-    ["S", "hayek"],
-    ["S", "wittgenstein"],
+  expect(realWorldEntities(plan, documentByRoot(plan, "hayek"))).toEqual([
+    "wittgenstein",
   ]);
 });

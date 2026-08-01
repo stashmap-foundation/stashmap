@@ -10,7 +10,7 @@ import {
   useRow,
 } from "../rowModel";
 import { useData } from "../DataContext";
-import { isEmptyNodeID, nodePathLabel } from "../core/connections";
+import { isEmptyNodeID } from "../core/connections";
 import { calendarEntryTarget } from "../core/ical";
 import { searchInsertTarget } from "../localSearch";
 import { NOTE_TYPE, Node } from "./Node";
@@ -23,17 +23,6 @@ import {
 } from "./temporaryViewState";
 import { isEditableElement, KeyboardMode } from "./keyboardNavigation";
 import { usePaneIndex } from "../SplitPanesContext";
-
-function nodePathText(
-  data: Data,
-  node: GraphNode | undefined,
-  sourceId: SourceId
-): string | undefined {
-  if (!node) {
-    return undefined;
-  }
-  return nodePathLabel(data.knowledgeDBs, node, sourceId);
-}
 
 function markDragDescendants(sourceViewKey: string): void {
   const prefix = `${sourceViewKey}:`;
@@ -101,18 +90,15 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
               .filter((candidate) => selection.has(candidate.viewKey))
               .toArray()
           : [row];
-        const dragNode = node;
         const dragNodeId = row.node.id;
         return {
           row,
           draggedRows,
           sourcePaneIndex: paneIndex,
           text: displayText,
-          virtualType,
           isCopyDrag: copyDrag || undefined,
           nodeId: dragNodeId,
           targetId: calendarEntryTarget(row.node),
-          linkText: nodePathText(data, dragNode, row.sourceId),
           insertTarget:
             row.materialize?.take ??
             (virtualType === "search"
@@ -185,115 +171,6 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
   }
 );
 
-function DraggableSuggestion({
-  className,
-  rowViewKey,
-  rowIndex,
-  rowDepth,
-  rows,
-  isActiveRow,
-  isSelected = false,
-  onRowFocus,
-  onRowClick,
-}: {
-  className?: string;
-  rowViewKey: string;
-  rowIndex: number;
-  rowDepth: number;
-  rows: List<Row>;
-  isActiveRow: boolean;
-  isSelected?: boolean;
-  onRowFocus: (key: string, index: number, mode: KeyboardMode) => void;
-  onRowClick?: (e: React.MouseEvent, viewKey: string) => void;
-}): JSX.Element {
-  const ref = useRef<HTMLDivElement>(null);
-  const row = useRow();
-  const paneIndex = usePaneIndex();
-  const { viewKey } = row;
-  const { selection } = useTemporaryView();
-  const node = useCurrentNode();
-  const displayText = useDisplayText();
-
-  const [{ isDragging }, drag, preview] = useDrag({
-    type: NOTE_TYPE,
-    item: () => {
-      clearDropIndent();
-      const draggedRows = selection.has(viewKey)
-        ? rows.filter((candidate) => selection.has(candidate.viewKey)).toArray()
-        : [row];
-      return {
-        row,
-        draggedRows,
-        sourcePaneIndex: paneIndex,
-        text: displayText,
-        virtualType: row.virtualType,
-        isSuggestion: true,
-        nodeId: node?.id,
-        insertTarget: row.materialize?.take,
-      };
-    },
-    collect: (monitor) => ({
-      isDragging: !!monitor.isDragging(),
-    }),
-  });
-
-  useEffect(() => {
-    preview(getEmptyImage(), { captureDraggingState: true });
-  }, [preview]);
-
-  drag(ref as ConnectableElement);
-
-  const handleClick = (e: React.MouseEvent): void => {
-    if (!onRowClick) {
-      return;
-    }
-    const target = e.target as HTMLElement;
-    if (isEditableElement(target)) {
-      return;
-    }
-    if (
-      target.closest(
-        "button, a, input, textarea, select, [role='button'], [data-node-action], [data-pane-action]"
-      )
-    ) {
-      return;
-    }
-    onRowClick(e, rowViewKey);
-  };
-
-  return (
-    <div
-      ref={ref}
-      className={`item suggestion-item ${isDragging ? "is-dragging" : ""} ${
-        className || ""
-      }`}
-      data-row-focusable="true"
-      data-view-key={rowViewKey}
-      data-row-index={rowIndex}
-      data-row-depth={rowDepth}
-      data-node-id={row.node.id}
-      data-node-text={displayText}
-      data-node-mutable={isEditableNode(node) ? "true" : "false"}
-      data-selected={isSelected ? "true" : undefined}
-      role="treeitem"
-      aria-label={displayText}
-      aria-selected={isActiveRow}
-      tabIndex={isActiveRow ? 0 : -1}
-      onFocusCapture={(e) =>
-        onRowFocus(
-          rowViewKey,
-          rowIndex,
-          isEditableElement(e.target) ? "insert" : "normal"
-        )
-      }
-      onClick={handleClick}
-      onKeyDown={() => {}}
-    >
-      <Node className={className} isSuggestion rows={rows} />
-    </div>
-  );
-}
-
 export function ListItem({
   row,
   rows,
@@ -311,11 +188,7 @@ export function ListItem({
 }): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
   const { viewKey, virtualType } = row;
-  const isSuggestion = virtualType === "suggestion";
-  const isCopyDrag =
-    virtualType === "incoming" ||
-    virtualType === "version" ||
-    virtualType === "search";
+  const isCopyDrag = virtualType === "incoming" || virtualType === "search";
   const isInSearchView = useIsInSearchView();
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
   const selected = useIsSelected();
@@ -345,27 +218,6 @@ export function ListItem({
         }`}
       >
         <Node rows={rows} />
-      </div>
-    );
-  }
-
-  if (isSuggestion) {
-    return (
-      <div
-        className={`visible-on-hover suggestion-item-container${
-          row.isFirstVirtual ? " first-virtual" : ""
-        }`}
-      >
-        <DraggableSuggestion
-          rowViewKey={viewKey}
-          rowIndex={row.index}
-          rowDepth={rowDepth}
-          rows={rows}
-          isActiveRow={isActiveRow}
-          isSelected={selected}
-          onRowFocus={onRowFocus}
-          onRowClick={onRowClick}
-        />
       </div>
     );
   }

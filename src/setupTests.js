@@ -5,7 +5,6 @@ import { ReadableStream, TransformStream, WritableStream } from "stream/web";
 import consumers from "stream/consumers";
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { cleanup } from "@testing-library/react";
-import { suggestionSettings } from "./core/constants";
 
 // Not a typescript file so disable typescript linting rules
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
@@ -45,7 +44,6 @@ global.ResizeObserver.prototype.disconnect = () => {};
 if (typeof Element !== "undefined") {
   Element.prototype.scrollIntoView = () => {};
 }
-suggestionSettings.maxSuggestions = 3;
 /* eslint-enable functional/immutable-data */
 
 afterEach(() => {

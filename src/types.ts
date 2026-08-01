@@ -93,8 +93,6 @@ declare global {
 
   type KnowledgeDBs = Map<SourceId, KnowledgeData>;
 
-  type SnapshotNodes = Map<string, Map<string, GraphNode>>;
-
   type LocationState = {
     referrer?: string;
   };
@@ -165,64 +163,17 @@ declare global {
     fallbackLabel?: string;
     searchQuery?: string;
     searchResultIDs?: ID[];
-    typeFilters?: (
-      | Relevance
-      | "suggestions"
-      | "versions"
-      | "incoming"
-      | "contains"
-    )[];
+    typeFilters?: (Relevance | "incoming" | "contains")[];
     scrollToId?: string;
   };
 
-  type RelatedSourceTagWeight = {
-    tag: string;
-    weight: number;
-  };
-
-  type RelatedSourceContext = {
-    targetRef: NodeRef;
-    pathRefs: readonly NodeRef[];
-    weightedTags: readonly RelatedSourceTagWeight[];
-  };
-
-  type RelatedSourcePlacement = {
-    sourceId: SourceId;
-    targetRef: NodeRef;
-    score: number;
-    overlapTags: readonly string[];
-  };
-
-  type RelatedSourceCandidate = {
-    rootRef: NodeRef;
-    sTags: readonly string[];
-    ms: number;
-    title: string;
-  };
-
-  type PullSourceMetadata = {
-    sourceId: SourceId;
-    coordinate: RouteCoordinate;
-    latestEventId: string;
-    ms: number;
-    sTags: string[];
-    relays: string[];
-    snapshotId: string;
-    title: string;
-    rootIds: string[];
-  };
-
   type PullOverlayData = {
-    sourceIds: ReadonlySet<SourceId>;
     matchedSourceIdsByPaneId: ReadonlyMap<string, readonly SourceId[]>;
-    relatedSourceIdsByPaneId: ReadonlyMap<string, readonly SourceId[]>;
-    metadataBySourceId: ReadonlyMap<SourceId, PullSourceMetadata>;
   };
 
   type Data = {
     user: User | undefined;
     knowledgeDBs: KnowledgeDBs;
-    snapshotNodes: SnapshotNodes;
     graphIndex: GraphIndex;
     documents: Map<string, DocumentType>;
     documentByFilePath: Map<string, DocumentType>;
@@ -278,12 +229,8 @@ declare global {
     parentChildIndex: number | undefined;
     childIndex: number | undefined;
     hasChildren: boolean;
-    // Display provenance of a computed row (idea.md: gutter marks are
-    // provenance, not styling): what kind of proposal/alternative this
-    // is and whose content it carries. Derived once at row creation;
-    // display code branches on this, never on virtualType.
     provenance?: {
-      kind: "suggestion" | "incoming" | "version" | "related-source";
+      kind: "incoming";
       sourceId: SourceId;
     };
     // The materialization recipe (idea.md: write gestures take first).
@@ -300,36 +247,10 @@ declare global {
     };
     standsFor?: { id: ID; liveText?: string };
     isFirstVirtual: boolean;
-    virtualType:
-      | "suggestion"
-      | "search"
-      | "incoming"
-      | "version"
-      | "related-source"
-      | undefined;
+    virtualType: "search" | "incoming" | undefined;
     // The action row: a button in row position, obviously not content.
     // One interaction (click); no gutter, no editor, no judgment, no drag.
-    action?: "toggle-past-entries" | "open-related-sources";
-    // A rename suggestion (replacement-shaped): the version's text left
-    // the edge baseline. Rendered strikethrough-old + new; x dismisses
-    // that version's text, any other judgment takes it.
-    renameSuggestion?: {
-      theirs: string;
-      mine: string;
-      versionId: ID;
-      snapshotId: string;
-      baselineNodeId: ID;
-    };
-    versionMeta:
-      | {
-          updated: number;
-          addCount: number;
-          removeCount: number;
-          // no baseline for this fork edge: counts are a direct comparison
-          // without direction, rendered as ±n
-          direct?: boolean;
-        }
-      | undefined;
+    action?: "toggle-past-entries";
     reference:
       | {
           id: ID;
@@ -349,9 +270,7 @@ declare global {
     // Calendar feed nodes: project bare past entries too (default: only
     // upcoming entries project; file content always shows).
     showPastEntries?: boolean;
-    typeFilters?: Array<
-      Relevance | "suggestions" | "versions" | "incoming" | "contains"
-    >;
+    typeFilters?: Array<Relevance | "incoming" | "contains">;
   };
 
   // Context is the path of ancestor node IDs leading to the head node
@@ -383,9 +302,7 @@ declare global {
     docId?: string;
     parent?: ID;
     systemRole?: RootSystemRole;
-    snapshotId?: string;
     updated: number;
-    basedOn?: ID;
     root: ID;
     relevance: Relevance;
     argument?: Argument;
@@ -416,7 +333,6 @@ declare global {
     incomingCrefs: globalThis.Map<ID, NodeRef[]>;
     incomingCrefsByTarget: globalThis.Map<string, NodeRef[]>;
     incomingFileLinks: globalThis.Map<string, NodeRef[]>;
-    basedOnIndex: globalThis.Map<ID, globalThis.Set<ID>>;
   };
 
   // Temporary UI state (not persisted to Nostr)

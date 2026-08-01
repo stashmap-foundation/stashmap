@@ -4,12 +4,7 @@ import { useUser } from "../../NostrAuthContext";
 import { useUserSessionState } from "../../userSessionState";
 import { useBackend } from "../../BackendContext";
 import { DataContextProvider, MergeKnowledgeDB } from "../../DataContext";
-import {
-  DocumentStoreProvider,
-  ParsedDocument,
-  SnapshotContent,
-  useDocumentStore,
-} from "../../DocumentStore";
+import { DocumentStoreProvider, ParsedDocument } from "../../DocumentStore";
 import { LOCAL } from "../../core/nodeRef";
 import { PlanningContextProvider } from "../../planner";
 import { FilesystemExecutorProvider } from "./FilesystemExecutorProvider";
@@ -78,68 +73,6 @@ function parseWorkspaceFiles(
   return documents;
 }
 
-const SNAPSHOT_LOAD_BATCH_SIZE = 20;
-
-function enqueueSnapshotBatches(
-  addSnapshotContents: (snapshots: ReadonlyArray<SnapshotContent>) => void,
-  snapshots: ReadonlyArray<SnapshotContent>,
-  index: number,
-  signal: AbortSignal
-): void {
-  if (signal.aborted) {
-    return;
-  }
-  const batch = snapshots.slice(index, index + SNAPSHOT_LOAD_BATCH_SIZE);
-  if (batch.length === 0) {
-    return;
-  }
-  addSnapshotContents(batch);
-  if (index + SNAPSHOT_LOAD_BATCH_SIZE < snapshots.length) {
-    window.setTimeout(() =>
-      enqueueSnapshotBatches(
-        addSnapshotContents,
-        snapshots,
-        index + SNAPSHOT_LOAD_BATCH_SIZE,
-        signal
-      )
-    );
-  }
-}
-
-function WorkspaceSnapshotLoader({
-  workspaceKey,
-}: {
-  workspaceKey: string;
-}): JSX.Element | null {
-  const { workspace } = useBackend();
-  const store = useDocumentStore();
-  const addSnapshotContents = store?.addSnapshotContents;
-  React.useEffect(() => {
-    const controller = new AbortController();
-    if (!workspace || !addSnapshotContents) {
-      return () => controller.abort();
-    }
-    window.setTimeout(() => {
-      if (controller.signal.aborted) {
-        return;
-      }
-      workspace
-        .loadSnapshots()
-        .then((snapshots) =>
-          enqueueSnapshotBatches(
-            addSnapshotContents,
-            snapshots,
-            0,
-            controller.signal
-          )
-        )
-        .catch(() => undefined);
-    });
-    return () => controller.abort();
-  }, [workspace, workspaceKey, addSnapshotContents]);
-  return null;
-}
-
 export function FilesystemDataProvider({
   children,
 }: {
@@ -163,7 +96,6 @@ export function FilesystemDataProvider({
       documentByFilePath={Map()}
       relaysInfos={Map()}
       publishEventsStatus={session.publishStatus}
-      snapshotNodes={Map()}
       views={session.views}
       panes={session.panes}
     >
@@ -171,10 +103,8 @@ export function FilesystemDataProvider({
         key={workspaceKey}
         localPubkey={user?.publicKey}
         initialDocuments={initialDocuments}
-        initialSnapshots={workspace?.snapshots ?? []}
         unpublishedEvents={session.publishStatus.unsignedEvents}
       >
-        <WorkspaceSnapshotLoader workspaceKey={workspaceKey} />
         <FilesystemWatcher />
         <MergeKnowledgeDB>
           <PullSourceProvider>

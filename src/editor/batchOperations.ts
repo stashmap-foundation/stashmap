@@ -15,7 +15,6 @@ import { getNode } from "../core/connections";
 import {
   planAddTopTargetsToDocument,
   planMaterializeComputedRow,
-  planResolveRenameSuggestion,
 } from "../core/plan";
 import { getDocumentByIdOrFilePath } from "../core/Document";
 import { spansToMarkdown } from "../core/nodeSpans";
@@ -50,12 +49,6 @@ function planUpdateOneMetadata(
   metadata: NodeItemMetadata,
   editorSpans: InlineSpan[] | undefined
 ): Plan {
-  // Rename suggestions resolve, never materialize: x dismisses the
-  // version's text, any other judgment takes it.
-  const renameResolved = planResolveRenameSuggestion(acc, row, metadata);
-  if (renameResolved) {
-    return renameResolved;
-  }
   // Write gestures take first: a computed row materializes with the
   // judgment applied at creation — one plan, one save.
   const [materializedPlan, , materializedNow] = planMaterializeComputedRow(
@@ -90,12 +83,10 @@ function planUpdateOneMetadata(
     {
       node: row.node,
       nodeID: row.node.id,
-      sourceId: row.sourceId,
       viewPath: row.viewPath,
       parentNode: row.parentNode,
       parentViewPath: row.parentViewPath,
       childIndex: row.childIndex,
-      virtualType: row.virtualType,
       paneIndex,
       paneAuthor: pane.sourceId,
       documentId: pane.documentId,

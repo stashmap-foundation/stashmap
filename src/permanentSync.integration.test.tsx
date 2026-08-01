@@ -2,11 +2,7 @@ import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Event } from "nostr-tools";
 import { clearDatabase } from "./infra/nostr/cache/indexedDB";
-import {
-  KIND_DELETE,
-  KIND_KNOWLEDGE_DOCUMENT,
-  KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
-} from "./nostr";
+import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "./nostr";
 import { LOG_ROOT_ROLE } from "./core/systemRoots";
 import {
   ALICE,
@@ -145,10 +141,7 @@ describe("permanent live sync integration", () => {
           filters: [
             expect.objectContaining({
               authors: [ALICE.publicKey],
-              kinds: [
-                KIND_KNOWLEDGE_DOCUMENT,
-                KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
-              ],
+              kinds: [KIND_KNOWLEDGE_DOCUMENT],
               limit: 0,
             }),
             expect.objectContaining({

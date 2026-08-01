@@ -6,7 +6,6 @@ import { injectEmptyNodesIntoKnowledgeDBs } from "./core/connections";
 import {
   useDocumentKnowledgeDBs,
   useDocumentGraphIndex,
-  useDocumentSnapshotNodes,
   useDocuments,
   useDocumentByFilePath,
 } from "./DocumentStore";
@@ -64,7 +63,6 @@ export function MergeKnowledgeDB({
   graphIndex,
   documents,
   documentByFilePath,
-  snapshotNodes,
   pull,
 }: {
   children: React.ReactNode;
@@ -72,7 +70,6 @@ export function MergeKnowledgeDB({
   graphIndex?: GraphIndex;
   documents?: Map<string, KnowstrDocument>;
   documentByFilePath?: Map<string, KnowstrDocument>;
-  snapshotNodes?: SnapshotNodes;
   pull?: PullOverlayData;
 }): JSX.Element {
   const data = useData();
@@ -80,7 +77,6 @@ export function MergeKnowledgeDB({
 
   const documentDBs = useDocumentKnowledgeDBs();
   const documentGraphIndex = useDocumentGraphIndex();
-  const documentSnapshotNodes = useDocumentSnapshotNodes();
   const documentRecords = useDocuments();
   const documentsByPath = useDocumentByFilePath();
   const mergedDataDBs = mergeKnowledgeDBs(data.knowledgeDBs, documentDBs);
@@ -99,10 +95,6 @@ export function MergeKnowledgeDB({
   const mergedDocumentByFilePath = documentByFilePath
     ? documentsByPath.merge(data.documentByFilePath).merge(documentByFilePath)
     : documentsByPath.merge(data.documentByFilePath);
-  const mergedSnapshotNodes = snapshotNodes
-    ? data.snapshotNodes.merge(documentSnapshotNodes).merge(snapshotNodes)
-    : data.snapshotNodes.merge(documentSnapshotNodes);
-
   const injectedDBs = injectEmptyNodesIntoKnowledgeDBs(
     baseDBs,
     temporaryEvents,
@@ -115,7 +107,6 @@ export function MergeKnowledgeDB({
         ...data,
         knowledgeDBs: injectedDBs,
         graphIndex: mergedGraphIndex,
-        snapshotNodes: mergedSnapshotNodes,
         documents: mergedDocuments,
         documentByFilePath: mergedDocumentByFilePath,
         pull: pull ?? data.pull,

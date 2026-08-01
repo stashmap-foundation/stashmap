@@ -40,11 +40,7 @@ function getArgumentTextStyle(argument: Argument | undefined): CSSProperties {
 }
 
 function isReferenceVirtualType(virtualType: Row["virtualType"]): boolean {
-  return (
-    virtualType === "incoming" ||
-    virtualType === "version" ||
-    virtualType === "related-source"
-  );
+  return virtualType === "incoming";
 }
 
 export function useItemStyle(): ItemStyle {
@@ -64,15 +60,6 @@ export function useItemStyle(): ItemStyle {
       row.standsFor?.liveText ?? nodeText(currentRow),
       Date.now()
     );
-
-  if (virtualType === "suggestion") {
-    return {
-      cardStyle: {},
-      textStyle: {},
-      textClassName: "text-readonly",
-      relevance: undefined,
-    };
-  }
 
   if (isViewingOtherUserContent) {
     const relevance = currentRow?.relevance;

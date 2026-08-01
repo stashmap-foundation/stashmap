@@ -8,10 +8,7 @@ import {
   isUserLoggedInWithExtension,
 } from "../../NostrAuthContext";
 import { applyWriteRelayConfig } from "../../relays";
-import {
-  KIND_KNOWLEDGE_DOCUMENT,
-  KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
-} from "../../nostr";
+import { KIND_KNOWLEDGE_DOCUMENT } from "../../nostr";
 import { buildStorageEnvelope } from "../../storageEncryption";
 import { publishEventToRelays, PUBLISH_TIMEOUT } from "./nostrPublish";
 
@@ -42,9 +39,6 @@ export async function signEvents(
     }
   };
 
-  // Storage events — documents and their fork snapshots — go on the wire
-  // encrypted: content becomes the age envelope under the event's
-  // per-document key, the key attachment never leaves the app.
   const toWireTemplate = async (
     e: EventTemplate & EventAttachment
   ): Promise<{
@@ -52,10 +46,7 @@ export async function signEvents(
     writeRelayConf?: WriteRelayConf;
   }> => {
     const { writeRelayConf, storageKey, ...template } = e;
-    if (
-      template.kind !== KIND_KNOWLEDGE_DOCUMENT &&
-      template.kind !== KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT
-    ) {
+    if (template.kind !== KIND_KNOWLEDGE_DOCUMENT) {
       return { template, writeRelayConf };
     }
     if (!storageKey) {

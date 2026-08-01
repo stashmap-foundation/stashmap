@@ -1,19 +1,7 @@
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Map } from "immutable";
-import {
-  ALICE,
-  setup,
-  expectTree,
-  findNewNodeEditor,
-  BOB,
-  forkReadonlyRoot,
-  readonlyRoute,
-  renderApp,
-  renderTree,
-  type,
-  requireUser,
-} from "./utils.test";
+import { ALICE, setup, expectTree, renderTree, type } from "./utils.test";
 import {
   parseViewPath,
   viewPathToString,
@@ -104,46 +92,6 @@ My Notes
   `);
 });
 
-test("Contact views list via version and list remains unchanged", async () => {
-  const [alice, bob] = setup([ALICE, BOB]);
-
-  renderTree(alice);
-  await type(
-    "My Notes{Enter}{Tab}Cities{Enter}{Tab}Paris{Enter}London{Escape}"
-  );
-
-  await expectTree(`
-My Notes
-  Cities
-    Paris
-    London
-  `);
-  cleanup();
-
-  await forkReadonlyRoot(bob(), requireUser(alice()).publicKey, "My Notes");
-  await userEvent.click(await screen.findByLabelText("expand Cities"));
-  await userEvent.click(await screen.findByLabelText("edit Cities"));
-  await userEvent.keyboard("{Enter}");
-  await type("Madrid{Escape}");
-
-  await expectTree(`
-My Notes
-  Cities
-    Madrid
-    Paris
-    London
-  `);
-  cleanup();
-
-  renderTree(alice);
-  await expectTree(`
-My Notes
-  Cities
-    Paris
-    London
-  `);
-});
-
 test("Alter View paths after disconnect", () => {
   const views = Map<string, { e: string }>({
     "p0:root:r:n": { e: "delete" },
@@ -199,80 +147,6 @@ test("View path roundtrip preserves node IDs", () => {
 
   expect(parsed).toEqual(viewPath);
   expect(parsed[2]).toBe(nodeId);
-});
-
-test("View doesn't change if list is forked from contact", async () => {
-  const [alice, bob] = setup([ALICE, BOB]);
-
-  renderTree(bob);
-  await type(
-    "My Notes{Enter}{Tab}Programming Languages{Enter}{Tab}OOP{Enter}{Tab}C++{Enter}Java{Enter}{Enter}FP{Enter}Logic{Enter}Scripting{Escape}"
-  );
-  await expectTree(`
-My Notes
-  Programming Languages
-    OOP
-      C++
-      Java
-    FP
-    Logic
-    Scripting
-  `);
-  cleanup();
-
-  renderApp({
-    ...alice(),
-    initialRoute: readonlyRoute(
-      requireUser(bob()).publicKey,
-      "My Notes",
-      "Programming Languages"
-    ),
-  });
-  await screen.findByText("READONLY");
-  await userEvent.click(await screen.findByLabelText("expand OOP"));
-  await expectTree(`
-[O] Programming Languages
-  [O] OOP
-    [O] C++
-    [O] Java
-  [O] FP
-  [O] Logic
-  [O] Scripting
-  `);
-
-  await userEvent.click(await screen.findByLabelText("copy root to edit"));
-  await waitFor(() => {
-    expect(screen.queryByText("READONLY")).toBeNull();
-  });
-  await expectTree(`
-Programming Languages
-  OOP
-    C++
-    Java
-  FP
-  Logic
-  Scripting
-  `);
-
-  await userEvent.click(
-    await screen.findByLabelText("edit Programming Languages")
-  );
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(
-    await findNewNodeEditor(),
-    "added programming language{Escape}"
-  );
-  await expectTree(`
-Programming Languages
-  added programming language
-  OOP
-    C++
-    Java
-  FP
-  Logic
-  Scripting
-  `);
-  cleanup();
 });
 
 test("Disconnect Nodes", async () => {

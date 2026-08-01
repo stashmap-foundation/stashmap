@@ -14,20 +14,20 @@ import { PublishingStatusWrapper } from "./PublishingStatusWrapper";
 import { PaneView } from "./Workspace";
 import { MockRelayPool } from "../nostrMock.test";
 
-test("Publishing Status", async () => {
+test("Sync Status", async () => {
   const [alice] = setup([ALICE]);
   renderApp(alice());
   await type("Root{Enter}New Note{Escape}");
   await screen.findByLabelText("edit New Note");
   await userEvent.click(
-    await screen.findByLabelText("publishing status", undefined, {
+    await screen.findByLabelText("sync status", undefined, {
       timeout: 5000,
     })
   );
   await screen.findByText("relay.test.first.success/");
 });
 
-test("Details of Publishing Status", async () => {
+test("Details of Sync Status", async () => {
   const [alice] = setup([ALICE]);
   const utils = alice();
   renderWithTestData(
@@ -55,7 +55,7 @@ test("Details of Publishing Status", async () => {
   );
   await type("Root{Enter}Hello World{Escape}");
   const publishingStatusButtons = await screen.findAllByLabelText(
-    "publishing status"
+    "sync status"
   );
   await userEvent.click(publishingStatusButtons[0]);
   await screen.findByText("relay.test.first.success/");

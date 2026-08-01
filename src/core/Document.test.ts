@@ -42,6 +42,29 @@ test("parseToDocument falls back to fallbackTitle when no frontmatter title", ()
   expect(document.title).toBe("projects");
 });
 
+test("legacy publish state is ignored and omitted on render", () => {
+  const markdown = [
+    "---",
+    "title: Notes",
+    "knowstr_publish:",
+    "  paused: true",
+    "---",
+    "# Notes <!-- id:notes -->",
+    "",
+  ].join("\n");
+  const { document, nodes } = parseToDocumentPreservingExplicitIds(
+    TEST_PUBKEY,
+    markdown,
+    {}
+  );
+
+  expect(document.frontMatter).not.toHaveProperty("knowstr_publish");
+  const knowledgeDBs = Map<SourceId, KnowledgeData>([[TEST_PUBKEY, { nodes }]]);
+  expect(renderDocumentMarkdown(knowledgeDBs, document)).not.toContain(
+    "knowstr_publish"
+  );
+});
+
 test("parseToDocument falls back to first top-level node text", () => {
   const markdown = "# Holiday Destinations\n- Spain\n";
   const { document } = parseToDocument(TEST_PUBKEY, markdown);
@@ -53,7 +76,7 @@ test("parseToDocument falls back to 'Untitled' when nothing else is available", 
   expect(document.title).toBe("Untitled");
 });
 
-test("node-level basedOn and snapshot survive parse and render", () => {
+test("legacy basedOn and snapshot attributes survive as generic attributes", () => {
   const rootSnapshot = `snap_sha256_${"1".repeat(64)}`;
   const childSnapshot = `snap_sha256_${"2".repeat(64)}`;
   const markdown = [
@@ -69,10 +92,14 @@ test("node-level basedOn and snapshot survive parse and render", () => {
     { docIdFallback: "doc-1" }
   );
 
-  expect(nodes.get("u1")?.basedOn).toBe("a1");
-  expect(nodes.get("u1")?.snapshotId).toBe(rootSnapshot);
-  expect(nodes.get("u2")?.basedOn).toBe("a2");
-  expect(nodes.get("u2")?.snapshotId).toBe(childSnapshot);
+  expect(nodes.get("u1")?.extraAttrs).toEqual({
+    basedOn: "a1",
+    snapshot: rootSnapshot,
+  });
+  expect(nodes.get("u2")?.extraAttrs).toEqual({
+    basedOn: "a2",
+    snapshot: childSnapshot,
+  });
 
   const knowledgeDBs = Map<SourceId, KnowledgeData>([[TEST_PUBKEY, { nodes }]]);
   expect(renderDocumentMarkdown(knowledgeDBs, document)).toContain(
@@ -83,7 +110,7 @@ test("node-level basedOn and snapshot survive parse and render", () => {
   );
 });
 
-test("parseToDocument tolerates malformed snapshot ids in foreign documents", () => {
+test("parseToDocument preserves arbitrary legacy snapshot values", () => {
   const markdown = [
     '# Houses <!-- id:u1 basedOn="a1" snapshot="garbage" -->',
     "",
@@ -97,7 +124,10 @@ test("parseToDocument tolerates malformed snapshot ids in foreign documents", ()
     { docIdFallback: "doc-1" }
   );
 
-  expect(nodes.get("u1")?.snapshotId).toBe("garbage");
+  expect(nodes.get("u1")?.extraAttrs).toEqual({
+    basedOn: "a1",
+    snapshot: "garbage",
+  });
 });
 
 test("unknown comment attributes survive parse and render", () => {
@@ -129,7 +159,7 @@ test("unknown comment attributes survive parse and render", () => {
   );
 });
 
-test("block-link rows keep basedOn, snapshot, and unknown attributes", () => {
+test("block-link rows keep generic attributes", () => {
   const snapshot = `snap_sha256_${"3".repeat(64)}`;
   const markdown = [
     "# Reading <!-- id:u1 -->",
@@ -144,9 +174,11 @@ test("block-link rows keep basedOn, snapshot, and unknown attributes", () => {
     { docIdFallback: "doc-1" }
   );
 
-  expect(nodes.get("u2")?.basedOn).toBe("a5");
-  expect(nodes.get("u2")?.snapshotId).toBe(snapshot);
-  expect(nodes.get("u2")?.extraAttrs).toEqual({ knowstr_vote_id: "v1" });
+  expect(nodes.get("u2")?.extraAttrs).toEqual({
+    basedOn: "a5",
+    snapshot,
+    knowstr_vote_id: "v1",
+  });
 
   const knowledgeDBs = Map<SourceId, KnowledgeData>([[TEST_PUBKEY, { nodes }]]);
   expect(renderDocumentMarkdown(knowledgeDBs, document)).toContain(

@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-use-before-define, functional/no-let, functional/immutable-data */
 import React from "react";
-import { Map } from "immutable";
 import { LOCAL } from "./core/nodeRef";
 import {
   isSearchId,
@@ -36,15 +35,6 @@ export function useRow(): Row {
 // fetch feeds, offer row furniture like the past chip.
 export function isFileRow(row: Pick<Row, "virtualType">): boolean {
   return row.virtualType === undefined;
-}
-
-// An embed row's expansion shows the TARGET's subtree — computed,
-// read-only, for inspection before taking. A non-embed row's expansion
-// shows its own children, file truth. The suggestion preview is the one
-// embed in the system today; when an explicit embed affordance lands,
-// this predicate graduates to a producer-set row field.
-export function isEmbedRow(row: Pick<Row, "virtualType">): boolean {
-  return row.virtualType === "suggestion";
 }
 
 export function getIndependentRows(rows: Row[]): Row[] {
@@ -159,20 +149,6 @@ export function getViewForNode(data: Data, path: ViewPath, nodeID: ID): View {
 }
 
 export function buildPaneTarget(data: Data, row: Row): EditorNavigationTarget {
-  if (
-    row.action === "open-related-sources" &&
-    row.parentRef &&
-    row.parentNode
-  ) {
-    return {
-      sourceId: row.parentRef.sourceId,
-      rootNodeId: row.parentNode.id,
-      ...(isCanonicalId(row.parentNode.id) && {
-        fallbackLabel: nodeText(row.parentNode),
-      }),
-    };
-  }
-
   const targetID =
     row.virtualType === "search" ? searchTargetID(row.node) : row.reference?.id;
   const refInfo = targetID
@@ -257,23 +233,9 @@ export function useCurrentEdge(): GraphNode {
 }
 
 export function getDisplayTextForRow(row: Row): string {
-  const { versionMeta, reference } = row;
-  if (row.renameSuggestion) {
-    return `${row.renameSuggestion.mine} ${row.renameSuggestion.theirs}`;
-  }
+  const { reference } = row;
   if (row.standsFor?.liveText !== undefined) {
     return row.standsFor.liveText;
-  }
-  // A version row's text IS its meta: date, author mark, diff counts.
-  if (row.virtualType === "version" && versionMeta) {
-    const meta = versionMeta;
-    return [
-      new Date(meta.updated).toLocaleString(),
-      ...(row.sourceId !== LOCAL ? ["\u{1F464}"] : []),
-      ...(meta.direct ? [`±${meta.addCount + meta.removeCount}`] : []),
-      ...(!meta.direct && meta.addCount > 0 ? [`+${meta.addCount}`] : []),
-      ...(!meta.direct && meta.removeCount > 0 ? [`-${meta.removeCount}`] : []),
-    ].join(" ");
   }
   if (
     row.virtualType === undefined &&
@@ -325,26 +287,6 @@ export function copyViewsWithNewPrefix(
   );
   return viewsToCopy.reduce((acc, view, key) => {
     const newKey = targetKey + key.slice(sourceKey.length);
-    return acc.set(newKey, view);
-  }, views);
-}
-
-export function copyViewsWithNodesMapping(
-  views: Views,
-  sourceKey: string,
-  targetKey: string,
-  nodesIdMapping: Map<ID, ID>
-): Views {
-  const viewsToCopy = views.filter(
-    (_, k) => k.startsWith(`${sourceKey}:`) || k === sourceKey
-  );
-  return viewsToCopy.reduce((acc, view, key) => {
-    const suffix = key.slice(sourceKey.length);
-    const mappedSuffix = nodesIdMapping.reduce(
-      (s, newId, oldId) => s.split(oldId).join(newId),
-      suffix
-    );
-    const newKey = targetKey + mappedSuffix;
     return acc.set(newKey, view);
   }, views);
 }

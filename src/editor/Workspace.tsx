@@ -1,20 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useMediaQuery } from "react-responsive";
-import { Dropdown } from "react-bootstrap";
 import { List, OrderedSet } from "immutable";
 import { LOCAL } from "../core/nodeRef";
 import { isUserLoggedIn } from "../NostrAuthContext";
-import { useUserRelayContext } from "../UserRelayContext";
 import { useBackend } from "../BackendContext";
-import { getWriteRelays } from "../relayUtils";
-import { ASSET_ENTITY_RELAY, DEFAULT_RELAYS } from "../nostr";
-import { depositEntityTags, hasAssetEntityTag } from "../nodesDocumentEvent";
-import { publishStateOf, type PublishState } from "../core/knowstrFrontmatter";
-import {
-  getNodeDocumentId,
-  planSetDocumentPublishState,
-  planTakeRenameSuggestion,
-} from "../core/plan";
+import { getNodeDocumentId } from "../core/plan";
 import { TemporaryViewProvider, useTemporaryView } from "./temporaryViewState";
 
 import { getDisplayTextForRow, getIndependentRows } from "../rowModel";
@@ -48,8 +37,6 @@ import { PublishingStatusWrapper } from "./PublishingStatusWrapper";
 import { SignInMenuBtn } from "../SignIn";
 import {
   usePlanner,
-  planForkPane,
-  planRetractDocument,
   planClearTemporarySelection,
   planSelectAllTemporaryRows,
   planShiftTemporarySelection,
@@ -93,7 +80,6 @@ import {
   planBatchOutdent,
 } from "./batchOperations";
 import { planDeleteNode } from "../treeMutations";
-import { IS_MOBILE } from "./responsive";
 import { MobileActionBar } from "./MobileActionBar";
 import { nodeText } from "../core/nodeSpans";
 import { defaultEntitySurfaceTitle } from "../entityLabels";
@@ -351,75 +337,6 @@ function Breadcrumbs(): JSX.Element {
   );
 }
 
-function ForkButton(): JSX.Element | null {
-  const isMobile = useMediaQuery(IS_MOBILE);
-  const data = useData();
-  const currentPane = useCurrentPane();
-  const isViewingOtherUserContent = currentPane.sourceId !== LOCAL;
-  const graph = graphLookupFromData(data);
-  const currentNode = currentPane.rootNodeId
-    ? lookupNode(graph, currentPane.rootNodeId, currentPane.sourceId)?.node
-    : undefined;
-  const paneIndex = usePaneIndex();
-  const navigatePane = useNavigatePane();
-  const { createPlan, executePlan } = usePlanner();
-
-  if (!isViewingOtherUserContent) {
-    return null;
-  }
-
-  const rootNodeId = currentPane.rootNodeId || currentNode?.root;
-  const isAtRoot = !!currentNode && currentNode.id === rootNodeId;
-
-  if (!rootNodeId) {
-    return null;
-  }
-
-  const handleFork = (): void => {
-    if (!currentNode) {
-      return;
-    }
-    const plan = planForkPane(
-      createPlan(),
-      paneIndex,
-      currentPane,
-      currentNode
-    );
-    executePlan(plan);
-  };
-
-  if (!isAtRoot) {
-    const href = buildNodeRouteUrl(rootNodeId, currentPane.sourceId, {
-      scrollToId: undefined,
-      fallbackLabel: currentPane.fallbackLabel,
-    });
-    return (
-      <a
-        href={href}
-        className="header-action-btn"
-        onClick={(e) => {
-          e.preventDefault();
-          navigatePane(href);
-        }}
-        aria-label="Open root to make a copy"
-      >
-        {isMobile ? "copy" : "open root to copy"}
-      </a>
-    );
-  }
-
-  return (
-    <button
-      type="button"
-      className="header-action-btn"
-      onClick={handleFork}
-      aria-label="copy root to edit"
-    >
-      {isMobile ? "copy" : "copy to edit"}
-    </button>
-  );
-}
-
 function HomeButton(): JSX.Element | null {
   const { knowledgeDBs } = useData();
   const navigatePane = useNavigatePane();
@@ -525,42 +442,12 @@ function BackButton(): JSX.Element | null {
   );
 }
 
-// Destinations render as plain hostnames: a user shouldn't need to know
-// what a relay or a wss:// URL is. The full URL stays in the tooltip.
-function hostLabel(url: string): string {
-  try {
-    return new URL(url).host;
-  } catch {
-    return url;
-  }
-}
-
-// A single destination reads by name — an asset document publishing to its
-// pinned relay says so instead of a bare "1 relays". Several stay a count.
-function destinationLabel(effective: ReadonlyArray<string>): string {
-  const single = effective.length === 1 ? effective[0] : undefined;
-  return single !== undefined
-    ? hostLabel(single)
-    : `${effective.length} relays`;
-}
-
-// The header chip states the document's audience — "who can open this" —
-// never a verb: private / everyone · N relays / paused. The popover is the
-// audience ladder: only me (the default), a secret link (the capability:
-// the per-document storage key in the URL fragment), everyone (publish).
-// No dialogs. The relay list shows the EFFECTIVE set — the per-document
-// choice when one exists, else the user's configured write relays (which
-// fall back to the defaults) — and toggling a relay materializes the
-// per-document override in knowstr_publish.relays.
-// Shown only on own documents; foreign panes get the fork button instead.
-function AudienceChip(): JSX.Element | null {
+function SecretLinkButton(): JSX.Element | null {
   const data = useData();
   const currentPane = useCurrentPane();
-  const { createPlan, executePlan } = usePlanner();
-  const { userRelays } = useUserRelayContext();
-  const [destinationDraft, setDestinationDraft] = useState("");
-
-  const isOwnContent = currentPane.sourceId === LOCAL;
+  if (currentPane.sourceId !== LOCAL || !isUserLoggedIn(data.user)) {
+    return null;
+  }
   const graph = graphLookupFromData(data);
   const rootNode = currentPane.rootNodeId
     ? lookupNode(graph, currentPane.rootNodeId, currentPane.sourceId)?.node
@@ -578,266 +465,25 @@ function AudienceChip(): JSX.Element | null {
         docId
       )
     : undefined;
-
-  if (!isOwnContent || !isUserLoggedIn(data.user) || !document) {
+  const authorAddress = addressForSource(LOCAL, data.user.publicKey);
+  const storageKey = document?.storageKey;
+  if (!document || !storageKey || !authorAddress) {
     return null;
   }
-
-  const state = publishStateOf(document.frontMatter);
-  const configured = getWriteRelays(userRelays).map((relay) => relay.url);
-  // A user should never have to know what a relay is: with nothing
-  // configured, the predefined set is offered and used. Documents
-  // published under an asset: entity default to the asset relay only
-  // (the v0 cheat), matching depositWriteRelayConf.
-  const configuredOrDefault =
-    configured.length > 0
-      ? configured
-      : getWriteRelays(DEFAULT_RELAYS).map((relay) => relay.url);
-  const audienceTags = depositEntityTags(document);
-  const hasAssetEntity = hasAssetEntityTag(audienceTags);
-  const baseline = hasAssetEntity ? [ASSET_ENTITY_RELAY] : configuredOrDefault;
-  const declared = state?.relays;
-  const effective = declared !== undefined ? declared : baseline;
-
-  const applyState = (next: PublishState): void => {
-    executePlan(
-      planSetDocumentPublishState(createPlan(), document.docId, next)
-    );
+  const copySecretLink = (): void => {
+    const url = buildShareRouteUrl(authorAddress, document.docId, storageKey);
+    navigator.clipboard.writeText(`${window.location.origin}${url}`);
   };
-
-  const applyRelays = (nextEffective: string[]): void => {
-    if (!state) {
-      return;
-    }
-    const sameAsBaseline =
-      nextEffective.length === baseline.length &&
-      baseline.every((url) => nextEffective.includes(url));
-    applyState({
-      ...state,
-      relays: sameAsBaseline ? undefined : nextEffective,
-    });
-  };
-
-  const handlePublish = (relays: string[] | undefined): void => {
-    applyState({
-      relays,
-      paused: false,
-    });
-  };
-
-  // An asset-tagged document offers both reaches: its pinned relay only
-  // (the default the v0 cheat routes to) or the user's write relays too —
-  // declared per document, so the choice rides the file.
-  const everyoneRelays = hasAssetEntity
-    ? [...new Set([...configuredOrDefault, ASSET_ENTITY_RELAY])]
-    : effective;
-
-  // The capability a share link carries: the document's storage key in the
-  // URL fragment — readable by anyone handed the link, discoverable by no
-  // one. The key exists once the document has ridden a storage event.
-  const { storageKey } = document;
-  const authorAddress = addressForSource(LOCAL, data.user.publicKey);
-  const secretLinkItem = storageKey !== undefined &&
-    authorAddress !== undefined && (
-      <Dropdown.Item
-        className="d-flex menu-item"
-        onClick={() => {
-          const url = buildShareRouteUrl(
-            authorAddress,
-            document.docId,
-            storageKey
-          );
-          // eslint-disable-next-line no-void
-          void navigator.clipboard.writeText(`${window.location.origin}${url}`);
-        }}
-        aria-label="copy secret link"
-        title="Anyone with the link can open this document"
-        tabIndex={0}
-      >
-        <span className="d-block dropdown-item-icon" aria-hidden="true">
-          🔗
-        </span>
-        <div className="menu-item-text">Copy secret link</div>
-      </Dropdown.Item>
-    );
-
-  if (!state) {
-    return (
-      <Dropdown className="options-dropdown publish-dropdown">
-        <Dropdown.Toggle
-          as="button"
-          className="header-action-btn"
-          aria-label="audience options"
-          title="Only you can open this document"
-          tabIndex={0}
-        >
-          ○ private
-        </Dropdown.Toggle>
-        <Dropdown.Menu>
-          <Dropdown.Item
-            className="d-flex menu-item"
-            aria-label="only me"
-            title="Encrypted — only you can open this document"
-            disabled
-          >
-            <span className="d-block dropdown-item-icon" aria-hidden="true">
-              ●
-            </span>
-            <div className="menu-item-text">Only me — encrypted</div>
-          </Dropdown.Item>
-          {secretLinkItem}
-          {hasAssetEntity && (
-            <Dropdown.Item
-              className="d-flex menu-item"
-              onClick={() => handlePublish(undefined)}
-              aria-label="publish to asset relays"
-              title={`Publish this document to ${destinationLabel([
-                ASSET_ENTITY_RELAY,
-              ])} — where holders read`}
-              tabIndex={0}
-            >
-              <span className="d-block dropdown-item-icon" aria-hidden="true">
-                ○
-              </span>
-              <div className="menu-item-text">Publish to Asset Relays</div>
-            </Dropdown.Item>
-          )}
-          <Dropdown.Item
-            className="d-flex menu-item"
-            onClick={() =>
-              handlePublish(hasAssetEntity ? everyoneRelays : undefined)
-            }
-            aria-label="publish document"
-            title={`Publish this document to ${destinationLabel(
-              everyoneRelays
-            )} — visible to everyone`}
-            tabIndex={0}
-          >
-            <span className="d-block dropdown-item-icon" aria-hidden="true">
-              ○
-            </span>
-            <div className="menu-item-text">
-              Everyone · {destinationLabel(everyoneRelays)}
-            </div>
-          </Dropdown.Item>
-        </Dropdown.Menu>
-      </Dropdown>
-    );
-  }
-
-  const relayRows = [
-    ...new Set([...baseline, ...configuredOrDefault, ...(declared ?? [])]),
-  ];
   return (
-    // autoClose="outside": toggling destinations is an editing session —
-    // the menu closes on outside click, not per click.
-    <Dropdown className="options-dropdown publish-dropdown" autoClose="outside">
-      <Dropdown.Toggle
-        as="button"
-        className="header-action-btn"
-        aria-label="audience options"
-        title={
-          state.paused
-            ? "Paused — the last published version stays visible"
-            : `Published — republishes on every save${
-                effective.length === 0 ? " (no destinations selected)" : ""
-              }`
-        }
-        tabIndex={0}
-      >
-        {state.paused
-          ? "◌ paused"
-          : `⦿ everyone · ${destinationLabel(effective)}`}
-      </Dropdown.Toggle>
-      <Dropdown.Menu>
-        {secretLinkItem}
-        {secretLinkItem && <Dropdown.Divider />}
-        {relayRows.map((url) => {
-          const active = effective.includes(url);
-          return (
-            <Dropdown.Item
-              key={url}
-              className={`d-flex menu-item${
-                active ? "" : " publish-destination-off"
-              }`}
-              onClick={() =>
-                applyRelays(
-                  active
-                    ? effective.filter((u) => u !== url)
-                    : [...effective, url]
-                )
-              }
-              aria-label={`${active ? "deselect" : "select"} relay ${url}`}
-              title={url}
-              tabIndex={0}
-            >
-              <span className="d-block dropdown-item-icon" aria-hidden="true">
-                {active ? "✓" : "○"}
-              </span>
-              <div className="menu-item-text">{hostLabel(url)}</div>
-            </Dropdown.Item>
-          );
-        })}
-        <form
-          className="d-flex menu-item publish-add-destination"
-          onSubmit={(event) => {
-            event.preventDefault();
-            const draft = destinationDraft.trim();
-            if (draft !== "") {
-              const url = draft.includes("://") ? draft : `wss://${draft}`;
-              applyRelays([...new Set([...effective, url])]);
-              setDestinationDraft("");
-            }
-          }}
-        >
-          <span className="d-block dropdown-item-icon" aria-hidden="true">
-            +
-          </span>
-          <input
-            className="publish-add-input"
-            type="text"
-            value={destinationDraft}
-            placeholder="add your own…"
-            aria-label="add destination"
-            onChange={(event) => setDestinationDraft(event.target.value)}
-            onClick={(event) => event.stopPropagation()}
-          />
-        </form>
-        <Dropdown.Divider />
-        <Dropdown.Item
-          className="d-flex menu-item"
-          onClick={() => applyState({ ...state, paused: !state.paused })}
-          aria-label={state.paused ? "resume publishing" : "pause publishing"}
-          title={
-            state.paused
-              ? "Resume — republishes on every save"
-              : "Pause — the last published version stays visible"
-          }
-          tabIndex={0}
-        >
-          <span className="d-block dropdown-item-icon" aria-hidden="true">
-            {state.paused ? "▶" : "⏸"}
-          </span>
-          <div className="menu-item-text">
-            {state.paused ? "Resume publishing" : "Pause publishing"}
-          </div>
-        </Dropdown.Item>
-        <Dropdown.Item
-          className="d-flex menu-item"
-          onClick={() =>
-            executePlan(planRetractDocument(createPlan(), document))
-          }
-          aria-label="stop publishing"
-          title="Retracts it from the relays — copies others made remain theirs"
-          tabIndex={0}
-        >
-          <span className="d-block dropdown-item-icon" aria-hidden="true">
-            ⏏
-          </span>
-          <div className="menu-item-text">Stop publishing</div>
-        </Dropdown.Item>
-      </Dropdown.Menu>
-    </Dropdown>
+    <button
+      type="button"
+      className="header-action-btn"
+      onClick={copySecretLink}
+      aria-label="copy secret link"
+      title="Copy secret link"
+    >
+      🔗
+    </button>
   );
 }
 
@@ -851,8 +497,7 @@ function PaneHeader(): JSX.Element {
       <div className="pane-header-left">
         <BackButton />
         <Breadcrumbs />
-        <AudienceChip />
-        <ForkButton />
+        <SecretLinkButton />
         {isFirstPane && <SignInMenuBtn />}
       </div>
       <div className="pane-header-right">
@@ -951,9 +596,6 @@ const KEY_TO_FILTER: Record<string, FilterId> = {
   x: "not_relevant",
   "5": "contains",
   o: "contains",
-  "8": "suggestions",
-  "@": "suggestions",
-  "9": "versions",
   "0": "incoming",
 };
 
@@ -1709,28 +1351,6 @@ function usePaneKeyboardNavigation(paneIndex: number): {
 
     if (e.key === "Enter" || e.key === "i") {
       e.preventDefault();
-      // Enter is the take key: it adopts a rename suggestion, and accepts
-      // an [S] suggestion as relevant. i stays pure edit.
-      if (e.key === "Enter") {
-        const takeRowKey = getRowKey(activeRow);
-        const takeRow = rows.find((row) => row.viewKey === takeRowKey);
-        if (takeRow?.renameSuggestion) {
-          const takePlan = planTakeRenameSuggestion(createPlan(), takeRow);
-          if (takePlan) {
-            executePlan(takePlan);
-            refocusPaneAfterRowMutation(root);
-            return;
-          }
-        }
-        if (
-          takeRow?.virtualType === "suggestion" &&
-          !takeRow.renameSuggestion
-        ) {
-          executePlan(planBatchRelevance(createPlan(), [takeRow], "relevant"));
-          refocusPaneAfterRowMutation(root);
-          return;
-        }
-      }
       if (focusRowEditor(activeRow)) {
         return;
       }

@@ -3,15 +3,11 @@ import { serializeFrontMatter } from "./core/knowstrFrontmatter";
 export function formatNodeAttrs(
   uuid: string,
   options?: {
-    basedOn?: ID;
-    snapshotId?: string;
     extraAttrs?: Record<string, string>;
   }
 ): string {
   const parts: string[] = [
     ...(uuid ? [`id:${uuid}`] : []),
-    ...(options?.basedOn ? [`basedOn="${options.basedOn}"`] : []),
-    ...(options?.snapshotId ? [`snapshot="${options.snapshotId}"`] : []),
     ...Object.entries(options?.extraAttrs ?? {}).map(
       ([key, value]) => `${key}="${value}"`
     ),

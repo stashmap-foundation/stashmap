@@ -1,4 +1,4 @@
-import React, { RefObject, useEffect, useRef } from "react";
+import React, { RefObject, useRef } from "react";
 import { List, OrderedSet } from "immutable";
 import { ConnectDropTarget, DropTargetMonitor, useDrop } from "react-dnd";
 import { NativeTypes } from "react-dnd-html5-backend";
@@ -28,12 +28,9 @@ type DragItemType = {
   row: Row;
   draggedRows: Row[];
   sourcePaneIndex: number;
-  isSuggestion?: boolean;
   isCopyDrag?: boolean;
-  virtualType: Row["virtualType"];
   nodeId?: ID;
   targetId?: ID;
-  linkText?: string;
   insertTarget?: AddToParentTarget;
 };
 
@@ -207,36 +204,6 @@ export function useDroppable({
 ] {
   const { anchor } = useTemporaryView();
   const { createPlan, executePlan } = usePlanner();
-  const invertCopyModeRef = useRef(false);
-
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent): void => {
-      // eslint-disable-next-line functional/immutable-data
-      invertCopyModeRef.current = e.altKey || e.key === "Alt";
-    };
-    const onKeyUp = (e: KeyboardEvent): void => {
-      if (e.key === "Alt" || !e.altKey) {
-        // eslint-disable-next-line functional/immutable-data
-        invertCopyModeRef.current = false;
-      }
-    };
-    const onWindowBlur = (): void => {
-      // eslint-disable-next-line functional/immutable-data
-      invertCopyModeRef.current = false;
-    };
-
-    window.addEventListener("keydown", onKeyDown, true);
-    window.addEventListener("keyup", onKeyUp, true);
-    window.addEventListener("blur", onWindowBlur);
-
-    return () => {
-      window.removeEventListener("keydown", onKeyDown, true);
-      window.removeEventListener("keyup", onKeyUp, true);
-      window.removeEventListener("blur", onWindowBlur);
-      // eslint-disable-next-line functional/immutable-data
-      invertCopyModeRef.current = false;
-    };
-  }, []);
 
   const currentDepth = row.depth;
 
@@ -486,8 +453,7 @@ export function useDroppable({
         dragItem,
         paneIndex,
         dropDestination.parentRow,
-        dropIndex,
-        invertCopyModeRef.current
+        dropIndex
       );
       executePlan(
         planSetTemporarySelectionState(dropped, {

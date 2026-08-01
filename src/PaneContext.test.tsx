@@ -7,7 +7,6 @@ import {
   ANON,
   setup,
   renderApp,
-  findNewNodeEditor,
   type,
   expectTree,
   readonlyRoute,
@@ -41,39 +40,6 @@ test("Navigate to specific node via local typed URL", async () => {
   });
 
   await screen.findByRole("treeitem", { name: "Test Node" });
-});
-
-test("Fork works when navigating to a version entry", async () => {
-  const [alice, bob] = setup([ALICE, BOB]);
-  renderApp(alice());
-  await type(
-    "My Notes{Enter}{Tab}Cities{Enter}{Tab}Paris{Enter}London{Enter}Rome{Enter}Vienna{Escape}"
-  );
-  cleanup();
-
-  renderApp({
-    ...bob(),
-    initialRoute: readonlyRoute(
-      requireUser(alice()).publicKey,
-      "My Notes",
-      "Cities"
-    ),
-  });
-  await screen.findByText("READONLY");
-  await userEvent.click(await screen.findByLabelText("copy root to edit"));
-
-  await userEvent.click(await screen.findByLabelText("edit Cities"));
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "Berlin{Escape}");
-
-  await expectTree(`
-Cities
-  Berlin
-  Paris
-  London
-  Rome
-  Vienna
-  `);
 });
 
 test("Bob can view Alice's node via storage URL without following her", async () => {
@@ -124,7 +90,7 @@ Cities
   `);
 });
 
-test("Anonymous user sees versioned node text via storage URL", async () => {
+test("Anonymous user sees updated node text via storage URL", async () => {
   const [alice, anon] = setup([ALICE, ANON]);
 
   renderApp(alice());

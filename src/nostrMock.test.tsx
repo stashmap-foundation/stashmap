@@ -11,13 +11,9 @@ import {
   matchFilters,
 } from "nostr-tools";
 import { v4 } from "uuid";
-import { KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT } from "./nostr";
+import { KIND_KNOWLEDGE_DOCUMENT } from "./nostr";
 import { decryptStorageEvent } from "./storageEncryption";
 
-// Storage events cross the mock relay encrypted, but parts of the test
-// harness (route resolution, fork helpers) need the plaintext view. The
-// pool keeps a decrypted shadow of every published event, opened with the
-// fixture keypairs registered here (utils.test registers ALICE/BOB/CAROL).
 // eslint-disable-next-line functional/no-let
 let storageDecryptUsers: ReadonlyArray<User> = [];
 export function registerStorageDecryptUsers(users: ReadonlyArray<User>): void {
@@ -174,7 +170,7 @@ test("replay honors limit 0 but still delivers future matching events", () => {
     id: "old-event".padEnd(64, "0"),
     pubkey: "alice" as PublicKey,
     created_at: 10,
-    kind: KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
+    kind: KIND_KNOWLEDGE_DOCUMENT,
     sig: "0".repeat(128),
     tags: [["d", "root-1"]],
     content: "# Old Root",
@@ -187,7 +183,7 @@ test("replay honors limit 0 but still delivers future matching events", () => {
     [
       {
         authors: ["alice"],
-        kinds: [KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT],
+        kinds: [KIND_KNOWLEDGE_DOCUMENT],
         limit: 0,
       },
     ],
@@ -219,7 +215,7 @@ test("replay honors since, until, and limit semantics", () => {
         id: `event-${createdAt}`.padEnd(64, `${createdAt % 10}`),
         pubkey: "alice" as PublicKey,
         created_at: createdAt,
-        kind: KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
+        kind: KIND_KNOWLEDGE_DOCUMENT,
         sig: "0".repeat(128),
         tags: [["d", `root-${createdAt}`]],
         content: `# Root ${createdAt}`,
@@ -235,7 +231,7 @@ test("replay honors since, until, and limit semantics", () => {
     [
       {
         authors: ["alice"],
-        kinds: [KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT],
+        kinds: [KIND_KNOWLEDGE_DOCUMENT],
         since: 9,
         until: 20,
         limit: 2,

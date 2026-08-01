@@ -1,4 +1,3 @@
-import type { Map as ImmutableMap } from "immutable";
 import { EMPTY_NODE_ID, getNode } from "./core/connections";
 import type { Document } from "./core/Document";
 import { spansToMarkdown } from "./core/nodeSpans";
@@ -16,12 +15,6 @@ type SerializeResult = {
   lines: string[];
 };
 
-// snapshotIds: fork-time baselines to stamp per node (only nodes carrying
-// basedOn consult it; a snapshotId already on the node always wins).
-type RenderOptions = {
-  snapshotIds?: ImmutableMap<ID, string>;
-};
-
 type SerializeReduceState = SerializeResult & {
   orderedCount: number;
   promoteToHeadingLevel?: number;
@@ -32,16 +25,8 @@ function getSerializableNodeBody(node: GraphNode): string | undefined {
   return body === "" ? undefined : body;
 }
 
-function getSerializableNodeAttrs(
-  node: GraphNode,
-  options?: RenderOptions
-): string {
-  const snapshotId =
-    node.snapshotId ??
-    (node.basedOn ? options?.snapshotIds?.get(node.id) : undefined);
+function getSerializableNodeAttrs(node: GraphNode): string {
   return formatNodeAttrs(node.id, {
-    ...(node.basedOn ? { basedOn: node.basedOn } : {}),
-    ...(snapshotId ? { snapshotId } : {}),
     ...(node.extraAttrs ? { extraAttrs: node.extraAttrs } : {}),
   });
 }
@@ -51,8 +36,7 @@ function serializeNodeSequence(
   author: SourceId,
   nodes: readonly GraphNode[],
   indent: string,
-  current: SerializeResult,
-  options?: RenderOptions
+  current: SerializeResult
 ): SerializeResult {
   const serializeChildren = (
     children: GraphNode["children"],
@@ -74,8 +58,7 @@ function serializeNodeSequence(
       author,
       childNodes,
       childIndent,
-      next,
-      options
+      next
     );
   };
 
@@ -87,7 +70,7 @@ function serializeNodeSequence(
         return acc;
       }
       const prefix = formatPrefixMarkers(item.relevance, item.argument);
-      const attrs = getSerializableNodeAttrs(resolvedChild, options);
+      const attrs = getSerializableNodeAttrs(resolvedChild);
 
       if (resolvedChild.blockKind === "heading") {
         const level = resolvedChild.headingLevel ?? 2;
@@ -159,8 +142,7 @@ function serializeNodeSequence(
 
 export function renderDocumentMarkdown(
   knowledgeDBs: KnowledgeDBs,
-  document: Document,
-  options?: RenderOptions
+  document: Document
 ): string {
   if (document.topNodeShortIds.length === 0) {
     return formatWithFrontMatter("", document.frontMatter);
@@ -177,8 +159,7 @@ export function renderDocumentMarkdown(
     document.sourceId,
     topNodes,
     "",
-    { lines: [] },
-    options
+    { lines: [] }
   );
   const markdown = addBlankLinesAroundHeadings(serialized.lines).join("\n");
   return formatWithFrontMatter(`${markdown}\n`, document.frontMatter);

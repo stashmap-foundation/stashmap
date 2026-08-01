@@ -271,13 +271,7 @@ export function isEmptyNodeID(nodeID: ID): boolean {
 
 export function itemPassesFilters(
   item: GraphNode,
-  activeFilters: (
-    | Relevance
-    | "suggestions"
-    | "versions"
-    | "incoming"
-    | "contains"
-  )[]
+  activeFilters: (Relevance | "incoming" | "contains")[]
 ): boolean {
   if (isEmptyNodeID(item.id)) {
     return true;

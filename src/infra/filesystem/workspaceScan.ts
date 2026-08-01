@@ -11,7 +11,6 @@ import {
 } from "../../core/Document";
 import { WalkContext } from "../../core/markdownNodes";
 import { MarkdownTreeNode, parseMarkdown } from "../../core/markdownTree";
-import { isValidSnapshotId } from "../../nodesDocumentEvent";
 
 export type WorkspaceSaveProfile = {
   pubkey: PublicKey;
@@ -117,13 +116,6 @@ function collectExplicitNodeIds(trees: MarkdownTreeNode[]): string[] {
   ]);
 }
 
-function collectSnapshotIds(trees: MarkdownTreeNode[]): string[] {
-  return trees.flatMap((tree) => [
-    ...(tree.snapshotId !== undefined ? [tree.snapshotId] : []),
-    ...collectSnapshotIds(tree.children),
-  ]);
-}
-
 function describeDuplicate(id: string, paths: string[]): string {
   const uniquePaths = [...new Set(paths)].sort();
   if (uniquePaths.length === 1) {
@@ -155,26 +147,10 @@ function checkDuplicateNodeIds(
   throw new Error(
     [
       ...conflictLines,
-      "  - if a file is a variant, give it fresh IDs (future: knowstr fork)",
+      "  - if a file is a variant, give it fresh IDs",
       "  - if it's a backup, move it out or add it to .knowstrignore",
     ].join("\n")
   );
-}
-
-function checkSnapshotIds(
-  files: ReadonlyArray<{ relativePath: string; tree: MarkdownTreeNode[] }>
-): void {
-  const malformed = files.flatMap((file) =>
-    collectSnapshotIds(file.tree)
-      .filter((snapshotId) => !isValidSnapshotId(snapshotId))
-      .map(
-        (snapshotId) =>
-          `${file.relativePath}: invalid snapshot id "${snapshotId}" (expected snap_sha256_<64 lowercase hex chars>)`
-      )
-  );
-  if (malformed.length > 0) {
-    throw new Error(malformed.join("\n"));
-  }
 }
 
 type ScanAcc = {
@@ -229,7 +205,6 @@ export async function scanWorkspaceDocuments(
     tree: parseMarkdown(file.content).tree,
   }));
   checkDuplicateNodeIds(parsedTrees);
-  checkSnapshotIds(parsedTrees);
 
   const final = files.reduce<ScanAcc>(
     (acc, file) => {

@@ -18,13 +18,6 @@ import { entityIdForText, isCanonicalId } from "./entityRecognition";
 import { icalFeedLinkText, isBareIcalFeedUrl } from "./ical";
 import { documentLinkHref } from "./linkPath";
 import { getWorkspaceNode, withWorkspace, workspaceOf } from "./knowledge";
-import {
-  PublishState,
-  withPublishState,
-  withoutPublishState,
-} from "./knowstrFrontmatter";
-import { constructDismissalBaseline } from "./merge/dismissal";
-import { snapshotIdForContent } from "../nodesDocumentEvent";
 import { newGraphNode } from "./nodeFactory";
 import {
   fileLinkSpan,
@@ -51,7 +44,6 @@ type GraphPlanData = Pick<
   Data,
   | "user"
   | "knowledgeDBs"
-  | "snapshotNodes"
   | "graphIndex"
   | "documents"
   | "documentByFilePath"
@@ -63,10 +55,6 @@ export type GraphPlan = GraphPlanData & {
   affectedDocuments: ImmutableSet<string>;
   deletedDocs: ImmutableSet<string>;
   relays: AllRelays;
-  // Constructed baselines minted by dismissals this plan: content rides
-  // the affected document's write into the snapshot store, exactly like a
-  // fork-capture snapshot.
-  extraSnapshots?: List<string>;
 };
 
 function planEnsureSystemRoot<T extends GraphPlan>(
@@ -135,61 +123,6 @@ export function planMarkDocumentAffected<T extends GraphPlan>(
     : plan;
 }
 
-// Publish state lives in the document's frontmatter and nowhere else.
-// Setting it marks the document affected so the next save (re)publishes;
-// paused state stops deposit emission (planner) while riding the file.
-export function planSetDocumentPublishState<T extends GraphPlan>(
-  plan: T,
-  docId: string,
-  state: PublishState
-): T {
-  const key = workspaceDocumentKey(docId);
-  const document = plan.documents.get(key);
-  if (!document) {
-    return plan;
-  }
-  const nextDocument: Document = {
-    ...document,
-    frontMatter: withPublishState(document.frontMatter, state),
-    updatedMs: Date.now(),
-  };
-  return withDocumentInFilePathIndex(
-    {
-      ...plan,
-      documents: plan.documents.set(key, nextDocument),
-      affectedDocuments: plan.affectedDocuments.add(docId),
-    },
-    nextDocument
-  );
-}
-
-// The explicit unpublish: the document forgets it was ever published. The
-// next save writes storage without knowstr_publish and emits no deposit;
-// the wire-side retraction rides separately (planner: planRetractDocument).
-export function planClearDocumentPublishState<T extends GraphPlan>(
-  plan: T,
-  docId: string
-): T {
-  const key = workspaceDocumentKey(docId);
-  const document = plan.documents.get(key);
-  if (!document) {
-    return plan;
-  }
-  const nextDocument: Document = {
-    ...document,
-    frontMatter: withoutPublishState(document.frontMatter),
-    updatedMs: Date.now(),
-  };
-  return withDocumentInFilePathIndex(
-    {
-      ...plan,
-      documents: plan.documents.set(key, nextDocument),
-      affectedDocuments: plan.affectedDocuments.add(docId),
-    },
-    nextDocument
-  );
-}
-
 export function upsertNodesCore<T extends GraphPlan>(
   plan: T,
   nodes: GraphNode
@@ -217,13 +150,16 @@ export function upsertNodesCore<T extends GraphPlan>(
 function addCrefToLog<T extends GraphPlan>(plan: T, nodeID: ID): T {
   const [planWithLog, nodes] = planEnsureSystemRoot(plan, LOG_ROOT_ROLE);
   const targetNode = getWorkspaceNode(planWithLog.knowledgeDBs, nodeID);
-  const crefNode = newGraphNode(
-    [linkSpan(nodeID, targetNode ? nodeText(targetNode) : "")],
-    {
-      root: nodes.root as ID,
-      parent: nodes.id as ID,
-    }
-  );
+  const crefNode = {
+    ...newGraphNode(
+      [linkSpan(nodeID, targetNode ? nodeText(targetNode) : "")],
+      {
+        root: nodes.root as ID,
+        parent: nodes.id as ID,
+      }
+    ),
+    extraAttrs: { embed: "true" },
+  };
   const planWithCref = upsertNodesCore(planWithLog, crefNode);
   return upsertNodesCore(planWithCref, {
     ...nodes,
@@ -246,8 +182,6 @@ export function planUpsertNodes<T extends GraphPlan>(
   }
   return addCrefToLog(basePlan, nodes.id);
 }
-
-type NodesIdMapping = Map<ID, ID>;
 
 function getEffectiveParentNodeID(node: GraphNode): ID | undefined {
   return node.parent;
@@ -319,73 +253,6 @@ function getNodeSubtree(
   }
 
   return List(ordered);
-}
-
-export function planCopyDescendantNodes<T extends GraphPlan>(
-  plan: T,
-  sourceGraph: KnowledgeData,
-  sourceNode: GraphNode,
-  targetParentNodeID?: ID,
-  root?: ID
-): [T, NodesIdMapping] {
-  const descendants = getNodeSubtree(sourceGraph, sourceNode);
-
-  const { copiedNodes } = descendants.reduce(
-    (acc, node) => {
-      const baseNode = newGraphNode(node.spans, {
-        root: acc.copiedRoot,
-      });
-      const nextCopiedRoot = acc.copiedRoot ?? baseNode.root;
-      return {
-        copiedRoot: nextCopiedRoot,
-        copiedNodes: acc.copiedNodes.push({
-          source: node,
-          sourceParentID: getEffectiveParentNodeID(node),
-          copy: baseNode,
-        }),
-      };
-    },
-    {
-      copiedRoot: root,
-      copiedNodes: List<{
-        source: GraphNode;
-        sourceParentID?: ID;
-        copy: GraphNode;
-      }>(),
-    }
-  );
-
-  const resultMapping = copiedNodes.reduce(
-    (acc, { source, copy }) => acc.set(source.id, copy.id),
-    Map<ID, ID>()
-  );
-
-  const resultPlan = copiedNodes.reduce(
-    (accPlan, { source, sourceParentID, copy }) => {
-      const isRootNode = source.id === sourceNode.id;
-      const children = source.children.map((childID) => {
-        const mappedID = resultMapping.get(childID as ID);
-        return mappedID || childID;
-      });
-      const copiedParentID = isRootNode
-        ? targetParentNodeID
-        : sourceParentID
-        ? resultMapping.get(sourceParentID)
-        : undefined;
-      return upsertNodesCore(accPlan, {
-        ...copy,
-        children,
-        parent: copiedParentID,
-        spans: source.spans,
-        basedOn: source.id,
-        relevance: source.relevance,
-        argument: source.argument,
-      });
-    },
-    plan
-  );
-
-  return [planMarkDocumentAffected(resultPlan as T, sourceNode), resultMapping];
 }
 
 export function planMoveDescendantNodes<T extends GraphPlan>(
@@ -586,9 +453,7 @@ export type MaterializableRow = {
   materialize?: {
     precededBy: ID[];
     // A prepared take: materialize by adding THIS target (a link row or
-    // document link) instead of minting the row's node — how proposals
-    // (incoming references, later suggestions) enter: reference, not
-    // adoption. Plain data, computed by the row's producer.
+    // document link) instead of minting the row's node.
     take?: AddToParentTarget;
     // Judgment defaults inherited from the proposal's source, applied
     // when the gesture carries none.
@@ -749,84 +614,6 @@ export function planMaterializeComputedRow<T extends GraphPlan>(
   return [planAttached, node ?? minted, true];
 }
 
-// Rename suggestions are replacement-shaped (idea.md, the conflict
-// walkthrough). Any judgment but x TAKES the rename: the node's text
-// becomes theirs. x DISMISSES it, and dismissal is the baseline's job,
-// never a field: the edge advances to a CONSTRUCTED baseline — the old
-// baseline with only this node's text set to theirs — so that version's
-// rename is absorbed while the old children keep the child suggestions
-// alive. Mutes a version, not a row: their next rename differs from the
-// constructed baseline and surfaces fresh. The stamp always advances on
-// THE FORK NODE of the edge when that node is mine — the two-endpoint
-// construction keeps both directions honest. Only for a FOREIGN fork of
-// my pure original does a pin land on my own node instead; a chained
-// fork (basedOn present) can never carry a pin — its snapshot attr is
-// its own edge's stamp — so that case is honestly unrepresentable.
-export function planTakeRenameSuggestion<T extends GraphPlan>(
-  plan: T,
-  row: Pick<Row, "renameSuggestion" | "parentNode">
-): T | undefined {
-  if (!row.renameSuggestion || !row.parentNode) {
-    return undefined;
-  }
-  return planUpsertNodes(plan, {
-    ...row.parentNode,
-    spans: plainSpans(row.renameSuggestion.theirs),
-  });
-}
-
-export function planResolveRenameSuggestion<T extends GraphPlan>(
-  plan: T,
-  row: Pick<Row, "renameSuggestion" | "parentNode">,
-  metadata: { relevance?: Relevance; argument?: Argument }
-): T | undefined {
-  if (!row.renameSuggestion || !row.parentNode) {
-    return undefined;
-  }
-  const target = row.parentNode;
-  const { theirs, versionId, snapshotId, baselineNodeId } =
-    row.renameSuggestion;
-  if (metadata.relevance !== "not_relevant") {
-    // Judgments are not acceptance on a replacement-shaped row — the
-    // question is "theirs or mine?", not "how relevant?". Taking is its
-    // own verb (Enter / the checkmark); everything but x is inert.
-    return plan;
-  }
-  const snapshotMap = plan.snapshotNodes.get(snapshotId);
-  if (!snapshotMap) {
-    return undefined;
-  }
-  const constructed = constructDismissalBaseline(snapshotMap, {
-    versionId,
-    mineId: target.id,
-    originId: baselineNodeId,
-    theirsText: theirs,
-  });
-  if (constructed === undefined) {
-    return undefined;
-  }
-  const version = getWorkspaceNode(plan.knowledgeDBs, versionId);
-  const forkNode =
-    target.basedOn === versionId
-      ? target
-      : version?.basedOn === target.id
-      ? version
-      : undefined;
-  const stamped =
-    forkNode ?? (target.basedOn === undefined ? target : undefined);
-  if (!stamped) {
-    return undefined;
-  }
-  const withSnapshot = {
-    ...plan,
-    extraSnapshots: (plan.extraSnapshots ?? List<string>()).push(constructed),
-  };
-  return planUpsertNodes(withSnapshot, {
-    ...stamped,
-    snapshotId: snapshotIdForContent(constructed),
-  });
-}
-
 export type AddToParentTarget =
   | ID
   | TextSeed
@@ -905,15 +692,18 @@ export function planAddTargetsToNode<T extends GraphPlan>(
           : undefined;
       if (refTarget || (objectID !== undefined && isSearchId(objectID))) {
         const childNode = refTarget
-          ? newGraphNode(
-              [linkSpan(refTarget.targetID, refTarget.linkText || "")],
-              {
-                root: parentNode.root,
-                parent: parentNode.id,
-                relevance,
-                argument,
-              }
-            )
+          ? {
+              ...newGraphNode(
+                [linkSpan(refTarget.targetID, refTarget.linkText || "")],
+                {
+                  root: parentNode.root,
+                  parent: parentNode.id,
+                  relevance,
+                  argument,
+                }
+              ),
+              extraAttrs: { embed: "true" },
+            }
           : ({
               children: List<ID>(),
               id: objectID,
@@ -992,6 +782,9 @@ export function planAddTargetsToNode<T extends GraphPlan>(
         ...childNode,
         relevance,
         argument,
+        ...((entityId || feedWrapped) && {
+          extraAttrs: { embed: "true" },
+        }),
       };
       return [
         planUpsertNodes(accPlan, nodeWithMetadata),
@@ -1067,11 +860,14 @@ export function planAddTopTargetsToDocument<T extends GraphPlan>(
       if (topNodeSpans.length === 0) {
         return [accPlan, accIds];
       }
-      const topNode = newGraphNode(topNodeSpans, {
-        docId: document.docId,
-        relevance,
-        argument,
-      });
+      const topNode = {
+        ...newGraphNode(topNodeSpans, {
+          docId: document.docId,
+          relevance,
+          argument,
+        }),
+        ...(refTarget && { extraAttrs: { embed: "true" } }),
+      };
       return [planUpsertNodes(accPlan, topNode), [...accIds, topNode.id]];
     },
     [plan, []]

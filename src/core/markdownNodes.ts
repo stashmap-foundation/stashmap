@@ -88,7 +88,6 @@ function materializeTreeNode(
     parent,
     docId: parent ? undefined : treeNode.docId,
     systemRole: parent ? undefined : treeNode.systemRole,
-    snapshotId: treeNode.snapshotId,
     ...(treeNode.blockKind !== undefined && { blockKind: treeNode.blockKind }),
     ...(treeNode.headingLevel !== undefined && {
       headingLevel: treeNode.headingLevel,
@@ -128,7 +127,6 @@ function materializeTreeNode(
   const node: GraphNode = {
     ...nodeBaseWithFields,
     children: List(childIDs),
-    ...(treeNode.basedOn ? { basedOn: treeNode.basedOn as ID } : {}),
     ...(withVisible.updated !== undefined
       ? { updated: withVisible.updated }
       : {}),

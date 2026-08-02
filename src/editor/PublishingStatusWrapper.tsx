@@ -4,9 +4,6 @@ import { useMediaQuery } from "react-responsive";
 import { useData } from "../DataContext";
 import { IS_MOBILE } from "./responsive";
 import { PublishingStatusContent } from "../commons/PublishingStatus";
-import { getWriteRelays } from "../relays";
-import { useUserRelayContext } from "../UserRelayContext";
-import { useBackend } from "../BackendContext";
 
 function getRelayRatio(
   results: PublishResultsEventMap,
@@ -71,11 +68,18 @@ function getStatusInfo(
 export function PublishingStatusWrapper(): JSX.Element {
   const isMobile = useMediaQuery(IS_MOBILE);
   const { publishEventsStatus } = useData();
-  const { userRelays } = useUserRelayContext();
-  const { workspaceConfig } = useBackend();
-  const writeRelayUrls = workspaceConfig
-    ? workspaceConfig.roomRelays
-    : getWriteRelays(userRelays).map((r) => r.url);
+  const { queueStatus } = publishEventsStatus;
+  const writeRelayUrls = [
+    ...new Set([
+      ...publishEventsStatus.results
+        .valueSeq()
+        .flatMap((result) => result.results.keySeq())
+        .toArray(),
+      ...(queueStatus?.pendingRelays ?? []),
+      ...(queueStatus?.backedOffRelays.map((relay) => relay.url) ?? []),
+      ...(queueStatus?.succeededPerRelay.map((relay) => relay.url) ?? []),
+    ]),
+  ].sort();
   const { text, segmentClass } = getStatusInfo(
     publishEventsStatus,
     writeRelayUrls

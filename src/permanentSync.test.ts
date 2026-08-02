@@ -47,7 +47,7 @@ beforeEach(() => {
 });
 
 test("buildPermanentSyncFilters creates broad document and delete filters", () => {
-  expect(buildPermanentSyncFilters([ALICE, BOB])).toEqual([
+  expect(buildPermanentSyncFilters([ALICE, BOB], [])).toEqual([
     {
       authors: [ALICE, BOB],
       kinds: [KIND_KNOWLEDGE_DOCUMENT],
@@ -76,7 +76,8 @@ test("buildPermanentCatchUpFilters narrows to authors with checkpoints", () => {
             latestSeenLiveCreatedAt: 100,
           },
         ],
-      ])
+      ]),
+      []
     )
   ).toEqual([
     {
@@ -99,6 +100,7 @@ test("buildPermanentBackfillFilter pages by author and until", () => {
       author: ALICE,
       kind: KIND_KNOWLEDGE_DOCUMENT,
       until: 55,
+      dTags: [],
     })
   ).toEqual({
     authors: [ALICE],
@@ -319,6 +321,7 @@ test("startPermanentDocumentSync applies document events immediately", async () 
     authors: [BOB_KEYPAIR.publicKey],
     user: BOB_KEYPAIR,
     capabilityKeys: [],
+    dTags: [],
   });
 
   await new Promise((resolve) => {
@@ -370,6 +373,7 @@ test("startPermanentDocumentSync uses live limit-0 subscription and catch-up sub
     authors: [ALICE],
     user: undefined,
     capabilityKeys: [],
+    dTags: [],
   });
 
   await new Promise((resolve) => {

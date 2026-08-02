@@ -94,7 +94,6 @@ export function FilesystemDataProvider({
       graphIndex={createEmptyGraphIndex()}
       documents={Map()}
       documentByFilePath={Map()}
-      relaysInfos={Map()}
       publishEventsStatus={session.publishStatus}
       views={session.views}
       panes={session.panes}

@@ -36,7 +36,10 @@ type PermanentSyncState = {
   checkpoints: Map<PublicKey, SyncCheckpointRecord>;
 };
 
-export function buildPermanentSyncFilters(authors: PublicKey[]): Filter[] {
+export function buildPermanentSyncFilters(
+  authors: PublicKey[],
+  dTags: readonly string[]
+): Filter[] {
   if (authors.length === 0) {
     return [];
   }
@@ -44,12 +47,22 @@ export function buildPermanentSyncFilters(authors: PublicKey[]): Filter[] {
     {
       authors,
       kinds: [KIND_KNOWLEDGE_DOCUMENT],
+      ...(dTags.length > 0 ? { "#d": [...dTags] } : {}),
       limit: 0,
     },
     {
       authors,
       kinds: [KIND_DELETE],
       "#k": [`${KIND_KNOWLEDGE_DOCUMENT}`],
+      ...(dTags.length > 0
+        ? {
+            "#a": authors.flatMap((author) =>
+              dTags.map(
+                (dTag) => `${KIND_KNOWLEDGE_DOCUMENT}:${author}:${dTag}`
+              )
+            ),
+          }
+        : {}),
       limit: 0,
     },
   ];
@@ -57,7 +70,8 @@ export function buildPermanentSyncFilters(authors: PublicKey[]): Filter[] {
 
 export function buildPermanentCatchUpFilters(
   authors: PublicKey[],
-  checkpoints: ReadonlyMap<PublicKey, SyncCheckpointRecord>
+  checkpoints: ReadonlyMap<PublicKey, SyncCheckpointRecord>,
+  dTags: readonly string[]
 ): Filter[] {
   const authorsWithCheckpoint = authors.filter(
     (author) => (checkpoints.get(author)?.latestSeenLiveCreatedAt || 0) > 0
@@ -76,12 +90,22 @@ export function buildPermanentCatchUpFilters(
     {
       authors: authorsWithCheckpoint,
       kinds: [KIND_KNOWLEDGE_DOCUMENT],
+      ...(dTags.length > 0 ? { "#d": [...dTags] } : {}),
       since,
     },
     {
       authors: authorsWithCheckpoint,
       kinds: [KIND_DELETE],
       "#k": [`${KIND_KNOWLEDGE_DOCUMENT}`],
+      ...(dTags.length > 0
+        ? {
+            "#a": authorsWithCheckpoint.flatMap((author) =>
+              dTags.map(
+                (dTag) => `${KIND_KNOWLEDGE_DOCUMENT}:${author}:${dTag}`
+              )
+            ),
+          }
+        : {}),
       since,
     },
   ];
@@ -91,15 +115,27 @@ export function buildPermanentBackfillFilter({
   author,
   until,
   kind,
+  dTags,
 }: {
   author: PublicKey;
   until?: number;
   kind: typeof KIND_KNOWLEDGE_DOCUMENT | typeof KIND_DELETE;
+  dTags: readonly string[];
 }): Filter {
   return {
     authors: [author],
     kinds: [kind],
     ...(kind === KIND_DELETE ? { "#k": [`${KIND_KNOWLEDGE_DOCUMENT}`] } : {}),
+    ...(dTags.length > 0 && kind === KIND_KNOWLEDGE_DOCUMENT
+      ? { "#d": [...dTags] }
+      : {}),
+    ...(dTags.length > 0 && kind === KIND_DELETE
+      ? {
+          "#a": dTags.map(
+            (dTag) => `${KIND_KNOWLEDGE_DOCUMENT}:${author}:${dTag}`
+          ),
+        }
+      : {}),
     ...(until !== undefined ? { until } : {}),
     limit: PERMANENT_SYNC_BACKFILL_PAGE_LIMIT,
   };
@@ -115,7 +151,7 @@ export function getStoredEventID(
 }
 
 export function toStoredDocumentRecord(
-  event: (Event | UnsignedEvent) & EventAttachment,
+  event: (Event | UnsignedEvent) & Partial<EventAttachment>,
   filePath?: string
 ): StoredDocumentRecord | undefined {
   if (event.kind !== KIND_KNOWLEDGE_DOCUMENT) {
@@ -327,6 +363,7 @@ export function startPermanentDocumentSync({
   authors,
   user,
   capabilityKeys,
+  dTags,
   addLiveEvents,
 }: {
   db: StashmapDB | null;
@@ -335,6 +372,7 @@ export function startPermanentDocumentSync({
   authors: PublicKey[];
   user: User | undefined;
   capabilityKeys: ReadonlyArray<string>;
+  dTags: readonly string[];
   addLiveEvents?: (events: ImmutableMap<string, Event | UnsignedEvent>) => void;
 }): () => void {
   if (
@@ -404,7 +442,11 @@ export function startPermanentDocumentSync({
   };
 
   const runCatchUp = async (): Promise<void> => {
-    const filters = buildPermanentCatchUpFilters(authors, state.checkpoints);
+    const filters = buildPermanentCatchUpFilters(
+      authors,
+      state.checkpoints,
+      dTags
+    );
     const events = await queryPermanentSyncFilters(
       relayPool,
       relayUrls,
@@ -444,6 +486,7 @@ export function startPermanentDocumentSync({
         oldestFetchedCreatedAt !== undefined
           ? oldestFetchedCreatedAt - 1
           : undefined,
+      dTags,
     });
     const events = await queryPermanentSyncFilters(relayPool, relayUrls, [
       filter,
@@ -514,7 +557,7 @@ export function startPermanentDocumentSync({
 
   const sub = relayPool.subscribeMany(
     relayUrls,
-    buildPermanentSyncFilters(authors),
+    buildPermanentSyncFilters(authors, dTags),
     {
       onevent(event: Event): void {
         applyIncomingEvent(event).catch(() => undefined);

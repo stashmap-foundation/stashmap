@@ -19,6 +19,7 @@ export function storedDocumentToEvent(
     kind: KIND_KNOWLEDGE_DOCUMENT,
     tags: document.tags,
     content: document.content,
+    route: { kind: "storage" },
     ...(document.storageKey !== undefined && {
       storageKey: document.storageKey,
     }),

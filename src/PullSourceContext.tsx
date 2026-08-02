@@ -3,7 +3,6 @@ import { Map as ImmutableMap } from "immutable";
 import { Event, Filter } from "nostr-tools";
 import { useBackend } from "./BackendContext";
 import { DataContextProvider, useData } from "./DataContext";
-import { useUserRelayContext } from "./UserRelayContext";
 import {
   addNodesToGraphIndex,
   createEmptyGraphIndex,
@@ -123,6 +122,12 @@ function overlayData(
 ): PullOverlayData {
   return {
     matchedSourceIdsByPaneId: matchedPaneMap(records, interests),
+    coordinatesBySourceId: new Map(
+      [...records.values()].map((record) => [
+        record.sourceId,
+        { ...record.coordinate, relays: record.relays },
+      ])
+    ),
   };
 }
 
@@ -133,13 +138,12 @@ export function PullSourceProvider({
 }): JSX.Element {
   const data = useData();
   const backend = useBackend();
-  const { userRelays } = useUserRelayContext();
   const [records, setRecords] = useState<Map<SourceId, PullSourceRecord>>(
     () => new Map()
   );
   const interests = useMemo(
-    () => derivePullInterests(data, backend.defaultRelays, userRelays),
-    [data, backend.defaultRelays, userRelays]
+    () => derivePullInterests(data, backend.workspaceConfig.roomRelays),
+    [data, backend.workspaceConfig.roomRelays]
   );
   const interestSig = interestsSignature(interests);
   useEffect(() => {
@@ -199,7 +203,6 @@ export function PullSourceProvider({
       graphIndex={mergeGraphIndexes(data.graphIndex, overlayGraphIndex)}
       documents={data.documents.merge(overlayDocuments)}
       documentByFilePath={data.documentByFilePath}
-      relaysInfos={data.relaysInfos}
       publishEventsStatus={data.publishEventsStatus}
       calendarFeeds={data.calendarFeeds}
       pull={pull}

@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-use-before-define, functional/no-let, functional/immutable-data, no-continue, no-nested-ternary */
 import { List, Map, Set as ImmutableSet } from "immutable";
 import { v4 } from "uuid";
-import { KIND_RELAY_METADATA_EVENT, newTimestamp, msTag } from "../nostr";
 import { ensureNodeNativeFields, isSearchId } from "./connections";
 import type {
   DocumentLinkTargetSeed,
@@ -42,19 +41,13 @@ export type CoreOutboundEvent = {
 
 type GraphPlanData = Pick<
   Data,
-  | "user"
-  | "knowledgeDBs"
-  | "graphIndex"
-  | "documents"
-  | "documentByFilePath"
-  | "relaysInfos"
+  "user" | "knowledgeDBs" | "graphIndex" | "documents" | "documentByFilePath"
 >;
 
 export type GraphPlan = GraphPlanData & {
   publishEvents: List<CoreOutboundEvent & EventAttachment>;
   affectedDocuments: ImmutableSet<string>;
   deletedDocs: ImmutableSet<string>;
-  relays: AllRelays;
 };
 
 function planEnsureSystemRoot<T extends GraphPlan>(
@@ -385,49 +378,8 @@ export function planDeleteDescendantNodes<T extends GraphPlan>(
   );
 }
 
-export function relayTags(relays: Relays): string[][] {
-  return relays
-    .map((r) => {
-      if (r.read && r.write) {
-        return ["r", r.url];
-      }
-      if (r.read) {
-        return ["r", r.url, "read"];
-      }
-      if (r.write) {
-        return ["r", r.url, "write"];
-      }
-      return [];
-    })
-    .filter((tag) => tag.length > 0);
-}
-
-export function planPublishRelayMetadata<T extends GraphPlan>(
-  plan: T,
-  relays: Relays
-): T {
-  const tags = relayTags(relays);
-  const publishRelayMetadataEvent: CoreOutboundEvent & EventAttachment = {
-    kind: KIND_RELAY_METADATA_EVENT,
-    pubkey: "",
-    created_at: newTimestamp(),
-    tags: [...tags, msTag()],
-    content: "",
-    writeRelayConf: {
-      defaultRelays: true,
-      user: true,
-      extraRelays: relays,
-    },
-  };
-  return {
-    ...plan,
-    publishEvents: plan.publishEvents.push(publishRelayMetadataEvent),
-  };
-}
-
 type CreateGraphPlanProps = GraphPlanData & {
   publishEvents?: List<CoreOutboundEvent & EventAttachment>;
-  relays: AllRelays;
 };
 
 export function createGraphPlan(props: CreateGraphPlanProps): GraphPlan {

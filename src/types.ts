@@ -1,7 +1,5 @@
 import { Map, OrderedMap, List, OrderedSet, Set } from "immutable";
 import { Event, EventTemplate, UnsignedEvent } from "nostr-tools";
-// eslint-disable-next-line import/no-unresolved
-import { RelayInformation } from "nostr-tools/lib/types/nip11";
 import { QueueStatus } from "./infra/nostr/cache/PublishQueue";
 import { Document as DocumentType } from "./core/Document";
 import { IcalEntry } from "./core/ical";
@@ -15,14 +13,6 @@ declare global {
   type PublicKey = string & { readonly "": unique symbol };
 
   type FrontMatter = Record<string, unknown>;
-
-  type Relay = {
-    url: string;
-    read: boolean;
-    write: boolean;
-  };
-
-  type Relays = Array<Relay>;
 
   type NotificationMessage = {
     title: string;
@@ -97,17 +87,13 @@ declare global {
     referrer?: string;
   };
 
-  type WriteRelayConf = {
-    defaultRelays?: boolean;
-    user?: boolean;
-    extraRelays?: Relays;
-  };
+  type PublicationRoute =
+    | { kind: "configuration"; relays: string[] }
+    | { kind: "storage" }
+    | { kind: "shared" };
 
   type EventAttachment = {
-    writeRelayConf?: WriteRelayConf;
-    // Per-document storage encryption key, carried alongside the event while
-    // it travels inside the app (plaintext internally). The publish seam
-    // encrypts the content with it and never signs it into the wire event.
+    route: PublicationRoute;
     storageKey?: string;
   };
 
@@ -125,11 +111,6 @@ declare global {
     temporaryView: TemporaryViewState;
     temporaryEvents: List<TemporaryEvent>;
     queueStatus?: QueueStatus;
-  };
-
-  type AllRelays = {
-    defaultRelays: Relays;
-    userRelays: Relays;
   };
 
   type RouteCoordinate = {
@@ -169,6 +150,7 @@ declare global {
 
   type PullOverlayData = {
     matchedSourceIdsByPaneId: ReadonlyMap<string, readonly SourceId[]>;
+    coordinatesBySourceId: ReadonlyMap<SourceId, RouteCoordinate>;
   };
 
   type Data = {
@@ -177,7 +159,6 @@ declare global {
     graphIndex: GraphIndex;
     documents: Map<string, DocumentType>;
     documentByFilePath: Map<string, DocumentType>;
-    relaysInfos: Map<string, RelayInformation | undefined>;
     publishEventsStatus: EventState;
     // Fetched calendar feeds, keyed by feed URL — the read path of the
     // machine-feeds law. Projections derive from these at row-build time
@@ -193,16 +174,6 @@ declare global {
     setLocalStorage: (key: string, value: string) => void;
     getLocalStorage: (key: string) => string | null;
     deleteLocalStorage: (key: string) => void;
-  };
-
-  type CompressedSettings = {
-    v: string;
-    n: Buffer;
-  };
-
-  type CompressedSettingsFromStore = {
-    v: string;
-    n: string;
   };
 
   type Hash = string;

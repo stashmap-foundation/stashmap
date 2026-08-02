@@ -23,6 +23,7 @@ export function buildDocumentEvent(
     created_at: newTimestamp(),
     tags: [["d", document.docId], ...systemRoleTags, msTag()],
     content,
+    route: { kind: "storage" },
     storageKey: document.storageKey ?? newStorageKey(),
   };
 }

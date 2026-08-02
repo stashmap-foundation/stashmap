@@ -25,14 +25,22 @@ export function FullscreenButton(): JSX.Element | null {
       return buildDocumentRouteUrl(
         target.sourceId,
         target.documentId,
-        target.scrollToId
+        target.scrollToId,
+        data.pull?.coordinatesBySourceId.get(target.sourceId) ??
+          (target.sourceId === pane.sourceId ? pane.routeCoordinate : undefined)
       );
     }
     if (target.rootNodeId) {
-      return buildNodeRouteUrl(target.rootNodeId, target.sourceId, {
-        scrollToId: target.scrollToId,
-        fallbackLabel: target.fallbackLabel,
-      });
+      return buildNodeRouteUrl(
+        target.rootNodeId,
+        target.sourceId,
+        {
+          scrollToId: target.scrollToId,
+          fallbackLabel: target.fallbackLabel,
+        },
+        data.pull?.coordinatesBySourceId.get(target.sourceId) ??
+          (target.sourceId === pane.sourceId ? pane.routeCoordinate : undefined)
+      );
     }
     return undefined;
   })();

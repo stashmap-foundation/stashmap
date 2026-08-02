@@ -268,9 +268,11 @@ Madrid
     screen.getByRole("treeitem", { name: "Local Name" });
     await waitFor(() => expect(fetchEntityMetadata).toHaveBeenCalledTimes(1));
     await screen.findByRole("treeitem", { name: "Barcelona auf Deutsch" });
-    expect(new URLSearchParams(window.location.search).get("label")).toBe(
-      "Barcelona auf Deutsch"
-    );
+    await waitFor(() => {
+      expect(new URLSearchParams(window.location.search).get("label")).toBe(
+        "Barcelona auf Deutsch"
+      );
+    });
     expect(fetchEntityMetadata).toHaveBeenCalledTimes(1);
     Reflect.defineProperty(navigator, "languages", {
       value: originalLanguages,

@@ -1,8 +1,14 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ModalForm } from "../commons/ModalForm";
 import { useBackend } from "../BackendContext";
-import { WorkspaceConfig, normalizeWorkspaceConfig } from "../workspaceConfig";
+import { usePlanner } from "../planner";
+import {
+  buildWorkspaceConfigEvent,
+  normalizeWebWorkspaceConfig,
+  normalizeWorkspaceConfig,
+  WorkspaceConfig,
+} from "../workspaceConfig";
 
 function RelayList({
   label,
@@ -90,14 +96,19 @@ export function Relays({
   const [storageRelays, setStorageRelays] = useState(config.storageRelays);
   const [roomRelays, setRoomRelays] = useState(config.roomRelays);
 
+  useEffect(() => {
+    setStorageRelays(config.storageRelays);
+    setRoomRelays(config.roomRelays);
+  }, [config]);
+
   const submit = async (): Promise<void> => {
-    const next = normalizeWorkspaceConfig({
+    const values = {
       storageRelays: showStorage ? storageRelays : [],
       roomRelays,
-    });
-    if (showStorage && next.storageRelays.length === 0) {
-      throw new Error("Web workspaces require storage relays");
-    }
+    };
+    const next = showStorage
+      ? normalizeWebWorkspaceConfig(values)
+      : normalizeWorkspaceConfig(values);
     await onSubmit(next);
   };
 
@@ -127,16 +138,26 @@ export function Relays({
 
 export function RelaysWrapper(): JSX.Element {
   const navigate = useNavigate();
-  const { workspace, workspaceConfig } = useBackend();
-  if (!workspace || !workspaceConfig) {
-    return <div>Workspace settings are unavailable.</div>;
-  }
+  const backend = useBackend();
+  const planner = usePlanner();
   return (
     <Relays
-      config={workspaceConfig}
-      showStorage={false}
+      config={backend.workspaceConfig}
+      showStorage={!backend.workspace}
       onSubmit={async (config) => {
-        await workspace.configure(config);
+        if (backend.workspace) {
+          await backend.workspace.configure(config);
+        } else {
+          if (!backend.user) {
+            throw new Error("Workspace settings require a signed-in user");
+          }
+          const event = await buildWorkspaceConfigEvent(backend.user, config);
+          const plan = planner.createPlan();
+          await planner.executePlan({
+            ...plan,
+            publishEvents: plan.publishEvents.push(event),
+          });
+        }
         navigate("/");
       }}
     />

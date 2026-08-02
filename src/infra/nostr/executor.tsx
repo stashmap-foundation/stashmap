@@ -7,23 +7,57 @@ import {
   isUserLoggedIn,
   isUserLoggedInWithExtension,
 } from "../../NostrAuthContext";
-import { applyWriteRelayConfig } from "../../relays";
 import { KIND_KNOWLEDGE_DOCUMENT } from "../../nostr";
 import { buildStorageEnvelope } from "../../storageEncryption";
+import {
+  defaultWebWorkspaceConfig,
+  normalizeWorkspaceRelayUrl,
+  WorkspaceConfig,
+} from "../../workspaceConfig";
 import { publishEventToRelays, PUBLISH_TIMEOUT } from "./nostrPublish";
 
 export { PUBLISH_TIMEOUT };
 
-type SignedEventWithConf = {
+export type SignedEventWithRoute = {
   readonly event: VerifiedEvent;
-  readonly writeRelayConf?: WriteRelayConf;
+  readonly route: PublicationRoute;
 };
+
+function publicationRouteCandidates(
+  route: PublicationRoute,
+  config: WorkspaceConfig
+): string[] {
+  if (route.kind === "configuration") {
+    return route.relays;
+  }
+  if (route.kind === "storage") {
+    return config.storageRelays;
+  }
+  return config.roomRelays;
+}
+
+export function publicationRouteUrls(
+  route: PublicationRoute,
+  config: WorkspaceConfig
+): string[] | undefined {
+  if (route.kind === "shared" && config.roomRelays.length === 0) {
+    return undefined;
+  }
+  const candidates = publicationRouteCandidates(route, config);
+  return [
+    ...new Set(
+      candidates
+        .map((url) => normalizeWorkspaceRelayUrl(url))
+        .filter((url): url is string => url !== undefined)
+    ),
+  ];
+}
 
 export async function signEvents(
   events: List<EventTemplate & EventAttachment>,
   user: User | undefined,
   finalizeEvent: FinalizeEvent
-): Promise<List<SignedEventWithConf>> {
+): Promise<List<SignedEventWithRoute>> {
   if (!isUserLoggedIn(user)) {
     return List();
   }
@@ -33,21 +67,17 @@ export async function signEvents(
   ): Promise<Event> => {
     try {
       return window.nostr.signEvent(event);
-      // eslint-disable-next-line no-empty
     } catch {
       throw new Error("Failed to sign event with extension");
     }
   };
 
   const toWireTemplate = async (
-    e: EventTemplate & EventAttachment
-  ): Promise<{
-    template: EventTemplate;
-    writeRelayConf?: WriteRelayConf;
-  }> => {
-    const { writeRelayConf, storageKey, ...template } = e;
+    event: EventTemplate & EventAttachment
+  ): Promise<{ template: EventTemplate; route: PublicationRoute }> => {
+    const { route, storageKey, ...template } = event;
     if (template.kind !== KIND_KNOWLEDGE_DOCUMENT) {
-      return { template, writeRelayConf };
+      return { template, route };
     }
     if (!storageKey) {
       throw new Error("Storage event without a storage key");
@@ -57,58 +87,49 @@ export async function signEvents(
         ...template,
         content: await buildStorageEnvelope(user, storageKey, template.content),
       },
-      writeRelayConf,
+      route,
     };
   };
 
   const wireEvents = await Promise.all(events.toArray().map(toWireTemplate));
 
   return isUserLoggedInWithExtension(user)
-    ? List<SignedEventWithConf>(
+    ? List<SignedEventWithRoute>(
         await Promise.all(
-          wireEvents.map(async ({ template, writeRelayConf }) => {
-            const signedEvent = await signEventWithExtension(template);
-            return {
-              event: signedEvent as VerifiedEvent,
-              writeRelayConf,
-            };
-          })
+          wireEvents.map(async ({ template, route }) => ({
+            event: (await signEventWithExtension(template)) as VerifiedEvent,
+            route,
+          }))
         )
       )
-    : List<SignedEventWithConf>(
-        wireEvents.map(({ template, writeRelayConf }) => {
-          const event = finalizeEvent(
+    : List<SignedEventWithRoute>(
+        wireEvents.map(({ template, route }) => ({
+          event: finalizeEvent(
             template,
             (user as KeyPair).privateKey
-          ) as VerifiedEvent;
-          return { event, writeRelayConf };
-        })
+          ) as VerifiedEvent,
+          route,
+        }))
       );
 }
 
-// Signed events out to relays, each routed by its writeRelayConf. Shared by
-// every executor that publishes — publication is storage-independent, so
-// the filesystem executor uses this for deposits too.
-export async function publishEventsWithConf(
+export async function publishEventsByRoute(
   backend: Pick<Backend, "publish">,
-  relays: AllRelays,
-  finalizedEvents: List<SignedEventWithConf>
+  config: WorkspaceConfig,
+  finalizedEvents: List<SignedEventWithRoute>
 ): Promise<PublishResultsEventMap> {
   const results = await Promise.all(
-    finalizedEvents.toArray().map(({ event, writeRelayConf }) => {
-      const writeRelayUrls = applyWriteRelayConfig(
-        relays.defaultRelays,
-        relays.userRelays,
-        writeRelayConf
-      );
-      const urls = Array.from(new Set(writeRelayUrls.map((r: Relay) => r.url)));
-      return publishEventToRelays(backend, event, urls);
+    finalizedEvents.toArray().map(({ event, route }) => {
+      const urls = publicationRouteUrls(route, config);
+      return urls
+        ? publishEventToRelays(backend, event, urls)
+        : Promise.resolve(undefined);
     })
   );
 
   return results.reduce((rdx, result, index) => {
     const eventId = finalizedEvents.get(index)?.event.id;
-    return eventId ? rdx.set(eventId, result) : rdx;
+    return eventId && result ? rdx.set(eventId, result) : rdx;
   }, Map<string, PublishResultsOfEvent>());
 }
 
@@ -116,20 +137,16 @@ export async function execute({
   plan,
   backend,
   finalizeEvent,
+  workspaceConfig = defaultWebWorkspaceConfig(),
 }: {
   plan: GraphPlan;
   backend: Pick<Backend, "publish">;
   finalizeEvent: FinalizeEvent;
+  workspaceConfig?: WorkspaceConfig;
 }): Promise<PublishResultsEventMap> {
-  // buildDocumentEvents returns plan.publishEvents + generated document events.
-  // In production executePlan pre-builds documents for the publish queue, so
-  // affectedDocuments is cleared before calling execute() making this a passthrough.
-  // In tests execute() is called directly and this generates the document events.
   const allEvents = buildDocumentEvents(plan);
 
   if (allEvents.size === 0) {
-    // eslint-disable-next-line no-console
-    console.warn("Won't execute Noop plan");
     return Map();
   }
 
@@ -139,7 +156,7 @@ export async function execute({
     return Map();
   }
 
-  return publishEventsWithConf(backend, plan.relays, finalizedEvents);
+  return publishEventsByRoute(backend, workspaceConfig, finalizedEvents);
 }
 
 export async function republishEvents({
@@ -152,8 +169,6 @@ export async function republishEvents({
   writeRelayUrl: string;
 }): Promise<PublishResultsEventMap> {
   if (events.size === 0) {
-    // eslint-disable-next-line no-console
-    console.warn("Won't republish noop events");
     return Map();
   }
 

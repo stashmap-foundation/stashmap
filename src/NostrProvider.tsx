@@ -1,12 +1,7 @@
 import React, { useEffect, useState } from "react";
 // eslint-disable-next-line import/no-unresolved
 import { setNostrWasm } from "nostr-tools/wasm";
-import {
-  nip11,
-  AbstractSimplePool,
-  verifyEvent,
-  finalizeEvent,
-} from "nostr-tools";
+import { AbstractSimplePool, verifyEvent, finalizeEvent } from "nostr-tools";
 import { initNostrWasm } from "nostr-wasm";
 import { ApiProvider, Apis } from "./Apis";
 
@@ -15,10 +10,7 @@ export function NostrProvider({
   apis,
 }: {
   children: React.ReactNode;
-  apis: Omit<
-    Apis,
-    "relayPool" | "finalizeEvent" | "nip11" | "eventLoadingTimeout"
-  >;
+  apis: Omit<Apis, "relayPool" | "finalizeEvent" | "eventLoadingTimeout">;
 }): JSX.Element {
   const [pool, setPool] = useState<AbstractSimplePool | undefined>(undefined);
 
@@ -37,10 +29,6 @@ export function NostrProvider({
         ...apis,
         relayPool: pool,
         finalizeEvent,
-        nip11: {
-          ...nip11,
-          searchDebounce: 500,
-        },
         eventLoadingTimeout: 20000,
       }}
     >

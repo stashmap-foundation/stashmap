@@ -6,7 +6,6 @@ import {
   ALICE,
   renderApp,
   renderWithTestData,
-  TEST_RELAYS,
   RootViewOrPaneIsLoading,
   type,
 } from "../utils.test";
@@ -50,7 +49,6 @@ test("Details of Sync Status", async () => {
           return results;
         },
       } as unknown as MockRelayPool,
-      relays: { ...utils.relays, userRelays: TEST_RELAYS },
     }
   );
   await type("Root{Enter}Hello World{Escape}");

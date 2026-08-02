@@ -70,7 +70,7 @@ export function sanitizeAuthorsFilter(filter: Filter): Filter {
 }
 
 export function eventToParsed(
-  event: (Event | UnsignedEvent) & EventAttachment
+  event: (Event | UnsignedEvent) & Partial<EventAttachment>
 ): ParsedDocument | undefined {
   if (event.kind !== KIND_KNOWLEDGE_DOCUMENT) return undefined;
   const dTag = findTag(event, "d");

@@ -247,7 +247,7 @@ test("two strangers find each other through an entity", async () => {
   const [bob] = setup([BOB], { relayPool });
   renderApp({
     ...bob(),
-    defaultRelays: [RELAY_URL],
+    roomRelays: [RELAY_URL],
     initialRoute: "/local/n/wd%3AQ1492?label=Barcelona",
   });
 
@@ -450,7 +450,7 @@ test("remote entity incoming refs open the remote deposit", async () => {
   const [bob] = setup([BOB], { relayPool });
   renderApp({
     ...bob(),
-    defaultRelays: [RELAY_URL],
+    roomRelays: [RELAY_URL],
     initialRoute: "/local/n/wd%3AQ7242?label=Ludwig%20von%20Mises",
   });
 
@@ -610,7 +610,7 @@ test("remote incoming groups open the source root and expanded child source rows
   const [bob] = setup([BOB], { relayPool });
   renderApp({
     ...bob(),
-    defaultRelays: [RELAY_URL],
+    roomRelays: [RELAY_URL],
     initialRoute: "/local/n/wd%3AQ40?label=Austria",
   });
 
@@ -647,7 +647,7 @@ Austria
   cleanup();
   renderApp({
     ...bob(),
-    defaultRelays: [RELAY_URL],
+    roomRelays: [RELAY_URL],
     initialRoute: "/local/n/wd%3AQ40?label=Austria",
   });
   await expectTree(`
@@ -696,7 +696,7 @@ test("nonmatching and self-authored deposits do not render", async () => {
   const [bob] = setup([BOB], { relayPool });
   renderApp({
     ...bob(),
-    defaultRelays: [RELAY_URL],
+    roomRelays: [RELAY_URL],
     initialRoute: "/local/n/wd%3AQ1492?label=Barcelona",
   });
 
@@ -736,7 +736,7 @@ test("live replacement removes visible remote rows and stale events stay ignored
   const [bob] = setup([BOB], { relayPool });
   renderApp({
     ...bob(),
-    defaultRelays: [RELAY_URL],
+    roomRelays: [RELAY_URL],
     initialRoute: "/local/n/wd%3AQ1492?label=Barcelona",
   });
 
@@ -778,19 +778,18 @@ test("tag subscriptions close when local attention navigates away", async () => 
   const [bob] = setup([BOB], { relayPool });
   renderApp({
     ...bob(),
-    defaultRelays: [RELAY_URL],
+    roomRelays: [RELAY_URL],
     initialRoute: "/local/n/wd%3AQ1492?label=Barcelona",
   });
   await waitFor(() => {
-    expect(
-      relayPool
-        .getSubscriptions()
-        .some((sub) =>
-          sub.filters.some((filter) =>
-            filter.kinds?.includes(KIND_KNOWLEDGE_DEPOSIT)
-          )
+    const subscription = relayPool
+      .getSubscriptions()
+      .find((sub) =>
+        sub.filters.some((filter) =>
+          filter.kinds?.includes(KIND_KNOWLEDGE_DEPOSIT)
         )
-    ).toBe(true);
+      );
+    expect(subscription?.relays).toEqual([RELAY_URL]);
   });
 
   await userEvent.click(await screen.findByLabelText("Create new note"));
@@ -834,10 +833,22 @@ test("deposit routes render Loading until the exact source arrives", async () =>
   const [bob] = setup([BOB], { relayPool });
   renderApp({
     ...bob(),
-    defaultRelays: [RELAY_URL],
+    roomRelays: ["wss://ambient-room.example/"],
     initialRoute: route,
   });
 
+  await waitFor(() => {
+    const subscription = relayPool
+      .getSubscriptions()
+      .find((candidate) =>
+        candidate.filters.some(
+          (filter) =>
+            filter.kinds?.includes(KIND_KNOWLEDGE_DEPOSIT) &&
+            filter["#d"]?.includes("route-doc")
+        )
+      );
+    expect(subscription?.relays).toEqual([RELAY_URL]);
+  });
   await screen.findByText("Loading...");
   await publishDepositFixture(
     relayPool,

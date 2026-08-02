@@ -5,7 +5,7 @@ import {
   encodePublicKeyAddress,
 } from "./infra/nostr/publicKeys";
 import { KIND_KNOWLEDGE_DEPOSIT, KIND_KNOWLEDGE_DOCUMENT } from "./nostr";
-import { sanitizeRelayUrl } from "./relayUtils";
+import { normalizeRelayHintUrl } from "./workspaceConfig";
 
 export const MAX_ROUTE_RELAY_HINTS = 3;
 
@@ -42,7 +42,7 @@ function normalizedRelayHints(relays: readonly string[]): string[] {
   return [
     ...new Set(
       relays
-        .map((relay) => sanitizeRelayUrl(relay))
+        .map((relay) => normalizeRelayHintUrl(relay))
         .filter((relay): relay is string => relay !== undefined)
     ),
   ].slice(0, MAX_ROUTE_RELAY_HINTS);
@@ -109,7 +109,8 @@ function storageCoordinate(
 export function buildNodeRouteUrl(
   rootNode: ID,
   sourceId: SourceId,
-  options: NodeRouteOptions
+  options: NodeRouteOptions,
+  routeCoordinate?: RouteCoordinate
 ): string {
   if (sourceId === LOCAL) {
     const params = new URLSearchParams();
@@ -125,7 +126,9 @@ export function buildNodeRouteUrl(
     }`;
   }
   const coordinate =
-    sourceCoordinate(sourceId) ?? storageCoordinate(sourceId, rootNode);
+    routeCoordinate ??
+    sourceCoordinate(sourceId) ??
+    storageCoordinate(sourceId, rootNode);
   if (!coordinate) {
     return `/local/n/${encodeURIComponent(rootNode)}`;
   }
@@ -142,7 +145,8 @@ export function buildNodeRouteUrl(
 export function buildDocumentRouteUrl(
   author: SourceId,
   docId: string,
-  scrollToId?: string
+  scrollToId?: string,
+  routeCoordinate?: RouteCoordinate
 ): string {
   if (author === LOCAL) {
     const params = new URLSearchParams();
@@ -153,7 +157,9 @@ export function buildDocumentRouteUrl(
     return `/local/d/${encodeURIComponent(docId)}${query ? `?${query}` : ""}`;
   }
   const coordinate =
-    sourceCoordinate(author) ?? storageCoordinate(author, docId);
+    routeCoordinate ??
+    sourceCoordinate(author) ??
+    storageCoordinate(author, docId);
   if (!coordinate) {
     return `/local/d/${encodeURIComponent(docId)}`;
   }
@@ -242,9 +248,13 @@ export function parseStorageKeyFromHash(hash: string): string | undefined {
 export function buildShareRouteUrl(
   author: SourceId,
   docId: string,
-  storageKey: string
+  storageKey: string,
+  relays: readonly string[]
 ): string {
-  const coordinate = storageCoordinate(author, docId);
+  const rawCoordinate = storageCoordinate(author, docId);
+  const coordinate = rawCoordinate
+    ? { ...rawCoordinate, relays: normalizedRelayHints(relays) }
+    : undefined;
   if (!coordinate) {
     return `/local/d/${encodeURIComponent(docId)}#key=${encodeURIComponent(
       storageKey

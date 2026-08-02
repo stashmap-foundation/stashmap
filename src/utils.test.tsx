@@ -1,6 +1,4 @@
 import React from "react";
-// eslint-disable-next-line import/no-unresolved
-import { RelayInformation } from "nostr-tools/lib/types/nip11";
 import { List, Map, Set, OrderedSet } from "immutable";
 import {
   cleanup,
@@ -50,10 +48,9 @@ import {
   computeDepthLimits,
   setDropIndentDepth,
 } from "./editor/DroppableContainer";
-import { UserRelayContextProvider } from "./UserRelayContext";
 import { StashmapDB } from "./infra/nostr/cache/indexedDB";
 import { createEmptyGraphIndex } from "./graphIndex";
-import { buildNodeRouteUrl } from "./navigationUrl";
+import { buildCoordinateRouteUrl, buildNodeRouteUrl } from "./navigationUrl";
 import { decodePublicKeyInputSync } from "./infra/nostr/publicKeys";
 import { processEvents } from "./eventProcessing";
 import { KIND_KNOWLEDGE_DOCUMENT } from "./nostr";
@@ -225,8 +222,10 @@ function applyApis(props?: Partial<TestApis>): TestApis {
       relayPool.subscribeMany(relays, filters, params),
     publish: (relays, event) => relayPool.publish(relays, event),
     user: undefined,
-    defaultRelays: [] as Relays,
-    workspaceConfig: undefined,
+    workspaceConfig: {
+      storageRelays: TEST_RELAYS.map((relay) => relay.url),
+      roomRelays: [],
+    },
   };
   return {
     eventLoadingTimeout: 0,
@@ -234,14 +233,6 @@ function applyApis(props?: Partial<TestApis>): TestApis {
     relayPool,
     backend,
     finalizeEvent: props?.finalizeEvent || mockFinalizeEvent(),
-    nip11: props?.nip11 || {
-      searchDebounce: 0,
-      fetchRelayInformation: jest.fn().mockReturnValue(
-        Promise.resolve({
-          suppported_nips: [],
-        })
-      ),
-    },
     ...props,
   };
 }
@@ -250,9 +241,7 @@ export type UpdateState = () => TestAppState;
 
 type TestAppState = TestDataProps & TestApis;
 
-type TestDataProps = DataContextProps & {
-  relays: AllRelays;
-};
+type TestDataProps = DataContextProps;
 
 const DEFAULT_DATA_CONTEXT_PROPS: TestDataProps = {
   user: ALICE,
@@ -260,10 +249,9 @@ const DEFAULT_DATA_CONTEXT_PROPS: TestDataProps = {
   graphIndex: createEmptyGraphIndex(),
   documents: Map(),
   documentByFilePath: Map(),
-  relaysInfos: Map<string, RelayInformation | undefined>(),
   publishEventsStatus: {
     isLoading: false,
-    unsignedEvents: List<UnsignedEvent>(),
+    unsignedEvents: List<UnsignedEvent & EventAttachment>(),
     results: Map<string, PublishResultsOfEvent>(),
     temporaryView: {
       rowFocusIntents: Map<number, RowFocusIntent>(),
@@ -277,10 +265,6 @@ const DEFAULT_DATA_CONTEXT_PROPS: TestDataProps = {
     temporaryEvents: List(),
   },
   views: Map<string, View>(),
-  relays: {
-    defaultRelays: [{ url: "wss://default.relay", read: true, write: true }],
-    userRelays: [{ url: "wss://user.relay", read: true, write: true }],
-  },
   panes: [{ id: "pane-0", sourceId: LOCAL }],
 };
 
@@ -318,7 +302,8 @@ type RenderApis = Partial<TestApis> &
   Partial<DataContextProps> & {
     initialRoute?: string;
     user?: User;
-    defaultRelays?: Array<string>;
+    storageRelays?: Array<string>;
+    roomRelays?: Array<string>;
     initialStack?: ID[];
     db?: StashmapDB | null;
     BackendProvider?: ProviderComponent;
@@ -406,52 +391,80 @@ function normalizeTestInitialRoute(
       .map((event) => event.storageKey)
       .filter((key): key is string => key !== undefined)
       .pop();
-  return capability ? `${url}#key=${encodeURIComponent(capability)}` : url;
+  const routeAuthor = decodePublicKeyInputSync(eventAuthor);
+  if (!capability || !docId || !routeAuthor) {
+    return url;
+  }
+  const sourceRelays = options.relayPool
+    ?.getEvents()
+    .filter(
+      (event) =>
+        event.kind === KIND_KNOWLEDGE_DOCUMENT &&
+        event.pubkey === eventAuthor &&
+        event.tags.some((tag) => tag[0] === "d" && tag[1] === docId)
+    )
+    .flatMap((event) => event.relays ?? [])
+    .filter((relay, index, relays) => relays.indexOf(relay) === index);
+  return buildCoordinateRouteUrl(
+    "storage",
+    {
+      eventKind: KIND_KNOWLEDGE_DOCUMENT,
+      pubkey: routeAuthor,
+      dTag: docId,
+      relays:
+        sourceRelays && sourceRelays.length > 0
+          ? sourceRelays
+          : options.storageRelays ?? TEST_RELAYS.map((relay) => relay.url),
+    },
+    targetNode.id,
+    capability
+  );
+}
+
+function normalizedTestUser(user: User | undefined): User | undefined {
+  if (!user) {
+    return undefined;
+  }
+  return isUserLoggedInWithSeed(user)
+    ? { privateKey: user.privateKey, publicKey: user.publicKey }
+    : { publicKey: user.publicKey };
 }
 
 export function renderApis(
   children: React.ReactElement,
   options?: RenderApis
 ): TestApis & RenderResult {
-  const {
-    fileStore,
-    relayPool,
-    backend,
-    finalizeEvent,
-    nip11,
-    fetchEntityMetadata,
-  } = applyApis(options);
+  const { fileStore, relayPool, backend, finalizeEvent, fetchEntityMetadata } =
+    applyApis(options);
 
   // If user is explicity undefined it will be overwritten, if not set default Alice is used
   const optionsWithDefaultUser = {
     user: ALICE,
     ...options,
   };
-  const user =
-    optionsWithDefaultUser.user &&
-    isUserLoggedInWithSeed(optionsWithDefaultUser.user)
-      ? {
-          privateKey: optionsWithDefaultUser.user.privateKey,
-          publicKey: optionsWithDefaultUser.user.publicKey,
-        }
-      : undefined;
-  if (user && user.publicKey && !user.privateKey) {
-    fileStore.setLocalStorage("publicKey", user.publicKey);
-  } else if (user && user.privateKey) {
+  const user = normalizedTestUser(optionsWithDefaultUser.user);
+  if (user && isUserLoggedInWithSeed(user)) {
     fileStore.setLocalStorage("privateKey", bytesToHex(user.privateKey));
+  } else if (user) {
+    fileStore.setLocalStorage("publicKey", user.publicKey);
   }
   window.history.pushState(
     {},
     "",
     normalizeTestInitialRoute(options?.initialRoute || "/", options)
   );
-  const defaultRelayUrls =
-    optionsWithDefaultUser.defaultRelays || TEST_RELAYS.map((r) => r.url);
+  const storageRelays =
+    optionsWithDefaultUser.storageRelays ??
+    TEST_RELAYS.map((relay) => relay.url);
+  const roomRelays = optionsWithDefaultUser.roomRelays ?? [];
   const BackendProviderComponent =
     options?.BackendProvider ??
     (({ children: c }: { children: React.ReactNode }) => (
       <NostrBackendProvider
-        defaultRelayUrls={defaultRelayUrls}
+        initialWorkspaceConfig={{
+          storageRelays,
+          roomRelays,
+        }}
         db={options?.db ?? null}
       >
         {c}
@@ -465,7 +478,6 @@ export function renderApis(
           fileStore,
           relayPool,
           finalizeEvent,
-          nip11,
           eventLoadingTimeout: 0,
           ...(options?.fetchCalendarFeed
             ? { fetchCalendarFeed: options.fetchCalendarFeed }
@@ -477,17 +489,15 @@ export function renderApis(
       >
         <BackendProviderComponent>
           <AuthProvider>
-            <UserRelayContextProvider>
-              <DataProviderComponent>
-                <PaneIndexProvider index={0}>
-                  <TestListViewportContext.Provider
-                    value={{ viewportHeight: 10000, itemHeight: 100 }}
-                  >
-                    {children}
-                  </TestListViewportContext.Provider>
-                </PaneIndexProvider>
-              </DataProviderComponent>
-            </UserRelayContextProvider>
+            <DataProviderComponent>
+              <PaneIndexProvider index={0}>
+                <TestListViewportContext.Provider
+                  value={{ viewportHeight: 10000, itemHeight: 100 }}
+                >
+                  {children}
+                </TestListViewportContext.Provider>
+              </PaneIndexProvider>
+            </DataProviderComponent>
           </AuthProvider>
         </BackendProviderComponent>
       </ApiProvider>
@@ -498,7 +508,6 @@ export function renderApis(
     relayPool,
     backend,
     finalizeEvent,
-    nip11,
     eventLoadingTimeout: 0,
     ...utils,
   };
@@ -562,6 +571,8 @@ export function renderWithTestData(
     db?: StashmapDB | null;
     BackendProvider?: ProviderComponent;
     DataProvider?: ProviderComponent;
+    storageRelays?: Array<string>;
+    roomRelays?: Array<string>;
   }
 ): TestAppState & RenderResult {
   const props = applyDefaults(options);

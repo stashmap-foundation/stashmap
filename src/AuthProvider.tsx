@@ -14,15 +14,8 @@ export function AuthProvider({
       login: backend.login,
       loginWithExtension: backend.loginWithExtension,
       logout: backend.logout,
-      defaultRelays: backend.defaultRelays,
     }),
-    [
-      backend.user,
-      backend.login,
-      backend.loginWithExtension,
-      backend.logout,
-      backend.defaultRelays,
-    ]
+    [backend.user, backend.login, backend.loginWithExtension, backend.logout]
   );
   return (
     <NostrAuthContext.Provider value={value}>

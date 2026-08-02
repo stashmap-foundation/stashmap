@@ -51,11 +51,16 @@ export function inlineTargetToHref(
       })
     : undefined;
   const targetRoot = parent ?? target;
-  return buildNodeRouteUrl(targetRoot.node.id, targetRoot.ref.sourceId, {
-    scrollToId:
-      targetRoot.node.id === target.node.id ? undefined : target.node.id,
-    fallbackLabel: undefined,
-  });
+  return buildNodeRouteUrl(
+    targetRoot.node.id,
+    targetRoot.ref.sourceId,
+    {
+      scrollToId:
+        targetRoot.node.id === target.node.id ? undefined : target.node.id,
+      fallbackLabel: undefined,
+    },
+    data.pull?.coordinatesBySourceId.get(targetRoot.ref.sourceId)
+  );
 }
 
 function localTargetToHref(data: Data, targetID: ID): string | undefined {
@@ -143,7 +148,8 @@ export function inlineLinkToHref(
     ? buildDocumentRouteUrl(
         document.sourceId,
         document.docId,
-        scrollToId || undefined
+        scrollToId || undefined,
+        data.pull?.coordinatesBySourceId.get(document.sourceId)
       )
     : undefined;
 }

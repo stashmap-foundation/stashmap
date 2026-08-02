@@ -55,7 +55,6 @@ function indexedData(entries: ReadonlyArray<[PublicKey, GraphNode[]]>): Data {
     graphIndex,
     documents: Map(),
     documentByFilePath: Map(),
-    relaysInfos: Map(),
     publishEventsStatus: {
       isLoading: false,
       unsignedEvents: List(),

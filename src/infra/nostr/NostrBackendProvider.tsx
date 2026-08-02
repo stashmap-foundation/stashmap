@@ -1,50 +1,87 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { getPublicKey } from "nostr-tools";
+import { Event, getPublicKey } from "nostr-tools";
 import { hexToBytes } from "@noble/hashes/utils";
 import { useApis } from "../../Apis";
 import { Backend, BackendProvider } from "../../BackendContext";
-import { DEFAULT_ROOM_RELAYS } from "../../nostr";
-import { sanitizeRelays } from "../../relays";
+import { CONFIG_RELAYS, KIND_SETTINGS } from "../../nostr";
+import {
+  decryptWorkspaceConfigEvent,
+  defaultWebWorkspaceConfig,
+  normalizeWebWorkspaceConfig,
+  selectLatestWorkspaceConfigEvent,
+  WorkspaceConfig,
+} from "../../workspaceConfig";
 import { clearDatabase, openDB, StashmapDB } from "./cache/indexedDB";
 import { CacheDBProvider } from "./cache/CacheDBContext";
 
 function userFromPrivateKey(privateKey: string): User {
   const key = hexToBytes(privateKey);
   const publicKey = getPublicKey(key) as PublicKey;
-  return {
-    publicKey,
-    privateKey: key,
-  };
+  return { publicKey, privateKey: key };
 }
 
 export function NostrBackendProvider({
-  defaultRelayUrls,
   db,
+  initialWorkspaceConfig,
   children,
 }: {
-  defaultRelayUrls?: Array<string>;
   db: StashmapDB | null;
+  initialWorkspaceConfig: WorkspaceConfig;
   children: React.ReactNode;
 }): JSX.Element {
   const { relayPool, fileStore } = useApis();
-  const privKeyFromStorage = fileStore.getLocalStorage("privateKey");
-  const userFromStorage =
-    privKeyFromStorage !== null
-      ? userFromPrivateKey(privKeyFromStorage)
-      : undefined;
-  const pubKeyFromStorage = fileStore.getLocalStorage("publicKey");
-  const userWithPubkeyFromStorage =
-    pubKeyFromStorage !== null
-      ? { publicKey: pubKeyFromStorage as PublicKey }
-      : undefined;
+  const privateKey = fileStore.getLocalStorage("privateKey");
+  const storedUser = privateKey ? userFromPrivateKey(privateKey) : undefined;
+  const publicKey = fileStore.getLocalStorage("publicKey");
+  const extensionUser = publicKey
+    ? { publicKey: publicKey as PublicKey }
+    : undefined;
   const [user, setUser] = useState<User | undefined>(
-    userFromStorage || userWithPubkeyFromStorage
+    storedUser || extensionUser
   );
-  const relays = defaultRelayUrls
-    ? sanitizeRelays(
-        defaultRelayUrls.map((url) => ({ url, read: true, write: true }))
-      )
-    : DEFAULT_ROOM_RELAYS;
+  const fallbackWorkspaceConfig = useMemo(
+    () => normalizeWebWorkspaceConfig(initialWorkspaceConfig),
+    [initialWorkspaceConfig]
+  );
+  const [workspaceConfig, setWorkspaceConfig] = useState(
+    fallbackWorkspaceConfig
+  );
+
+  useEffect(() => {
+    setWorkspaceConfig(fallbackWorkspaceConfig);
+    if (!user) {
+      return () => {};
+    }
+    const controller = new AbortController();
+    const validEvents = new Map<
+      string,
+      { event: Event; config: WorkspaceConfig }
+    >();
+    const subscription = relayPool.subscribeMany(
+      CONFIG_RELAYS,
+      [{ authors: [user.publicKey], kinds: [KIND_SETTINGS], limit: 1 }],
+      {
+        onevent: (event) => {
+          decryptWorkspaceConfigEvent(user, event).then((config) => {
+            if (!config || controller.signal.aborted) {
+              return;
+            }
+            validEvents.set(event.id, { event, config });
+            const winner = selectLatestWorkspaceConfigEvent(
+              [...validEvents.values()].map((entry) => entry.event)
+            );
+            if (winner) {
+              setWorkspaceConfig(validEvents.get(winner.id)?.config ?? config);
+            }
+          });
+        },
+      }
+    );
+    return () => {
+      controller.abort();
+      subscription.close();
+    };
+  }, [fallbackWorkspaceConfig, relayPool, user]);
 
   useEffect(() => {
     return () => {
@@ -55,22 +92,21 @@ export function NostrBackendProvider({
   }, [db]);
 
   const backend: Backend = useMemo(() => {
-    const login = (privateKey: string): User => {
-      fileStore.setLocalStorage("privateKey", privateKey);
-      const nextUser = userFromPrivateKey(privateKey);
+    const login = (nextPrivateKey: string): User => {
+      fileStore.setLocalStorage("privateKey", nextPrivateKey);
+      const nextUser = userFromPrivateKey(nextPrivateKey);
       setUser(nextUser);
       return nextUser;
     };
-    const loginWithExtension = (publicKey: PublicKey): User => {
-      fileStore.setLocalStorage("publicKey", publicKey);
-      const nextUser = { publicKey };
+    const loginWithExtension = (nextPublicKey: PublicKey): User => {
+      fileStore.setLocalStorage("publicKey", nextPublicKey);
+      const nextUser = { publicKey: nextPublicKey };
       setUser(nextUser);
       return nextUser;
     };
     const logout = async (): Promise<void> => {
-      const publicKey = user?.publicKey;
-      if (publicKey) {
-        fileStore.deleteLocalStorage(publicKey);
+      if (user?.publicKey) {
+        fileStore.deleteLocalStorage(user.publicKey);
       }
       fileStore.deleteLocalStorage("privateKey");
       fileStore.deleteLocalStorage("publicKey");
@@ -87,10 +123,9 @@ export function NostrBackendProvider({
       login,
       loginWithExtension,
       logout,
-      defaultRelays: relays,
-      workspaceConfig: undefined,
+      workspaceConfig,
     };
-  }, [relayPool, fileStore, user, relays]);
+  }, [relayPool, fileStore, user, workspaceConfig]);
 
   return (
     <BackendProvider backend={backend}>
@@ -100,10 +135,8 @@ export function NostrBackendProvider({
 }
 
 export function NostrBackendDbProvider({
-  defaultRelayUrls,
   children,
 }: {
-  defaultRelayUrls?: Array<string>;
   children: React.ReactNode;
 }): JSX.Element | null {
   const [db, setDb] = useState<StashmapDB | null | undefined>(undefined);
@@ -127,7 +160,10 @@ export function NostrBackendDbProvider({
   }
 
   return (
-    <NostrBackendProvider defaultRelayUrls={defaultRelayUrls} db={db}>
+    <NostrBackendProvider
+      db={db}
+      initialWorkspaceConfig={defaultWebWorkspaceConfig()}
+    >
       {children}
     </NostrBackendProvider>
   );

@@ -68,9 +68,7 @@ test("shared init persists the pinned default room relays", () => {
   const workspaceDir = workspace();
   init(["--shared"], workspaceDir);
 
-  expect(readProfile(workspaceDir).shared.relays).toEqual(
-    DEFAULT_ROOM_RELAYS.map((relay) => relay.url)
-  );
+  expect(readProfile(workspaceDir).shared.relays).toEqual(DEFAULT_ROOM_RELAYS);
 });
 
 test("doc selects the workspace directory without entering the profile", () => {

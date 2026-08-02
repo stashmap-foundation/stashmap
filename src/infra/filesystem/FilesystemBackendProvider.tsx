@@ -124,12 +124,10 @@ export function FilesystemBackendProvider({
             : {}),
         }
       : undefined;
-    const workspaceConfig = profile?.workspaceConfig;
-    const defaultRelays = (workspaceConfig?.roomRelays ?? []).map((url) => ({
-      url,
-      read: true,
-      write: true,
-    }));
+    const workspaceConfig = profile?.workspaceConfig ?? {
+      storageRelays: [],
+      roomRelays: [],
+    };
     const workspace: WorkspaceState = {
       profile,
       files,
@@ -154,7 +152,6 @@ export function FilesystemBackendProvider({
       subscribe: relayPool.subscribe,
       publish: relayPool.publish,
       user,
-      defaultRelays,
       workspaceConfig,
       workspace,
     };

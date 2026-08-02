@@ -2,19 +2,10 @@ import { List, Map } from "immutable";
 import { Event, UnsignedEvent } from "nostr-tools";
 import { buildKnowledgeDBFromDocumentEvents } from "./documentMaterialization";
 import { newDB } from "./core/knowledge";
-import { findRelays } from "./relayUtils";
 
 type ProcessedEvents = {
   knowledgeDB: KnowledgeData;
-  relays: Relays;
 };
-
-export function newProcessedEvents(): ProcessedEvents {
-  return {
-    knowledgeDB: newDB(),
-    relays: [],
-  };
-}
 
 function processEventsByAuthor(
   authorEvents: List<UnsignedEvent | Event>
@@ -22,11 +13,7 @@ function processEventsByAuthor(
   const author = authorEvents.first()?.pubkey as PublicKey | undefined;
   const knowledgeDB =
     author && buildKnowledgeDBFromDocumentEvents(author, authorEvents);
-  const relays = findRelays(authorEvents);
-  return {
-    knowledgeDB: knowledgeDB || newDB(),
-    relays,
-  };
+  return { knowledgeDB: knowledgeDB || newDB() };
 }
 
 export function processEvents(

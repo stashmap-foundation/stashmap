@@ -99,7 +99,7 @@ export async function decryptStorageEvent(
   capabilityKeys: ReadonlyArray<string>
 ): Promise<((Event | UnsignedEvent) & EventAttachment) | undefined> {
   if (event.kind !== KIND_KNOWLEDGE_DOCUMENT) {
-    return event;
+    return { ...event, route: { kind: "storage" } };
   }
   const envelope = parseEnvelope(event.content);
   if (!envelope) {
@@ -109,7 +109,7 @@ export async function decryptStorageEvent(
     try {
       const storageKey = await unwrapStorageKey(user, envelope.key);
       const content = await decryptWithStorageKey(storageKey, envelope.data);
-      return { ...event, content, storageKey };
+      return { ...event, content, route: { kind: "storage" }, storageKey };
     } catch {
       return undefined;
     }
@@ -122,7 +122,12 @@ export async function decryptStorageEvent(
         async (result) =>
           result ??
           decryptWithStorageKey(storageKey, envelope.data).then(
-            (content) => ({ ...event, content, storageKey }),
+            (content) => ({
+              ...event,
+              content,
+              route: { kind: "storage" },
+              storageKey,
+            }),
             () => undefined
           )
       ),

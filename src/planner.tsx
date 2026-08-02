@@ -45,7 +45,6 @@ import { calendarEntryEditedSpans } from "./core/ical";
 import { LOCAL } from "./core/nodeRef";
 import { entityIdForText } from "./core/entityRecognition";
 import { getWorkspaceNode } from "./core/knowledge";
-import { useRelaysToCreatePlan } from "./relays";
 import {
   MultiSelectionState,
   clearSelection,
@@ -61,9 +60,7 @@ export {
   planDeleteDescendantNodes,
   planDeleteNodes,
   planMoveDescendantNodes,
-  planPublishRelayMetadata,
   planUpsertNodes,
-  relayTags,
 } from "./core/plan";
 
 type WorkspacePlan = GraphPlan &
@@ -607,7 +604,7 @@ export function buildDocumentEvents(
     return events.push(event);
   }, plan.publishEvents);
   return plan.deletedDocs.reduce((events, docId) => {
-    const deleteEvent = {
+    const deleteEvent: UnsignedEvent & EventAttachment = {
       kind: KIND_DELETE,
       pubkey,
       created_at: newTimestamp(),
@@ -617,8 +614,9 @@ export function buildDocumentEvents(
         msTag(),
       ],
       content: "",
+      route: { kind: "storage" },
     };
-    return events.push(deleteEvent as UnsignedEvent & EventAttachment);
+    return events.push(deleteEvent);
   }, withUpserts);
 }
 
@@ -655,7 +653,6 @@ export function PlanningContextProvider({
 export function createPlan(
   props: Data & {
     publishEvents?: List<UnsignedEvent & EventAttachment>;
-    relays: AllRelays;
   }
 ): Plan {
   return {
@@ -671,17 +668,9 @@ export function createPlan(
 
 export function usePlanner(): Planner {
   const data = useData();
-  const relays = useRelaysToCreatePlan();
   const dataRef = useRef(data);
-  const relaysRef = useRef(relays);
   dataRef.current = data;
-  relaysRef.current = relays;
-  const createPlanningContext = (): Plan => {
-    return createPlan({
-      ...dataRef.current,
-      relays: relaysRef.current,
-    });
-  };
+  const createPlanningContext = (): Plan => createPlan(dataRef.current);
   const planningContext = React.useContext(PlanningContext);
   if (planningContext === undefined) {
     throw new Error("PlanningContext not provided");

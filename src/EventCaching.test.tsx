@@ -151,6 +151,7 @@ test("status bar shows pending when outbox has events on reload", async () => {
       created_at: 1,
       tags: [["d", "abc"]],
       content: "hello",
+      route: { kind: "storage" },
     },
     createdAt: Date.now(),
   });
@@ -163,6 +164,7 @@ test("status bar shows pending when outbox has events on reload", async () => {
       created_at: 2,
       tags: [["d", "def"]],
       content: "world",
+      route: { kind: "storage" },
     },
     createdAt: Date.now(),
   });
@@ -174,10 +176,11 @@ test("status bar shows pending when outbox has events on reload", async () => {
     {
       ...alice(),
       db: { __fake: true } as never,
+      relayPool: mockRelayPoolWithFailure("wss://relay.test.second.fail/"),
     }
   );
 
-  await screen.findByText("2 pending");
+  await screen.findByText(/2 pending/);
 }, 20000);
 
 test("relay results appear after queue flushes pending outbox events on reload", async () => {
@@ -192,6 +195,7 @@ test("relay results appear after queue flushes pending outbox events on reload",
       created_at: 1,
       tags: [["d", "abc"]],
       content: "hello",
+      route: { kind: "storage" },
     },
     createdAt: Date.now(),
   });
@@ -204,6 +208,7 @@ test("relay results appear after queue flushes pending outbox events on reload",
       created_at: 2,
       tags: [["d", "def"]],
       content: "world",
+      route: { kind: "storage" },
     },
     createdAt: Date.now(),
   });
@@ -217,8 +222,6 @@ test("relay results appear after queue flushes pending outbox events on reload",
       db: { __fake: true } as never,
     }
   );
-
-  await screen.findByText("2 pending");
 
   await userEvent.click(await screen.findByLabelText("sync status"));
   await screen.findByText("relay.test.first.success/");
@@ -240,6 +243,7 @@ test("partial relay failure shows correct per-relay counts", async () => {
       created_at: 1,
       tags: [["d", "aaa"]],
       content: "one",
+      route: { kind: "storage" },
     },
     createdAt: Date.now(),
   });
@@ -252,6 +256,7 @@ test("partial relay failure shows correct per-relay counts", async () => {
       created_at: 2,
       tags: [["d", "bbb"]],
       content: "two",
+      route: { kind: "storage" },
     },
     createdAt: Date.now(),
   });
@@ -266,8 +271,6 @@ test("partial relay failure shows correct per-relay counts", async () => {
       relayPool: mockRelayPoolWithFailure(failingUrl),
     }
   );
-
-  await screen.findByText("2 pending");
 
   await screen.findByText(/pending.*3\/4 relays/, {}, { timeout: 10000 });
 

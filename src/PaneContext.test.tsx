@@ -11,6 +11,7 @@ import {
   expectTree,
   readonlyRoute,
   requireUser,
+  TEST_RELAYS,
 } from "./utils.test";
 import { defaultPane } from "./userSessionState";
 
@@ -57,13 +58,30 @@ test("Bob can view Alice's node via storage URL without following her", async ()
   );
   cleanup();
 
-  renderApp({ ...bob(), initialRoute: nodeUrl });
+  const { relayPool } = renderApp({
+    ...bob(),
+    initialRoute: nodeUrl,
+    storageRelays: ["wss://ambient-storage.example/"],
+  });
 
   await expectTree(`
 [O] Cities
   [O] Paris
   [O] London
   `);
+  const exactSubscription = relayPool
+    .getSubscriptions()
+    .find((subscription) =>
+      subscription.filters.some(
+        (filter) =>
+          filter.kinds?.includes(34775) &&
+          filter.authors?.includes(requireUser(alice()).publicKey) &&
+          filter["#d"] !== undefined
+      )
+    );
+  expect(exactSubscription?.relays).toEqual(
+    TEST_RELAYS.slice(0, 3).map((relay) => relay.url)
+  );
 });
 
 test("Anonymous user can view node via storage URL", async () => {

@@ -5,7 +5,6 @@ type IdentityContextValue = {
   login?: (privateKey: string) => User;
   loginWithExtension?: (publicKey: PublicKey) => User;
   logout?: () => Promise<void>;
-  defaultRelays: Relays;
 };
 
 export const NostrAuthContext = React.createContext<
@@ -34,14 +33,6 @@ export function useUser(): User | undefined {
     throw new Error("NostrAuthContext missing");
   }
   return context.user;
-}
-
-export function useDefaultRelays(): Relays {
-  const context = React.useContext(NostrAuthContext);
-  if (!context) {
-    throw new Error("NostrAuthContext missing");
-  }
-  return context.defaultRelays;
 }
 
 export function useLogin(): ((privateKey: string) => User) | undefined {

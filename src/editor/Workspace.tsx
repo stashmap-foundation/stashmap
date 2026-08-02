@@ -7,6 +7,7 @@ import { TemporaryViewProvider, useTemporaryView } from "./temporaryViewState";
 
 import { getDisplayTextForRow, getIndependentRows } from "../rowModel";
 import { useData } from "../DataContext";
+import { useBackend } from "../BackendContext";
 import {
   useCurrentPane,
   usePaneIndex,
@@ -272,14 +273,26 @@ function Breadcrumbs(): JSX.Element {
             return buildDocumentRouteUrl(
               target.sourceId,
               target.documentId,
-              target.scrollToId
+              target.scrollToId,
+              data.pull?.coordinatesBySourceId.get(target.sourceId) ??
+                (target.sourceId === pane.sourceId
+                  ? pane.routeCoordinate
+                  : undefined)
             );
           }
           if (target?.rootNodeId) {
-            return buildNodeRouteUrl(target.rootNodeId, target.sourceId, {
-              scrollToId: target.scrollToId,
-              fallbackLabel: target.fallbackLabel,
-            });
+            return buildNodeRouteUrl(
+              target.rootNodeId,
+              target.sourceId,
+              {
+                scrollToId: target.scrollToId,
+                fallbackLabel: target.fallbackLabel,
+              },
+              data.pull?.coordinatesBySourceId.get(target.sourceId) ??
+                (target.sourceId === pane.sourceId
+                  ? pane.routeCoordinate
+                  : undefined)
+            );
           }
           return undefined;
         })();
@@ -291,8 +304,14 @@ function Breadcrumbs(): JSX.Element {
                 setPane({
                   ...pane,
                   sourceId: target.sourceId,
-                  routeCoordinate: undefined,
-                  storageKey: undefined,
+                  routeCoordinate:
+                    target.sourceId === pane.sourceId
+                      ? pane.routeCoordinate
+                      : undefined,
+                  storageKey:
+                    target.sourceId === pane.sourceId
+                      ? pane.storageKey
+                      : undefined,
                   documentId: target.documentId,
                   rootNodeId: undefined,
                   searchQuery: undefined,
@@ -306,8 +325,14 @@ function Breadcrumbs(): JSX.Element {
                 setPane({
                   ...pane,
                   sourceId: target.sourceId,
-                  routeCoordinate: undefined,
-                  storageKey: undefined,
+                  routeCoordinate:
+                    target.sourceId === pane.sourceId
+                      ? pane.routeCoordinate
+                      : undefined,
+                  storageKey:
+                    target.sourceId === pane.sourceId
+                      ? pane.storageKey
+                      : undefined,
                   documentId: undefined,
                   rootNodeId: target.rootNodeId,
                   searchQuery: undefined,
@@ -443,6 +468,7 @@ function BackButton(): JSX.Element | null {
 
 function SecretLinkButton(): JSX.Element | null {
   const data = useData();
+  const backend = useBackend();
   const currentPane = useCurrentPane();
   if (currentPane.sourceId !== LOCAL || !isUserLoggedIn(data.user)) {
     return null;
@@ -470,7 +496,12 @@ function SecretLinkButton(): JSX.Element | null {
     return null;
   }
   const copySecretLink = (): void => {
-    const url = buildShareRouteUrl(authorAddress, document.docId, storageKey);
+    const url = buildShareRouteUrl(
+      authorAddress,
+      document.docId,
+      storageKey,
+      backend.workspaceConfig.storageRelays
+    );
     navigator.clipboard.writeText(`${window.location.origin}${url}`);
   };
   return (

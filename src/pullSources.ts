@@ -5,9 +5,9 @@ import {
   parseToDocumentPreservingExplicitIds,
 } from "./core/Document";
 import { isCanonicalId } from "./core/entityRecognition";
-import { KIND_KNOWLEDGE_DEPOSIT, ASSET_ENTITY_RELAY } from "./nostr";
+import { KIND_KNOWLEDGE_DEPOSIT } from "./nostr";
 import { findTag } from "./nostrEvents";
-import { getReadRelays, sanitizeRelayUrl } from "./relayUtils";
+import { normalizeRelayHintUrl } from "./workspaceConfig";
 import { routeCoordinateSourceId } from "./navigationUrl";
 import { LOCAL } from "./core/nodeRef";
 
@@ -61,31 +61,9 @@ function sortedUnique(values: readonly string[]): string[] {
 export function normalizedRelayUrls(urls: readonly string[]): string[] {
   return sortedUnique(
     urls
-      .map((url) => sanitizeRelayUrl(url))
+      .map((url) => normalizeRelayHintUrl(url))
       .filter((url): url is string => url !== undefined)
   );
-}
-
-function readRelayUrls(relays: Relays): string[] {
-  return getReadRelays(relays).map((relay) => relay.url);
-}
-
-function schemeRelays(tags: readonly string[]): string[] {
-  return tags.some((tag) => tag.startsWith("asset:"))
-    ? [ASSET_ENTITY_RELAY]
-    : [];
-}
-
-function relaysForTags(
-  tags: readonly string[],
-  defaultRelays: Relays,
-  userRelays: Relays
-): string[] {
-  return normalizedRelayUrls([
-    ...readRelayUrls(defaultRelays),
-    ...readRelayUrls(userRelays),
-    ...schemeRelays(tags),
-  ]);
 }
 
 function interestKey(
@@ -104,8 +82,7 @@ function interestKey(
 
 export function derivePullInterests(
   data: Data,
-  defaultRelays: Relays,
-  userRelays: Relays
+  roomRelays: readonly string[]
 ): PullInterest[] {
   return data.panes.flatMap((pane): PullInterest[] => {
     if (pane.sourceId !== LOCAL) {
@@ -113,11 +90,7 @@ export function derivePullInterests(
       if (!coordinate || coordinate.eventKind !== KIND_KNOWLEDGE_DEPOSIT) {
         return [];
       }
-      const relays = normalizedRelayUrls([
-        ...coordinate.relays,
-        ...readRelayUrls(defaultRelays),
-        ...readRelayUrls(userRelays),
-      ]);
+      const relays = normalizedRelayUrls(coordinate.relays);
       if (relays.length === 0) {
         return [];
       }
@@ -141,7 +114,7 @@ export function derivePullInterests(
       return [];
     }
     const tags = [pane.rootNodeId];
-    const relays = relaysForTags(tags, defaultRelays, userRelays);
+    const relays = normalizedRelayUrls(roomRelays);
     if (relays.length === 0) {
       return [];
     }
@@ -166,21 +139,10 @@ function eventMs(event: Event): number {
   return Number.isFinite(ms) ? ms : event.created_at * 1000;
 }
 
-function replacementTuple(record: PullSourceRecord): [number, number, string] {
-  return [record.createdAt, record.ms, record.latestEventId];
-}
-
-function eventTuple(event: Event): [number, number, string] {
-  return [event.created_at, eventMs(event), event.id];
-}
-
-function compareTuple(
-  left: [number, number, string],
-  right: [number, number, string]
-): number {
-  return (
-    left[0] - right[0] || left[1] - right[1] || left[2].localeCompare(right[2])
-  );
+function isNewerDeposit(event: Event, record: PullSourceRecord): boolean {
+  return event.created_at !== record.createdAt
+    ? event.created_at > record.createdAt
+    : event.id < record.latestEventId;
 }
 
 export function matchedInterestKeys(
@@ -324,10 +286,7 @@ export function applyDepositEventToRecords(
     return new Map(records);
   }
   const existing = records.get(nextRecord.sourceId);
-  if (
-    existing &&
-    compareTuple(eventTuple(event), replacementTuple(existing)) <= 0
-  ) {
+  if (existing && !isNewerDeposit(event, existing)) {
     return new Map(records);
   }
   const rematched = {

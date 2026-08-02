@@ -3,8 +3,8 @@ import { Event, UnsignedEvent } from "nostr-tools";
 import { FinalizeEvent } from "../../../Apis";
 import { Backend } from "../../../BackendContext";
 import { KIND_DELETE } from "../../../nostr";
-import { signEvents, PUBLISH_TIMEOUT } from "../executor";
-import { applyWriteRelayConfig } from "../../../relays";
+import { publicationRouteUrls, signEvents, PUBLISH_TIMEOUT } from "../executor";
+import type { WorkspaceConfig } from "../../../workspaceConfig";
 import {
   StashmapDB,
   OutboxEntry,
@@ -32,7 +32,7 @@ type RelayBackoffState = {
 
 export type FlushDeps = {
   readonly user: User | undefined;
-  readonly relays: AllRelays;
+  readonly workspaceConfig: WorkspaceConfig;
   readonly backend: Pick<Backend, "publish">;
   readonly finalizeEvent: FinalizeEvent;
 };
@@ -48,6 +48,7 @@ export type QueueStatus = {
     readonly url: string;
     readonly count: number;
   }>;
+  readonly pendingRelays: ReadonlyArray<string>;
 };
 
 type PublishQueueConfig = {
@@ -62,6 +63,7 @@ type PublishQueue = {
   readonly enqueue: (events: List<UnsignedEvent & EventAttachment>) => void;
   readonly getStatus: () => QueueStatus;
   readonly init: () => Promise<void>;
+  readonly wake: () => void;
   readonly destroy: () => void;
 };
 
@@ -144,6 +146,24 @@ export const createPublishQueue = (
     const succeededPerRelay = Array.from(counts.entries()).map(
       ([url, count]) => ({ url, count })
     );
+    const pendingRelays = (() => {
+      try {
+        const { workspaceConfig } = config.getDeps();
+        return [
+          ...new Set(
+            buffer
+              .valueSeq()
+              .flatMap(
+                (entry) =>
+                  publicationRouteUrls(entry.event.route, workspaceConfig) ?? []
+              )
+              .toArray()
+          ),
+        ].sort();
+      } catch {
+        return [];
+      }
+    })();
     return {
       pendingCount: buffer.size,
       flushing,
@@ -152,6 +172,7 @@ export const createPublishQueue = (
         .toArray()
         .map(([url, state]) => ({ url, retryAfter: state.nextRetryAfter })),
       succeededPerRelay,
+      pendingRelays,
     };
   };
 
@@ -211,18 +232,6 @@ export const createPublishQueue = (
     }, delay);
   };
 
-  const resolveWriteRelayUrls = (
-    writeRelayConf: WriteRelayConf | undefined,
-    relays: AllRelays
-  ): ReadonlyArray<string> => {
-    const writeRelays = applyWriteRelayConfig(
-      relays.defaultRelays,
-      relays.userRelays,
-      writeRelayConf
-    );
-    return Array.from(new Set(writeRelays.map((r: Relay) => r.url)));
-  };
-
   const processBatch = async (
     chunk: ReadonlyArray<[string, OutboxEntry]>,
     deps: FlushDeps
@@ -237,9 +246,12 @@ export const createPublishQueue = (
     const relaySuccesses = new Set<string>();
 
     await Promise.all(
-      signed.toArray().map(async ({ event, writeRelayConf }, index) => {
+      signed.toArray().map(async ({ event, route }, index) => {
         const [entryKey, outboxEntry] = chunk[index];
-        const relayUrls = resolveWriteRelayUrls(writeRelayConf, deps.relays);
+        const relayUrls = publicationRouteUrls(route, deps.workspaceConfig);
+        if (!relayUrls) {
+          return;
+        }
         const alreadyDone = outboxEntry.succeededRelays || [];
         const needsPublish = relayUrls.filter(
           (url) => !alreadyDone.includes(url)
@@ -364,10 +376,8 @@ export const createPublishQueue = (
       const first = signed.first();
       if (!first) return;
 
-      const relayUrls = resolveWriteRelayUrls(
-        first.writeRelayConf,
-        deps.relays
-      );
+      const relayUrls = publicationRouteUrls(first.route, deps.workspaceConfig);
+      if (!relayUrls) return;
 
       const relayResults = await publishToRelays(
         deps.backend,
@@ -389,6 +399,18 @@ export const createPublishQueue = (
       // eslint-disable-next-line no-console
       console.error("Immediate delete publish failed", error);
     }
+  };
+
+  const wake = (): void => {
+    if (destroyed) return;
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      if (flushing) {
+        wake();
+      } else {
+        flush();
+      }
+    }, 0);
   };
 
   const enqueue = (events: List<UnsignedEvent & EventAttachment>): void => {
@@ -460,5 +482,5 @@ export const createPublishQueue = (
     window.removeEventListener("beforeunload", handleBeforeUnload);
   };
 
-  return { enqueue, getStatus, init, destroy };
+  return { enqueue, getStatus, init, wake, destroy };
 };

@@ -1,27 +1,44 @@
 import React, { Dispatch, SetStateAction, useEffect, useRef } from "react";
 import { List, Set as ImmutableSet } from "immutable";
-import { Event } from "nostr-tools";
+import { Event, UnsignedEvent } from "nostr-tools";
 import { useApis } from "../../Apis";
 import { useBackend } from "../../BackendContext";
 import { useData } from "../../DataContext";
 import { ExecutorProvider } from "../../ExecutorContext";
-import { buildDocumentEvents, Plan } from "../../planner";
+import { buildDocumentEvents, buildDocumentWrites, Plan } from "../../planner";
+import { buildDepositEvent } from "../../nodesDocumentEvent";
+import { newTimestamp } from "../../nostr";
 import { execute, republishEvents } from "./executor";
 import { createPublishQueue } from "./cache/PublishQueue";
 import { useCacheDB } from "./cache/CacheDBContext";
 import { mergePublishResultsOfEvents } from "../../commons/PublishingStatus";
 
+function buildDepositEvents(
+  plan: Plan,
+  roomConfigured: boolean
+): List<UnsignedEvent & EventAttachment> {
+  if (!roomConfigured || !plan.user) {
+    return List();
+  }
+  const pubkey = plan.user.publicKey;
+  const createdAt = newTimestamp();
+  return List(
+    buildDocumentWrites(plan).map((write): UnsignedEvent & EventAttachment => ({
+      ...buildDepositEvent(write.document, pubkey, write.content, createdAt),
+      route: { kind: "shared" },
+    }))
+  );
+}
+
 export function NostrExecutorProvider({
   setPublishEvents,
   setPanes,
   setViews,
-  getRelays,
   children,
 }: {
   setPublishEvents: Dispatch<SetStateAction<EventState>>;
   setPanes: Dispatch<SetStateAction<Pane[]>>;
   setViews: Dispatch<SetStateAction<Views>>;
-  getRelays: () => AllRelays;
   children: React.ReactNode;
 }): JSX.Element {
   const { finalizeEvent } = useApis();
@@ -31,14 +48,14 @@ export function NostrExecutorProvider({
 
   const depsRef = useRef({
     user,
-    relays: getRelays(),
+    workspaceConfig: backend.workspaceConfig,
     backend,
     finalizeEvent,
   });
   // eslint-disable-next-line functional/immutable-data
   depsRef.current = {
     user,
-    relays: getRelays(),
+    workspaceConfig: backend.workspaceConfig,
     backend,
     finalizeEvent,
   };
@@ -58,6 +75,10 @@ export function NostrExecutorProvider({
   }, []);
 
   const queueRef = useRef<ReturnType<typeof createPublishQueue> | null>(null);
+
+  useEffect(() => {
+    queueRef.current?.wake();
+  }, [backend.workspaceConfig]);
 
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-empty-function
@@ -96,7 +117,12 @@ export function NostrExecutorProvider({
       setPanes(plan.panes);
     }
     setViews(plan.views);
-    const filteredEvents = buildDocumentEvents(plan);
+    const storageEvents = buildDocumentEvents(plan);
+    const depositEvents = buildDepositEvents(
+      plan,
+      backend.workspaceConfig.roomRelays.length > 0
+    );
+    const filteredEvents = storageEvents.concat(depositEvents);
 
     if (filteredEvents.size === 0) {
       setPublishEvents((prevStatus) => {
@@ -144,6 +170,7 @@ export function NostrExecutorProvider({
       plan: filteredPlan,
       backend,
       finalizeEvent,
+      workspaceConfig: backend.workspaceConfig,
     });
 
     if (!mountedRef.current) {

@@ -1,10 +1,16 @@
 import React from "react";
-import { render } from "@testing-library/react";
+import { hexToBytes } from "@noble/hashes/utils";
+import { render, waitFor } from "@testing-library/react";
 import { ApiProvider } from "../../Apis";
 import { NostrBackendProvider } from "./NostrBackendProvider";
 import { Backend, useBackend } from "../../BackendContext";
 import { mockRelayPool } from "../../nostrMock.test";
-import { mockFinalizeEvent } from "../../utils.test";
+import { ALICE, ALICE_PRIVATE_KEY, mockFinalizeEvent } from "../../utils.test";
+import {
+  buildWorkspaceConfigEvent,
+  defaultWebWorkspaceConfig,
+} from "../../workspaceConfig";
+import { CONFIG_RELAYS } from "../../nostr";
 
 function CaptureBackend({
   capture,
@@ -15,6 +21,53 @@ function CaptureBackend({
   capture(backend);
   return <div />;
 }
+
+test("NostrBackendProvider loads encrypted workspace configuration", async () => {
+  const relayPool = mockRelayPool();
+  const unsigned = await buildWorkspaceConfigEvent(ALICE, {
+    storageRelays: ["wss://storage.example/"],
+    roomRelays: ["wss://room.example/"],
+  });
+  const { route, storageKey, ...template } = unsigned;
+  const event = mockFinalizeEvent()(template, hexToBytes(ALICE_PRIVATE_KEY));
+  await Promise.all(relayPool.publish(CONFIG_RELAYS, event));
+  const capture = jest.fn<void, [Backend]>();
+
+  render(
+    <ApiProvider
+      apis={{
+        fileStore: {
+          setLocalStorage: () => undefined,
+          getLocalStorage: (key) =>
+            key === "privateKey" ? ALICE_PRIVATE_KEY : null,
+          deleteLocalStorage: () => undefined,
+        },
+        relayPool,
+        finalizeEvent: mockFinalizeEvent(),
+        eventLoadingTimeout: 0,
+      }}
+    >
+      <NostrBackendProvider
+        db={null}
+        initialWorkspaceConfig={defaultWebWorkspaceConfig()}
+      >
+        <CaptureBackend capture={capture} />
+      </NostrBackendProvider>
+    </ApiProvider>
+  );
+
+  await waitFor(() => {
+    expect(capture.mock.calls.at(-1)?.[0].workspaceConfig).toEqual({
+      storageRelays: ["wss://storage.example/"],
+      roomRelays: ["wss://room.example/"],
+    });
+  });
+  expect(route).toEqual({
+    kind: "configuration",
+    relays: CONFIG_RELAYS,
+  });
+  expect(storageKey).toBeUndefined();
+});
 
 test("NostrBackendProvider exposes subscribe and publish that delegate to relayPool", () => {
   const relayPool = mockRelayPool();
@@ -30,16 +83,13 @@ test("NostrBackendProvider exposes subscribe and publish that delegate to relayP
         },
         relayPool,
         finalizeEvent: mockFinalizeEvent(),
-        nip11: {
-          searchDebounce: 0,
-          fetchRelayInformation: jest
-            .fn()
-            .mockReturnValue(Promise.resolve({ suppported_nips: [] })),
-        },
         eventLoadingTimeout: 0,
       }}
     >
-      <NostrBackendProvider db={null}>
+      <NostrBackendProvider
+        db={null}
+        initialWorkspaceConfig={defaultWebWorkspaceConfig()}
+      >
         <CaptureBackend
           capture={(b) => {
             captured = b;

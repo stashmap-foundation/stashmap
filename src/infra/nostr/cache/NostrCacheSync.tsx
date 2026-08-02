@@ -2,16 +2,11 @@ import { useEffect, useMemo } from "react";
 import { Map as ImmutableMap } from "immutable";
 import { Event, UnsignedEvent } from "nostr-tools";
 import { useApis } from "../../../Apis";
+import { useBackend } from "../../../BackendContext";
 import { useData } from "../../../DataContext";
 import { useDocumentStore } from "../../../DocumentStore";
-import { useDefaultRelays } from "../../../NostrAuthContext";
-import { useUserRelayContext } from "../../../UserRelayContext";
-import { decodePublicKeyInputSync } from "../publicKeys";
-import {
-  flattenRelays,
-  getReadRelays,
-  sanitizeRelays,
-} from "../../../relayUtils";
+import { KIND_KNOWLEDGE_DOCUMENT } from "../../../nostr";
+import { normalizedRelayUrls } from "../../../pullSources";
 import {
   applyStoredDelete,
   applyStoredDocument,
@@ -106,63 +101,48 @@ function changeToEvent(
   return undefined;
 }
 
-export function NostrCacheSync({
-  paneRelays,
-}: {
-  paneRelays: ImmutableMap<PublicKey, Relays>;
-}): null {
+export function NostrCacheSync(): null {
   const db = useCacheDB();
   const addEvents = useDocumentStore()?.addEvents;
   const { relayPool } = useApis();
-  const { user, panes } = useData();
-  const { userRelays } = useUserRelayContext();
-  const defaultRelays = useDefaultRelays();
-
-  const paneAuthors = useMemo(
+  const backend = useBackend();
+  const { user, panes, publishEventsStatus } = useData();
+  const storageRelayUrls = useMemo(
+    () => normalizedRelayUrls(backend.workspaceConfig.storageRelays),
+    [backend.workspaceConfig.storageRelays]
+  );
+  const foreignSources = useMemo(
     () =>
       panes
-        .map((pane) => decodePublicKeyInputSync(pane.sourceId))
-        .filter((author): author is PublicKey => author !== undefined),
-    [panes]
-  );
-
-  // Storage keys handed to this client through capability links — the only
-  // way a foreign storage event can be opened.
-  const capabilityKeys = useMemo(
-    () => [
-      ...new globalThis.Set(
-        panes
-          .map((pane) => pane.storageKey)
-          .filter((key): key is string => key !== undefined)
-      ),
-    ],
-    [panes]
-  );
-
-  const authors = useMemo(() => {
-    const own = user ? decodePublicKeyInputSync(user.publicKey) : undefined;
-    return [
-      ...new globalThis.Set([...(own ? [own] : []), ...paneAuthors]),
-    ].sort();
-  }, [user, paneAuthors]);
-
-  const relayUrls = useMemo(
-    () =>
-      [
-        ...new Set(
-          getReadRelays([
-            ...defaultRelays,
-            ...userRelays,
-            ...flattenRelays(paneRelays),
-          ])
-            .flatMap((relay) => sanitizeRelays([relay]).map((r) => r.url))
-            .map((url) => url.trim().replace(/\/$/, ""))
+        .flatMap((pane) => {
+          const coordinate = pane.routeCoordinate;
+          if (
+            !coordinate ||
+            coordinate.eventKind !== KIND_KNOWLEDGE_DOCUMENT ||
+            coordinate.pubkey === user?.publicKey ||
+            !pane.storageKey
+          ) {
+            return [];
+          }
+          const relays = normalizedRelayUrls(coordinate.relays);
+          return relays.length === 0
+            ? []
+            : [{ coordinate, storageKey: pane.storageKey, relays }];
+        })
+        .filter(
+          (source, index, sources) =>
+            sources.findIndex(
+              (candidate) =>
+                candidate.coordinate.pubkey === source.coordinate.pubkey &&
+                candidate.coordinate.dTag === source.coordinate.dTag &&
+                candidate.storageKey === source.storageKey &&
+                candidate.relays.join("|") === source.relays.join("|")
+            ) === index
         ),
-      ].sort(),
-    [defaultRelays, userRelays, paneRelays]
+    [panes, user?.publicKey]
   );
+  const foreignSourcesSignature = JSON.stringify(foreignSources);
 
-  // Load persisted state and subscribe to cross-tab changes
   useEffect(() => {
     if (!db || !addEvents) return () => {};
     const controller = new AbortController();
@@ -199,23 +179,45 @@ export function NostrCacheSync({
     };
   }, [db, addEvents]);
 
-  // Subscribe to relays for live documents/deletes
   useEffect(() => {
-    if (db === undefined || relayUrls.length === 0 || authors.length === 0) {
-      return () => {};
-    }
-    return startPermanentDocumentSync({
-      db: db || null,
-      relayPool,
-      relayUrls,
-      authors,
-      user,
-      capabilityKeys,
-      addLiveEvents: addEvents,
-    });
-  }, [addEvents, authors, db, relayPool, relayUrls, user, capabilityKeys]);
+    const closers = [
+      ...(user
+        ? [
+            startPermanentDocumentSync({
+              db: db || null,
+              relayPool,
+              relayUrls: storageRelayUrls,
+              authors: [user.publicKey],
+              user,
+              capabilityKeys: [],
+              dTags: [],
+              addLiveEvents: addEvents,
+            }),
+          ]
+        : []),
+      ...foreignSources.map((source) =>
+        startPermanentDocumentSync({
+          db: null,
+          relayPool,
+          relayUrls: source.relays,
+          authors: [source.coordinate.pubkey],
+          user,
+          capabilityKeys: [source.storageKey],
+          dTags: [source.coordinate.dTag],
+          addLiveEvents: addEvents,
+        })
+      ),
+    ];
+    return () => closers.forEach((close) => close());
+  }, [
+    addEvents,
+    db,
+    relayPool,
+    storageRelayUrls,
+    user,
+    foreignSourcesSignature,
+  ]);
 
-  // Persist locally-added events to IndexedDB
   const persistEvents = useMemo(() => {
     if (!db) return undefined;
     return (events: ReadonlyArray<Event | UnsignedEvent>) => {
@@ -234,14 +236,12 @@ export function NostrCacheSync({
           db,
           events
             .map(toCachedEvent)
-            .filter((e): e is CachedEvent => e !== undefined)
+            .filter((event): event is CachedEvent => event !== undefined)
         ).catch(() => undefined);
       }
     };
   }, [db]);
 
-  // Persist unpublishedEvents (from planner) to IndexedDB so they survive reload
-  const { publishEventsStatus } = useData();
   useEffect(() => {
     if (!persistEvents || publishEventsStatus.unsignedEvents.size === 0) {
       return;

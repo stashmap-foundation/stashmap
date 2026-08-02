@@ -14,15 +14,12 @@ import { FilesystemDataProvider } from "./infra/filesystem/FilesystemDataProvide
 import { NostrBackendDbProvider } from "./infra/nostr/NostrBackendProvider";
 import { NostrDataProvider } from "./infra/nostr/NostrDataProvider";
 import { NostrProvider } from "./NostrProvider";
-import { UserRelayContextProvider } from "./UserRelayContext";
 import {
   isElectronDesktopShell,
   shouldUseHashRouter,
 } from "./runtimeEnvironment";
 import { electronWorkspaceIpc } from "./infra/filesystem/electronWorkspaceIpc";
 import { FilesystemAppRoot } from "./desktop/FilesystemAppRoot";
-
-const defaultRelayUrls = process.env.DEFAULT_ROOM_RELAYS?.split(",");
 
 function createFileStore(): LocalStorage {
   return {
@@ -48,11 +45,9 @@ function bootstrap(): void {
           <FilesystemBackendProvider ipc={ipc}>
             <AuthProvider>
               <FilesystemAppRoot>
-                <UserRelayContextProvider>
-                  <FilesystemDataProvider>
-                    <App />
-                  </FilesystemDataProvider>
-                </UserRelayContextProvider>
+                <FilesystemDataProvider>
+                  <App />
+                </FilesystemDataProvider>
               </FilesystemAppRoot>
             </AuthProvider>
           </FilesystemBackendProvider>
@@ -64,13 +59,11 @@ function bootstrap(): void {
   createRoot(root).render(
     <Router>
       <NostrProvider apis={{ fileStore: createFileStore() }}>
-        <NostrBackendDbProvider defaultRelayUrls={defaultRelayUrls}>
+        <NostrBackendDbProvider>
           <AuthProvider>
-            <UserRelayContextProvider>
-              <NostrDataProvider>
-                <App />
-              </NostrDataProvider>
-            </UserRelayContextProvider>
+            <NostrDataProvider>
+              <App />
+            </NostrDataProvider>
           </AuthProvider>
         </NostrBackendDbProvider>
       </NostrProvider>

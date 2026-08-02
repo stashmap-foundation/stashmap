@@ -97,7 +97,7 @@ test("coordinate routes round-trip and cap relay hints", () => {
 });
 
 test("storage share route carries the key fragment", () => {
-  const route = buildShareRouteUrl(OTHER_PUBKEY, "doc-1", "secret key");
+  const route = buildShareRouteUrl(OTHER_PUBKEY, "doc-1", "secret key", []);
   const url = new URL(route, "https://x");
   expect(parseCoordinateRouteUrl(url.pathname, "storage")?.dTag).toBe("doc-1");
   expect(parseStorageKeyFromHash(url.hash)).toBe("secret key");

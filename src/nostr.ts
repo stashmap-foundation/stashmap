@@ -11,21 +11,22 @@ export const KIND_KNOWLEDGE_DOCUMENT = 34775;
 // be both stored and published without the replaceable events colliding.
 export const KIND_KNOWLEDGE_DEPOSIT = 34774;
 
-// v0 cheat: every document published under an asset: entity goes to the
-// deedsats relay only (per-document override in the publish popover wins).
-export const ASSET_ENTITY_RELAY =
-  process.env.REACT_APP_ASSET_RELAY ?? "wss://nostr.nodesmap.com/";
-
 export const KIND_DELETE = 5;
 
-export const KIND_RELAY_METADATA_EVENT = 10002;
-export const DEFAULT_ROOM_RELAYS: Relays = [
-  { url: "wss://nostr.nodesmap.com/", read: true, write: true },
-  { url: "wss://relay.damus.io/", read: true, write: true },
-  { url: "wss://relay.primal.net/", read: true, write: true },
-  { url: "wss://nos.lol/", read: true, write: true },
-  { url: "wss://nostr.mom/", read: true, write: true },
-  //  { url: "wss://nostr.noones.com/", read: true, write: true },
+export const DEFAULT_STORAGE_RELAYS = [
+  "wss://nostr.nodesmap.com/",
+  "wss://relay.damus.io/",
+  "wss://relay.primal.net/",
+  "wss://nos.lol/",
+  "wss://nostr.mom/",
+];
+
+export const DEFAULT_ROOM_RELAYS = [...DEFAULT_STORAGE_RELAYS];
+
+export const CONFIG_RELAYS = [
+  "wss://relay.nostr.band/",
+  "wss://purplepag.es/",
+  "wss://relay.snort.social/",
 ];
 
 export function newTimestamp(): number {

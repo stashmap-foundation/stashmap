@@ -6,6 +6,7 @@ import { mockRelayPool, MockRelayPool } from "../../../nostrMock.test";
 import { createPublishQueue, FlushDeps } from "./PublishQueue";
 import { newStorageKey } from "../../../storageEncryption";
 import { mockFinalizeEvent, ALICE_PRIVATE_KEY } from "../../../utils.test";
+import type { WorkspaceConfig } from "../../../workspaceConfig";
 
 jest.mock("./indexedDB");
 
@@ -15,9 +16,9 @@ const ALICE_USER: User = {
   privateKey: hexToBytes(ALICE_PRIVATE_KEY),
 };
 
-const TEST_RELAYS: AllRelays = {
-  defaultRelays: [],
-  userRelays: [{ url: "wss://relay.test/", read: true, write: true }],
+const TEST_CONFIG = {
+  storageRelays: ["wss://relay.test/"],
+  roomRelays: [],
 };
 
 const makeEvent = (dTag: string): UnsignedEvent & EventAttachment => ({
@@ -26,7 +27,20 @@ const makeEvent = (dTag: string): UnsignedEvent & EventAttachment => ({
   created_at: Math.floor(Date.now() / 1000),
   tags: [["d", dTag]],
   content: `content-${dTag}`,
+  route: { kind: "storage" },
   storageKey: newStorageKey(),
+});
+
+const makeDeposit = (
+  dTag: string,
+  route: PublicationRoute
+): UnsignedEvent & EventAttachment => ({
+  kind: 34774,
+  pubkey: ALICE_USER.publicKey,
+  created_at: Math.floor(Date.now() / 1000),
+  tags: [["d", dTag]],
+  content: `content-${dTag}`,
+  route,
 });
 
 const waitForResults = (
@@ -73,7 +87,7 @@ const makeQueue = (
     batchSize: overrides.batchSize ?? 2,
     getDeps: (): FlushDeps => ({
       user: ALICE_USER,
-      relays: TEST_RELAYS,
+      workspaceConfig: TEST_CONFIG,
       backend: relayPool,
       finalizeEvent: mockFinalizeEvent(),
     }),
@@ -81,6 +95,71 @@ const makeQueue = (
   });
   return { queue, relayPool, onResults };
 };
+
+test("configuration routes use only their embedded relay URLs", async () => {
+  const relayPool = mockRelayPool();
+  const onResults = jest.fn();
+  const queue = createPublishQueue({
+    db: null,
+    debounceMs: 10,
+    getDeps: () => ({
+      user: ALICE_USER,
+      workspaceConfig: TEST_CONFIG,
+      backend: relayPool,
+      finalizeEvent: mockFinalizeEvent(),
+    }),
+    onResults,
+  });
+
+  queue.enqueue(
+    List([
+      makeDeposit("config", {
+        kind: "configuration",
+        relays: ["wss://config.example/", "wss://config.example/"],
+      }),
+    ])
+  );
+  await waitForResults(onResults, 1);
+
+  expect(relayPool.getPublishedOnRelays()).toEqual(["wss://config.example/"]);
+});
+
+test("shared routes wait until a room is configured", async () => {
+  const relayPool = mockRelayPool();
+  const onResults = jest.fn();
+  const getWorkspaceConfig = jest
+    .fn<WorkspaceConfig, []>()
+    .mockReturnValue({ ...TEST_CONFIG });
+  const queue = createPublishQueue({
+    db: null,
+    debounceMs: 10,
+    getDeps: () => ({
+      user: ALICE_USER,
+      workspaceConfig: getWorkspaceConfig(),
+      backend: relayPool,
+      finalizeEvent: mockFinalizeEvent(),
+    }),
+    onResults,
+  });
+
+  queue.enqueue(List([makeDeposit("waiting", { kind: "shared" })]));
+  await new Promise((resolve) => {
+    setTimeout(resolve, 50);
+  });
+  expect(queue.getStatus().pendingCount).toBe(1);
+  expect(relayPool.getEvents()).toEqual([]);
+
+  getWorkspaceConfig.mockReturnValue({
+    storageRelays: TEST_CONFIG.storageRelays,
+    roomRelays: ["wss://room.example/"],
+  });
+  queue.wake();
+  await waitForResults(onResults, 1);
+
+  expect(relayPool.getEvents()).toHaveLength(1);
+  expect(relayPool.getPublishedOnRelays()).toEqual(["wss://room.example/"]);
+  expect(queue.getStatus().pendingCount).toBe(0);
+});
 
 test("flushes remaining events via re-scheduled flush after first batch", async () => {
   const { queue, relayPool, onResults } = makeQueue({ batchSize: 2 });
@@ -186,13 +265,10 @@ test("clears events from buffer when their target relay is removed from config",
     },
   } as MockRelayPool;
 
-  const relayConfig: { current: AllRelays } = {
+  const relayConfig = {
     current: {
-      defaultRelays: [],
-      userRelays: [
-        { url: RELAY_A, read: true, write: true },
-        { url: RELAY_B, read: true, write: true },
-      ],
+      storageRelays: [RELAY_A, RELAY_B],
+      roomRelays: [],
     },
   };
 
@@ -203,7 +279,7 @@ test("clears events from buffer when their target relay is removed from config",
     batchSize: 10,
     getDeps: (): FlushDeps => ({
       user: ALICE_USER,
-      relays: relayConfig.current,
+      workspaceConfig: relayConfig.current,
       backend: failPool,
       finalizeEvent: mockFinalizeEvent(),
     }),
@@ -217,8 +293,8 @@ test("clears events from buffer when their target relay is removed from config",
 
   // eslint-disable-next-line functional/immutable-data
   relayConfig.current = {
-    defaultRelays: [],
-    userRelays: [{ url: RELAY_A, read: true, write: true }],
+    storageRelays: [RELAY_A],
+    roomRelays: [],
   };
 
   queue.enqueue(List([makeEvent("c")]));
@@ -260,7 +336,7 @@ test("publishes events enqueued during an in-progress flush", async () => {
     batchSize: 10,
     getDeps: (): FlushDeps => ({
       user: ALICE_USER,
-      relays: TEST_RELAYS,
+      workspaceConfig: TEST_CONFIG,
       backend: controlledPool,
       finalizeEvent: mockFinalizeEvent(),
     }),

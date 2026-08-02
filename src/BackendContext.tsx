@@ -35,8 +35,7 @@ export type Backend = {
   login?: (privateKey: string) => User;
   loginWithExtension?: (publicKey: PublicKey) => User;
   logout?: () => Promise<void>;
-  defaultRelays: Relays;
-  workspaceConfig: WorkspaceConfig | undefined;
+  workspaceConfig: WorkspaceConfig;
   workspace?: WorkspaceState;
 };
 

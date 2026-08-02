@@ -126,9 +126,7 @@ function normalizedConfig(parsed: InitCliArgs): WorkspaceConfig | undefined {
   return {
     storageRelays: [],
     roomRelays:
-      parsed.relayUrls.length > 0
-        ? parsed.relayUrls
-        : DEFAULT_ROOM_RELAYS.map((relay) => relay.url),
+      parsed.relayUrls.length > 0 ? parsed.relayUrls : DEFAULT_ROOM_RELAYS,
   };
 }
 

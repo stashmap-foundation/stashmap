@@ -1,81 +1,125 @@
 /** @jest-environment node */
 
 import fs from "fs";
-import { nip19 } from "nostr-tools";
 import os from "os";
 import path from "path";
-import { loadCliProfile } from "./config";
+import { LoadedCliProfile, loadCliProfile } from "./config";
+import { createWorkspaceProfile } from "./init";
+import { WorkspaceConfig } from "../workspaceConfig";
 
-function writeJson(filePath: string, value: unknown): void {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, JSON.stringify(value, null, 2));
+function workspace(): string {
+  return fs.mkdtempSync(path.join(os.tmpdir(), "knowstr-config-"));
 }
 
-test("loadCliProfile defaults the workspace root to the current agent directory", () => {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "knowstr-config-"));
-  const agentDir = path.join(tempDir, "agents", "codex-me");
-  const knowstrDir = path.join(agentDir, ".knowstr");
-  const configPath = path.join(knowstrDir, "profile.json");
+function configured(config: WorkspaceConfig): LoadedCliProfile {
+  const workspaceDir = workspace();
+  createWorkspaceProfile({ workspaceDir, workspaceConfig: config });
+  return loadCliProfile({ cwd: workspaceDir });
+}
 
-  writeJson(configPath, {
-    pubkey: "a".repeat(64),
-    nsec_file: "./.knowstr/me.nsec",
-    bootstrap_relays: ["wss://bootstrap.example/"],
-    relays: [{ url: "wss://profile.example/", read: true, write: false }],
+test("a folder without a profile is a local workspace", () => {
+  const workspaceDir = workspace();
+  const profile = loadCliProfile({ cwd: workspaceDir });
+
+  expect(profile.workspaceConfig).toEqual({
+    storageRelays: [],
+    roomRelays: [],
   });
-
-  const profile = loadCliProfile({ cwd: agentDir });
-
-  expect(profile.configPath).toBe(configPath);
-  expect(profile.agentRoot).toBe(agentDir);
-  expect(profile.workspaceDir).toBe(agentDir);
-  expect(profile.readAs).toBe("a".repeat(64));
-  expect(profile.nsecFile).toBe(path.join(agentDir, ".knowstr", "me.nsec"));
-  expect(profile.bootstrapRelays.map((relay) => relay.url)).toEqual([
-    "wss://bootstrap.example/",
-  ]);
-  expect(profile.relays.map((relay) => relay.url)).toEqual([
-    "wss://profile.example/",
-  ]);
+  expect(profile.workspaceDir).toBe(workspaceDir);
+  expect(profile.pubkey).toBeUndefined();
+  expect(profile.nsecFile).toBeUndefined();
 });
 
-test("loadCliProfile supports reading as another user", () => {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "knowstr-config-"));
-  const agentDir = path.join(tempDir, "agents", "codex-me");
-  const knowstrDir = path.join(agentDir, ".knowstr");
-  const configPath = path.join(knowstrDir, "profile.json");
-
-  writeJson(configPath, {
-    pubkey: "a".repeat(64),
-    read_as: "b".repeat(64),
-    relays: ["wss://profile.example/"],
+test("loads the room profile and derives its pubkey", () => {
+  const profile = configured({
+    storageRelays: [],
+    roomRelays: ["wss://room.example/"],
   });
 
-  const profile = loadCliProfile({ cwd: agentDir });
-
-  expect(profile.pubkey).toBe("a".repeat(64));
-  expect(profile.readAs).toBe("b".repeat(64));
+  expect(profile.workspaceConfig).toEqual({
+    storageRelays: [],
+    roomRelays: ["wss://room.example/"],
+  });
+  expect(profile.pubkey).toMatch(/^[0-9a-f]{64}$/u);
+  expect(profile.nsecFile).toBe(
+    path.join(profile.workspaceDir, ".knowstr", "me.nsec")
+  );
 });
 
-test("loadCliProfile accepts npub values for pubkey and read_as", () => {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "knowstr-config-"));
-  const agentDir = path.join(tempDir, "agents", "codex-me");
-  const knowstrDir = path.join(agentDir, ".knowstr");
-  const configPath = path.join(knowstrDir, "profile.json");
+test("profile parsing rejects legacy and unknown fields", () => {
+  const workspaceDir = workspace();
+  const profilePath = path.join(workspaceDir, ".knowstr", "profile.json");
+  fs.mkdirSync(path.dirname(profilePath), { recursive: true });
+  fs.writeFileSync(
+    profilePath,
+    JSON.stringify({
+      pubkey: "a".repeat(64),
+      nsec_file: "./.knowstr/me.nsec",
+      relays: ["wss://room.example/"],
+    })
+  );
 
-  const hexPubkey = "a".repeat(64);
-  const hexReadAs = "b".repeat(64);
-  const npubPubkey = nip19.npubEncode(hexPubkey);
-  const npubReadAs = nip19.npubEncode(hexReadAs);
+  expect(() => loadCliProfile({ cwd: workspaceDir })).toThrow(
+    "unsupported fields"
+  );
+});
 
-  writeJson(configPath, {
-    pubkey: npubPubkey,
-    read_as: npubReadAs,
-    relays: ["wss://profile.example/"],
-  });
+test("profile parsing rejects storage relays", () => {
+  const workspaceDir = workspace();
+  const profilePath = path.join(workspaceDir, ".knowstr", "profile.json");
+  fs.mkdirSync(path.dirname(profilePath), { recursive: true });
+  fs.writeFileSync(
+    profilePath,
+    JSON.stringify({
+      nsec_file: "./.knowstr/me.nsec",
+      storage_relays: ["wss://storage.example/"],
+    })
+  );
 
-  const profile = loadCliProfile({ cwd: agentDir });
+  expect(() => loadCliProfile({ cwd: workspaceDir })).toThrow(
+    "unsupported fields"
+  );
+});
 
-  expect(profile.pubkey).toBe(hexPubkey);
-  expect(profile.readAs).toBe(hexReadAs);
+test("profile parsing rejects empty and invalid relay lists", () => {
+  const workspaceDir = workspace();
+  const knowstrDir = path.join(workspaceDir, ".knowstr");
+  fs.mkdirSync(knowstrDir, { recursive: true });
+  const profilePath = path.join(knowstrDir, "profile.json");
+  fs.writeFileSync(
+    profilePath,
+    JSON.stringify({
+      nsec_file: "./.knowstr/me.nsec",
+      shared: { relays: [] },
+    })
+  );
+  expect(() => loadCliProfile({ cwd: workspaceDir })).toThrow(
+    "non-empty relay URL array"
+  );
+
+  fs.writeFileSync(
+    profilePath,
+    JSON.stringify({
+      nsec_file: "./.knowstr/me.nsec",
+      shared: { relays: ["https://room.example/"] },
+    })
+  );
+  expect(() => loadCliProfile({ cwd: workspaceDir })).toThrow("ws or wss");
+});
+
+test("profile parsing rejects keys outside the workspace", () => {
+  const workspaceDir = workspace();
+  const profilePath = path.join(workspaceDir, ".knowstr", "profile.json");
+  fs.mkdirSync(path.dirname(profilePath), { recursive: true });
+  fs.writeFileSync(
+    profilePath,
+    JSON.stringify({
+      nsec_file: "../me.nsec",
+      shared: { relays: ["wss://room.example/"] },
+    })
+  );
+
+  expect(() => loadCliProfile({ cwd: workspaceDir })).toThrow(
+    "relative workspace path"
+  );
 });

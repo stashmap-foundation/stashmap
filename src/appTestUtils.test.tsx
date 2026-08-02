@@ -108,6 +108,9 @@ export async function renderAppTree(
   }
 
   const profile = loadCliProfile({ cwd: path });
+  if (!profile.pubkey) {
+    throw new Error(`Missing test workspace pubkey for ${path}`);
+  }
   await app.findByLabelText("Search to change pane 0 content");
   if (options.search) {
     await navigateToNodeViaSearch(0, options.search, {

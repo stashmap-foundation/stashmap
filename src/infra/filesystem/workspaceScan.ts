@@ -13,7 +13,6 @@ import { WalkContext } from "../../core/markdownNodes";
 import { MarkdownTreeNode, parseMarkdown } from "../../core/markdownTree";
 
 export type WorkspaceSaveProfile = {
-  pubkey: PublicKey;
   workspaceDir: string;
 };
 

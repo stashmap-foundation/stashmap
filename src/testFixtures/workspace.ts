@@ -13,16 +13,16 @@ type InitResult = {
 
 type InitOptions = {
   relays?: string[];
-  doc?: string;
 };
 
 export function knowstrInit(options: InitOptions = {}): InitResult {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "knowstr-test-"));
-  const relayArgs = (options.relays ?? []).flatMap((url) => ["--relay", url]);
-  const docArgs = options.doc ? ["--doc", options.doc] : [];
-  const result = runInitCommand([...relayArgs, ...docArgs], tempDir);
-  if ("help" in result) {
-    throw new Error("knowstrInit: unexpected help output");
+  const relayArgs = (options.relays ?? ["wss://room.example/"]).flatMap(
+    (url) => ["--relay", url]
+  );
+  const result = runInitCommand(["--shared", ...relayArgs], tempDir);
+  if ("help" in result || !result.configured) {
+    throw new Error("knowstrInit: unexpected unconfigured result");
   }
   const nsecPath = path.join(tempDir, ".knowstr", "me.nsec");
   const nsec = fs.readFileSync(nsecPath, "utf8").trim();
@@ -50,7 +50,7 @@ function profilePathFor(workspaceDir: string): string {
 
 export async function knowstrSave(
   workspaceDir: string
-): Promise<{ changed_paths: string[] }> {
+): Promise<{ changed_paths: string[]; warnings: string[] }> {
   const result = await runSaveCommand([
     "--config",
     profilePathFor(workspaceDir),

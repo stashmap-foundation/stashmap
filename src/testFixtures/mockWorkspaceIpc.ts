@@ -117,7 +117,14 @@ export function mockWorkspaceIpc(
             return hexToBytes(hex);
           })()
         : undefined;
-      createWorkspaceProfile({ workspaceDir: folder, secretKey });
+      createWorkspaceProfile({
+        workspaceDir: folder,
+        workspaceConfig: {
+          storageRelays: [],
+          roomRelays: ["wss://room.example/"],
+        },
+        secretKey,
+      });
       await setCurrentFolder(folder);
     },
     isInitialised: (folder) =>

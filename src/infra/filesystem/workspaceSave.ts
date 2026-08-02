@@ -51,15 +51,75 @@ export async function applyWorkspaceChanges(
   };
 }
 
+function embeddedTarget(node: GraphNode | undefined): string | undefined {
+  if (
+    node?.extraAttrs?.embed !== "true" ||
+    node.spans.length !== 1 ||
+    node.spans[0]?.kind !== "link" ||
+    !node.spans[0].href.startsWith("#")
+  ) {
+    return undefined;
+  }
+  return node.spans[0].href.slice(1);
+}
+
+function documentWarnings(
+  knowledgeDBs: KnowledgeDBs,
+  document: ScannedWorkspaceDocument
+): string[] {
+  const nodes = knowledgeDBs.get(document.sourceId)?.nodes;
+  const roots = document.topNodeShortIds.map((id) => nodes?.get(id));
+  const arrangementRoots = roots.filter(
+    (root) => embeddedTarget(root) !== undefined
+  );
+
+  if (document.docId.startsWith("arr:") && arrangementRoots.length === 0) {
+    throw new Error(
+      `${document.relativePath}: arr: is reserved for arrangement documents`
+    );
+  }
+
+  const rootWarnings =
+    roots.length === 0
+      ? [`${document.relativePath}: shared documents need a root`]
+      : [];
+  const assetRoots = roots.filter((root) => root?.id.startsWith("asset:"));
+  const validAssetRoots = assetRoots.filter(
+    (root) => root && /^asset:.+/u.test(root.id)
+  );
+  const assetWarnings =
+    assetRoots.length > 0 &&
+    (roots.length !== 1 || validAssetRoots.length !== 1)
+      ? [
+          `${document.relativePath}: asset entry documents need exactly one asset root`,
+        ]
+      : [];
+  if (!document.docId.startsWith("arr:")) {
+    return [...rootWarnings, ...assetWarnings];
+  }
+  const sourceRoot = document.docId.slice("arr:".length);
+  const arrangementWarnings =
+    roots.length !== 1 || embeddedTarget(roots[0]) !== sourceRoot
+      ? [
+          `${document.relativePath}: ${document.docId} must have one root embedding ${sourceRoot}`,
+        ]
+      : [];
+  return [...rootWarnings, ...assetWarnings, ...arrangementWarnings];
+}
+
 export async function saveEditedWorkspaceDocuments(
   profile: WorkspaceSaveProfile
 ): Promise<{
   changed_paths: string[];
+  warnings: string[];
 }> {
   const { documents: scannedDocuments, knowledgeDBs } =
     await scanWorkspaceDocuments(profile);
   const normalizedDocuments = scannedDocuments.map((document) =>
     normalizeWorkspaceDocument(knowledgeDBs, document)
+  );
+  const warnings = scannedDocuments.flatMap((document) =>
+    documentWarnings(knowledgeDBs, document)
   );
 
   const writes = normalizedDocuments
@@ -70,5 +130,5 @@ export async function saveEditedWorkspaceDocuments(
     }));
 
   const result = await applyWorkspaceChanges(writes);
-  return { changed_paths: result.changed_paths };
+  return { changed_paths: result.changed_paths, warnings };
 }

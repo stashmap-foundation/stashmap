@@ -149,7 +149,7 @@ export function createWorkspaceRuntime(workspaceDir: string): WorkspaceRuntime {
       const profile = loadCliProfile({ cwd: workspaceDir });
       recordSaveEchoes(documents, deletedPaths);
       return saveDocumentsToWorkspace(
-        { pubkey: profile.pubkey, workspaceDir: profile.workspaceDir },
+        { workspaceDir: profile.workspaceDir },
         documents,
         deletedPaths
       );

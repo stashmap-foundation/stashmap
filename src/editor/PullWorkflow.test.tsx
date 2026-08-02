@@ -23,14 +23,21 @@ import { createWorkspaceProfile } from "../cli/init";
 import { loadCliProfile } from "../cli/config";
 
 const RELAY_URL = "wss://relay.test/";
-const RELAYS = [{ url: RELAY_URL, read: true, write: true }];
+
+function profilePubkey(workspacePath: string): PublicKey {
+  const { pubkey } = loadCliProfile({ cwd: workspacePath });
+  if (!pubkey) {
+    throw new Error(`Missing workspace pubkey for ${workspacePath}`);
+  }
+  return pubkey;
+}
 
 function fixedWorkspace(author: KeyPair): string {
   const workspacePath = fs.mkdtempSync(path.join(os.tmpdir(), "knowstr-test-"));
   createWorkspaceProfile({
     workspaceDir: workspacePath,
+    workspaceConfig: { storageRelays: [], roomRelays: [RELAY_URL] },
     secretKey: author.privateKey,
-    relays: RELAYS,
   });
   return workspacePath;
 }
@@ -172,7 +179,7 @@ async function publishDepositFixture(
   await Promise.all(
     relayPool.publish([RELAY_URL], {
       id: `${dTag}-${ms}`.padEnd(64, "0").slice(0, 64),
-      pubkey: profile.pubkey,
+      pubkey: profilePubkey(workspacePath),
       created_at: Math.floor(ms / 1000),
       kind: KIND_KNOWLEDGE_DEPOSIT,
       tags: [
@@ -817,7 +824,7 @@ test("deposit routes render Loading until the exact source arrives", async () =>
     "deposit",
     {
       eventKind: KIND_KNOWLEDGE_DEPOSIT,
-      pubkey: loadCliProfile({ cwd: alicePath }).pubkey,
+      pubkey: profilePubkey(alicePath),
       dTag: "route-doc",
       relays: [RELAY_URL],
     },

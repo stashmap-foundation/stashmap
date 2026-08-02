@@ -7,7 +7,6 @@ import type {
   WorkspaceMarkdownFile,
   WorkspaceWriteRequest,
 } from "./workspaceBackend";
-import { DEFAULT_RELAYS } from "../../nostr";
 import type { FsEventHandler } from "./workspaceWatcher";
 
 export type WorkspaceLoaded = {
@@ -86,7 +85,7 @@ export function FilesystemBackendProvider({
     const data = state.status === "loaded" ? state.data : null;
     const profile = data?.profile ?? null;
     const files = data?.files ?? [];
-    const user = profile
+    const user = profile?.pubkey
       ? {
           publicKey: profile.pubkey,
           ...(data?.privateKey
@@ -95,7 +94,11 @@ export function FilesystemBackendProvider({
         }
       : undefined;
     const defaultRelays =
-      profile && profile.relays.length > 0 ? profile.relays : DEFAULT_RELAYS;
+      profile?.workspaceConfig.roomRelays.map((url) => ({
+        url,
+        read: true,
+        write: true,
+      })) ?? [];
     const workspace: WorkspaceState = {
       profile,
       files,

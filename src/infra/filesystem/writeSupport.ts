@@ -2,16 +2,11 @@ import fs from "fs/promises";
 import { hexToBytes } from "@noble/hashes/utils";
 import { Event, UnsignedEvent, finalizeEvent, getPublicKey } from "nostr-tools";
 import { convertInputToPrivateKey } from "../../nostrKey";
-import {
-  getWriteRelays,
-  relaysFromUrls,
-  uniqueRelayUrls,
-} from "../../relayUtils";
+import { decodePublicKeyInputSync } from "../nostr/publicKeys";
 
 export type WriteProfile = {
   pubkey: PublicKey;
-  relays: Relays;
-  nsecFile?: string;
+  nsecFile: string;
 };
 
 export type WritePublisher = {
@@ -21,31 +16,9 @@ export type WritePublisher = {
   ) => Promise<PublishResultsOfEvent>;
 };
 
-export function resolveWriteRelayUrls(
-  profile: WriteProfile,
-  relayUrls: string[] | undefined
-): string[] {
-  const explicitRelays = relaysFromUrls(relayUrls || []);
-  if (explicitRelays.length > 0) {
-    return uniqueRelayUrls(explicitRelays);
-  }
-
-  const configuredRelayUrls = uniqueRelayUrls(getWriteRelays(profile.relays));
-  if (configuredRelayUrls.length === 0) {
-    throw new Error(
-      "No write relays configured. Provide --relay or write-enabled relays in .knowstr/profile.json"
-    );
-  }
-  return configuredRelayUrls;
-}
-
 export async function loadWriteSecretKey(
   profile: WriteProfile
 ): Promise<Uint8Array> {
-  if (!profile.nsecFile) {
-    throw new Error("profile.json must include nsec_file for write commands");
-  }
-
   const raw = await fs.readFile(profile.nsecFile, "utf8");
   const privateKey = convertInputToPrivateKey(raw);
   if (!privateKey) {
@@ -53,7 +26,7 @@ export async function loadWriteSecretKey(
   }
 
   const secretKey = hexToBytes(privateKey);
-  const derivedPubkey = getPublicKey(secretKey) as PublicKey;
+  const derivedPubkey = decodePublicKeyInputSync(getPublicKey(secretKey));
   if (derivedPubkey !== profile.pubkey) {
     throw new Error("nsec_file does not match profile pubkey");
   }

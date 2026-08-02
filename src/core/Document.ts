@@ -97,8 +97,21 @@ export function getDocumentForNode(
   return docId ? documents.get(documentKeyOf(sourceId, docId)) : undefined;
 }
 
+function compareUtf8(left: string, right: string): number {
+  const encoder = new TextEncoder();
+  const leftBytes = encoder.encode(left);
+  const rightBytes = encoder.encode(right);
+  const differenceIndex = leftBytes.findIndex(
+    (byte, index) => byte !== rightBytes[index]
+  );
+  if (differenceIndex >= 0 && differenceIndex < rightBytes.length) {
+    return leftBytes[differenceIndex] - rightBytes[differenceIndex];
+  }
+  return leftBytes.length - rightBytes.length;
+}
+
 function sortedUnique(values: readonly string[]): string[] {
-  return [...new Set(values)].sort();
+  return [...new Set(values)].sort(compareUtf8);
 }
 
 function linkDocumentPath(path: string): string {

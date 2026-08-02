@@ -1,6 +1,7 @@
 /** @jest-environment node */
 
 import fs from "fs";
+import os from "os";
 import path from "path";
 import {
   expectMarkdown,
@@ -9,6 +10,85 @@ import {
   readNodeId,
   write,
 } from "../testFixtures/workspace";
+import { runInitCommand } from "./init";
+
+const saveModes = [
+  { name: "local", args: [] },
+  {
+    name: "shared",
+    args: ["--shared", "--relay", "wss://room.example/"],
+  },
+];
+
+test.each(saveModes)(
+  "save stays local in a $name workspace",
+  async ({ args }) => {
+    const workspaceDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), "knowstr-save-")
+    );
+    runInitCommand(args, workspaceDir);
+    write(workspaceDir, "doc.md", "# Doc\n- one\n");
+
+    const result = await knowstrSave(workspaceDir);
+
+    expect(result.changed_paths).toEqual([path.join(workspaceDir, "doc.md")]);
+    expect(result).toEqual({
+      changed_paths: [path.join(workspaceDir, "doc.md")],
+      warnings: [],
+    });
+    expect(fs.readdirSync(workspaceDir).toSorted()).toEqual(
+      args.length === 0 ? ["doc.md"] : [".knowstr", "doc.md"]
+    );
+  }
+);
+
+test("shared save reports document-shape lints without rejecting", async () => {
+  const { path: workspaceDir } = knowstrInit();
+  write(
+    workspaceDir,
+    "asset.md",
+    [
+      "---",
+      "knowstr_doc_id: asset-entry",
+      "---",
+      "# Asset <!-- id:asset:contract -->",
+      "# Extra <!-- id:extra -->",
+      "",
+    ].join("\n")
+  );
+  write(
+    workspaceDir,
+    "arrangement.md",
+    [
+      "---",
+      "knowstr_doc_id: arr:source",
+      "---",
+      '- [Wrong](#other) <!-- id:a1 embed="true" -->',
+      "",
+    ].join("\n")
+  );
+
+  const result = await knowstrSave(workspaceDir);
+
+  expect(result.warnings).toEqual([
+    "arrangement.md: arr:source must have one root embedding source",
+    "asset.md: asset entry documents need exactly one asset root",
+  ]);
+  expect(result.changed_paths).toHaveLength(2);
+});
+
+test("save rejects an organic document id using the arrangement prefix", async () => {
+  const { path: workspaceDir } = knowstrInit();
+  write(
+    workspaceDir,
+    "organic.md",
+    "---\nknowstr_doc_id: arr:reserved\n---\n# Organic <!-- id:root -->\n"
+  );
+
+  await expect(knowstrSave(workspaceDir)).rejects.toThrow(
+    "arr: is reserved for arrangement documents"
+  );
+});
 
 test("save assigns knowstr_doc_id and node ids in place", async () => {
   const { path: workspaceDir } = knowstrInit();

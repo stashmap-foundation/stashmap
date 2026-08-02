@@ -1,20 +1,31 @@
 import fs from "fs";
 import path from "path";
 import { generateSecretKey, getPublicKey, nip19 } from "nostr-tools";
+import { DEFAULT_ROOM_RELAYS } from "../nostr";
+import {
+  WorkspaceConfig,
+  filesystemProfileFromWorkspaceConfig,
+  parseFilesystemProfile,
+} from "../workspaceConfig";
+import { decodePublicKeyInputSync } from "../infra/nostr/publicKeys";
 import { requireValue } from "./args";
 
 type InitCliArgs = {
   doc?: string;
   relayUrls: string[];
+  shared: boolean;
   help: boolean;
 };
 
-type InitResult = {
-  config_path: string;
-  pubkey: PublicKey;
-  npub: string;
-  relays: string[];
-};
+type InitResult =
+  | { configured: false; message: string; workspace_dir: string }
+  | {
+      configured: true;
+      config_path: string;
+      pubkey: PublicKey;
+      npub: string;
+      workspace_config: WorkspaceConfig;
+    };
 
 function parseInitArgs(args: string[]): InitCliArgs {
   const parse = (index: number, current: InitCliArgs): InitCliArgs => {
@@ -40,6 +51,8 @@ function parseInitArgs(args: string[]): InitCliArgs {
             requireValue(args, index, "--relay"),
           ],
         });
+      case "--shared":
+        return parse(index + 1, { ...current, shared: true });
       default:
         throw new Error(`Unknown init argument: ${arg}`);
     }
@@ -47,39 +60,34 @@ function parseInitArgs(args: string[]): InitCliArgs {
 
   return parse(0, {
     relayUrls: [],
+    shared: false,
     help: false,
   });
 }
 
 export function initHelp(): string {
   return [
-    "Usage: knowstr init [--doc <dir>] [--relay <url> ...]",
+    "Usage: knowstr init [--shared] [--relay <url> ...] [--doc <dir>]",
     "",
-    "Initializes a new Knowstr workspace with .knowstr/profile.json and a new keypair.",
-    "Relays are optional. With no relays configured, use 'knowstr save' for local-only work.",
+    "Local work needs no configuration.",
+    "Use --shared to bind the workspace to a room.",
   ].join("\n");
 }
 
-type CreateWorkspaceProfileArgs = {
+export function createWorkspaceProfile({
+  workspaceDir,
+  workspaceConfig,
+  secretKey,
+}: {
   workspaceDir: string;
+  workspaceConfig: WorkspaceConfig;
   secretKey?: Uint8Array;
-  relays?: Relays;
-  documentDir?: string;
-};
-
-type CreatedWorkspaceProfile = {
+}): {
   profilePath: string;
   nsecPath: string;
   pubkey: PublicKey;
   npub: string;
-};
-
-export function createWorkspaceProfile({
-  workspaceDir,
-  secretKey,
-  relays = [],
-  documentDir,
-}: CreateWorkspaceProfileArgs): CreatedWorkspaceProfile {
+} {
   const knowstrDir = path.join(workspaceDir, ".knowstr");
   const profilePath = path.join(knowstrDir, "profile.json");
 
@@ -87,36 +95,41 @@ export function createWorkspaceProfile({
     throw new Error(`${profilePath} already exists`);
   }
 
+  const { profile } = parseFilesystemProfile(
+    filesystemProfileFromWorkspaceConfig(workspaceConfig, "./.knowstr/me.nsec")
+  );
   fs.mkdirSync(knowstrDir, { recursive: true });
 
   const sk = secretKey ?? generateSecretKey();
   const nsec = nip19.nsecEncode(sk);
-  const pubkey = getPublicKey(sk) as PublicKey;
-  const npub = nip19.npubEncode(pubkey);
-
+  const decodedPubkey = decodePublicKeyInputSync(getPublicKey(sk));
+  if (!decodedPubkey) {
+    throw new Error("Could not derive workspace public key");
+  }
+  const npub = nip19.npubEncode(decodedPubkey);
   const nsecPath = path.join(knowstrDir, "me.nsec");
   fs.writeFileSync(nsecPath, `${nsec}\n`, { mode: 0o600 });
 
-  const profile = {
-    pubkey: npub,
-    nsec_file: "./.knowstr/me.nsec",
-    relays,
-    ...(documentDir ? { workspace_dir: documentDir } : {}),
-  };
   fs.writeFileSync(profilePath, `${JSON.stringify(profile, null, 2)}\n`);
 
-  return { profilePath, nsecPath, pubkey, npub };
+  return { profilePath, nsecPath, pubkey: decodedPubkey, npub };
 }
 
-function buildRelays(parsed: InitCliArgs): Relays {
-  if (parsed.relayUrls.length > 0) {
-    return parsed.relayUrls.map((url) => ({
-      url,
-      read: true,
-      write: true,
-    }));
+function normalizedConfig(parsed: InitCliArgs): WorkspaceConfig | undefined {
+  if (!parsed.shared) {
+    if (parsed.relayUrls.length > 0) {
+      throw new Error("--relay requires --shared");
+    }
+    return undefined;
   }
-  return [];
+
+  return {
+    storageRelays: [],
+    roomRelays:
+      parsed.relayUrls.length > 0
+        ? parsed.relayUrls
+        : DEFAULT_ROOM_RELAYS.map((relay) => relay.url),
+  };
 }
 
 export function runInitCommand(
@@ -128,17 +141,30 @@ export function runInitCommand(
     return { help: true, text: initHelp() };
   }
 
-  const relays = buildRelays(parsed);
+  const workspaceDir = parsed.doc
+    ? path.resolve(cwd, parsed.doc)
+    : path.resolve(cwd);
+  const workspaceConfig = normalizedConfig(parsed);
+  if (!workspaceConfig) {
+    return {
+      configured: false,
+      message: "Local work needs no configuration.",
+      workspace_dir: workspaceDir,
+    };
+  }
+
   const { profilePath, pubkey, npub } = createWorkspaceProfile({
-    workspaceDir: cwd,
-    relays,
-    documentDir: parsed.doc,
+    workspaceDir,
+    workspaceConfig,
   });
 
   return {
+    configured: true,
     config_path: profilePath,
     pubkey,
     npub,
-    relays: relays.map((r) => r.url),
+    workspace_config: parseFilesystemProfile(
+      JSON.parse(fs.readFileSync(profilePath, "utf8"))
+    ).config,
   };
 }

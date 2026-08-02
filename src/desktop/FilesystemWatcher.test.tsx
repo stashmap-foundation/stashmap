@@ -33,6 +33,9 @@ test("/local/d route keeps showing a known file after top node ids change", asyn
   await knowstrSave(path);
 
   const profile = loadCliProfile({ cwd: path });
+  if (!profile.pubkey) {
+    throw new Error("Missing test workspace pubkey");
+  }
   const savedContent = fs.readFileSync(pathModule.join(path, "doc.md"), "utf8");
   const { document } = parseToDocument(profile.pubkey, savedContent);
 

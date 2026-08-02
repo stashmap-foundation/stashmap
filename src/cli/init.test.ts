@@ -7,129 +7,136 @@ import { generateSecretKey, getPublicKey, nip19 } from "nostr-tools";
 import { hexToBytes } from "@noble/hashes/utils";
 import { createWorkspaceProfile, runInitCommand } from "./init";
 import { convertInputToPrivateKey } from "../nostrKey";
-import { knowstrInit } from "../testFixtures/workspace";
+import { DEFAULT_ROOM_RELAYS } from "../nostr";
 
-test("knowstrInit generates a fresh nsec + npub and writes profile.json / me.nsec", () => {
-  const { nsec, npub, path: workspaceDir, profilePath } = knowstrInit();
+function workspace(): string {
+  return fs.mkdtempSync(path.join(os.tmpdir(), "knowstr-init-"));
+}
 
-  expect(nsec.startsWith("nsec1")).toBe(true);
-  expect(npub.startsWith("npub1")).toBe(true);
-  expect(profilePath).toBe(path.join(workspaceDir, ".knowstr", "profile.json"));
+function init(
+  args: string[],
+  cwd: string
+): Exclude<
+  ReturnType<typeof runInitCommand>,
+  { help: true } | { configured: false }
+> {
+  const result = runInitCommand(args, cwd);
+  if ("help" in result || !result.configured) {
+    throw new Error("expected configured init result");
+  }
+  return result;
+}
 
-  const profile = JSON.parse(fs.readFileSync(profilePath, "utf8")) as {
-    pubkey: string;
-    nsec_file: string;
-    relays: unknown[];
-  };
-  expect(profile.pubkey).toBe(npub);
-  expect(profile.nsec_file).toBe("./.knowstr/me.nsec");
-  expect(profile.relays).toEqual([]);
+function readProfile(workspaceDir: string): ReturnType<typeof JSON.parse> {
+  return JSON.parse(
+    fs.readFileSync(path.join(workspaceDir, ".knowstr", "profile.json"), "utf8")
+  );
+}
 
-  const privateKeyHex = convertInputToPrivateKey(nsec) as string;
-  const derivedPubkey = getPublicKey(hexToBytes(privateKeyHex));
-  expect(nip19.npubEncode(derivedPubkey)).toBe(npub);
-});
+test("bare init leaves a local workspace unconfigured", () => {
+  const workspaceDir = workspace();
+  const result = runInitCommand([], workspaceDir);
 
-test("knowstrInit with relays adds them to profile.json", () => {
-  const { profilePath } = knowstrInit({
-    relays: ["wss://a.example/", "wss://b.example/"],
+  expect(result).toEqual({
+    configured: false,
+    message: "Local work needs no configuration.",
+    workspace_dir: workspaceDir,
   });
-
-  const profile = JSON.parse(fs.readFileSync(profilePath, "utf8")) as {
-    relays: Array<{ url: string; read: boolean; write: boolean }>;
-  };
-  expect(profile.relays).toEqual([
-    { url: "wss://a.example/", read: true, write: true },
-    { url: "wss://b.example/", read: true, write: true },
-  ]);
+  expect(fs.existsSync(path.join(workspaceDir, ".knowstr"))).toBe(false);
 });
 
-test("knowstrInit with doc sets workspace_dir", () => {
-  const { profilePath } = knowstrInit({ doc: "./workspace" });
+test("relay arguments require a shared workspace", () => {
+  const workspaceDir = workspace();
 
-  const profile = JSON.parse(fs.readFileSync(profilePath, "utf8")) as {
-    workspace_dir: string;
-  };
-  expect(profile.workspace_dir).toBe("./workspace");
+  expect(() =>
+    runInitCommand(["--relay", "wss://room.example/"], workspaceDir)
+  ).toThrow("--relay requires --shared");
+  expect(fs.existsSync(path.join(workspaceDir, ".knowstr"))).toBe(false);
 });
 
-test("init refuses to overwrite existing profile.json", () => {
-  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "knowstr-init-"));
-  runInitCommand([], cwd);
-  expect(() => runInitCommand([], cwd)).toThrow("already exists");
+test("shared init creates the exact room profile", () => {
+  const workspaceDir = workspace();
+  init(["--shared", "--relay", "wss://room.example/"], workspaceDir);
+
+  expect(readProfile(workspaceDir)).toEqual({
+    nsec_file: "./.knowstr/me.nsec",
+    shared: { relays: ["wss://room.example/"] },
+  });
 });
 
-test("createWorkspaceProfile generates a fresh keypair when secretKey omitted", () => {
-  const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), "knowstr-cwp-"));
-  const result = createWorkspaceProfile({ workspaceDir });
+test("shared init persists the pinned default room relays", () => {
+  const workspaceDir = workspace();
+  init(["--shared"], workspaceDir);
 
-  const nsecRaw = fs.readFileSync(result.nsecPath, "utf8").trim();
-  expect(nsecRaw.startsWith("nsec1")).toBe(true);
-  expect(result.npub.startsWith("npub1")).toBe(true);
-
-  const stat = fs.statSync(result.nsecPath);
-  // eslint-disable-next-line no-bitwise
-  expect(stat.mode & 0o777).toBe(0o600);
-
-  const privateKeyHex = convertInputToPrivateKey(nsecRaw) as string;
-  const derivedPubkey = getPublicKey(hexToBytes(privateKeyHex));
-  expect(derivedPubkey).toBe(result.pubkey);
-  expect(nip19.npubEncode(derivedPubkey)).toBe(result.npub);
-
-  const profile = JSON.parse(fs.readFileSync(result.profilePath, "utf8")) as {
-    pubkey: string;
-    nsec_file: string;
-    relays: unknown[];
-  };
-  expect(profile.pubkey).toBe(result.npub);
-  expect(profile.nsec_file).toBe("./.knowstr/me.nsec");
-  expect(profile.relays).toEqual([]);
-});
-
-test("createWorkspaceProfile uses the provided secretKey", () => {
-  const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), "knowstr-cwp-"));
-  const secretKey = generateSecretKey();
-  const expectedPubkey = getPublicKey(secretKey);
-  const expectedNpub = nip19.npubEncode(expectedPubkey);
-
-  const result = createWorkspaceProfile({ workspaceDir, secretKey });
-
-  expect(result.pubkey).toBe(expectedPubkey);
-  expect(result.npub).toBe(expectedNpub);
-
-  const profile = JSON.parse(fs.readFileSync(result.profilePath, "utf8")) as {
-    pubkey: string;
-  };
-  expect(profile.pubkey).toBe(expectedNpub);
-
-  const nsecRaw = fs.readFileSync(result.nsecPath, "utf8").trim();
-  const privateKeyHex = convertInputToPrivateKey(nsecRaw) as string;
-  expect(getPublicKey(hexToBytes(privateKeyHex))).toBe(expectedPubkey);
-});
-
-test("createWorkspaceProfile refuses to overwrite an existing profile.json", () => {
-  const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), "knowstr-cwp-"));
-  createWorkspaceProfile({ workspaceDir });
-  expect(() => createWorkspaceProfile({ workspaceDir })).toThrow(
-    "already exists"
+  expect(readProfile(workspaceDir).shared.relays).toEqual(
+    DEFAULT_ROOM_RELAYS.map((relay) => relay.url)
   );
 });
 
-test("createWorkspaceProfile records relays and documentDir", () => {
-  const workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), "knowstr-cwp-"));
-  const relays: Relays = [
-    { url: "wss://r.example/", read: true, write: false },
-  ];
+test("doc selects the workspace directory without entering the profile", () => {
+  const cwd = workspace();
+  const workspaceDir = path.join(cwd, "documents");
+  init(
+    ["--doc", "documents", "--shared", "--relay", "wss://room.example/"],
+    cwd
+  );
+
+  expect(readProfile(workspaceDir)).toEqual({
+    nsec_file: "./.knowstr/me.nsec",
+    shared: { relays: ["wss://room.example/"] },
+  });
+  expect(readProfile(workspaceDir)).not.toHaveProperty("workspace_dir");
+});
+
+test("shared init writes one mode-0600 nsec and derives the pubkey", () => {
+  const workspaceDir = workspace();
+  const result = init(
+    ["--shared", "--relay", "wss://room.example/"],
+    workspaceDir
+  );
+  const nsecPath = path.join(workspaceDir, ".knowstr", "me.nsec");
+  const nsec = fs.readFileSync(nsecPath, "utf8").trim();
+  const privateKeyHex = convertInputToPrivateKey(nsec);
+  if (!privateKeyHex) {
+    throw new Error("expected valid generated nsec");
+  }
+
+  expect(nsec.startsWith("nsec1")).toBe(true);
+  expect(result.npub).toBe(
+    nip19.npubEncode(getPublicKey(hexToBytes(privateKeyHex)))
+  );
+  expect(result.pubkey).toBe(getPublicKey(hexToBytes(privateKeyHex)));
+  expect(fs.statSync(nsecPath).mode % 0o1000).toBe(0o600);
+});
+
+test("createWorkspaceProfile uses a supplied secret key", () => {
+  const workspaceDir = workspace();
+  const secretKey = generateSecretKey();
   const result = createWorkspaceProfile({
     workspaceDir,
-    relays,
-    documentDir: "./docs",
+    workspaceConfig: {
+      storageRelays: [],
+      roomRelays: ["wss://room.example/"],
+    },
+    secretKey,
   });
 
-  const profile = JSON.parse(fs.readFileSync(result.profilePath, "utf8")) as {
-    relays: Array<{ url: string; read: boolean; write: boolean }>;
-    workspace_dir: string;
-  };
-  expect(profile.relays).toEqual(relays);
-  expect(profile.workspace_dir).toBe("./docs");
+  expect(result.pubkey).toBe(getPublicKey(secretKey));
+  expect(result.npub).toBe(nip19.npubEncode(getPublicKey(secretKey)));
+});
+
+test("init validates relays before creating key material", () => {
+  const workspaceDir = workspace();
+  expect(() =>
+    init(["--shared", "--relay", "https://invalid.example/"], workspaceDir)
+  ).toThrow("ws or wss");
+  expect(fs.existsSync(path.join(workspaceDir, ".knowstr"))).toBe(false);
+});
+
+test("init refuses to overwrite an existing profile", () => {
+  const workspaceDir = workspace();
+  init(["--shared", "--relay", "wss://room.example/"], workspaceDir);
+  expect(() =>
+    init(["--shared", "--relay", "wss://room.example/"], workspaceDir)
+  ).toThrow("already exists");
 });

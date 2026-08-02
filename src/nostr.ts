@@ -19,7 +19,7 @@ export const ASSET_ENTITY_RELAY =
 export const KIND_DELETE = 5;
 
 export const KIND_RELAY_METADATA_EVENT = 10002;
-export const DEFAULT_RELAYS: Relays = [
+export const DEFAULT_ROOM_RELAYS: Relays = [
   { url: "wss://nostr.nodesmap.com/", read: true, write: true },
   { url: "wss://relay.damus.io/", read: true, write: true },
   { url: "wss://relay.primal.net/", read: true, write: true },
@@ -27,6 +27,8 @@ export const DEFAULT_RELAYS: Relays = [
   { url: "wss://nostr.mom/", read: true, write: true },
   //  { url: "wss://nostr.noones.com/", read: true, write: true },
 ];
+
+export const DEFAULT_RELAYS = DEFAULT_ROOM_RELAYS;
 
 export function newTimestamp(): number {
   return Math.floor(Date.now() / 1000);

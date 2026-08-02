@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { AbstractSimplePool, verifyEvent } from "nostr-tools";
+import { Map as ImmutableMap } from "immutable";
 import { hexToBytes } from "@noble/hashes/utils";
 import { Backend, BackendProvider, WorkspaceState } from "../../BackendContext";
 import { LoadedCliProfile } from "../../cli/config";
@@ -8,6 +9,9 @@ import type {
   WorkspaceWriteRequest,
 } from "./workspaceBackend";
 import type { FsEventHandler } from "./workspaceWatcher";
+import type { WritePublisher } from "./writeSupport";
+import type { WorkspaceConfig } from "../../workspaceConfig";
+import { publishEventToRelays } from "../nostr/nostrPublish";
 
 export type WorkspaceLoaded = {
   profile: LoadedCliProfile;
@@ -21,8 +25,8 @@ export type WorkspaceIpc = {
   load: () => Promise<WorkspaceLoaded | null>;
   pickFolder: () => Promise<string | null>;
   open: (folder: string) => Promise<void>;
-  create: (args: { folder: string; secretKeyInput?: string }) => Promise<void>;
-  isInitialised: (folder: string) => Promise<boolean>;
+  create: (args: { folder: string }) => Promise<void>;
+  configure: (config: WorkspaceConfig) => Promise<void>;
   save: (
     writes: ReadonlyArray<WorkspaceWriteRequest>,
     deletedPaths?: ReadonlyArray<string>
@@ -52,10 +56,12 @@ function realRelayPool(): RelayPoolLike {
 export function FilesystemBackendProvider({
   ipc,
   pool,
+  publisher,
   children,
 }: {
   ipc: WorkspaceIpc;
   pool?: RelayPoolLike;
+  publisher?: WritePublisher;
   children: React.ReactNode;
 }): JSX.Element | null {
   const [state, setState] = useState<LoadState>({ status: "loading" });
@@ -80,6 +86,31 @@ export function FilesystemBackendProvider({
   }, []);
 
   const relayPool = useMemo(() => pool ?? realRelayPool(), [pool]);
+  const writePublisher = useMemo<WritePublisher>(
+    () =>
+      publisher ?? {
+        publishEvent: async (relayUrls, event) => {
+          try {
+            return await publishEventToRelays(
+              { publish: relayPool.publish },
+              event,
+              relayUrls
+            );
+          } catch (error) {
+            return {
+              event,
+              results: ImmutableMap(
+                relayUrls.map((url) => [
+                  url,
+                  { status: "rejected", reason: String(error) },
+                ])
+              ),
+            };
+          }
+        },
+      },
+    [publisher, relayPool]
+  );
 
   const backend: Backend = useMemo(() => {
     const data = state.status === "loaded" ? state.data : null;
@@ -93,23 +124,27 @@ export function FilesystemBackendProvider({
             : {}),
         }
       : undefined;
-    const defaultRelays =
-      profile?.workspaceConfig.roomRelays.map((url) => ({
-        url,
-        read: true,
-        write: true,
-      })) ?? [];
+    const workspaceConfig = profile?.workspaceConfig;
+    const defaultRelays = (workspaceConfig?.roomRelays ?? []).map((url) => ({
+      url,
+      read: true,
+      write: true,
+    }));
     const workspace: WorkspaceState = {
       profile,
       files,
       pickFolder: () => ipc.pickFolder(),
-      isInitialised: (folder) => ipc.isInitialised(folder),
+      publisher: writePublisher,
       open: async (folder) => {
         await ipc.open(folder);
         refresh();
       },
       create: async (args) => {
         await ipc.create(args);
+        refresh();
+      },
+      configure: async (config) => {
+        await ipc.configure(config);
         refresh();
       },
       save: (writes, deletedPaths) => ipc.save(writes, deletedPaths),
@@ -120,9 +155,10 @@ export function FilesystemBackendProvider({
       publish: relayPool.publish,
       user,
       defaultRelays,
+      workspaceConfig,
       workspace,
     };
-  }, [state, ipc, refresh, relayPool]);
+  }, [state, ipc, refresh, relayPool, writePublisher]);
 
   if (state.status === "loading") {
     return null;

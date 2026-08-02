@@ -28,8 +28,6 @@ export const DEFAULT_ROOM_RELAYS: Relays = [
   //  { url: "wss://nostr.noones.com/", read: true, write: true },
 ];
 
-export const DEFAULT_RELAYS = DEFAULT_ROOM_RELAYS;
-
 export function newTimestamp(): number {
   return Math.floor(Date.now() / 1000);
 }

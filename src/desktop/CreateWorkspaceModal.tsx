@@ -1,15 +1,11 @@
 import React, { useState } from "react";
 import { Form } from "react-bootstrap";
 import { ModalForm } from "../commons/ModalForm";
-import { convertInputToPrivateKey } from "../nostrKey";
 
 type Props = {
   initialFolder: string | null;
   onCancel: () => void;
-  onCreate: (args: {
-    folder: string;
-    secretKeyInput?: string;
-  }) => Promise<void>;
+  onCreate: (args: { folder: string }) => Promise<void>;
   pickFolder: () => Promise<string | null>;
 };
 
@@ -28,21 +24,11 @@ export function CreateWorkspaceModal({
     }
   };
 
-  const submit = async (form: HTMLFormElement): Promise<void> => {
+  const submit = async (): Promise<void> => {
     if (!folder) {
       throw new Error("Pick a folder for the new workspace");
     }
-    const seedField = form.elements.namedItem(
-      "seedInput"
-    ) as HTMLInputElement | null;
-    const seedInput = seedField?.value.trim() ?? "";
-    if (seedInput && !convertInputToPrivateKey(seedInput)) {
-      throw new Error("Input is not a valid nsec, private key or mnemonic");
-    }
-    await onCreate({
-      folder,
-      secretKeyInput: seedInput.length > 0 ? seedInput : undefined,
-    });
+    await onCreate({ folder });
   };
 
   return (
@@ -70,17 +56,6 @@ export function CreateWorkspaceModal({
             Pick Folder
           </button>
         </div>
-      </Form.Group>
-      <Form.Group controlId="seedInput">
-        <Form.Label>Existing nsec or 12-word seed (optional)</Form.Label>
-        <Form.Control
-          type="password"
-          name="seedInput"
-          placeholder="nsec, private key or mnemonic (12 words)"
-        />
-        <Form.Text className="text-muted">
-          Leave empty to generate a fresh keypair.
-        </Form.Text>
       </Form.Group>
     </ModalForm>
   );

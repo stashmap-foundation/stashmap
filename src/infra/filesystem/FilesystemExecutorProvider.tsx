@@ -1,5 +1,6 @@
 import React, { Dispatch, SetStateAction } from "react";
 import { Map as ImmutableMap } from "immutable";
+import { finalizeEvent } from "nostr-tools";
 import { LOCAL } from "../../core/nodeRef";
 import { useBackend } from "../../BackendContext";
 import { useDocumentStore, useDocuments } from "../../DocumentStore";
@@ -13,6 +14,10 @@ import {
   parseToDocument,
 } from "../../core/Document";
 import { LOG_ROOT_FILE } from "../../core/systemRoots";
+import { isUserLoggedInWithSeed } from "../../NostrAuthContext";
+import { buildDepositEvent } from "../../nodesDocumentEvent";
+import type { WorkspaceConfig } from "../../workspaceConfig";
+import type { WritePublisher } from "./writeSupport";
 
 function slugify(text: string): string {
   const slug = text
@@ -84,12 +89,42 @@ function enrichWithFilePath(
   });
   return {
     parsed: {
-      document: { ...parsed.document, filePath },
+      document: {
+        ...parsed.document,
+        filePath,
+        realWorldEntities: write.document.realWorldEntities,
+      },
       nodes: parsed.nodes,
     },
     filePath,
     content: write.content,
   };
+}
+
+function publishDocument(
+  document: Document,
+  content: string,
+  saveMs: number,
+  config: WorkspaceConfig,
+  user: User,
+  publisher: WritePublisher
+): Promise<PublishResultsOfEvent> | undefined {
+  if (config.roomRelays.length === 0) {
+    return undefined;
+  }
+  if (!isUserLoggedInWithSeed(user)) {
+    throw new Error("Shared filesystem work requires a workspace key");
+  }
+  const event = finalizeEvent(
+    buildDepositEvent(
+      document,
+      user.publicKey,
+      content,
+      Math.floor(saveMs / 1000)
+    ),
+    user.privateKey
+  );
+  return publisher.publishEvent(config.roomRelays, event);
 }
 
 export function FilesystemExecutorProvider({
@@ -130,6 +165,7 @@ export function FilesystemExecutorProvider({
 
     if (writes.length === 0 && deletions.length === 0) return;
 
+    const saveMs = Date.now();
     const enriched = writes.reduce<{
       items: EnrichedWrite[];
       taken: ReadonlySet<string>;
@@ -160,6 +196,33 @@ export function FilesystemExecutorProvider({
         })),
         deletedPaths
       );
+      const { workspaceConfig, user } = backend;
+      if (workspaceConfig && user) {
+        const publishResults = (
+          await Promise.all(
+            enriched.items.map((write) =>
+              publishDocument(
+                write.parsed.document,
+                write.content,
+                saveMs,
+                workspaceConfig,
+                user,
+                workspace.publisher
+              )
+            )
+          )
+        ).filter(
+          (result): result is PublishResultsOfEvent => result !== undefined
+        );
+        setPublishEvents((current) => ({
+          ...current,
+          results: publishResults.reduce(
+            (results, result) => results.set(result.event.id, result),
+            ImmutableMap<string, PublishResultsOfEvent>()
+          ),
+          isLoading: false,
+        }));
+      }
     }
   };
 

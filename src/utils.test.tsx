@@ -226,6 +226,7 @@ function applyApis(props?: Partial<TestApis>): TestApis {
     publish: (relays, event) => relayPool.publish(relays, event),
     user: undefined,
     defaultRelays: [] as Relays,
+    workspaceConfig: undefined,
   };
   return {
     eventLoadingTimeout: 0,

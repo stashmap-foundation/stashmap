@@ -1,10 +1,15 @@
 import fs from "fs";
 import path from "path";
-import { getPublicKey } from "nostr-tools";
+import { generateSecretKey, getPublicKey, nip19 } from "nostr-tools";
 import { hexToBytes } from "@noble/hashes/utils";
 import { convertInputToPrivateKey } from "../nostrKey";
 import { decodePublicKeyInputSync } from "../infra/nostr/publicKeys";
-import { WorkspaceConfig, parseFilesystemProfile } from "../workspaceConfig";
+import {
+  WorkspaceConfig,
+  filesystemProfileFromWorkspaceConfig,
+  normalizeWorkspaceConfig,
+  parseFilesystemProfile,
+} from "../workspaceConfig";
 
 export type LoadedCliProfile = {
   workspaceConfig: WorkspaceConfig;
@@ -47,6 +52,46 @@ function loadPubkey(nsecPath: string): PublicKey {
   return pubkey;
 }
 
+export function writeCliWorkspaceConfig(
+  workspaceDir: string,
+  config: WorkspaceConfig
+): void {
+  const normalized = normalizeWorkspaceConfig(config);
+  if (normalized.storageRelays.length > 0) {
+    throw new Error("Filesystem workspaces cannot configure storage relays");
+  }
+  const knowstrDir = path.join(workspaceDir, ".knowstr");
+  const profilePath = path.join(knowstrDir, "profile.json");
+  if (normalized.roomRelays.length === 0) {
+    if (fs.existsSync(profilePath)) {
+      fs.unlinkSync(profilePath);
+    }
+    return;
+  }
+
+  const existing = fs.existsSync(profilePath)
+    ? parseFilesystemProfile(JSON.parse(fs.readFileSync(profilePath, "utf8")))
+        .profile
+    : undefined;
+  const relativeNsecFile = existing?.nsec_file ?? "./.knowstr/me.nsec";
+  const nsecPath = resolveAbsolute(workspaceDir, relativeNsecFile);
+  fs.mkdirSync(path.dirname(nsecPath), { recursive: true });
+  if (!fs.existsSync(nsecPath)) {
+    fs.writeFileSync(nsecPath, `${nip19.nsecEncode(generateSecretKey())}\n`, {
+      mode: 0o600,
+    });
+  }
+  loadPubkey(nsecPath);
+
+  const profile = filesystemProfileFromWorkspaceConfig(
+    normalized,
+    relativeNsecFile
+  );
+  fs.mkdirSync(knowstrDir, { recursive: true });
+  const temporaryPath = `${profilePath}.${process.pid}.tmp`;
+  fs.writeFileSync(temporaryPath, `${JSON.stringify(profile, null, 2)}\n`);
+  fs.renameSync(temporaryPath, profilePath);
+}
 export function loadCliProfile({
   cwd = process.cwd(),
   env = process.env,

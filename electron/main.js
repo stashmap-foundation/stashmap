@@ -9,9 +9,10 @@ const {
 const fs = require("fs");
 const path = require("path");
 // eslint-disable-next-line import/no-unresolved
-const { loadCliProfile } = require("../dist/cli/config");
-// eslint-disable-next-line import/no-unresolved
-const { createWorkspaceProfile } = require("../dist/cli/init");
+const {
+  loadCliProfile,
+  writeCliWorkspaceConfig,
+} = require("../dist/cli/config");
 // eslint-disable-next-line import/no-unresolved
 const {
   createRecentWorkspacesStore,
@@ -20,7 +21,6 @@ const {
 } = require("../dist/electronMain/recentWorkspaces");
 // eslint-disable-next-line import/no-unresolved
 const { convertInputToPrivateKey } = require("../dist/nostrKey");
-const { hexToBytes } = require("@noble/hashes/utils");
 // eslint-disable-next-line import/no-unresolved
 const {
   createWorkspaceRuntime,
@@ -78,9 +78,6 @@ function envCliProfileArgs() {
 
 const recentWorkspaces = createRecentWorkspacesStore();
 
-// Publishing needs the key in the renderer: deposits are signed there and
-// sent straight to relays. Storage stays on disk — the desktop has no
-// storage channel, but publication is storage-independent.
 function readProfilePrivateKey(profile) {
   if (!profile.nsecFile || !fs.existsSync(profile.nsecFile)) {
     return undefined;
@@ -103,10 +100,6 @@ async function loadProfileAndEvents(profile) {
   };
 }
 
-function isInitialisedFolder(folder) {
-  return fs.existsSync(path.join(folder, ".knowstr", "profile.json"));
-}
-
 async function loadFromFolder(folder) {
   const profile = loadCliProfile({ cwd: folder });
   return loadProfileAndEvents(profile);
@@ -123,7 +116,7 @@ async function loadCurrentWorkspace() {
     return null;
   }
   const entry = pruned.workspaces[id];
-  if (!entry || !isInitialisedFolder(entry.path)) {
+  if (!entry || !fs.existsSync(entry.path)) {
     return null;
   }
   return loadFromFolder(entry.path);
@@ -153,30 +146,10 @@ function reloadFocusedWindow() {
   }
 }
 
-async function confirmInitialise(folder) {
-  const result = await dialog.showMessageBox({
-    type: "question",
-    buttons: ["Initialize", "Cancel"],
-    defaultId: 0,
-    cancelId: 1,
-    title: "Initialize Workspace",
-    message: `${folder} isn't a workspace yet.`,
-    detail: "Initialize it as a new workspace with a freshly generated key?",
-  });
-  return result.response === 0;
-}
-
 async function handleOpenWorkspaceMenuAction() {
   const folder = await pickWorkspaceFolder();
   if (!folder) {
     return;
-  }
-  if (!isInitialisedFolder(folder)) {
-    const ok = await confirmInitialise(folder);
-    if (!ok) {
-      return;
-    }
-    createWorkspaceProfile({ workspaceDir: folder });
   }
   recordOpenedWorkspace(folder);
   reloadFocusedWindow();
@@ -184,10 +157,10 @@ async function handleOpenWorkspaceMenuAction() {
 }
 
 function handleSwitchWorkspaceMenuAction(folder) {
-  if (!isInitialisedFolder(folder)) {
+  if (!fs.existsSync(folder)) {
     dialog.showErrorBox(
       "Workspace not available",
-      `${folder} no longer contains a workspace.`
+      `${folder} no longer exists.`
     );
     buildAndSetMenu();
     return;
@@ -327,46 +300,49 @@ app.whenReady().then(() => {
   });
   ipcMain.handle("workspace:load", async () => loadCurrentWorkspace());
   ipcMain.handle("workspace:pickFolder", async () => pickWorkspaceFolder());
-  ipcMain.handle("workspace:isInitialised", async (_event, folder) =>
-    isInitialisedFolder(folder)
-  );
   ipcMain.handle("workspace:open", async (_event, folder) => {
-    if (!isInitialisedFolder(folder)) {
-      throw new Error(`${folder} is not an initialised workspace`);
+    if (!fs.existsSync(folder)) {
+      throw new Error(`${folder} does not exist`);
     }
     recordOpenedWorkspace(folder);
     buildAndSetMenu();
   });
   ipcMain.handle("workspace:create", async (_event, args) => {
-    const { folder, secretKeyInput } = args || {};
+    const { folder } = args || {};
     if (!folder) {
       throw new Error("workspace:create requires a folder");
     }
-    const secretKey = secretKeyInput
-      ? (() => {
-          const hex = convertInputToPrivateKey(secretKeyInput);
-          if (!hex) {
-            throw new Error(
-              "Input is not a valid nsec, private key or mnemonic"
-            );
-          }
-          return hexToBytes(hex);
-        })()
-      : undefined;
-    createWorkspaceProfile({ workspaceDir: folder, secretKey });
+    fs.mkdirSync(folder, { recursive: true });
     recordOpenedWorkspace(folder);
     buildAndSetMenu();
+  });
+  ipcMain.handle("workspace:configure", async (_event, config) => {
+    const envArgs = envCliProfileArgs();
+    const pruned = recentWorkspaces.listAndPrune();
+    const autoOpenId = pickAutoOpenId(pruned);
+    const autoOpenEntry = autoOpenId
+      ? pruned.workspaces[autoOpenId]
+      : undefined;
+    const workspaceDir = envArgs
+      ? loadCliProfile(envArgs).workspaceDir
+      : autoOpenEntry?.path;
+    if (!workspaceDir) {
+      throw new Error("workspace:configure has no active workspace");
+    }
+    writeCliWorkspaceConfig(workspaceDir, config);
   });
   ipcMain.handle("workspace:save", async (_event, documents, deletedPaths) => {
     const envArgs = envCliProfileArgs();
     const pruned = recentWorkspaces.listAndPrune();
     const autoOpenId = pickAutoOpenId(pruned);
-    const autoOpenEntry = autoOpenId ? pruned.workspaces[autoOpenId] : undefined;
+    const autoOpenEntry = autoOpenId
+      ? pruned.workspaces[autoOpenId]
+      : undefined;
     const profile = envArgs
       ? loadCliProfile(envArgs)
       : autoOpenEntry
-        ? loadCliProfile({ cwd: autoOpenEntry.path })
-        : null;
+      ? loadCliProfile({ cwd: autoOpenEntry.path })
+      : null;
     if (!profile) {
       throw new Error("workspace:save has no active workspace");
     }

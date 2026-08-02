@@ -22,7 +22,7 @@ import {
 import { electronWorkspaceIpc } from "./infra/filesystem/electronWorkspaceIpc";
 import { FilesystemAppRoot } from "./desktop/FilesystemAppRoot";
 
-const defaultRelayUrls = process.env.DEFAULT_RELAYS?.split(",");
+const defaultRelayUrls = process.env.DEFAULT_ROOM_RELAYS?.split(",");
 
 function createFileStore(): LocalStorage {
   return {

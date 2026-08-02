@@ -1,7 +1,9 @@
 import React from "react";
-import { RenderResult, within } from "@testing-library/react";
+import { RenderResult, screen, within } from "@testing-library/react";
+import { Route, Routes } from "react-router-dom";
 import { nip19 } from "nostr-tools";
 import { FilesystemBackendProvider } from "./infra/filesystem/FilesystemBackendProvider";
+import type { WritePublisher } from "./infra/filesystem/writeSupport";
 import { FilesystemDataProvider } from "./infra/filesystem/FilesystemDataProvider";
 import { FilesystemAppRoot } from "./desktop/FilesystemAppRoot";
 import {
@@ -13,6 +15,7 @@ import { loadCliProfile } from "./cli/config";
 import { knowstrInit } from "./testFixtures/workspace";
 import { navigateToNodeViaSearch, renderWithTestData } from "./utils.test";
 import { SplitPaneLayout } from "./editor/SplitPaneLayout";
+import { RelaysWrapper } from "./editor/Relays";
 import { PaneHistoryProvider } from "./PaneHistoryContext";
 import { CalendarFeedProvider } from "./CalendarFeedContext";
 import { EntityLabelProvider } from "./EntityLabelContext";
@@ -51,6 +54,7 @@ type AppRenderOptions = {
    */
   empty?: boolean;
   fetchEntityMetadata?: (url: string) => Promise<Response>;
+  publisher?: WritePublisher;
 };
 
 type AppRenderResult = RenderResult & {
@@ -72,15 +76,23 @@ export async function renderAppTree(
 
   const utils = renderWithTestData(
     <FilesystemAppRoot>
-      <CalendarFeedProvider>
-        <EntityLabelProvider>
-          <DND>
-            <PaneHistoryProvider>
-              <SplitPaneLayout />
-            </PaneHistoryProvider>
-          </DND>
-        </EntityLabelProvider>
-      </CalendarFeedProvider>
+      <Routes>
+        <Route path="/relays" element={<RelaysWrapper />} />
+        <Route
+          path="*"
+          element={
+            <CalendarFeedProvider>
+              <EntityLabelProvider>
+                <DND>
+                  <PaneHistoryProvider>
+                    <SplitPaneLayout />
+                  </PaneHistoryProvider>
+                </DND>
+              </EntityLabelProvider>
+            </CalendarFeedProvider>
+          }
+        />
+      </Routes>
     </FilesystemAppRoot>,
     {
       BackendProvider: ({ children }) => (
@@ -91,6 +103,7 @@ export async function renderAppTree(
               relayPool.subscribeMany(relays, filters, params),
             publish: (relays, event) => relayPool.publish(relays, event),
           }}
+          publisher={options.publisher}
         >
           {children}
         </FilesystemBackendProvider>
@@ -108,10 +121,11 @@ export async function renderAppTree(
   }
 
   const profile = loadCliProfile({ cwd: path });
-  if (!profile.pubkey) {
-    throw new Error(`Missing test workspace pubkey for ${path}`);
+  if (options.initialRoute === "/relays") {
+    await screen.findByText("Workspace Settings");
+  } else {
+    await app.findByLabelText("Search to change pane 0 content");
   }
-  await app.findByLabelText("Search to change pane 0 content");
   if (options.search) {
     await navigateToNodeViaSearch(0, options.search, {
       waitForFullscreen: true,
@@ -122,7 +136,11 @@ export async function renderAppTree(
     ipc,
     relayPool,
     path,
-    pubkey: profile.pubkey,
-    npub: nip19.npubEncode(profile.pubkey),
+    ...(profile.pubkey
+      ? {
+          pubkey: profile.pubkey,
+          npub: nip19.npubEncode(profile.pubkey),
+        }
+      : {}),
   };
 }

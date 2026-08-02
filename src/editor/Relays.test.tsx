@@ -1,143 +1,101 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import fs from "fs";
+import os from "os";
+import path from "path";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { Event } from "nostr-tools";
-import { KIND_RELAY_METADATA_EVENT } from "../nostr";
-import { Relays } from "./Relays";
-import { ALICE, setup, renderApp, TEST_RELAYS } from "../utils.test";
-import { relayTags } from "../planner";
+import { renderAppTree } from "../appTestUtils.test";
+import { loadCliProfile } from "../cli/config";
 
-const filterRelayMetadataEvents = (event: Event): boolean =>
-  event.kind === KIND_RELAY_METADATA_EVENT;
+function localWorkspace(): string {
+  return fs.mkdtempSync(path.join(os.tmpdir(), "knowstr-settings-"));
+}
 
-test("Remove a Relay and add a suggested Relay", async () => {
-  const [alice] = setup([ALICE]);
-  const { relayPool } = renderApp({ ...alice(), initialRoute: `/relays` });
-  await screen.findByText("Edit Nostr Relays");
-  screen.getByText("wss://relay.test.second.fail/");
-  fireEvent.click(
-    screen.getByLabelText("delete relay wss://relay.test.second.fail/")
-  );
-  fireEvent.click(screen.getByText("Save"));
+async function addRelay(
+  channel: "storage" | "room",
+  url: string
+): Promise<void> {
+  await userEvent.type(screen.getByLabelText(`add ${channel} relay`), url);
+  await userEvent.click(screen.getByLabelText(`save ${channel} relay`));
+}
 
-  await waitFor(() =>
-    expect(
-      relayPool.getEvents().filter(filterRelayMetadataEvents)
-    ).toHaveLength(1)
-  );
-  const secondRelay = TEST_RELAYS[1];
-  const relaysWithoutSecond = TEST_RELAYS.filter(
-    (r) => r.url !== secondRelay.url
-  );
-  const tags = relayTags(relaysWithoutSecond);
-  const event = relayPool.getEvents().filter(filterRelayMetadataEvents)[0];
-  expect(event).toEqual(
-    expect.objectContaining({
-      kind: 10002,
-      pubkey:
-        "f0289b28573a7c9bb169f43102b26259b7a4b758aca66ea3ac8cd0fe516a3758",
-      tags: expect.arrayContaining(tags),
-      content: "",
-    })
-  );
+test("filesystem settings bind a room with the exact profile shape", async () => {
+  const workspaceDir = localWorkspace();
+  const { relayPool } = await renderAppTree({
+    path: workspaceDir,
+    initialRoute: "/relays",
+  });
 
-  // relay is now shown as suggested and can be added
-  fireEvent.click(await screen.findByLabelText("open menu"));
-  fireEvent.click(await screen.findByLabelText("edit relays"));
-  await screen.findByText("Edit Nostr Relays");
-  fireEvent.click(
-    screen.getByLabelText("add relay wss://relay.test.second.fail/")
-  );
-  fireEvent.click(screen.getByText("Save"));
+  expect(screen.queryByLabelText("add storage relay")).toBeNull();
+  await addRelay("room", "wss://one.example/");
+  await addRelay("room", "wss://two.example/");
+  await userEvent.click(screen.getByText("Save"));
 
-  await waitFor(() =>
-    expect(
-      relayPool.getEvents().filter(filterRelayMetadataEvents)
-    ).toHaveLength(2)
-  );
-  const newTags = relayTags([...relaysWithoutSecond, secondRelay]);
-  const newEvent = relayPool.getEvents().filter(filterRelayMetadataEvents)[1];
-  expect(newEvent).toEqual(
-    expect.objectContaining({
-      kind: 10002,
-      pubkey:
-        "f0289b28573a7c9bb169f43102b26259b7a4b758aca66ea3ac8cd0fe516a3758",
-      tags: expect.arrayContaining(newTags),
-      content: "",
-    })
-  );
-});
-
-test("Add a new Relay", async () => {
-  const [alice] = setup([ALICE]);
-  const { relayPool } = renderApp({ ...alice(), initialRoute: `/relays` });
-  await screen.findByText("Edit Nostr Relays");
-  const inputRelay = screen.getByLabelText("add new relay");
-  await userEvent.type(inputRelay, "wss://relay.test.fifth/");
-  fireEvent.click(
-    screen.getByLabelText("add new relay wss://relay.test.fifth/")
-  );
-  fireEvent.click(screen.getByText("Save"));
-
-  await waitFor(() =>
-    expect(
-      relayPool.getEvents().filter(filterRelayMetadataEvents)
-    ).toHaveLength(1)
-  );
-  const event = relayPool.getEvents().filter(filterRelayMetadataEvents)[0];
-  const tags = relayTags([
-    ...TEST_RELAYS,
-    { url: "wss://relay.test.fifth/", read: true, write: true },
-  ] as Relays);
-  expect(event).toEqual(
-    expect.objectContaining({
-      kind: 10002,
-      pubkey:
-        "f0289b28573a7c9bb169f43102b26259b7a4b758aca66ea3ac8cd0fe516a3758",
-      tags: expect.arrayContaining(tags),
-      content: "",
-    })
-  );
-  expect(event.relays).toEqual([
-    ...TEST_RELAYS.map((r) => r.url),
-    // new relays
-    "wss://relay.test.fifth/",
-  ]);
-});
-
-test("Stop writing to an existing Nostr Relay", async () => {
-  const [alice] = setup([ALICE]);
-  const { relayPool } = renderApp({ ...alice(), initialRoute: `/relays` });
-  await screen.findByText("Edit Nostr Relays");
-  screen.getByText("wss://relay.test.fourth.success/");
-
-  fireEvent.click(
-    screen.getByLabelText(
-      "stop writing to relay wss://relay.test.fourth.success/"
+  await waitFor(() => {
+    expect(loadCliProfile({ cwd: workspaceDir }).workspaceConfig).toEqual({
+      storageRelays: [],
+      roomRelays: ["wss://one.example/", "wss://two.example/"],
+    });
+  });
+  expect(
+    JSON.parse(
+      fs.readFileSync(
+        path.join(workspaceDir, ".knowstr", "profile.json"),
+        "utf8"
+      )
     )
+  ).toEqual({
+    nsec_file: "./.knowstr/me.nsec",
+    shared: {
+      relays: ["wss://one.example/", "wss://two.example/"],
+    },
+  });
+  expect(
+    fs.statSync(path.join(workspaceDir, ".knowstr", "me.nsec")).mode % 0o1000
+  ).toBe(0o600);
+  expect(relayPool.getEvents()).toEqual([]);
+});
+
+test("filesystem settings reload, edit, and remove the room", async () => {
+  const workspaceDir = localWorkspace();
+  const { unmount: unmountFirst } = await renderAppTree({
+    path: workspaceDir,
+    initialRoute: "/relays",
+  });
+  await addRelay("room", "wss://old.example/");
+  await userEvent.click(screen.getByText("Save"));
+  const nsecPath = path.join(workspaceDir, ".knowstr", "me.nsec");
+  await waitFor(() => expect(fs.existsSync(nsecPath)).toBe(true));
+  const nsec = fs.readFileSync(nsecPath, "utf8");
+  unmountFirst();
+
+  const { unmount: unmountSecond } = await renderAppTree({
+    path: workspaceDir,
+    initialRoute: "/relays",
+  });
+  await screen.findByLabelText("room relay wss://old.example/");
+  await userEvent.click(
+    screen.getByLabelText("delete room relay wss://old.example/")
   );
-  fireEvent.click(screen.getByText("Save"));
+  await addRelay("room", "wss://new.example/");
+  await userEvent.click(screen.getByText("Save"));
+  await waitFor(() =>
+    expect(
+      loadCliProfile({ cwd: workspaceDir }).workspaceConfig.roomRelays
+    ).toEqual(["wss://new.example/"])
+  );
+  unmountSecond();
+
+  await renderAppTree({ path: workspaceDir, initialRoute: "/relays" });
+  await screen.findByLabelText("room relay wss://new.example/");
+  await userEvent.click(
+    screen.getByLabelText("delete room relay wss://new.example/")
+  );
+  await userEvent.click(screen.getByText("Save"));
 
   await waitFor(() =>
     expect(
-      relayPool.getEvents().filter(filterRelayMetadataEvents)
-    ).toHaveLength(1)
+      fs.existsSync(path.join(workspaceDir, ".knowstr", "profile.json"))
+    ).toBe(false)
   );
-  const event = relayPool.getEvents().filter(filterRelayMetadataEvents)[0];
-  const tags = relayTags(
-    TEST_RELAYS.map((r) =>
-      r.url === "wss://relay.test.fourth.success/" ? { ...r, write: false } : r
-    ) as Relays
-  );
-  expect(event).toEqual(
-    expect.objectContaining({
-      kind: 10002,
-      pubkey:
-        "f0289b28573a7c9bb169f43102b26259b7a4b758aca66ea3ac8cd0fe516a3758",
-      tags: expect.arrayContaining(tags),
-      content: "",
-    })
-  );
+  expect(fs.readFileSync(nsecPath, "utf8")).toBe(nsec);
 });
-
-// TODO: demonstrate that knowledge db is reloaded when editing a relay
-// TODO: test adding relay with knowledge data

@@ -1,8 +1,6 @@
 import fs from "fs";
-import path from "path";
-import { hexToBytes } from "@noble/hashes/utils";
-import { createWorkspaceProfile } from "../cli/init";
 import { convertInputToPrivateKey } from "../nostrKey";
+import { writeCliWorkspaceConfig } from "../cli/config";
 import {
   WorkspaceIpc,
   WorkspaceLoaded,
@@ -12,8 +10,6 @@ import {
   WorkspaceRuntime,
 } from "../infra/filesystem/workspaceRuntime";
 
-// Same behavior as electron/main.js: the load payload carries the profile's
-// private key so the renderer can sign deposits.
 function readProfilePrivateKey(profile: {
   nsecFile?: string;
 }): string | undefined {
@@ -105,32 +101,17 @@ export function mockWorkspaceIpc(
     open: async (folder) => {
       await setCurrentFolder(folder);
     },
-    create: async ({ folder, secretKeyInput }) => {
-      const secretKey = secretKeyInput
-        ? (() => {
-            const hex = convertInputToPrivateKey(secretKeyInput);
-            if (!hex) {
-              throw new Error(
-                "Input is not a valid nsec, private key or mnemonic"
-              );
-            }
-            return hexToBytes(hex);
-          })()
-        : undefined;
-      createWorkspaceProfile({
-        workspaceDir: folder,
-        workspaceConfig: {
-          storageRelays: [],
-          roomRelays: ["wss://room.example/"],
-        },
-        secretKey,
-      });
+    create: async ({ folder }) => {
+      fs.mkdirSync(folder, { recursive: true });
       await setCurrentFolder(folder);
     },
-    isInitialised: (folder) =>
-      Promise.resolve(
-        fs.existsSync(path.join(folder, ".knowstr", "profile.json"))
-      ),
+    configure: (config) => {
+      if (!state.current) {
+        return Promise.reject(new Error("No current workspace"));
+      }
+      writeCliWorkspaceConfig(state.current, config);
+      return Promise.resolve();
+    },
     save: async (documents, deletedPaths) => {
       return (
         (await getRuntime()?.save(documents, deletedPaths)) ?? {

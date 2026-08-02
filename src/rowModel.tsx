@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-use-before-define, functional/no-let, functional/immutable-data */
 import React from "react";
 import { LOCAL } from "./core/nodeRef";
+import { useBackend } from "./BackendContext";
+import { useData } from "./DataContext";
 import {
   isSearchId,
   parseSearchId,
@@ -8,7 +10,6 @@ import {
   EMPTY_NODE_ID,
   getRefTargetInfo,
 } from "./core/connections";
-import { useData } from "./DataContext";
 import { isCanonicalId } from "./core/entityRecognition";
 import { nodeText } from "./core/nodeSpans";
 import { EditorNavigationTarget } from "./editor/linkOperations";
@@ -217,11 +218,9 @@ export function useCurrentNode(): GraphNode {
 
 export function useIsViewingOtherUserContent(): boolean {
   const { user } = useData();
+  const { workspace } = useBackend();
   const row = useRow();
-  if (!user) {
-    return true;
-  }
-  return row.sourceId !== LOCAL;
+  return (!user && !workspace) || row.sourceId !== LOCAL;
 }
 
 export function useNodeIndex(): number | undefined {

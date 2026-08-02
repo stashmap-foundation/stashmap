@@ -5,6 +5,7 @@ import type {
   WorkspaceWriteRequest,
 } from "./workspaceBackend";
 import type { FsEvent, FsEventHandler } from "./workspaceWatcher";
+import type { WorkspaceConfig } from "../../workspaceConfig";
 
 export type IpcChannel = {
   load: () => Promise<{
@@ -13,8 +14,8 @@ export type IpcChannel = {
   } | null>;
   pickFolder: () => Promise<string | null>;
   open: (folder: string) => Promise<void>;
-  create: (args: { folder: string; secretKeyInput?: string }) => Promise<void>;
-  isInitialised: (folder: string) => Promise<boolean>;
+  create: (args: { folder: string }) => Promise<void>;
+  configure: (config: WorkspaceConfig) => Promise<void>;
   save: (
     writes: ReadonlyArray<WorkspaceWriteRequest>,
     deletedPaths?: ReadonlyArray<string>
@@ -61,12 +62,12 @@ export function electronWorkspaceIpc(): WorkspaceIpc {
       }
       await channel.create(args);
     },
-    isInitialised: async (folder) => {
+    configure: async (config) => {
       const channel = getChannel();
       if (!channel) {
-        return false;
+        throw new Error("Electron workspace bridge not available");
       }
-      return channel.isInitialised(folder);
+      await channel.configure(config);
     },
     save: async (writes, deletedPaths) => {
       const channel = getChannel();

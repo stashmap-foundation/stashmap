@@ -1,5 +1,9 @@
 import fs from "fs";
+import os from "os";
+import pathModule from "path";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { Map as ImmutableMap } from "immutable";
+import { Event, verifyEvent } from "nostr-tools";
 import userEvent from "@testing-library/user-event";
 import {
   expectMarkdown,
@@ -15,6 +19,7 @@ import {
   navigateToNodeViaSearch,
   type,
 } from "../utils.test";
+import type { WritePublisher } from "../infra/filesystem/writeSupport";
 
 async function expectKnowstrDocIdFrontmatter(
   workspacePath: string,
@@ -404,4 +409,188 @@ My Links
   expect(itemOneIdMatch?.[1]).toBeDefined();
   expect(linkTargetMatch?.[1]).toBeDefined();
   expect(linkTargetMatch?.[1]).toBe(itemOneIdMatch?.[1]);
+});
+
+function recordingPublisher(
+  resultFor: (relayUrl: string, event: Event) => PublishStatus
+): {
+  publisher: WritePublisher;
+  publishEvent: jest.MockedFunction<WritePublisher["publishEvent"]>;
+} {
+  const publishEvent = jest.fn<
+    Promise<PublishResultsOfEvent>,
+    [string[], Event]
+  >((relayUrls, event) =>
+    Promise.resolve({
+      event,
+      results: ImmutableMap<string, PublishStatus>(
+        relayUrls.map((url) => [url, resultFor(url, event)])
+      ),
+    })
+  );
+  const publisher: WritePublisher = { publishEvent };
+  return { publisher, publishEvent };
+}
+
+async function addSettingsRelay(url: string): Promise<void> {
+  await userEvent.type(screen.getByLabelText("add room relay"), url);
+  await userEvent.click(screen.getByLabelText("save room relay"));
+}
+
+async function configureFilesystemWorkspace(
+  roomRelays: string[]
+): Promise<void> {
+  await screen.findByText("Workspace Settings");
+  await roomRelays.reduce(
+    (saved, url) => saved.then(() => addSettingsRelay(url)),
+    Promise.resolve()
+  );
+  await userEvent.click(screen.getByText("Save"));
+}
+
+const publicationModes = [
+  {
+    label: "local",
+    roomRelays: [],
+    expected: [],
+  },
+  {
+    label: "shared",
+    roomRelays: ["wss://room.example/"],
+    expected: [{ kind: 34774, relays: ["wss://room.example/"] }],
+  },
+];
+
+test.each(publicationModes)(
+  "$label publishes only the saved document through configured channels",
+  async ({ roomRelays, expected }) => {
+    const workspacePath = fs.mkdtempSync(
+      pathModule.join(os.tmpdir(), "knowstr-publication-")
+    );
+    write(
+      workspacePath,
+      "doc.md",
+      "---\nknowstr_doc_id: routed-doc\n---\n# Doc <!-- id:root -->\n- row <!-- id:row -->\n"
+    );
+    write(
+      workspacePath,
+      "untouched.md",
+      "---\nknowstr_doc_id: untouched-doc\n---\n# Untouched <!-- id:untouched -->\n"
+    );
+    await knowstrSave(workspacePath);
+    const { publisher, publishEvent } = recordingPublisher(() => ({
+      status: "fulfilled",
+    }));
+    await renderAppTree({
+      path: workspacePath,
+      initialRoute: "/relays",
+      publisher,
+    });
+    await configureFilesystemWorkspace(roomRelays);
+    await navigateToNodeViaSearch(0, "Doc");
+    const now = jest.spyOn(Date, "now").mockReturnValue(1750000000123);
+
+    await userEvent.click(await screen.findByLabelText("edit row"));
+    await userEvent.keyboard("{End} changed{Escape}");
+    await waitFor(() =>
+      expect(publishEvent).toHaveBeenCalledTimes(expected.length)
+    );
+    now.mockRestore();
+
+    const calls = publishEvent.mock.calls.map(([relayUrls, event]) => ({
+      relayUrls,
+      event,
+    }));
+    expect(
+      calls.map(({ relayUrls, event }) => ({
+        kind: event.kind,
+        relays: relayUrls,
+      }))
+    ).toEqual(expected);
+    calls.forEach(({ event }) => {
+      expect(verifyEvent(event)).toBe(true);
+      expect(event.created_at).toBe(1750000000);
+      expect(event.tags[0]).toEqual(["d", "routed-doc"]);
+    });
+    const normalized = fs.readFileSync(
+      pathModule.join(workspacePath, "doc.md"),
+      "utf8"
+    );
+    const deposit = calls.find(({ event }) => event.kind === 34774)?.event;
+    if (deposit) {
+      expect(deposit.content).toBe(normalized);
+      expect(deposit.tags).toEqual([
+        ["d", "routed-doc"],
+        ["S", "root"],
+      ]);
+    }
+  }
+);
+
+test("partial and total relay failures are reported and retried on the next save", async () => {
+  const workspacePath = fs.mkdtempSync(
+    pathModule.join(os.tmpdir(), "knowstr-publication-retry-")
+  );
+  write(
+    workspacePath,
+    "doc.md",
+    "---\nknowstr_doc_id: retry-doc\n---\n# Doc <!-- id:root -->\n- row <!-- id:row -->\n"
+  );
+  await knowstrSave(workspacePath);
+  const { publisher, publishEvent } = recordingPublisher((relayUrl, event) => {
+    const succeeds =
+      event.content.includes("row one two three") ||
+      (event.content.includes("row one") &&
+        !event.content.includes("row one two") &&
+        relayUrl === "wss://one.example/");
+    return succeeds
+      ? { status: "fulfilled" }
+      : { status: "rejected", reason: "offline" };
+  });
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: "/relays",
+    publisher,
+  });
+  await configureFilesystemWorkspace([
+    "wss://one.example/",
+    "wss://two.example/",
+  ]);
+  await navigateToNodeViaSearch(0, "Doc");
+
+  await userEvent.click(await screen.findByLabelText("edit row"));
+  await userEvent.keyboard("{End} one{Escape}");
+  await waitFor(() => expect(publishEvent).toHaveBeenCalledTimes(1));
+  await waitFor(() =>
+    expect(screen.getByLabelText("sync status").textContent).toBe("1/2 relays")
+  );
+  await expect(publishEvent.mock.results[0]?.value).resolves.toMatchObject({
+    results: ImmutableMap({
+      "wss://one.example/": { status: "fulfilled" },
+      "wss://two.example/": { status: "rejected", reason: "offline" },
+    }),
+  });
+
+  await userEvent.click(await screen.findByLabelText("edit row one"));
+  await userEvent.keyboard("{End} two{Escape}");
+  await waitFor(() => expect(publishEvent).toHaveBeenCalledTimes(2));
+  await waitFor(() =>
+    expect(screen.getByLabelText("sync status").textContent).toBe("error")
+  );
+  await userEvent.click(await screen.findByLabelText("edit row one two"));
+  await userEvent.keyboard("{End} three{Escape}");
+  await waitFor(() => expect(publishEvent).toHaveBeenCalledTimes(3));
+  await waitFor(() =>
+    expect(screen.getByLabelText("sync status").textContent).toBe("synced")
+  );
+  expect(publishEvent.mock.calls.map(([relayUrls]) => relayUrls)).toEqual([
+    ["wss://one.example/", "wss://two.example/"],
+    ["wss://one.example/", "wss://two.example/"],
+    ["wss://one.example/", "wss://two.example/"],
+  ]);
+  expect(
+    publishEvent.mock.calls.map(
+      ([, event]) => event.tags.find((tag) => tag[0] === "d")?.[1]
+    )
+  ).toEqual(["retry-doc", "retry-doc", "retry-doc"]);
 });

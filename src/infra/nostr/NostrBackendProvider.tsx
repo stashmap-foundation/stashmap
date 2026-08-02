@@ -3,7 +3,7 @@ import { getPublicKey } from "nostr-tools";
 import { hexToBytes } from "@noble/hashes/utils";
 import { useApis } from "../../Apis";
 import { Backend, BackendProvider } from "../../BackendContext";
-import { DEFAULT_RELAYS } from "../../nostr";
+import { DEFAULT_ROOM_RELAYS } from "../../nostr";
 import { sanitizeRelays } from "../../relays";
 import { clearDatabase, openDB, StashmapDB } from "./cache/indexedDB";
 import { CacheDBProvider } from "./cache/CacheDBContext";
@@ -44,7 +44,7 @@ export function NostrBackendProvider({
     ? sanitizeRelays(
         defaultRelayUrls.map((url) => ({ url, read: true, write: true }))
       )
-    : DEFAULT_RELAYS;
+    : DEFAULT_ROOM_RELAYS;
 
   useEffect(() => {
     return () => {
@@ -88,6 +88,7 @@ export function NostrBackendProvider({
       loginWithExtension,
       logout,
       defaultRelays: relays,
+      workspaceConfig: undefined,
     };
   }, [relayPool, fileStore, user, relays]);
 

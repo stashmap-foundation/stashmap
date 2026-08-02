@@ -56,11 +56,7 @@ export function NoWorkspaceEmptyState(): JSX.Element {
     if (!folder) {
       return;
     }
-    if (await workspace.isInitialised(folder)) {
-      await workspace.open(folder);
-      return;
-    }
-    setCreateModal({ initialFolder: folder });
+    await workspace.open(folder);
   };
 
   return (
@@ -75,8 +71,8 @@ export function NoWorkspaceEmptyState(): JSX.Element {
           initialFolder={createModal.initialFolder}
           onCancel={() => setCreateModal(null)}
           pickFolder={workspace.pickFolder}
-          onCreate={async ({ folder, secretKeyInput }) => {
-            await workspace.create({ folder, secretKeyInput });
+          onCreate={async ({ folder }) => {
+            await workspace.create({ folder });
             setCreateModal(null);
           }}
         />

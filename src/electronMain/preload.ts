@@ -8,8 +8,7 @@ const workspace: IpcChannel = {
   pickFolder: () => ipcRenderer.invoke("workspace:pickFolder"),
   open: (folder) => ipcRenderer.invoke("workspace:open", folder),
   create: (args) => ipcRenderer.invoke("workspace:create", args),
-  isInitialised: (folder) =>
-    ipcRenderer.invoke("workspace:isInitialised", folder),
+  configure: (config) => ipcRenderer.invoke("workspace:configure", config),
   save: (documents, deletedPaths) =>
     ipcRenderer.invoke("workspace:save", documents, deletedPaths),
   onFsEvent: (listener) => {

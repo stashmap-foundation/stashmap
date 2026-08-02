@@ -1,6 +1,6 @@
 import { Buffer } from "buffer";
 import crypto from "crypto";
-import { TextEncoder, TextDecoder } from "util";
+import { TextDecoder } from "util";
 import { ReadableStream, TransformStream, WritableStream } from "stream/web";
 import consumers from "stream/consumers";
 // eslint-disable-next-line import/no-extraneous-dependencies
@@ -18,7 +18,9 @@ if (!global.crypto) {
     value: crypto.webcrypto.subtle,
   });
 }
-global.TextEncoder = TextEncoder;
+global.TextEncoder = function TextEncoder() {};
+global.TextEncoder.prototype.encode = (input = "") =>
+  Uint8Array.from(Buffer.from(input, "utf8"));
 global.TextDecoder = TextDecoder;
 global.Buffer = Buffer;
 // age-encryption drives its cipher through Web Streams and collects the

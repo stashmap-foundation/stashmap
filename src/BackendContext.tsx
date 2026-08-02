@@ -6,17 +6,20 @@ import type {
   WorkspaceWriteRequest,
 } from "./infra/filesystem/workspaceBackend";
 import type { FsEventHandler } from "./infra/filesystem/workspaceWatcher";
+import type { WritePublisher } from "./infra/filesystem/writeSupport";
+import type { WorkspaceConfig } from "./workspaceConfig";
 
 export type WorkspaceState = {
   pickFolder: () => Promise<string | null>;
   open: (folder: string) => Promise<void>;
-  create: (args: { folder: string; secretKeyInput?: string }) => Promise<void>;
-  isInitialised: (folder: string) => Promise<boolean>;
+  create: (args: { folder: string }) => Promise<void>;
+  configure: (config: WorkspaceConfig) => Promise<void>;
   save: (
     writes: ReadonlyArray<WorkspaceWriteRequest>,
     deletedPaths?: ReadonlyArray<string>
   ) => Promise<{ changed_paths: string[]; removed_paths: string[] }>;
   subscribeFsEvents: (handler: FsEventHandler) => () => void;
+  publisher: WritePublisher;
   profile: LoadedCliProfile | null;
   files: WorkspaceMarkdownFile[];
 };
@@ -33,6 +36,7 @@ export type Backend = {
   loginWithExtension?: (publicKey: PublicKey) => User;
   logout?: () => Promise<void>;
   defaultRelays: Relays;
+  workspaceConfig: WorkspaceConfig | undefined;
   workspace?: WorkspaceState;
 };
 

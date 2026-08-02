@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { List, OrderedSet } from "immutable";
 import { LOCAL } from "../core/nodeRef";
 import { isUserLoggedIn } from "../NostrAuthContext";
-import { useBackend } from "../BackendContext";
 import { getNodeDocumentId } from "../core/plan";
 import { TemporaryViewProvider, useTemporaryView } from "./temporaryViewState";
 
@@ -557,7 +556,6 @@ function PaneStatusLine({
 }): JSX.Element {
   const paneIndex = usePaneIndex();
   const pane = useCurrentPane();
-  const { workspace } = useBackend();
   const isFirstPane = paneIndex === 0;
   const isViewingOtherUserContent = pane.sourceId !== LOCAL;
 
@@ -573,9 +571,7 @@ function PaneStatusLine({
       >
         {isViewingOtherUserContent && "READONLY"}
       </div>
-      {/* The relays/synced status tracks the web storage channel. The
-          desktop workspace is the disk — there is nothing to sync. */}
-      {isFirstPane && !workspace && <PublishingStatusWrapper />}
+      {isFirstPane && <PublishingStatusWrapper />}
       {isFirstPane && (
         <div className="status-segment">
           <PaneSettingsMenu onShowShortcuts={onShowShortcuts} />

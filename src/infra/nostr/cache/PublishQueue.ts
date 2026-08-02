@@ -44,11 +44,13 @@ export type QueueStatus = {
     readonly url: string;
     readonly retryAfter: number;
   }>;
-  readonly succeededPerRelay: ReadonlyArray<{
+  readonly pendingPerRelay: ReadonlyArray<{
     readonly url: string;
     readonly count: number;
   }>;
-  readonly pendingRelays: ReadonlyArray<string>;
+  readonly pendingStorageRelays: ReadonlyArray<string>;
+  readonly pendingRoomRelays: ReadonlyArray<string>;
+  readonly pendingConfigurationRelays: ReadonlyArray<string>;
 };
 
 type PublishQueueConfig = {
@@ -57,10 +59,12 @@ type PublishQueueConfig = {
   readonly batchSize?: number;
   readonly getDeps: () => FlushDeps;
   readonly onResults: (results: PublishResultsEventMap) => void;
+  readonly onStatus: (status: QueueStatus) => void;
 };
 
 type PublishQueue = {
   readonly enqueue: (events: List<UnsignedEvent & EventAttachment>) => void;
+  readonly flush: () => Promise<PublishResultsEventMap>;
   readonly getStatus: () => QueueStatus;
   readonly init: () => Promise<void>;
   readonly wake: () => void;
@@ -95,17 +99,26 @@ const publishToRelays = async (
   if (writeRelayUrls.length === 0) {
     return Map<string, PublishStatus>();
   }
-  const timeoutPromise = (ms: number): Promise<unknown> =>
-    new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("Timeout")), ms);
+  const withTimeout = (promise: Promise<unknown>): Promise<unknown> =>
+    new Promise((resolve, reject) => {
+      const timeout = setTimeout(
+        () => reject(new Error("Timeout")),
+        PUBLISH_TIMEOUT
+      );
+      promise.then(
+        (value) => {
+          clearTimeout(timeout);
+          resolve(value);
+        },
+        (error) => {
+          clearTimeout(timeout);
+          reject(error);
+        }
+      );
     });
 
   const results = await Promise.allSettled(
-    backend
-      .publish([...writeRelayUrls], event)
-      .map((promise) =>
-        Promise.race([promise, timeoutPromise(PUBLISH_TIMEOUT)])
-      )
+    backend.publish([...writeRelayUrls], event).map(withTimeout)
   );
 
   return writeRelayUrls.reduce((rdx, url, index) => {
@@ -137,33 +150,35 @@ export const createPublishQueue = (
   let destroyed = false;
 
   const getStatus = (): QueueStatus => {
-    const counts = new globalThis.Map<string, number>();
-    buffer.forEach((entry) => {
-      (entry.succeededRelays || []).forEach((url) => {
-        counts.set(url, (counts.get(url) || 0) + 1);
+    const pendingCounts = new globalThis.Map<string, number>();
+    const storageRelays = new Set<string>();
+    const roomRelays = new Set<string>();
+    const configurationRelays = new Set<string>();
+    try {
+      const { workspaceConfig } = config.getDeps();
+      buffer.forEach((entry) => {
+        const relayUrls =
+          publicationRouteUrls(entry.event.route, workspaceConfig) ?? [];
+        const succeeded = entry.succeededRelays || [];
+        relayUrls.forEach((url) => {
+          if (!succeeded.includes(url)) {
+            pendingCounts.set(url, (pendingCounts.get(url) || 0) + 1);
+          }
+          if (entry.event.route.kind === "storage") {
+            storageRelays.add(url);
+          } else if (entry.event.route.kind === "shared") {
+            roomRelays.add(url);
+          } else {
+            configurationRelays.add(url);
+          }
+        });
       });
-    });
-    const succeededPerRelay = Array.from(counts.entries()).map(
-      ([url, count]) => ({ url, count })
-    );
-    const pendingRelays = (() => {
-      try {
-        const { workspaceConfig } = config.getDeps();
-        return [
-          ...new Set(
-            buffer
-              .valueSeq()
-              .flatMap(
-                (entry) =>
-                  publicationRouteUrls(entry.event.route, workspaceConfig) ?? []
-              )
-              .toArray()
-          ),
-        ].sort();
-      } catch {
-        return [];
-      }
-    })();
+    } catch {
+      pendingCounts.clear();
+      storageRelays.clear();
+      roomRelays.clear();
+      configurationRelays.clear();
+    }
     return {
       pendingCount: buffer.size,
       flushing,
@@ -171,10 +186,16 @@ export const createPublishQueue = (
         .entrySeq()
         .toArray()
         .map(([url, state]) => ({ url, retryAfter: state.nextRetryAfter })),
-      succeededPerRelay,
-      pendingRelays,
+      pendingPerRelay: Array.from(pendingCounts.entries()).map(
+        ([url, count]) => ({ url, count })
+      ),
+      pendingStorageRelays: [...storageRelays].sort(),
+      pendingRoomRelays: [...roomRelays].sort(),
+      pendingConfigurationRelays: [...configurationRelays].sort(),
     };
   };
+
+  const emitStatus = (): void => config.onStatus(getStatus());
 
   const persistToOutbox = (entry: OutboxEntry): void => {
     if (!config.db) return;
@@ -235,10 +256,10 @@ export const createPublishQueue = (
   const processBatch = async (
     chunk: ReadonlyArray<[string, OutboxEntry]>,
     deps: FlushDeps
-  ): Promise<void> => {
+  ): Promise<PublishResultsEventMap> => {
     const chunkEvents = List(chunk.map(([, entry]) => entry.event));
     const signed = await signEvents(chunkEvents, deps.user, deps.finalizeEvent);
-    if (signed.size === 0) return;
+    if (signed.size === 0) return Map();
 
     // eslint-disable-next-line functional/no-let
     let batchResults = Map<string, PublishResultsOfEvent>();
@@ -312,16 +333,36 @@ export const createPublishQueue = (
       }
     });
 
-    flushing = false;
+    emitStatus();
     if (batchResults.size > 0) {
       config.onResults(batchResults);
     }
-    flushing = true;
+    return batchResults;
   };
 
-  async function flush(): Promise<void> {
-    if (flushing || destroyed || buffer.size === 0) return;
+  // eslint-disable-next-line functional/no-let
+  let flushPromise = Promise.resolve(Map<string, PublishResultsOfEvent>());
+
+  function flush(): Promise<PublishResultsEventMap> {
+    // eslint-disable-next-line @typescript-eslint/no-use-before-define
+    const requested = flushPromise.then(runFlush, runFlush);
+    flushPromise = requested.then(
+      () => Map<string, PublishResultsOfEvent>(),
+      () => Map<string, PublishResultsOfEvent>()
+    );
+    return requested;
+  }
+
+  async function runFlush(): Promise<PublishResultsEventMap> {
+    if (destroyed || buffer.size === 0) return Map();
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
     flushing = true;
+    emitStatus();
+    // eslint-disable-next-line functional/no-let
+    let flushResults = Map<string, PublishResultsOfEvent>();
 
     try {
       const deps = config.getDeps();
@@ -334,7 +375,9 @@ export const createPublishQueue = (
           prev.then(async () => {
             if (destroyed) return;
             try {
-              await processBatch(chunk, deps);
+              flushResults = flushResults.merge(
+                await processBatch(chunk, deps)
+              );
             } catch (error) {
               // eslint-disable-next-line no-console
               console.error("Publish queue batch failed, continuing", error);
@@ -342,8 +385,6 @@ export const createPublishQueue = (
           }),
         Promise.resolve()
       );
-
-      flushing = false;
 
       scheduleRetry();
 
@@ -360,7 +401,9 @@ export const createPublishQueue = (
       scheduleRetry();
     } finally {
       flushing = false;
+      emitStatus();
     }
+    return flushResults;
   }
 
   const publishDeleteImmediate = async (
@@ -447,6 +490,7 @@ export const createPublishQueue = (
     if (buffered) {
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => flush(), debounceMs);
+      emitStatus();
     }
   };
 
@@ -468,6 +512,7 @@ export const createPublishQueue = (
       if (buffer.size > 0) {
         timer = setTimeout(() => flush(), debounceMs);
       }
+      emitStatus();
     } catch {
       // eslint-disable-next-line no-console
       console.error("Failed to load outbox from IndexedDB");
@@ -482,5 +527,5 @@ export const createPublishQueue = (
     window.removeEventListener("beforeunload", handleBeforeUnload);
   };
 
-  return { enqueue, getStatus, init, wake, destroy };
+  return { enqueue, flush, getStatus, init, wake, destroy };
 };

@@ -139,10 +139,21 @@ function eventMs(event: Event): number {
   return Number.isFinite(ms) ? ms : event.created_at * 1000;
 }
 
-function isNewerDeposit(event: Event, record: PullSourceRecord): boolean {
-  return event.created_at !== record.createdAt
-    ? event.created_at > record.createdAt
-    : event.id < record.latestEventId;
+function replacementTuple(record: PullSourceRecord): [number, number, string] {
+  return [record.createdAt, record.ms, record.latestEventId];
+}
+
+function eventTuple(event: Event): [number, number, string] {
+  return [event.created_at, eventMs(event), event.id];
+}
+
+function compareTuple(
+  left: [number, number, string],
+  right: [number, number, string]
+): number {
+  return (
+    left[0] - right[0] || left[1] - right[1] || left[2].localeCompare(right[2])
+  );
 }
 
 export function matchedInterestKeys(
@@ -286,7 +297,10 @@ export function applyDepositEventToRecords(
     return new Map(records);
   }
   const existing = records.get(nextRecord.sourceId);
-  if (existing && !isNewerDeposit(event, existing)) {
+  if (
+    existing &&
+    compareTuple(eventTuple(event), replacementTuple(existing)) <= 0
+  ) {
     return new Map(records);
   }
   const rematched = {

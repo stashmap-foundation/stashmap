@@ -136,10 +136,16 @@ signedDepositFixtures.forEach((fixture) => {
     if (!pubkey) {
       throw new Error(`${name}: pubkey is invalid`);
     }
+    const ms = event.tags.find((tag) => tag[0] === "ms")?.[1];
+    if (!ms) {
+      throw new Error(`${name}: ms tag is missing`);
+    }
+    const dateNow = jest.spyOn(Date, "now").mockReturnValue(Number(ms));
     const rebuilt = finalizeEvent(
       buildDepositEvent(document, pubkey, event.content, event.created_at),
       hexToBytes(fixture.secretKey)
     );
+    dateNow.mockRestore();
     expect({
       kind: rebuilt.kind,
       pubkey: rebuilt.pubkey,
@@ -201,7 +207,9 @@ test("deposit construction derives every ordered S tag from the workspace graph"
     throw new Error("Missing multi-root fixture document");
   }
   const content = fs.readFileSync(path.join(workspaceDir, "main.md"), "utf8");
+  const dateNow = jest.spyOn(Date, "now").mockReturnValue(1234000);
   const event = buildDepositEvent(document, profile.pubkey, content, 1234);
+  dateNow.mockRestore();
 
   expect(event).toEqual({
     kind: 34774,
@@ -213,34 +221,44 @@ test("deposit construction derives every ordered S tag from the workspace graph"
       ["S", "asset:contract"],
       ["S", ""],
       ["S", "😀"],
+      ["ms", "1234000"],
     ],
     content,
   });
 });
 
-test("replacement ordering chooses the latest timestamp then lower id", () => {
+test("replacement ordering chooses the latest timestamp then ms", () => {
   const base = fixtureEvent(signedDepositFixtures[0]?.event);
   const older = {
     ...base,
     id: "0".repeat(64),
     created_at: 99,
-    tags: [["d", "replacement"]],
+    tags: [
+      ["d", "replacement"],
+      ["ms", "99000"],
+    ],
   };
-  const higherId = {
+  const lowerMs = {
     ...base,
-    id: "e".repeat(64),
+    id: "f".repeat(64),
     created_at: 100,
-    tags: [["d", "replacement"]],
+    tags: [
+      ["d", "replacement"],
+      ["ms", "100000"],
+    ],
   };
-  const lowerId = {
+  const higherMs = {
     ...base,
     id: "a".repeat(64),
     created_at: 100,
-    tags: [["d", "replacement"]],
+    tags: [
+      ["d", "replacement"],
+      ["ms", "100001"],
+    ],
   };
 
-  expect(selectLatestDepositEvents([older, higherId, lowerId])).toEqual([
-    lowerId,
+  expect(selectLatestDepositEvents([older, lowerMs, higherMs])).toEqual([
+    higherMs,
   ]);
 });
 

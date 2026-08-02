@@ -98,7 +98,10 @@ test("web settings publish encrypted configuration only to configuration relays"
     expect(screen.getByLabelText(`storage relay ${url}`)).toBeDefined();
   });
   await addRelay("storage", "wss://storage.extra/");
-  await addRelay("room", "wss://room.example/");
+  await userEvent.type(
+    screen.getByLabelText("add room relay"),
+    "wss://room.example/"
+  );
   await userEvent.click(screen.getByText("Save"));
 
   await waitFor(() => {
@@ -311,7 +314,7 @@ test("web saves route storage and canonical deposits independently", async () =>
   expect(storageWire.relays).toEqual(TEST_RELAYS.map((relay) => relay.url));
   expect(deposit.content).toBe(storage.content);
   expect(deposit.tags[0]?.[0]).toBe("d");
-  expect(deposit.tags.some((tag) => tag[0] === "ms")).toBe(false);
+  expect(deposit.tags.some((tag) => tag[0] === "ms")).toBe(true);
   expect(deposit.tags).toContainEqual([
     "S",
     "asset:rgb:cdtFZh2Q-YTY1rYW-yBdMlZb-GbkThw~-ArYpJ72-eXiti5Y",

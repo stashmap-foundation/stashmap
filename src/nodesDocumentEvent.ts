@@ -2,6 +2,7 @@ import { Event, UnsignedEvent } from "nostr-tools";
 import type { Document } from "./core/Document";
 import { documentAudienceTags } from "./core/Document";
 import { newStorageKey } from "./storageEncryption";
+import { getEventMs } from "./nostrEvents";
 import {
   KIND_KNOWLEDGE_DEPOSIT,
   KIND_KNOWLEDGE_DOCUMENT,
@@ -48,15 +49,26 @@ export function buildDepositEvent(
     tags: [
       ["d", document.docId],
       ...depositEntityTags(document).map((tag) => ["S", tag]),
+      msTag(),
     ],
     content,
   };
 }
 
+function depositOrder(event: Event): [number, number, string] {
+  return [event.created_at, getEventMs(event), event.id];
+}
+
 function isNewerDeposit(candidate: Event, current: Event): boolean {
-  return candidate.created_at !== current.created_at
-    ? candidate.created_at > current.created_at
-    : candidate.id < current.id;
+  const candidateOrder = depositOrder(candidate);
+  const currentOrder = depositOrder(current);
+  return (
+    candidateOrder[0] > currentOrder[0] ||
+    (candidateOrder[0] === currentOrder[0] &&
+      (candidateOrder[1] > currentOrder[1] ||
+        (candidateOrder[1] === currentOrder[1] &&
+          candidateOrder[2] > currentOrder[2])))
+  );
 }
 
 export function selectLatestDepositEvents(events: readonly Event[]): Event[] {

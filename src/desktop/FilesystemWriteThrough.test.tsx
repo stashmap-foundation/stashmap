@@ -522,6 +522,7 @@ test.each(publicationModes)(
       expect(deposit.tags).toEqual([
         ["d", "routed-doc"],
         ["S", "root"],
+        ["ms", "1750000000123"],
       ]);
     }
   }

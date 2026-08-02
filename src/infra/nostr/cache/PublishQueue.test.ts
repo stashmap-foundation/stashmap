@@ -92,6 +92,7 @@ const makeQueue = (
       finalizeEvent: mockFinalizeEvent(),
     }),
     onResults,
+    onStatus: jest.fn(),
   });
   return { queue, relayPool, onResults };
 };
@@ -109,6 +110,7 @@ test("configuration routes use only their embedded relay URLs", async () => {
       finalizeEvent: mockFinalizeEvent(),
     }),
     onResults,
+    onStatus: jest.fn(),
   });
 
   queue.enqueue(
@@ -140,6 +142,7 @@ test("shared routes wait until a room is configured", async () => {
       finalizeEvent: mockFinalizeEvent(),
     }),
     onResults,
+    onStatus: jest.fn(),
   });
 
   queue.enqueue(List([makeDeposit("waiting", { kind: "shared" })]));
@@ -284,6 +287,7 @@ test("clears events from buffer when their target relay is removed from config",
       finalizeEvent: mockFinalizeEvent(),
     }),
     onResults,
+    onStatus: jest.fn(),
   });
 
   queue.enqueue(List([makeEvent("a"), makeEvent("b")]));
@@ -341,6 +345,7 @@ test("publishes events enqueued during an in-progress flush", async () => {
       finalizeEvent: mockFinalizeEvent(),
     }),
     onResults,
+    onStatus: jest.fn(),
   });
 
   queue.enqueue(List([makeEvent("a")]));

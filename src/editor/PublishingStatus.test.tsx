@@ -26,6 +26,34 @@ test("Sync Status", async () => {
   await screen.findByText("relay.test.first.success/");
 });
 
+test("Sync Status displays storage and room routes", async () => {
+  const [alice] = setup([ALICE]);
+  renderWithTestData(
+    <>
+      <RootViewOrPaneIsLoading>
+        <PublishingStatusWrapper />
+        <PaneView />
+      </RootViewOrPaneIsLoading>
+    </>,
+    {
+      ...alice(),
+      storageRelays: ["wss://storage.one/", "wss://storage.two/"],
+      roomRelays: ["wss://room.one/", "wss://room.two/", "wss://room.three/"],
+    }
+  );
+
+  await type("Root{Enter}Hello routes{Escape}");
+  await userEvent.click((await screen.findAllByLabelText("sync status"))[0]);
+
+  await screen.findByText("storage.one/");
+  await screen.findByText("storage.two/");
+  await screen.findByText("room.one/");
+  await screen.findByText("room.two/");
+  await screen.findByText("room.three/");
+  expect(screen.getByLabelText("Storage relays")).toBeDefined();
+  expect(screen.getByLabelText("Room relays")).toBeDefined();
+});
+
 test("Details of Sync Status", async () => {
   const [alice] = setup([ALICE]);
   const utils = alice();

@@ -1,3 +1,20 @@
+/* eslint-disable functional/immutable-data, functional/no-let, no-console */
+/**
+ * Generates the shared signed-event conformance fixtures.
+ *
+ * The markdown corpus pins the parser; these fixtures pin the wire. They
+ * are canonical kind-34774 deposits built through the production
+ * `buildDepositEvent` path, signed with fixed keys at fixed timestamps,
+ * for the wallet's Rust backend — the wire contract's second
+ * implementation — to verify: signature validity, `d` = `knowstr_doc_id`,
+ * graph-derived `S` tags, and newest-wins selection per (pubkey, docId)
+ * with the `ms` tie-break.
+ *
+ * Usage:
+ *   npx esbuild scripts/generateKnowstrEventFixtures.ts --bundle \
+ *     --platform=node --outfile=/tmp/knowstr-event-gen.cjs
+ *   node /tmp/knowstr-event-gen.cjs <outFile>
+ */
 /// <reference path="../src/types.ts" />
 import * as fs from "fs";
 import * as path from "path";
@@ -28,6 +45,7 @@ type FixtureCase = {
   markdown: string;
   secretKey: string;
   createdAt: number;
+  ms: number;
 };
 
 const CASES: FixtureCase[] = [
@@ -46,6 +64,7 @@ const CASES: FixtureCase[] = [
     ].join("\n"),
     secretKey: ALICE_SK,
     createdAt: 1750000000,
+    ms: 1750000000000,
   },
   {
     name: "entities-essay",
@@ -63,6 +82,7 @@ const CASES: FixtureCase[] = [
     ].join("\n"),
     secretKey: ALICE_SK,
     createdAt: 1750000100,
+    ms: 1750000100000,
   },
   {
     name: "arrangement",
@@ -82,6 +102,7 @@ const CASES: FixtureCase[] = [
     ].join("\n"),
     secretKey: BOB_SK,
     createdAt: 1750000150,
+    ms: 1750000150000,
   },
   {
     name: "replaceable-old",
@@ -97,6 +118,7 @@ const CASES: FixtureCase[] = [
     ].join("\n"),
     secretKey: ALICE_SK,
     createdAt: 1750000200,
+    ms: 1750000200000,
   },
   {
     name: "replaceable-new",
@@ -112,9 +134,11 @@ const CASES: FixtureCase[] = [
     ].join("\n"),
     secretKey: ALICE_SK,
     createdAt: 1750000300,
+    ms: 1750000300000,
   },
   {
-    name: "tie-a",
+    // Same created_at as tie-high — the ms tag must break the tie.
+    name: "tie-low-ms",
     markdown: [
       "---",
       "knowstr_doc_id: fixture-tie",
@@ -127,9 +151,10 @@ const CASES: FixtureCase[] = [
     ].join("\n"),
     secretKey: ALICE_SK,
     createdAt: 1750000400,
+    ms: 1750000400000,
   },
   {
-    name: "tie-b",
+    name: "tie-high-ms",
     markdown: [
       "---",
       "knowstr_doc_id: fixture-tie",
@@ -142,36 +167,7 @@ const CASES: FixtureCase[] = [
     ].join("\n"),
     secretKey: ALICE_SK,
     createdAt: 1750000400,
-  },
-  {
-    name: "id-tie-a",
-    markdown: [
-      "---",
-      "knowstr_doc_id: fixture-id-tie",
-      "---",
-      "",
-      "# Id tie <!-- id:u40 -->",
-      "",
-      "- candidate a <!-- id:u41 -->",
-      "",
-    ].join("\n"),
-    secretKey: ALICE_SK,
-    createdAt: 1750000450,
-  },
-  {
-    name: "id-tie-b",
-    markdown: [
-      "---",
-      "knowstr_doc_id: fixture-id-tie",
-      "---",
-      "",
-      "# Id tie <!-- id:u40 -->",
-      "",
-      "- candidate b <!-- id:u41 -->",
-      "",
-    ].join("\n"),
-    secretKey: ALICE_SK,
-    createdAt: 1750000450,
+    ms: 1750000400500,
   },
   {
     name: "second-author",
@@ -187,6 +183,7 @@ const CASES: FixtureCase[] = [
     ].join("\n"),
     secretKey: BOB_SK,
     createdAt: 1750000250,
+    ms: 1750000250000,
   },
 ];
 
@@ -214,13 +211,19 @@ function buildFixture(fixtureCase: FixtureCase) {
     parsed.document
   );
   const content = renderDocumentMarkdown(parsed.context.knowledgeDBs, document);
+  const template = buildDepositEvent(
+    document,
+    publicKey(fixtureCase.secretKey),
+    content,
+    fixtureCase.createdAt
+  );
   const event = finalizeEvent(
-    buildDepositEvent(
-      document,
-      publicKey(fixtureCase.secretKey),
-      content,
-      fixtureCase.createdAt
-    ),
+    {
+      ...template,
+      tags: template.tags.map((tag) =>
+        tag[0] === "ms" ? ["ms", String(fixtureCase.ms)] : tag
+      ),
+    },
     hexToBytes(fixtureCase.secretKey)
   );
   return {

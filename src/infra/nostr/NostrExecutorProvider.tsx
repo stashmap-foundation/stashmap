@@ -7,7 +7,7 @@ import { useData } from "../../DataContext";
 import { ExecutorProvider } from "../../ExecutorContext";
 import { buildDocumentEvents, buildDocumentWrites, Plan } from "../../planner";
 import { buildDepositEvent } from "../../nodesDocumentEvent";
-import { newTimestamp } from "../../nostr";
+import { KIND_SETTINGS, newTimestamp } from "../../nostr";
 import { execute, republishEvents } from "./executor";
 import { createPublishQueue } from "./cache/PublishQueue";
 import { useCacheDB } from "./cache/CacheDBContext";
@@ -92,19 +92,19 @@ export function NostrExecutorProvider({
           ...prevStatus,
           results: mergePublishResultsOfEvents(prevStatus.results, results),
           isLoading: false,
-          queueStatus: queueRef.current?.getStatus(),
+        }));
+      },
+      onStatus: (queueStatus) => {
+        if (!mountedRef.current) return;
+        setPublishEventsRef.current((prevStatus) => ({
+          ...prevStatus,
+          queueStatus,
         }));
       },
     });
     // eslint-disable-next-line functional/immutable-data
     queueRef.current = queue;
-    queue.init().then(() => {
-      if (!mountedRef.current) return;
-      setPublishEventsRef.current((prev) => ({
-        ...prev,
-        queueStatus: queue.getStatus(),
-      }));
-    });
+    queue.init().then(() => undefined);
     return () => {
       // eslint-disable-next-line functional/immutable-data
       queueRef.current = null;
@@ -152,11 +152,29 @@ export function NostrExecutorProvider({
     });
 
     if (queueRef.current) {
-      queueRef.current.enqueue(filteredEvents);
-      setPublishEvents((prev) => ({
-        ...prev,
-        queueStatus: queueRef.current?.getStatus(),
-      }));
+      const queue = queueRef.current;
+      queue.enqueue(filteredEvents);
+      if (
+        filteredEvents.every((event) => event.route.kind === "configuration")
+      ) {
+        const results = await queue.flush();
+        const configurationResults = results.filter(
+          ({ event }) => event.kind === KIND_SETTINGS
+        );
+        const acknowledged = configurationResults.some(({ results: relays }) =>
+          relays.some(({ status }) => status === "fulfilled")
+        );
+        if (!acknowledged) {
+          const failedRelays = configurationResults
+            .valueSeq()
+            .flatMap(({ results: relays }) =>
+              relays.filter(({ status }) => status === "rejected").keySeq()
+            )
+            .toSet()
+            .toArray();
+          throw new Error(`Failed to publish on: ${failedRelays.join(",")}`);
+        }
+      }
       return;
     }
 

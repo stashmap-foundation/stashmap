@@ -10,38 +10,48 @@ import {
   WorkspaceConfig,
 } from "../workspaceConfig";
 
+function withRelayDraft(
+  relays: string[],
+  draft: string,
+  channel: "storage" | "room"
+): string[] {
+  if (draft.length === 0) {
+    return relays;
+  }
+  const normalized = normalizeWorkspaceConfig({
+    storageRelays: channel === "storage" ? [draft] : [],
+    roomRelays: channel === "room" ? [draft] : [],
+  });
+  const url =
+    channel === "storage"
+      ? normalized.storageRelays[0]
+      : normalized.roomRelays[0];
+  return url && !relays.includes(url) ? [...relays, url] : relays;
+}
+
 function RelayList({
   label,
   channel,
   relays,
+  draft,
   onChange,
+  onDraftChange,
 }: {
   label: string;
   channel: "storage" | "room";
   relays: string[];
+  draft: string;
   onChange: (relays: string[]) => void;
+  onDraftChange: (draft: string) => void;
 }): JSX.Element {
-  const [newRelay, setNewRelay] = useState("");
   const add = (): void => {
-    const normalized = normalizeWorkspaceConfig({
-      storageRelays: channel === "storage" ? [newRelay] : [],
-      roomRelays: channel === "room" ? [newRelay] : [],
-    });
-    const url =
-      channel === "storage"
-        ? normalized.storageRelays[0]
-        : normalized.roomRelays[0];
-    if (!url || relays.includes(url)) {
-      setNewRelay("");
-      return;
-    }
-    onChange([...relays, url]);
-    setNewRelay("");
+    onChange(withRelayDraft(relays, draft, channel));
+    onDraftChange("");
   };
 
   return (
     <section aria-label={label} className="mb-4">
-      <h5>{label}</h5>
+      <div className="relay-section-header">{label}</div>
       {relays.map((url, index) => (
         <div
           className="relay-row"
@@ -66,9 +76,9 @@ function RelayList({
           type="text"
           className="form-control"
           aria-label={`add ${channel} relay`}
-          value={newRelay}
+          value={draft}
           placeholder="wss://"
-          onChange={(event) => setNewRelay(event.target.value)}
+          onChange={(event) => onDraftChange(event.target.value)}
         />
         <button
           type="button"
@@ -95,6 +105,8 @@ export function Relays({
   const navigate = useNavigate();
   const [storageRelays, setStorageRelays] = useState(config.storageRelays);
   const [roomRelays, setRoomRelays] = useState(config.roomRelays);
+  const [storageRelayDraft, setStorageRelayDraft] = useState("");
+  const [roomRelayDraft, setRoomRelayDraft] = useState("");
 
   useEffect(() => {
     setStorageRelays(config.storageRelays);
@@ -103,8 +115,10 @@ export function Relays({
 
   const submit = async (): Promise<void> => {
     const values = {
-      storageRelays: showStorage ? storageRelays : [],
-      roomRelays,
+      storageRelays: showStorage
+        ? withRelayDraft(storageRelays, storageRelayDraft, "storage")
+        : [],
+      roomRelays: withRelayDraft(roomRelays, roomRelayDraft, "room"),
     };
     const next = showStorage
       ? normalizeWebWorkspaceConfig(values)
@@ -123,14 +137,18 @@ export function Relays({
           label="Storage relays"
           channel="storage"
           relays={storageRelays}
+          draft={storageRelayDraft}
           onChange={setStorageRelays}
+          onDraftChange={setStorageRelayDraft}
         />
       )}
       <RelayList
         label="Room relays"
         channel="room"
         relays={roomRelays}
+        draft={roomRelayDraft}
         onChange={setRoomRelays}
+        onDraftChange={setRoomRelayDraft}
       />
     </ModalForm>
   );

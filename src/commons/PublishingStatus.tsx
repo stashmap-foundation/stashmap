@@ -2,6 +2,12 @@ import React from "react";
 import { Map } from "immutable";
 import { Event } from "nostr-tools";
 import { QueueStatus } from "../infra/nostr/cache/PublishQueue";
+import {
+  KIND_DELETE,
+  KIND_KNOWLEDGE_DEPOSIT,
+  KIND_KNOWLEDGE_DOCUMENT,
+  KIND_SETTINGS,
+} from "../nostr";
 
 export function mergePublishResultsOfEvents(
   existing: PublishResultsEventMap,
@@ -20,19 +26,22 @@ export function mergePublishResultsOfEvents(
 }
 
 function transformPublishResults(
-  results: PublishResultsEventMap
+  results: PublishResultsEventMap,
+  kinds: ReadonlyArray<number>
 ): PublishResultsRelayMap {
-  return results.reduce((reducer, resultsOfEvents, eventId) => {
-    return resultsOfEvents.results.reduce((rdx, publishStatus, relayUrl) => {
-      return rdx.set(
-        relayUrl,
-        (rdx.get(relayUrl) || Map<string, Event & PublishStatus>()).set(
-          eventId,
-          { ...resultsOfEvents.event, ...publishStatus }
-        )
-      );
-    }, reducer);
-  }, Map<string, Map<string, Event & PublishStatus>>());
+  return results
+    .filter(({ event }) => kinds.includes(event.kind))
+    .reduce((reducer, resultsOfEvents, eventId) => {
+      return resultsOfEvents.results.reduce((rdx, publishStatus, relayUrl) => {
+        return rdx.set(
+          relayUrl,
+          (rdx.get(relayUrl) || Map<string, Event & PublishStatus>()).set(
+            eventId,
+            { ...resultsOfEvents.event, ...publishStatus }
+          )
+        );
+      }, reducer);
+    }, Map<string, Map<string, Event & PublishStatus>>());
 }
 
 function getStatusCount(status: PublishResultsOfRelay, type: string): number {
@@ -114,12 +123,6 @@ function RelayRow({
   );
 }
 
-type PublishingStatusContentProps = {
-  publishEventsStatus: { readonly results: PublishResultsEventMap };
-  writeRelayUrls: ReadonlyArray<string>;
-  queueStatus?: QueueStatus;
-};
-
 const getBackoffSeconds = (
   queueStatus: QueueStatus | undefined,
   relayUrl: string
@@ -136,30 +139,34 @@ const getPendingForRelay = (
   relayUrl: string
 ): number => {
   if (!queueStatus || queueStatus.pendingCount === 0) return 0;
-  const entry = queueStatus.succeededPerRelay.find((r) => r.url === relayUrl);
-  return entry
-    ? queueStatus.pendingCount - entry.count
-    : queueStatus.pendingCount;
+  return (
+    queueStatus.pendingPerRelay.find((entry) => entry.url === relayUrl)
+      ?.count ?? 0
+  );
 };
 
-export function PublishingStatusContent({
+function RelaySection({
+  title,
+  relayUrls,
   publishEventsStatus,
-  writeRelayUrls,
+  eventKinds,
   queueStatus,
-}: PublishingStatusContentProps): JSX.Element {
-  const pendingCount = queueStatus?.pendingCount ?? 0;
+}: {
+  title: string;
+  relayUrls: ReadonlyArray<string>;
+  publishEventsStatus: { readonly results: PublishResultsEventMap };
+  eventKinds: ReadonlyArray<number>;
+  queueStatus: QueueStatus | undefined;
+}): JSX.Element | null {
+  if (relayUrls.length === 0) return null;
   const publishResultsRelayMap = transformPublishResults(
-    publishEventsStatus.results
+    publishEventsStatus.results,
+    eventKinds
   );
-
   return (
-    <div className="publish-status-content">
-      {pendingCount > 0 && (
-        <div className="publish-pending-info">
-          {pendingCount} event{pendingCount !== 1 ? "s" : ""} pending
-        </div>
-      )}
-      {writeRelayUrls.map((relayUrl) => (
+    <section aria-label={title}>
+      <div className="relay-section-header">{title}</div>
+      {relayUrls.map((relayUrl) => (
         <RelayRow
           key={relayUrl}
           relayUrl={relayUrl}
@@ -168,6 +175,53 @@ export function PublishingStatusContent({
           backoffSeconds={getBackoffSeconds(queueStatus, relayUrl)}
         />
       ))}
+    </section>
+  );
+}
+
+export function PublishingStatusContent({
+  publishEventsStatus,
+  storageRelayUrls,
+  roomRelayUrls,
+  configurationRelayUrls,
+  queueStatus,
+}: {
+  publishEventsStatus: { readonly results: PublishResultsEventMap };
+  storageRelayUrls: ReadonlyArray<string>;
+  roomRelayUrls: ReadonlyArray<string>;
+  configurationRelayUrls: ReadonlyArray<string>;
+  queueStatus: QueueStatus | undefined;
+}): JSX.Element {
+  const pendingCount = queueStatus?.pendingCount ?? 0;
+
+  return (
+    <div className="publish-status-content">
+      {pendingCount > 0 && (
+        <div className="publish-pending-info">
+          {pendingCount} event{pendingCount !== 1 ? "s" : ""} pending
+        </div>
+      )}
+      <RelaySection
+        title="Storage relays"
+        relayUrls={storageRelayUrls}
+        publishEventsStatus={publishEventsStatus}
+        eventKinds={[KIND_KNOWLEDGE_DOCUMENT, KIND_DELETE]}
+        queueStatus={queueStatus}
+      />
+      <RelaySection
+        title="Room relays"
+        relayUrls={roomRelayUrls}
+        publishEventsStatus={publishEventsStatus}
+        eventKinds={[KIND_KNOWLEDGE_DEPOSIT]}
+        queueStatus={queueStatus}
+      />
+      <RelaySection
+        title="Configuration relays"
+        relayUrls={configurationRelayUrls}
+        publishEventsStatus={publishEventsStatus}
+        eventKinds={[KIND_SETTINGS]}
+        queueStatus={queueStatus}
+      />
     </div>
   );
 }

@@ -902,24 +902,27 @@ function getIncomingGroupChildren(
   };
 }
 
-// The embed projection at row level (idea.md: an embed means "that node,
-// here" and shows the target's live text and children). Graph-only walks
-// from the displayed row — no pane or document lookups — so it works in
-// every surface. Composition terminates when an id repeats on the active
-// expansion path.
-function getProjectedGraphChildren(
+// The embed composition at row level (lab RULES): start from base child
+// order, let the placement rows in the embedding file consume their
+// occurrences, move anchored placements after their anchors, suppress
+// dismissals with their subtree, and append anchorless own rows after the
+// base rows in file order. Graph-only walks from the displayed row — no
+// pane or document lookups — so it works in every surface. Composition
+// terminates when an id repeats on the active expansion path.
+function composeEmbedChildren(
   data: Data,
   graph: GraphLookup,
   parentRow: Row,
+  fileChildRows: List<Row>,
   typeFilters: Pane["typeFilters"]
-): List<Row> {
+): List<Row> | undefined {
   const targetID = embeddedTarget(parentRow.node);
   if (targetID === undefined) {
-    return List<Row>();
+    return undefined;
   }
   const target = lookupNode(graph, targetID, parentRow.ref.sourceId);
   if (!target) {
-    return List<Row>();
+    return undefined;
   }
   const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
   const expansionPath = expansionPathOf(parentRow.viewPath);
@@ -927,31 +930,112 @@ function getProjectedGraphChildren(
     parentRow.viewPath,
     parentRow.node.id
   );
-  return target.node.children
+  const claimTargetOf = (node: GraphNode): ID | undefined =>
+    embeddedTarget(node);
+  const dismissedClaim = (node: GraphNode): boolean =>
+    node.relevance === "not_relevant" && claimTargetOf(node) !== undefined;
+  const rowsByNodeId = new globalThis.Map<ID, Row>(
+    fileChildRows.toArray().map((row) => [row.node.id, row])
+  );
+  // Consumption reads the file's bytes, not the filtered display rows: a
+  // dismissed placement suppresses its occurrence even while hidden.
+  const consumedBy = new globalThis.Map<ID, GraphNode>();
+  parentRow.node.children.toArray().forEach((childID) => {
+    const child = getNodeInSource(graph, {
+      sourceId: parentRow.ref.sourceId,
+      id: childID,
+    })?.node;
+    const claimTarget = child ? claimTargetOf(child) : undefined;
+    if (child && claimTarget !== undefined && !consumedBy.has(claimTarget)) {
+      consumedBy.set(claimTarget, child);
+    }
+  });
+  const baseItems = target.node.children
     .filter(
       (childID) => childID !== EMPTY_NODE_ID && !expansionPath.includes(childID)
     )
-    .map((childID) =>
-      getNodeInSource(graph, { sourceId: target.ref.sourceId, id: childID })
-    )
-    .filter((child): child is ResolvedNode => child !== undefined)
-    .filter((child) => itemPassesFilters(child.node, activeFilters))
-    .map((child) =>
-      createRow(
-        data,
-        graph,
-        appendNodeToPath(parentPath, child.node.id),
-        child.node,
-        child.ref.sourceId,
-        parentRow,
-        target.node,
-        target.ref,
-        undefined,
-        false,
-        undefined
-      )
-    )
-    .toList();
+    .toArray()
+    .flatMap((childID) => {
+      const placement = consumedBy.get(childID);
+      if (placement) {
+        if (dismissedClaim(placement)) {
+          return [];
+        }
+        const placementRow = rowsByNodeId.get(placement.id);
+        return placementRow ? [placementRow] : [];
+      }
+      const child = getNodeInSource(graph, {
+        sourceId: target.ref.sourceId,
+        id: childID,
+      });
+      if (!child || !itemPassesFilters(child.node, activeFilters)) {
+        return [];
+      }
+      return [
+        createRow(
+          data,
+          graph,
+          appendNodeToPath(parentPath, child.node.id),
+          child.node,
+          child.ref.sourceId,
+          parentRow,
+          target.node,
+          target.ref,
+          undefined,
+          false,
+          undefined
+        ),
+      ];
+    });
+  const appended = fileChildRows
+    .filter((row) => {
+      if (dismissedClaim(row.node)) {
+        return false;
+      }
+      const claimTarget = claimTargetOf(row.node);
+      const rendersAtOccurrence =
+        claimTarget !== undefined &&
+        consumedBy.get(claimTarget)?.id === row.node.id &&
+        target.node.children.includes(claimTarget);
+      return !rendersAtOccurrence;
+    })
+    .toArray();
+  const inSequence = (sequence: Row[], anchor: ID): number =>
+    sequence.findIndex(
+      (row) => row.node.id === anchor || claimTargetOf(row.node) === anchor
+    );
+  const withAppends = [...baseItems, ...appended];
+  return List(
+    fileChildRows.toArray().reduce((sequence, row) => {
+      const after = row.node.extraAttrs?.after;
+      const front = row.node.extraAttrs?.front === "true";
+      if ((after === undefined && !front) || dismissedClaim(row.node)) {
+        return sequence;
+      }
+      const currentIndex = sequence.findIndex(
+        (candidate) => candidate.viewKey === row.viewKey
+      );
+      if (currentIndex < 0) {
+        return sequence;
+      }
+      const without = [
+        ...sequence.slice(0, currentIndex),
+        ...sequence.slice(currentIndex + 1),
+      ];
+      if (front) {
+        return [row, ...without];
+      }
+      const anchorIndex = after !== undefined ? inSequence(without, after) : -1;
+      if (anchorIndex < 0) {
+        return sequence;
+      }
+      return [
+        ...without.slice(0, anchorIndex + 1),
+        row,
+        ...without.slice(anchorIndex + 1),
+      ];
+    }, withAppends)
+  );
 }
 
 function getChildrenForRegularNode(
@@ -1007,12 +1091,9 @@ function getChildrenForRegularNode(
     return { rows: childRows };
   }
 
-  const combinedRows = getProjectedGraphChildren(
-    data,
-    graph,
-    parentRow,
-    typeFilters
-  ).concat(childRows);
+  const combinedRows =
+    composeEmbedChildren(data, graph, parentRow, childRows, typeFilters) ??
+    childRows;
 
   if (!isFileRow(parentRow)) {
     return { rows: combinedRows };

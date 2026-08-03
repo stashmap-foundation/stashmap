@@ -80,6 +80,56 @@ Note
   `);
 });
 
+test("placement claims compose per the fixture rules", async () => {
+  const workspacePath = writeWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [Old](#src) <!-- id:emb embed="true" -->',
+      '  - (!) [c](#c) <!-- id:o1 embed="true" -->',
+      "    - Meine Anmerkung <!-- id:o2 -->",
+      '  - (x) [d](#d) <!-- id:o3 embed="true" -->',
+      '  - [a](#a) <!-- id:o4 embed="true" after="e" -->',
+      "  - My own row <!-- id:o5 -->",
+      '  - [b](#b) <!-- id:o6 embed="true" -->',
+      '    - (!) [b1](#b1) <!-- id:o7 embed="true" -->',
+    ].join("\n"),
+    "source.md": [
+      "# Source <!-- id:src -->",
+      "",
+      "- Argument A <!-- id:a -->",
+      "- Argument B <!-- id:b -->",
+      "  - Beleg B1 <!-- id:b1 -->",
+      "- Argument C <!-- id:c -->",
+      "- Argument D <!-- id:d -->",
+      "- Argument E <!-- id:e -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await expectTree(
+    `
+Note
+  Source
+    Argument B
+      {!} Beleg B1
+    {!} Argument C
+      Meine Anmerkung
+    Argument E
+    Argument A
+    My own row
+  `,
+    { showGutter: true }
+  );
+});
+
 test("Log entries are plain links and stay flat", async () => {
   const [alice] = setup([ALICE]);
   const { relayPool } = renderApp(alice());

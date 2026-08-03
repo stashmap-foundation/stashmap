@@ -115,6 +115,29 @@ function extractSpans(children: readonly Token[]): InlineSpan[] {
   const extractFrom = (index: number, spans: InlineSpan[]): InlineSpan[] => {
     if (index >= tokens.length) return spans;
     const token = tokens[index];
+    // The rewording bond: a strike wrapping exactly one link becomes a
+    // struck link span. Any other struck content stays literal text.
+    if (token.type === "s_open") {
+      const relativeSCloseIndex = tokens
+        .slice(index + 1)
+        .findIndex((candidate) => candidate.type === "s_close");
+      const sCloseIndex = index + relativeSCloseIndex + 1;
+      const inner = tokens.slice(index + 1, sCloseIndex);
+      const isSoleLink =
+        relativeSCloseIndex >= 0 &&
+        inner[0]?.type === "link_open" &&
+        inner[inner.length - 1]?.type === "link_close";
+      if (isSoleLink) {
+        const innerSpans = extractSpans(inner);
+        const struckLink = innerSpans[0];
+        if (innerSpans.length === 1 && struckLink?.kind === "link") {
+          return extractFrom(
+            sCloseIndex + 1,
+            appendSpan(spans, { ...struckLink, struck: true })
+          );
+        }
+      }
+    }
     if (token.type !== "link_open") {
       return extractFrom(
         index + 1,

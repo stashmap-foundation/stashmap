@@ -267,7 +267,9 @@ declare global {
 
   type InlineSpan =
     | { kind: "text"; text: string }
-    | { kind: "link"; href: string; text: string };
+    // struck: the rewording bond `~~[frozen label](#t)~~` — the reader's
+    // words carry the row, the struck link keeps target and drift baseline.
+    | { kind: "link"; href: string; text: string; struck?: true };
 
   type GraphNode = {
     children: List<ID>;

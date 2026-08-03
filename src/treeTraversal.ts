@@ -20,6 +20,7 @@ import {
 } from "./core/connections";
 import {
   embeddedTarget,
+  placementTarget,
   linkSpan,
   nodeText,
   plainSpans,
@@ -126,7 +127,7 @@ function createRow(
   const projected =
     parentRow !== undefined &&
     (parentRow.projected === true ||
-      (embeddedTarget(parentRow.node) !== undefined &&
+      (placementTarget(parentRow.node) !== undefined &&
         !parentRow.node.children.includes(nodeID)));
   const standsFor = (() => {
     const targetID = embeddedTarget(node);
@@ -938,7 +939,7 @@ function composeEmbedChildren(
   fileChildRows: List<Row>,
   typeFilters: Pane["typeFilters"]
 ): List<Row> | undefined {
-  const targetID = embeddedTarget(parentRow.node);
+  const targetID = placementTarget(parentRow.node);
   if (targetID === undefined) {
     return undefined;
   }
@@ -953,7 +954,7 @@ function composeEmbedChildren(
     parentRow.node.id
   );
   const claimTargetOf = (node: GraphNode): ID | undefined =>
-    embeddedTarget(node);
+    placementTarget(node);
   const dismissedClaim = (node: GraphNode): boolean =>
     node.relevance === "not_relevant" && claimTargetOf(node) !== undefined;
   const rowsByNodeId = new globalThis.Map<ID, Row>(

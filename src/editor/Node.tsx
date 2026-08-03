@@ -457,6 +457,11 @@ function InlineSpans({
       {node.spans.map((span, index) => {
         const key = `${index}-${span.kind}-${span.text}`;
         if (span.kind === "link") {
+          // The rewording bond is quiet provenance: the reader's words
+          // carry the row, the struck link stays in the file only.
+          if (span.struck === true) {
+            return null;
+          }
           return (
             <InlineLinkSpan
               key={key}

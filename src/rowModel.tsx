@@ -11,7 +11,7 @@ import {
   getRefTargetInfo,
 } from "./core/connections";
 import { isCanonicalId } from "./core/entityRecognition";
-import { nodeText } from "./core/nodeSpans";
+import { effectiveText, nodeText } from "./core/nodeSpans";
 import { EditorNavigationTarget } from "./editor/linkOperations";
 import { searchTargetID } from "./localSearch";
 
@@ -240,7 +240,7 @@ export function getDisplayTextForRow(row: Row): string {
     row.virtualType === undefined &&
     row.node.spans.some((span) => span.kind === "link")
   ) {
-    return nodeText(row.node);
+    return effectiveText(row.node);
   }
   if (reference) return reference.text;
   if (isSearchId(row.node.id)) {

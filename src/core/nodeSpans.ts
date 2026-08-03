@@ -7,6 +7,15 @@ export const plainSpans = (text: string): InlineSpan[] => [
 export const nodeText = (node: GraphNode): string =>
   node.spans.map((span) => span.text).join("");
 
+// The row's effective text (lab RULES): a rewording speaks the reader's
+// words — the struck bond is provenance, never display.
+export const effectiveText = (node: GraphNode): string =>
+  node.spans
+    .filter((span) => !(span.kind === "link" && span.struck === true))
+    .map((span) => span.text)
+    .join("")
+    .trim();
+
 export const spansText = (spans: InlineSpan[]): string =>
   spans.map((span) => span.text).join("");
 
@@ -36,12 +45,32 @@ export const embeddedTarget = (node: GraphNode | undefined): ID | undefined => {
     node?.extraAttrs?.embed !== "true" ||
     node.spans.length !== 1 ||
     node.spans[0]?.kind !== "link" ||
+    node.spans[0].struck === true ||
     !node.spans[0].href.startsWith("#")
   ) {
     return undefined;
   }
   return node.spans[0].href.slice(1);
 };
+
+export const rewordingTarget = (
+  node: GraphNode | undefined
+): ID | undefined => {
+  if (node?.extraAttrs?.embed !== "true") {
+    return undefined;
+  }
+  const struck = node.spans.flatMap((span) =>
+    span.kind === "link" && span.struck === true && span.href.startsWith("#")
+      ? [span.href.slice(1)]
+      : []
+  );
+  return struck.length === 1 ? struck[0] : undefined;
+};
+
+// A placement row is either an explicit embed or a rewording of one —
+// both bind their declared target (lab RULES, target join).
+export const placementTarget = (node: GraphNode | undefined): ID | undefined =>
+  embeddedTarget(node) ?? rewordingTarget(node);
 
 export const getAllLinks = (
   node: GraphNode
@@ -71,11 +100,13 @@ function escapeLinkText(text: string): string {
 
 export const spansToMarkdown = (spans: InlineSpan[]): string =>
   spans
-    .map((span) =>
-      span.kind === "text"
-        ? span.text
-        : `[${escapeLinkText(span.text)}](${span.href})`
-    )
+    .map((span) => {
+      if (span.kind === "text") {
+        return span.text;
+      }
+      const link = `[${escapeLinkText(span.text)}](${span.href})`;
+      return span.struck === true ? `~~${link}~~` : link;
+    })
     .join("");
 
 export const linkSpan = (targetID: ID, text: string): InlineSpan => ({

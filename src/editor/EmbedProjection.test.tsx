@@ -130,6 +130,40 @@ Note
   );
 });
 
+test("rewordings speak the reader's words and project the target", async () => {
+  const workspacePath = writeWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [S](#src) <!-- id:emb embed="true" -->',
+      '  - Kapital flieht vor Unberechenbarkeit ~~[c label](#c)~~ <!-- id:o1 embed="true" -->',
+    ].join("\n"),
+    "source.md": [
+      "# Source <!-- id:src -->",
+      "",
+      "- Argument A <!-- id:a -->",
+      "- Argument C <!-- id:c -->",
+      "  - C Beleg <!-- id:c1 -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await expectTree(`
+Note
+  Source
+    Argument A
+    Kapital flieht vor Unberechenbarkeit
+      C Beleg
+  `);
+});
+
 test("dragging a projected row writes a position claim", async () => {
   const workspacePath = writeWorkspace({
     "note.md": [

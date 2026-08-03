@@ -1208,7 +1208,20 @@ function composeEmbedChildren(
       }
       const anchorIndex = after !== undefined ? inSequence(without, after) : -1;
       if (anchorIndex < 0) {
-        return sequence;
+        // Lapse: the whole move suspends. A deep row falls back to its
+        // source position; a direct child stays at base order.
+        const claimTarget = claimTargetOf(row.node);
+        const fallsBackDeep =
+          claimTarget !== undefined &&
+          !target.node.children.includes(claimTarget) &&
+          subtreeContains(
+            graph,
+            target.ref.sourceId,
+            target.node,
+            claimTarget,
+            new globalThis.Set<ID>([target.node.id])
+          );
+        return fallsBackDeep ? without : sequence;
       }
       return [
         ...without.slice(0, anchorIndex + 1),

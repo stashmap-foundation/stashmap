@@ -498,6 +498,40 @@ Source
   `);
 });
 
+test("a move to the root with a dead anchor suspends whole", async () => {
+  const workspacePath = writeWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [S](#src) <!-- id:emb embed="true" -->',
+      '  - [Sagrada Familia](#sf) <!-- id:o1 embed="true" after="spain" -->',
+    ].join("\n"),
+    "source.md": [
+      "# Source <!-- id:src -->",
+      "",
+      "- Barcelona <!-- id:b -->",
+      "  - Gaudi <!-- id:g -->",
+      "    - Sagrada Familia <!-- id:sf -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await expectTree(`
+Note
+  Source
+    Barcelona
+      Gaudi
+        Sagrada Familia
+  `);
+});
+
 test("a broken evidence edge suspends instead of re-aiming", async () => {
   const workspacePath = writeWorkspace({
     "note.md": [

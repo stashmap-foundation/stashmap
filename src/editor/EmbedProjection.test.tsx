@@ -157,6 +157,7 @@ Target
   expect(
     getPane(1).queryByRole("textbox", { name: "edit Descendant" })
   ).toBeNull();
+  expect(getPane(1).queryByRole("textbox", { name: "edit Source" })).toBeNull();
 
   await userEvent.click(
     getPane(1).getByRole("treeitem", { name: "Descendant" })

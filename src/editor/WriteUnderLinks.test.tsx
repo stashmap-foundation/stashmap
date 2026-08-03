@@ -418,8 +418,12 @@ Favorite Authors
   ).toHaveLength(2);
   expect(favoriteAuthors).toContain('embed="true"');
 
-  await userEvent.click(await screen.findByLabelText("edit Book Club"));
-  await userEvent.keyboard("{Escape}{Delete}");
+  await userEvent.click(
+    screen.getByRole("treeitem", {
+      name: (accessibleName) => accessibleName.startsWith("Book Club"),
+    })
+  );
+  await userEvent.keyboard("{Delete}");
   await expectTree(`
 Favorite Authors
   [I] Book Club ↩
@@ -431,8 +435,12 @@ Favorite Authors
 Book Club
   Favorite Authors
   `);
-  await userEvent.click(await screen.findByLabelText("edit Favorite Authors"));
-  await userEvent.keyboard("{Escape}{Delete}");
+  await userEvent.click(
+    screen.getByRole("treeitem", {
+      name: (accessibleName) => accessibleName.startsWith("Favorite Authors"),
+    })
+  );
+  await userEvent.keyboard("{Delete}");
   await expectTree(`
 Book Club
   `);

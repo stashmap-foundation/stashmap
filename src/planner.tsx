@@ -73,13 +73,17 @@ type WorkspacePlan = GraphPlan &
 
 export type Plan = WorkspacePlan;
 
+function soleEmbedLinkHref(spans: InlineSpan[]): string | undefined {
+  const span =
+    spans.length === 1 && spans[0]?.kind === "link" ? spans[0] : undefined;
+  return span &&
+    (span.href.startsWith("#") || classifyLinkHref(span.href) === "feed")
+    ? span.href
+    : undefined;
+}
+
 function isStandaloneEmbedLink(spans: InlineSpan[]): boolean {
-  return (
-    spans.length === 1 &&
-    spans[0]?.kind === "link" &&
-    (spans[0].href.startsWith("#") ||
-      classifyLinkHref(spans[0].href) === "feed")
-  );
+  return soleEmbedLinkHref(spans) !== undefined;
 }
 
 export function planUpdateNodeSpans(
@@ -94,10 +98,17 @@ export function planUpdateNodeSpans(
   ) {
     return plan;
   }
+  // The embed attr is written when a sole link is created or retargeted —
+  // a first-party gesture. Touching the label of an existing plain block
+  // link (the Log's form) never converts it into an embed.
+  const nextEmbedHref = soleEmbedLinkHref(spans);
+  const stampEmbed =
+    nextEmbedHref !== undefined &&
+    nextEmbedHref !== soleEmbedLinkHref(currentNode.spans);
   return planUpsertNodes(plan, {
     ...currentNode,
     spans,
-    ...(isStandaloneEmbedLink(spans) && {
+    ...(stampEmbed && {
       extraAttrs: { ...currentNode.extraAttrs, embed: "true" },
     }),
     updated: Date.now(),

@@ -27,7 +27,12 @@ import {
   isEmptyNodeID,
   computeEmptyNodeMetadata,
 } from "../core/connections";
-import { isFileLinkHref, spansText, spansToMarkdown } from "../core/nodeSpans";
+import {
+  embeddedTarget,
+  isFileLinkHref,
+  spansText,
+  spansToMarkdown,
+} from "../core/nodeSpans";
 import { classifyLinkHref, externalLinkUrl } from "../core/linkPath";
 import {
   calendarEntryTarget,
@@ -970,7 +975,17 @@ function InteractiveNodeContent({ rows }: { rows: List<Row> }): JSX.Element {
     return <ErrorContent />;
   }
 
-  if (isEditableNode(currentNode) && !isReadonly) {
+  // A node-target embed row displays the target's live text; its stored
+  // label is a frozen machine record. Typing gets its meaning in 3.4b as
+  // the rewording gesture — until then the row's text is not editable.
+  // Calendar feed names and entity occurrence labels stay the user's
+  // wording and keep their editor.
+  const embedTargetID = embeddedTarget(row.node);
+  const displaysLiveTarget =
+    embedTargetID !== undefined &&
+    classifyLinkHref(`#${embedTargetID}`) === "node";
+
+  if (isEditableNode(currentNode) && !isReadonly && !displaysLiveTarget) {
     return <EditableContent rows={rows} />;
   }
 

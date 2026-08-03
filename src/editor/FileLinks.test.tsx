@@ -85,7 +85,9 @@ B
   A↩
   `);
 
-  const reverseLink = await screen.findByRole("link", { name: "A" });
+  const reverseLink = await screen.findByRole("link", {
+    name: "Navigate to A",
+  });
   expect(reverseLink.getAttribute("data-href")).toMatch(/^#/u);
 
   await userEvent.click(reverseLink);

@@ -212,7 +212,7 @@ Search: Source
 Search: Source
   [R] My Notes / Source
 Target
-  My Notes / Source
+  Source
   `);
 });
 

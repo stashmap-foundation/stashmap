@@ -902,6 +902,28 @@ function getIncomingGroupChildren(
   };
 }
 
+// A touch on a projected row materializes it as a placement in the
+// embedding file: the take snapshots the live text as the frozen label,
+// and the host chain writes nested placements for nested touches
+// (fixture 22).
+function withPlacementRecipe(row: Row, parentRow: Row): Row {
+  if (row.materialize) {
+    return row;
+  }
+  return {
+    ...row,
+    materialize: {
+      precededBy: [...parentRow.node.children.toArray()].reverse(),
+      take: createRefTarget(row.node.id, nodeText(row.node)),
+      host: {
+        node: parentRow.node,
+        parentRef: parentRow.parentRef,
+        materialize: parentRow.materialize,
+      },
+    },
+  };
+}
+
 // The embed composition at row level (lab RULES): start from base child
 // order, let the placement rows in the embedding file consume their
 // occurrences, move anchored placements after their anchors, suppress
@@ -962,7 +984,22 @@ function composeEmbedChildren(
           return [];
         }
         const placementRow = rowsByNodeId.get(placement.id);
-        return placementRow ? [placementRow] : [];
+        if (!placementRow) {
+          return [];
+        }
+        // A fresh placement stands where its occurrence stood — it
+        // inherits that occurrence's expansion state until it has its own.
+        const occurrenceView =
+          data.views.get(placementRow.viewKey) === undefined
+            ? data.views.get(
+                viewPathToString(appendNodeToPath(parentPath, childID))
+              )
+            : undefined;
+        return [
+          occurrenceView !== undefined
+            ? { ...placementRow, view: occurrenceView }
+            : placementRow,
+        ];
       }
       const child = getNodeInSource(graph, {
         sourceId: target.ref.sourceId,
@@ -972,18 +1009,21 @@ function composeEmbedChildren(
         return [];
       }
       return [
-        createRow(
-          data,
-          graph,
-          appendNodeToPath(parentPath, child.node.id),
-          child.node,
-          child.ref.sourceId,
-          parentRow,
-          target.node,
-          target.ref,
-          undefined,
-          false,
-          undefined
+        withPlacementRecipe(
+          createRow(
+            data,
+            graph,
+            appendNodeToPath(parentPath, child.node.id),
+            child.node,
+            child.ref.sourceId,
+            parentRow,
+            target.node,
+            target.ref,
+            undefined,
+            false,
+            undefined
+          ),
+          parentRow
         ),
       ];
     });
@@ -1091,9 +1131,12 @@ function getChildrenForRegularNode(
     return { rows: childRows };
   }
 
+  const ownChildRows = parentRow.projected
+    ? childRows.map((row) => withPlacementRecipe(row, parentRow))
+    : childRows;
   const combinedRows =
-    composeEmbedChildren(data, graph, parentRow, childRows, typeFilters) ??
-    childRows;
+    composeEmbedChildren(data, graph, parentRow, ownChildRows, typeFilters) ??
+    ownChildRows;
 
   if (!isFileRow(parentRow)) {
     return { rows: combinedRows };

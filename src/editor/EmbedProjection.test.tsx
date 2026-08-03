@@ -212,7 +212,6 @@ Target
   await userEvent.click(
     getPane(1).getByRole("treeitem", { name: "Descendant" })
   );
-  await userEvent.keyboard("!");
   await userEvent.keyboard("{Backspace}");
 
   await expectTree(
@@ -226,6 +225,69 @@ Target
   `,
     { showGutter: true }
   );
+
+  await userEvent.click(
+    getPane(1).getByRole("treeitem", { name: "Descendant" })
+  );
+  await userEvent.keyboard("!");
+
+  await expectTree(
+    `
+Source
+  Descendant
+  [I] Target Document / Target ↩
+Target
+  Source
+    {!} Descendant
+  `,
+    { showGutter: true }
+  );
+});
+
+test("judging projected rows materializes nested placements", async () => {
+  const workspacePath = writeWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [S](#src) <!-- id:emb embed="true" -->',
+    ].join("\n"),
+    "source.md": [
+      "# Source <!-- id:src -->",
+      "",
+      "- Argument B <!-- id:b -->",
+      "  - Beleg B1 <!-- id:b1 -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await userEvent.click(screen.getByRole("treeitem", { name: "Beleg B1" }));
+  await userEvent.keyboard("!");
+
+  await expectTree(
+    `
+Note
+  Source
+    Argument B
+      {!} Beleg B1
+  `,
+    { showGutter: true }
+  );
+
+  await waitFor(() => {
+    const note = fs.readFileSync(pathModule.join(workspacePath, "note.md"), {
+      encoding: "utf8",
+    });
+    expect(note).toMatch(
+      /- \[S\]\(#src\) <!-- id:emb embed="true" -->\n {2}- \[Argument B\]\(#b\) <!-- id:\S+ embed="true" -->\n {4}- \(!\) \[Beleg B1\]\(#b1\) <!-- id:\S+ embed="true" -->/u
+    );
+  });
 });
 
 test("an embed row opens as a pane root and projects there", async () => {

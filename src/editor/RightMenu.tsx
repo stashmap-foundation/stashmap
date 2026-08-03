@@ -24,11 +24,13 @@ export function RightMenu(): JSX.Element {
   const isDocumentTopLevel =
     isRoot && pane.documentId !== undefined && !isVirtualItem && !!currentNode;
 
+  // Projected rows are judgeable regardless of author: the judgment
+  // materializes a placement in the embedding file, never a write to the
+  // source.
   const isReadonly =
     (isRoot && !isDocumentTopLevel) ||
     isInSearchView ||
-    projected === true ||
-    (isViewingOtherUserContent && !isVirtualItem);
+    (isViewingOtherUserContent && !isVirtualItem && !projected);
 
   return (
     <div className="right-menu">

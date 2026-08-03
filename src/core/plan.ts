@@ -468,16 +468,11 @@ export function planMaterializeComputedRow<T extends GraphPlan>(
     );
     return [planWithRoot, materializedRoot ?? rootNode, true];
   }
-  const parentID = placement?.parentID ?? row.parentRef?.id;
-  if (parentID === undefined) {
-    return [plan, row.node, false];
-  }
-  const parentNode = getWorkspaceNode(plan.knowledgeDBs, parentID);
-  if (!parentNode) {
-    const { host } = row.materialize;
-    if (!host) {
-      return [plan, row.node, false];
-    }
+  // A host names where the materialized row belongs — the placement
+  // chain, not the row's graph parent: a projected row's parentRef is the
+  // source-side node and must never receive the write.
+  const { host } = row.materialize;
+  if (placement?.parentID === undefined && host !== undefined) {
     const [planWithHost, hostNode] = planMaterializeComputedRow(plan, host);
     if (!getWorkspaceNode(planWithHost.knowledgeDBs, hostNode.id)) {
       return [plan, row.node, false];
@@ -486,6 +481,14 @@ export function planMaterializeComputedRow<T extends GraphPlan>(
       parentID: hostNode.id,
       insertIndex: placement?.insertIndex,
     });
+  }
+  const parentID = placement?.parentID ?? row.parentRef?.id;
+  if (parentID === undefined) {
+    return [plan, row.node, false];
+  }
+  const parentNode = getWorkspaceNode(plan.knowledgeDBs, parentID);
+  if (!parentNode) {
+    return [plan, row.node, false];
   }
   const placedChildId = parentNode.children.find((childId) => {
     if (childId === row.node.id) {

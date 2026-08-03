@@ -49,6 +49,11 @@ function planUpdateOneMetadata(
   metadata: NodeItemMetadata,
   editorSpans: InlineSpan[] | undefined
 ): Plan {
+  // Projected embed content is readonly: a judgment there must never
+  // write through to the source node.
+  if (row.projected) {
+    return acc;
+  }
   // Write gestures take first: a computed row materializes with the
   // judgment applied at creation — one plan, one save.
   const [materializedPlan, , materializedNow] = planMaterializeComputedRow(

@@ -42,6 +42,7 @@ import {
 } from "./rowModel";
 import { plainSpans, spansText, spansToMarkdown } from "./core/nodeSpans";
 import { calendarEntryEditedSpans } from "./core/ical";
+import { classifyLinkHref } from "./core/linkPath";
 import { LOCAL } from "./core/nodeRef";
 import { entityIdForText } from "./core/entityRecognition";
 import { getWorkspaceNode } from "./core/knowledge";
@@ -72,11 +73,12 @@ type WorkspacePlan = GraphPlan &
 
 export type Plan = WorkspacePlan;
 
-function isStandaloneInternalLink(spans: InlineSpan[]): boolean {
+function isStandaloneEmbedLink(spans: InlineSpan[]): boolean {
   return (
     spans.length === 1 &&
     spans[0]?.kind === "link" &&
-    spans[0].href.startsWith("#")
+    (spans[0].href.startsWith("#") ||
+      classifyLinkHref(spans[0].href) === "feed")
   );
 }
 
@@ -95,7 +97,7 @@ export function planUpdateNodeSpans(
   return planUpsertNodes(plan, {
     ...currentNode,
     spans,
-    ...(isStandaloneInternalLink(spans) && {
+    ...(isStandaloneEmbedLink(spans) && {
       extraAttrs: { ...currentNode.extraAttrs, embed: "true" },
     }),
     updated: Date.now(),
@@ -339,7 +341,7 @@ export function planAddSpansToParent(
       relevance,
       argument,
     }),
-    ...(isStandaloneInternalLink(spans) && {
+    ...(isStandaloneEmbedLink(spans) && {
       extraAttrs: { embed: "true" },
     }),
   };
@@ -429,7 +431,7 @@ export function planCreateNoteAtRoot(
     ...withDocumentRoot(
       newGraphNode(spans, entityId ? { uuid: entityId } : {})
     ),
-    ...(isStandaloneInternalLink(spans) && {
+    ...(isStandaloneEmbedLink(spans) && {
       extraAttrs: { embed: "true" },
     }),
   };

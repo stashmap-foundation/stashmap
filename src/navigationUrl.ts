@@ -52,7 +52,9 @@ export function routeCoordinateSourceId(coordinate: RouteCoordinate): SourceId {
   return `${coordinate.eventKind}:${coordinate.pubkey}:${coordinate.dTag}`;
 }
 
-function sourceCoordinate(sourceId: SourceId): RouteCoordinate | undefined {
+export function sourceCoordinate(
+  sourceId: SourceId
+): RouteCoordinate | undefined {
   const [kindText, pubkeyText, ...dParts] = sourceId.split(":");
   const dTag = dParts.join(":");
   const kind = Number(kindText);

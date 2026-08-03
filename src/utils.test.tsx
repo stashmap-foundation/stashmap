@@ -792,9 +792,22 @@ function classifyRow(row: Element): RowInfo | null {
     if (!rawText) {
       return null;
     }
+    // The aria label carries the plain display text; the reciprocal ↩
+    // cluster lives in the row content and must survive an expand toggle.
+    // Reference rows already speak ↩ through their own text.
+    /* eslint-disable testing-library/no-node-access */
+    const reciprocalCluster = Array.from(
+      innerNode?.querySelectorAll(
+        ".incoming-part:not(.external-link-part):not(.dead-link-part)"
+      ) ?? []
+    )
+      .filter((part) => part.closest('[data-testid="reference-row"]') === null)
+      .map((part) => part.textContent ?? "")
+      .join("");
+    /* eslint-enable testing-library/no-node-access */
     return withGutter({
       element: toggleButton as HTMLElement,
-      text: `${prefix}${rawText}`,
+      text: `${prefix}${rawText}${reciprocalCluster}`,
       indentLevel: getIndentLevel(toggleButton as HTMLElement),
     });
   }

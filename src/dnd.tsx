@@ -2,6 +2,7 @@ import React from "react";
 import { List } from "immutable";
 import { DndProvider, useDragLayer, XYCoord } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
+import { nip19 } from "nostr-tools";
 import { LOCAL } from "./core/nodeRef";
 import { moveNodes, createRefTarget, getNode } from "./core/connections";
 import { nodeText } from "./core/nodeSpans";
@@ -17,7 +18,12 @@ import {
   AddToParentTarget,
 } from "./planner";
 import { planMoveNode } from "./treeMutations";
-import { planMaterializeComputedRow } from "./core/plan";
+import {
+  planMaterializeComputedRow,
+  planRecordKnowstrSource,
+} from "./core/plan";
+import { sourceCoordinate } from "./navigationUrl";
+import { decodePublicKeyInputSync } from "./infra/nostr/publicKeys";
 
 type DragSource = {
   row: Row;
@@ -57,6 +63,42 @@ function addFallbackLinkText(
     return target;
   }
   return createRefTarget(target.targetID, text);
+}
+
+// Dragging a row from another user's document records that document in
+// knowstr_sources of ours — the one moment the source is known for
+// certain, so foreign ids resolve on a future fetch.
+function planRecordForeignSource(
+  plan: Plan,
+  sourcePane: Pane | undefined,
+  sourceRow: Row,
+  targetNode: GraphNode
+): Plan {
+  if (sourceRow.sourceId === LOCAL) {
+    return plan;
+  }
+  const coordinate =
+    sourcePane?.routeCoordinate ?? sourceCoordinate(sourceRow.sourceId);
+  const pubkey =
+    coordinate?.pubkey ?? decodePublicKeyInputSync(sourceRow.sourceId);
+  if (!pubkey) {
+    return plan;
+  }
+  const sourceDocument = getDocumentForNode(
+    plan.knowledgeDBs,
+    plan.documents,
+    sourceRow.node,
+    sourceRow.sourceId
+  );
+  const doc = sourceDocument?.docId ?? coordinate?.dTag;
+  if (!doc) {
+    return plan;
+  }
+  return planRecordKnowstrSource(plan, targetNode, {
+    author: nip19.npubEncode(pubkey),
+    doc,
+    relays: coordinate?.relays ?? [],
+  });
 }
 
 function isDraggedOccurrence(row: Row, sources: Row[]): boolean {
@@ -277,15 +319,23 @@ export function dnd(
   targetParentRow: Row,
   dropIndex: number
 ): Plan {
-  const [plan, targetParentNode] = planMaterializeComputedRow(
-    basePlan,
-    targetParentRow
-  );
   const source = sourceDrag.row.viewKey;
   const sources = sourceDrag.draggedRows.length
     ? sourceDrag.draggedRows
     : [sourceDrag.row];
   const independentRows = getIndependentRows(sources);
+  // Projected embed content is readonly: nothing drops into it, and its
+  // rows don't drag out yet — materializing from an embed is later work.
+  if (
+    targetParentRow.projected ||
+    independentRows.some((row) => row.projected)
+  ) {
+    return basePlan;
+  }
+  const [plan, targetParentNode] = planMaterializeComputedRow(
+    basePlan,
+    targetParentRow
+  );
 
   const sourcePane = plan.panes[sourceDrag.sourcePaneIndex];
   const targetPane = plan.panes[targetPaneIndex];
@@ -475,6 +525,10 @@ export function dnd(
     const insertAt = dropIndex + idx;
     const isPrimarySource = sourceRow.viewKey === source;
     const targetNode = getCurrentPlanNode(accPlan, targetParentNode);
+    const planWithSource =
+      targetSourceId === LOCAL
+        ? planRecordForeignSource(accPlan, sourcePane, sourceRow, targetNode)
+        : accPlan;
     const insertTarget =
       sourceRow.materialize?.take ??
       (isPrimarySource ? sourceDrag.insertTarget : undefined);
@@ -483,7 +537,7 @@ export function dnd(
       : undefined;
     if (insertTarget) {
       return planAddToParent(
-        accPlan,
+        planWithSource,
         addFallbackLinkText(insertTarget, sourceDrag.text),
         targetNode.id,
         insertAt,
@@ -493,7 +547,7 @@ export function dnd(
     }
     if (dragTargetID) {
       return planAddToParent(
-        accPlan,
+        planWithSource,
         createRefTarget(dragTargetID, nodeText(sourceNode)),
         targetNode.id,
         insertAt,
@@ -502,7 +556,7 @@ export function dnd(
       )[0];
     }
     return planAddToParent(
-      accPlan,
+      planWithSource,
       toReferenceTarget(sourceRow),
       targetNode.id,
       insertAt,

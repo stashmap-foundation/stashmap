@@ -306,6 +306,13 @@ function InlineLinkSpan({
   const navigatePane = useNavigatePane();
   const row = useRow();
   const isSearchResult = row.virtualType === "search";
+  // An embed shows the target's live text: the row's own label is the
+  // frozen file record, the display follows the source.
+  const displayedText =
+    row.standsFor?.liveText !== undefined &&
+    span.href === `#${row.standsFor.id}`
+      ? row.standsFor.liveText
+      : span.text;
   const calendarContent =
     !isSearchResult &&
     (calendarFeedUrl(node) !== undefined ||
@@ -343,7 +350,7 @@ function InlineLinkSpan({
     return (
       <>
         <span data-href={span.href} data-target={span.href}>
-          {span.text}
+          {displayedText}
         </span>
         {reciprocal && (
           <IncomingPart
@@ -367,10 +374,10 @@ function InlineLinkSpan({
           data-link-dead={dead ? "true" : undefined}
           aria-disabled={dead || undefined}
           aria-label={
-            dead ? `${span.text}. Target no longer exists` : undefined
+            dead ? `${displayedText}. Target no longer exists` : undefined
           }
         >
-          {span.text}
+          {displayedText}
         </span>
         {externalPart}
         {deadPart}
@@ -416,9 +423,9 @@ function InlineLinkSpan({
           e.stopPropagation();
           navigatePane(href);
         }}
-        aria-label={`Navigate to ${span.text}`}
+        aria-label={`Navigate to ${displayedText}`}
       >
-        {span.text}
+        {displayedText}
       </a>
       {reciprocal && (
         <IncomingPart
@@ -945,7 +952,10 @@ function InteractiveNodeContent({ rows }: { rows: List<Row> }): JSX.Element {
   const displayText = useDisplayText();
 
   const isReadonly =
-    isInSearchView || isViewingOtherUserContent || virtualType !== undefined;
+    isInSearchView ||
+    isViewingOtherUserContent ||
+    virtualType !== undefined ||
+    row.projected === true;
 
   if (isLoading) {
     return <LoadingNode />;

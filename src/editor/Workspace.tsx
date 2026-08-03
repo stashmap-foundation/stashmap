@@ -1460,7 +1460,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       e.preventDefault();
       const targetRows = getIndependentRows(
         getActionTargetRows(selection, activeRow, rows)
-      ).filter((row) => row.sourceId === LOCAL);
+      ).filter((row) => row.sourceId === LOCAL && !row.projected);
       const keys = targetRows.map((row) => row.viewKey);
       const focusIndex = computeFocusIndexAfterDeletion(keys, rows);
       const result = planClearTemporarySelection(

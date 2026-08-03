@@ -184,6 +184,7 @@ export function getIncomingCrefsForNode(
   visibleAuthors: ImmutableSet<SourceId>,
   currentNodeID: ID | undefined,
   itemsSourceId: SourceId,
+  expansionPath: readonly ID[],
   currentItems?: List<GraphNode>,
   currentNodeFilePath?: string
 ): List<NodeRef> {
@@ -231,6 +232,9 @@ export function getIncomingCrefsForNode(
     ...graphLinkSourceNodes,
     ...fileLinkSourceNodes,
   ])
+    // A reference the view is currently looking through — its carrying
+    // row sits on the active expansion path — never queues under itself.
+    .filter((source) => !expansionPath.includes(source.node.id))
     .filter(
       (source) =>
         !isCalendarEntryPlacement(source.node, parentOf(graph, source)?.node)

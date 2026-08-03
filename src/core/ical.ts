@@ -38,6 +38,13 @@ export function calendarFeedUrl(node: GraphNode): string | undefined {
     : undefined;
 }
 
+// The projecting form: only a feed link carrying the explicit embed attr
+// is a machine embed. A plain feed link keeps its calendar dress but
+// projects nothing.
+export function embeddedFeedUrl(node: GraphNode): string | undefined {
+  return node.extraAttrs?.embed === "true" ? calendarFeedUrl(node) : undefined;
+}
+
 export function calendarEntryTarget(
   node: GraphNode | undefined
 ): ID | undefined {

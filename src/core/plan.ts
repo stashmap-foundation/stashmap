@@ -566,6 +566,55 @@ export function planMaterializeComputedRow<T extends GraphPlan>(
   return [planAttached, node ?? minted, true];
 }
 
+// The listening side of publication (idea.md): machine-written at the
+// moment an embed is created — the one moment the source is known for
+// certain. One entry per source document; entries are cache, a stale one
+// costs a lookup, never correctness.
+export function planRecordKnowstrSource<T extends GraphPlan>(
+  plan: T,
+  targetNode: GraphNode,
+  source: { author: string; doc: string; relays: string[] }
+): T {
+  const docId = getNodeDocumentId(plan, targetNode);
+  if (!docId) {
+    return plan;
+  }
+  const key = workspaceDocumentKey(docId);
+  const document = plan.documents.get(key);
+  if (!document) {
+    return plan;
+  }
+  const recorded = document.frontMatter?.knowstr_sources;
+  const existing: unknown[] = Array.isArray(recorded) ? recorded : [];
+  const alreadyRecorded = existing.some(
+    (entry) =>
+      typeof entry === "object" &&
+      entry !== null &&
+      "author" in entry &&
+      entry.author === source.author &&
+      "doc" in entry &&
+      entry.doc === source.doc
+  );
+  if (alreadyRecorded) {
+    return plan;
+  }
+  const nextDocument: Document = {
+    ...document,
+    frontMatter: {
+      ...document.frontMatter,
+      knowstr_sources: [...existing, source],
+    },
+  };
+  return withDocumentInFilePathIndex(
+    {
+      ...plan,
+      documents: plan.documents.set(key, nextDocument),
+      affectedDocuments: plan.affectedDocuments.add(docId),
+    },
+    nextDocument
+  );
+}
+
 export type AddToParentTarget =
   | ID
   | TextSeed

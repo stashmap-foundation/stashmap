@@ -71,10 +71,14 @@ test.each(compositionFixtures)(
       pathModule.join(fixturePath, "source.md"),
       pathModule.join(workspacePath, "source.md")
     );
+    fs.copyFileSync(
+      pathModule.join(fixturePath, "diff.md"),
+      pathModule.join(workspacePath, "diff.md")
+    );
 
     await renderAppTree({
       path: workspacePath,
-      initialRoute: buildDocumentRouteUrl(LOCAL, "source.md"),
+      initialRoute: buildDocumentRouteUrl(LOCAL, "diff.md"),
     });
     const [root] = await screen.findAllByRole("treeitem");
     await userEvent.click(root);

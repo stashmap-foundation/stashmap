@@ -217,6 +217,9 @@ declare global {
       root?: true;
     };
     standsFor?: { id: ID; liveText?: string };
+    // Projected embed content: the target's rows rendered at a placement.
+    // Readonly in this step — touches materialize diffs in a later one.
+    projected?: true;
     isFirstVirtual: boolean;
     virtualType: "search" | "incoming" | undefined;
     // The action row: a button in row position, obviously not content.

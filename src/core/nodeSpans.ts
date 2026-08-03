@@ -31,6 +31,18 @@ export const isWebsiteLinkHref = (href: string): boolean => {
   return targetClass === "website" || targetClass === "feed";
 };
 
+export const embeddedTarget = (node: GraphNode | undefined): ID | undefined => {
+  if (
+    node?.extraAttrs?.embed !== "true" ||
+    node.spans.length !== 1 ||
+    node.spans[0]?.kind !== "link" ||
+    !node.spans[0].href.startsWith("#")
+  ) {
+    return undefined;
+  }
+  return node.spans[0].href.slice(1);
+};
+
 export const getAllLinks = (
   node: GraphNode
 ): { targetID: ID; text: string }[] =>

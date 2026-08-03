@@ -1,5 +1,6 @@
 import fs from "fs/promises";
 import path from "path";
+import { embeddedTarget } from "../../core/nodeSpans";
 import { renderDocumentMarkdown } from "../../documentRenderer";
 import {
   ScannedWorkspaceDocument,
@@ -49,18 +50,6 @@ export async function applyWorkspaceChanges(
     changed_paths: writes.map((write) => write.filePath),
     removed_paths: [...deletions],
   };
-}
-
-function embeddedTarget(node: GraphNode | undefined): string | undefined {
-  if (
-    node?.extraAttrs?.embed !== "true" ||
-    node.spans.length !== 1 ||
-    node.spans[0]?.kind !== "link" ||
-    !node.spans[0].href.startsWith("#")
-  ) {
-    return undefined;
-  }
-  return node.spans[0].href.slice(1);
 }
 
 function documentWarnings(

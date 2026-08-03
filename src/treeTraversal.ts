@@ -18,11 +18,16 @@ import {
   itemPassesFilters,
   nodePathLabel as nodePathLabelOf,
 } from "./core/connections";
-import { linkSpan, nodeText, plainSpans } from "./core/nodeSpans";
+import {
+  embeddedTarget,
+  linkSpan,
+  nodeText,
+  plainSpans,
+} from "./core/nodeSpans";
 import {
   IcalEntry,
   calendarEntryTarget,
-  calendarFeedUrl,
+  embeddedFeedUrl,
   hiddenPastEntryCount,
   isCalendarEntryId,
   icalEntryDisplayText,
@@ -60,6 +65,11 @@ function emptyTreeResult(rows: List<Row> = List<Row>()): TreeResult {
 
 function sourceIdForPath(data: Data, path: ViewPath): SourceId {
   return data.panes[path[0]]?.sourceId ?? LOCAL;
+}
+
+function expansionPathOf(viewPath: ViewPath): ID[] {
+  const [, ...segments] = viewPath;
+  return segments;
 }
 
 function footerVisibleSources(
@@ -113,6 +123,19 @@ function createRow(
     parentRow?.virtualType === "search" ? parentRow.virtualType : undefined;
   const rowVirtualType =
     virtualType ?? (isSearchId(nodeID) ? "search" : inheritedVirtualType);
+  const projected =
+    parentRow !== undefined &&
+    (parentRow.projected === true ||
+      (embeddedTarget(parentRow.node) !== undefined &&
+        !parentRow.node.children.includes(nodeID)));
+  const standsFor = (() => {
+    const targetID = embeddedTarget(node);
+    if (targetID === undefined) {
+      return undefined;
+    }
+    const target = lookupNode(graph, targetID, sourceId)?.node;
+    return target ? { id: targetID, liveText: nodeText(target) } : undefined;
+  })();
   const provenance =
     rowVirtualType === "incoming"
       ? { kind: rowVirtualType, sourceId }
@@ -166,6 +189,8 @@ function createRow(
     parentChildIndex: parentRow?.childIndex,
     childIndex,
     hasChildren: false,
+    ...(standsFor && { standsFor }),
+    ...(projected && { projected: true }),
     isFirstVirtual,
     virtualType: rowVirtualType,
     provenance,
@@ -278,12 +303,17 @@ function resolveRowForPath(
   if (!node) {
     return undefined;
   }
+  // A path segment that is not a file child of its parent (a projected
+  // row) belongs to the source that resolved it, not to the parent.
+  const rowSourceId = edgeNode
+    ? resolvedParentRow?.sourceId ?? resolved?.ref.sourceId ?? paneSourceId
+    : resolved?.ref.sourceId ?? resolvedParentRow?.sourceId ?? paneSourceId;
   return createRow(
     data,
     graph,
     viewPath,
     node,
-    resolvedParentRow?.sourceId ?? resolved?.ref.sourceId ?? paneSourceId,
+    rowSourceId,
     resolvedParentRow,
     resolvedParentRow?.node,
     resolvedParentRow?.ref,
@@ -627,7 +657,7 @@ function interleaveProjectionRows(
   childRows: List<Row>,
   typeFilters: Pane["typeFilters"]
 ): { rows: List<Row>; actionRow?: Row } {
-  const feedUrl = calendarFeedUrl(parentNode);
+  const feedUrl = embeddedFeedUrl(parentNode);
   const entries = feedUrl ? data.calendarFeeds?.get(feedUrl) : undefined;
   if (!entries || entries.length === 0) {
     return { rows: childRows };
@@ -872,6 +902,58 @@ function getIncomingGroupChildren(
   };
 }
 
+// The embed projection at row level (idea.md: an embed means "that node,
+// here" and shows the target's live text and children). Graph-only walks
+// from the displayed row — no pane or document lookups — so it works in
+// every surface. Composition terminates when an id repeats on the active
+// expansion path.
+function getProjectedGraphChildren(
+  data: Data,
+  graph: GraphLookup,
+  parentRow: Row,
+  typeFilters: Pane["typeFilters"]
+): List<Row> {
+  const targetID = embeddedTarget(parentRow.node);
+  if (targetID === undefined) {
+    return List<Row>();
+  }
+  const target = lookupNode(graph, targetID, parentRow.ref.sourceId);
+  if (!target) {
+    return List<Row>();
+  }
+  const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
+  const expansionPath = expansionPathOf(parentRow.viewPath);
+  const parentPath = addNodesToLastElement(
+    parentRow.viewPath,
+    parentRow.node.id
+  );
+  return target.node.children
+    .filter(
+      (childID) => childID !== EMPTY_NODE_ID && !expansionPath.includes(childID)
+    )
+    .map((childID) =>
+      getNodeInSource(graph, { sourceId: target.ref.sourceId, id: childID })
+    )
+    .filter((child): child is ResolvedNode => child !== undefined)
+    .filter((child) => itemPassesFilters(child.node, activeFilters))
+    .map((child) =>
+      createRow(
+        data,
+        graph,
+        appendNodeToPath(parentPath, child.node.id),
+        child.node,
+        child.ref.sourceId,
+        parentRow,
+        target.node,
+        target.ref,
+        undefined,
+        false,
+        undefined
+      )
+    )
+    .toList();
+}
+
 function getChildrenForRegularNode(
   data: Data,
   graph: GraphLookup,
@@ -925,8 +1007,15 @@ function getChildrenForRegularNode(
     return { rows: childRows };
   }
 
+  const combinedRows = getProjectedGraphChildren(
+    data,
+    graph,
+    parentRow,
+    typeFilters
+  ).concat(childRows);
+
   if (!isFileRow(parentRow)) {
-    return { rows: childRows };
+    return { rows: combinedRows };
   }
 
   const rowsByChildId = Map<ID, Row>(
@@ -939,7 +1028,7 @@ function getChildrenForRegularNode(
     nodes,
     nodeSourceId,
     rowsByChildId,
-    childRows,
+    combinedRows,
     typeFilters
   );
 
@@ -954,6 +1043,7 @@ function getChildrenForRegularNode(
     visibleAuthors,
     parentRow.standsFor?.id ?? nodes.id,
     nodeSourceId,
+    expansionPathOf(parentRow.viewPath),
     allChildNodes,
     undefined
   ).filter((ref) => ref.id !== nodes.id);
@@ -1054,7 +1144,7 @@ function hasHiddenPastEntries(
   node: GraphNode,
   sourceId: SourceId
 ): boolean {
-  const feedUrl = calendarFeedUrl(node);
+  const feedUrl = embeddedFeedUrl(node);
   const entries = feedUrl ? data.calendarFeeds?.get(feedUrl) : undefined;
   if (!entries) {
     return false;
@@ -1200,6 +1290,7 @@ export function getNodesInDocument(
     visibleAuthors,
     undefined,
     document.sourceId,
+    expansionPathOf(documentRootPath),
     topNodes,
     document.filePath
   );

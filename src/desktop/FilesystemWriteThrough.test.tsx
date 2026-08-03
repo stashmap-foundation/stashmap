@@ -20,6 +20,8 @@ import {
   type,
 } from "../utils.test";
 import type { WritePublisher } from "../infra/filesystem/writeSupport";
+import { buildDocumentRouteUrl } from "../navigationUrl";
+import { LOCAL } from "../core/nodeRef";
 
 async function expectKnowstrDocIdFrontmatter(
   workspacePath: string,
@@ -30,6 +32,60 @@ async function expectKnowstrDocIdFrontmatter(
     expect(content).toMatch(/^---\n[\s\S]*knowstr_doc_id:/u);
   });
 }
+
+const compositionCorpusPath = pathModule.resolve(
+  __dirname,
+  "../../../deedsats-wallet/packages/knowstr_core/test/corpus"
+);
+const compositionFixtures = fs
+  .readdirSync(compositionCorpusPath, { withFileTypes: true })
+  .filter(
+    (entry) =>
+      entry.isDirectory() &&
+      ["source.md", "diff.md", "expected.tree"].every((file) =>
+        fs.existsSync(pathModule.join(compositionCorpusPath, entry.name, file))
+      )
+  )
+  .map((entry) => entry.name)
+  .sort();
+
+if (compositionFixtures.length === 0) {
+  throw new Error("Composition corpus is empty");
+}
+
+function visibleFixtureTree(content: string): string {
+  return content
+    .split("\n")
+    .map((line) => line.replace(/ <!-- (?:id|base):[^ ]+ -->$/u, ""))
+    .join("\n");
+}
+
+test.each(compositionFixtures)(
+  "composition fixture UI: %s",
+  async (fixture) => {
+    const fixturePath = pathModule.join(compositionCorpusPath, fixture);
+    const workspacePath = fs.mkdtempSync(
+      pathModule.join(os.tmpdir(), "knowstr-composition-")
+    );
+    fs.copyFileSync(
+      pathModule.join(fixturePath, "source.md"),
+      pathModule.join(workspacePath, "source.md")
+    );
+
+    await renderAppTree({
+      path: workspacePath,
+      initialRoute: buildDocumentRouteUrl(LOCAL, "source.md"),
+    });
+    const [root] = await screen.findAllByRole("treeitem");
+    await userEvent.click(root);
+    await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+    const expected = visibleFixtureTree(
+      fs.readFileSync(pathModule.join(fixturePath, "expected.tree"), "utf8")
+    );
+    await expectTree(expected, { showGutter: true });
+  }
+);
 
 test("typing in the editor writes markdown files to the workspace", async () => {
   const { path } = await renderAppTree();

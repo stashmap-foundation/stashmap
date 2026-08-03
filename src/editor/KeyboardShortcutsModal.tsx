@@ -18,6 +18,7 @@ export function KeyboardShortcutsModal({
         <ul>
           <li>j/k or arrows: move between visible rows</li>
           <li>h/l or arrows: collapse/expand or move parent/child</li>
+          <li>Cmd/Ctrl+Down: expand the current row and all descendants</li>
           <li>g g: first row, G: last row</li>
           <li>Enter or i: edit current row</li>
           <li>/: search in current pane</li>

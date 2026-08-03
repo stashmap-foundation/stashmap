@@ -41,6 +41,8 @@ import {
   planSelectAllTemporaryRows,
   planShiftTemporarySelection,
   planToggleTemporarySelection,
+  planExpandNode,
+  type Plan,
 } from "../planner";
 import { parseTextToTrees, planPasteMarkdownTrees } from "./FileDropZone";
 import { getNodeText } from "../core/connections";
@@ -83,6 +85,7 @@ import { planDeleteNode } from "../treeMutations";
 import { MobileActionBar } from "./MobileActionBar";
 import { nodeText } from "../core/nodeSpans";
 import { defaultEntitySurfaceTitle } from "../entityLabels";
+import { getTreeChildren } from "../treeTraversal";
 
 function BreadcrumbItem({
   label,
@@ -859,6 +862,22 @@ export function getActionTargetRows(
   return rows.filter((row) => selection.contains(row.viewKey)).toArray();
 }
 
+function planExpandSubtree(plan: Plan, data: Data, pane: Pane, row: Row): Plan {
+  const expanded = planExpandNode(plan, row.view, row.viewPath);
+  const currentData = { ...data, views: expanded.views };
+  return getTreeChildren(
+    currentData,
+    row.viewPath,
+    pane.rootNodeId,
+    pane.sourceId,
+    pane.typeFilters
+  ).rows.reduce(
+    (next, child) =>
+      planExpandSubtree(next, { ...data, views: next.views }, pane, child),
+    expanded
+  );
+}
+
 function usePaneKeyboardNavigation(paneIndex: number): {
   wrapperRef: React.RefObject<HTMLDivElement>;
   onKeyDownCapture: (e: React.KeyboardEvent<HTMLDivElement>) => void;
@@ -873,6 +892,8 @@ function usePaneKeyboardNavigation(paneIndex: number): {
   const { selection, anchor } = useTemporaryView();
   const toggleFilter = useToggleFilter();
   const { createPlan, executePlan } = usePlanner();
+  const data = useData();
+  const pane = useCurrentPane();
   const treeResult = usePaneTreeResult();
   const rows = treeResult?.rows || List<Row>();
   const orderedViewKeys = useMemo(
@@ -1152,6 +1173,20 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       executePlan(
         planSelectAllTemporaryRows(createPlan(), orderedViewKeys, anchor)
       );
+      return;
+    }
+
+    if ((e.metaKey || e.ctrlKey) && e.key === "ArrowDown") {
+      const activeRow = getActiveRow(root);
+      const row = activeRow
+        ? rows.find((candidate) => candidate.viewKey === getRowKey(activeRow))
+        : undefined;
+      if (!row) {
+        return;
+      }
+      e.preventDefault();
+      executePlan(planExpandSubtree(createPlan(), data, pane, row));
+      refocusPaneAfterRowMutation(root);
       return;
     }
 

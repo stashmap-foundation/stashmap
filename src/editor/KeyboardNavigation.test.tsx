@@ -143,6 +143,67 @@ Root
     `);
   });
 
+  test("Cmd+Up collapses the focused root and every descendant", async () => {
+    await renderNestedFilesystemTree();
+    await userEvent.click(
+      await screen.findByRole("treeitem", { name: "Root" })
+    );
+    await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+    await expectTree(`
+Root
+  A
+    A1
+      A2
+  B
+    B1
+    `);
+
+    await userEvent.click(
+      await screen.findByRole("treeitem", { name: "Root" })
+    );
+    await userEvent.keyboard("{Meta>}{ArrowUp}{/Meta}");
+    await expectTree(`
+Root
+    `);
+
+    await userEvent.click(
+      await screen.findByRole("treeitem", { name: "Root" })
+    );
+    await userEvent.keyboard("{ArrowRight}");
+    await expectTree(`
+Root
+  A
+  B
+    `);
+  });
+
+  test("Cmd+Up collapses only the focused subtree", async () => {
+    await renderNestedFilesystemTree();
+    await userEvent.click(
+      await screen.findByRole("treeitem", { name: "Root" })
+    );
+    await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+    await userEvent.click(await screen.findByRole("treeitem", { name: "A" }));
+    await userEvent.keyboard("{Meta>}{ArrowUp}{/Meta}");
+    await expectTree(`
+Root
+  A
+  B
+    B1
+    `);
+
+    await userEvent.click(await screen.findByRole("treeitem", { name: "A" }));
+    await userEvent.keyboard("{ArrowRight}");
+    await expectTree(`
+Root
+  A
+    A1
+  B
+    B1
+    `);
+  });
+
   test("Escape after editing returns focus to the same row", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());

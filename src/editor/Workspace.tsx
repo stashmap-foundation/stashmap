@@ -5,7 +5,11 @@ import { isUserLoggedIn } from "../NostrAuthContext";
 import { getNodeDocumentId } from "../core/plan";
 import { TemporaryViewProvider, useTemporaryView } from "./temporaryViewState";
 
-import { getDisplayTextForRow, getIndependentRows } from "../rowModel";
+import {
+  getDisplayTextForRow,
+  getIndependentRows,
+  updateView,
+} from "../rowModel";
 import { useData } from "../DataContext";
 import { useBackend } from "../BackendContext";
 import {
@@ -42,6 +46,7 @@ import {
   planShiftTemporarySelection,
   planToggleTemporarySelection,
   planExpandNode,
+  planUpdateViews,
   type Plan,
 } from "../planner";
 import { parseTextToTrees, planPasteMarkdownTrees } from "./FileDropZone";
@@ -862,9 +867,23 @@ export function getActionTargetRows(
   return rows.filter((row) => selection.contains(row.viewKey)).toArray();
 }
 
-function planExpandSubtree(plan: Plan, data: Data, pane: Pane, row: Row): Plan {
-  const expanded = planExpandNode(plan, row.view, row.viewPath);
-  const currentData = { ...data, views: expanded.views };
+function planSetSubtreeExpanded(
+  plan: Plan,
+  data: Data,
+  pane: Pane,
+  row: Row,
+  expanded: boolean
+): Plan {
+  const updated = expanded
+    ? planExpandNode(plan, row.view, row.viewPath)
+    : planUpdateViews(
+        plan,
+        updateView(plan.views, row.viewPath, {
+          ...row.view,
+          expanded: false,
+        })
+      );
+  const currentData = { ...data, views: updated.views };
   return getTreeChildren(
     currentData,
     row.viewPath,
@@ -873,8 +892,14 @@ function planExpandSubtree(plan: Plan, data: Data, pane: Pane, row: Row): Plan {
     pane.typeFilters
   ).rows.reduce(
     (next, child) =>
-      planExpandSubtree(next, { ...data, views: next.views }, pane, child),
-    expanded
+      planSetSubtreeExpanded(
+        next,
+        { ...data, views: next.views },
+        pane,
+        child,
+        expanded
+      ),
+    updated
   );
 }
 
@@ -1176,7 +1201,10 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       return;
     }
 
-    if ((e.metaKey || e.ctrlKey) && e.key === "ArrowDown") {
+    if (
+      (e.metaKey || e.ctrlKey) &&
+      (e.key === "ArrowDown" || e.key === "ArrowUp")
+    ) {
       const activeRow = getActiveRow(root);
       const row = activeRow
         ? rows.find((candidate) => candidate.viewKey === getRowKey(activeRow))
@@ -1185,7 +1213,15 @@ function usePaneKeyboardNavigation(paneIndex: number): {
         return;
       }
       e.preventDefault();
-      executePlan(planExpandSubtree(createPlan(), data, pane, row));
+      executePlan(
+        planSetSubtreeExpanded(
+          createPlan(),
+          data,
+          pane,
+          row,
+          e.key === "ArrowDown"
+        )
+      );
       refocusPaneAfterRowMutation(root);
       return;
     }

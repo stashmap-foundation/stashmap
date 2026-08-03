@@ -5,7 +5,7 @@ import { HTML5Backend } from "react-dnd-html5-backend";
 import { nip19 } from "nostr-tools";
 import { LOCAL } from "./core/nodeRef";
 import { moveNodes, createRefTarget, getNode } from "./core/connections";
-import { nodeText } from "./core/nodeSpans";
+import { embeddedTarget, nodeText } from "./core/nodeSpans";
 import { calendarEntryTarget } from "./core/ical";
 import { getIndependentRows, updateViewPathsAfterMoveNodes } from "./rowModel";
 import { getDocumentForNode } from "./core/Document";
@@ -109,6 +109,8 @@ function isDraggedOccurrence(row: Row, sources: Row[]): boolean {
   );
 }
 
+// The visible parent of a projected row is the embed row standing for
+// its source-side parent, not that parent itself.
 function getVisibleParentRow(rows: List<Row>, row: Row): Row | undefined {
   if (!row.parentRef) {
     return undefined;
@@ -118,7 +120,9 @@ function getVisibleParentRow(rows: List<Row>, row: Row): Row | undefined {
     .reverse()
     .find(
       (candidate) =>
-        candidate.depth < row.depth && refsEqual(candidate.ref, row.parentRef)
+        candidate.depth < row.depth &&
+        (refsEqual(candidate.ref, row.parentRef) ||
+          candidate.standsFor?.id === row.parentRef?.id)
     );
 }
 
@@ -317,21 +321,48 @@ export function dnd(
   sourceDrag: DragSource,
   targetPaneIndex: number,
   targetParentRow: Row,
-  dropIndex: number
+  dropIndex: number,
+  dropAnchor: Row | undefined
 ): Plan {
   const source = sourceDrag.row.viewKey;
   const sources = sourceDrag.draggedRows.length
     ? sourceDrag.draggedRows
     : [sourceDrag.row];
   const independentRows = getIndependentRows(sources);
-  // Projected embed content is readonly: nothing drops into it, and its
-  // rows don't drag out yet — materializing from an embed is later work.
-  if (
-    targetParentRow.projected ||
-    independentRows.some((row) => row.projected)
-  ) {
-    return basePlan;
-  }
+  // Under an embed the composed order is carried by explicit position
+  // attrs, never by where rows sit in the file (lab RULES, K-010).
+  const isEmbedDestination =
+    embeddedTarget(targetParentRow.node) !== undefined ||
+    targetParentRow.projected === true;
+  const positionAttrs = (
+    anchorID: ID | undefined
+  ): Record<string, string> | undefined => {
+    if (!isEmbedDestination) {
+      return undefined;
+    }
+    if (anchorID !== undefined) {
+      return { after: anchorID };
+    }
+    return dropIndex === 0 ? { front: "true" } : undefined;
+  };
+  const planWithPosition = (
+    accPlan: Plan,
+    placedID: ID | undefined,
+    anchorID: ID | undefined
+  ): Plan => {
+    const attrs = positionAttrs(anchorID);
+    if (attrs === undefined || placedID === undefined) {
+      return accPlan;
+    }
+    const node = getNode(accPlan.knowledgeDBs, placedID, LOCAL);
+    if (!node) {
+      return accPlan;
+    }
+    return planUpsertNodes(accPlan, {
+      ...node,
+      extraAttrs: { ...node.extraAttrs, ...attrs },
+    });
+  };
   const [plan, targetParentNode] = planMaterializeComputedRow(
     basePlan,
     targetParentRow
@@ -444,6 +475,15 @@ export function dnd(
   };
 
   if (reorder) {
+    if (isEmbedDestination) {
+      return independentRows.reduce<{ plan: Plan; anchorID: ID | undefined }>(
+        (acc, row) => ({
+          plan: planWithPosition(acc.plan, row.node.id, acc.anchorID),
+          anchorID: row.node.id,
+        }),
+        { plan, anchorID: dropAnchor?.node.id }
+      ).plan;
+    }
     const realRows = independentRows.filter(
       (row) => row.childIndex !== undefined
     );
@@ -502,10 +542,20 @@ export function dnd(
         insertAt
       );
     }, moveBasePlan);
+    const positionedPlan = realRows.reduce<{
+      plan: Plan;
+      anchorID: ID | undefined;
+    }>(
+      (acc, sourceRow) => ({
+        plan: planWithPosition(acc.plan, sourceRow.node.id, acc.anchorID),
+        anchorID: sourceRow.node.id,
+      }),
+      { plan: movedPlan, anchorID: dropAnchor?.node.id }
+    ).plan;
     return virtualRows.reduce((accPlan: Plan, sourceRow, idx) => {
       const insertAt = dropIndex + realRows.length + idx;
       return addProjectedSourceAsReference(accPlan, sourceRow, insertAt);
-    }, movedPlan);
+    }, positionedPlan);
   }
 
   const expandedPlan = targetParentRow.view.expanded
@@ -518,52 +568,48 @@ export function dnd(
       nodeText(sourceRow.node)
     );
 
-  return independentRows.reduce((accPlan: Plan, sourceRow, idx) => {
-    const sourceNode = sourceRow.node;
-    const sourceEdgeRelevance = sourceNode.relevance;
-    const sourceEdgeArgument = sourceNode.argument;
-    const insertAt = dropIndex + idx;
-    const isPrimarySource = sourceRow.viewKey === source;
-    const targetNode = getCurrentPlanNode(accPlan, targetParentNode);
-    const planWithSource =
-      targetSourceId === LOCAL
-        ? planRecordForeignSource(accPlan, sourcePane, sourceRow, targetNode)
-        : accPlan;
-    const insertTarget =
-      sourceRow.materialize?.take ??
-      (isPrimarySource ? sourceDrag.insertTarget : undefined);
-    const dragTargetID = isPrimarySource
-      ? sourceDrag.targetId || sourceDrag.nodeId
-      : undefined;
-    if (insertTarget) {
-      return planAddToParent(
+  return independentRows.reduce<{ plan: Plan; anchorID: ID | undefined }>(
+    (acc, sourceRow, idx) => {
+      const sourceNode = sourceRow.node;
+      const sourceEdgeRelevance = sourceNode.relevance;
+      const sourceEdgeArgument = sourceNode.argument;
+      const insertAt = dropIndex + idx;
+      const isPrimarySource = sourceRow.viewKey === source;
+      const targetNode = getCurrentPlanNode(acc.plan, targetParentNode);
+      const planWithSource =
+        targetSourceId === LOCAL
+          ? planRecordForeignSource(acc.plan, sourcePane, sourceRow, targetNode)
+          : acc.plan;
+      const insertTarget =
+        sourceRow.materialize?.take ??
+        (isPrimarySource ? sourceDrag.insertTarget : undefined);
+      const dragTargetID = isPrimarySource
+        ? sourceDrag.targetId || sourceDrag.nodeId
+        : undefined;
+      const addTarget = ((): AddToParentTarget => {
+        if (insertTarget) {
+          return addFallbackLinkText(insertTarget, sourceDrag.text);
+        }
+        if (dragTargetID) {
+          return createRefTarget(dragTargetID, nodeText(sourceNode));
+        }
+        return toReferenceTarget(sourceRow);
+      })();
+      const [added, ids] = planAddToParent(
         planWithSource,
-        addFallbackLinkText(insertTarget, sourceDrag.text),
+        addTarget,
         targetNode.id,
         insertAt,
         sourceEdgeRelevance,
         sourceEdgeArgument
-      )[0];
-    }
-    if (dragTargetID) {
-      return planAddToParent(
-        planWithSource,
-        createRefTarget(dragTargetID, nodeText(sourceNode)),
-        targetNode.id,
-        insertAt,
-        sourceEdgeRelevance,
-        sourceEdgeArgument
-      )[0];
-    }
-    return planAddToParent(
-      planWithSource,
-      toReferenceTarget(sourceRow),
-      targetNode.id,
-      insertAt,
-      sourceEdgeRelevance,
-      sourceEdgeArgument
-    )[0];
-  }, expandedPlan);
+      );
+      return {
+        plan: planWithPosition(added, ids[0], acc.anchorID),
+        anchorID: ids[0] ?? acc.anchorID,
+      };
+    },
+    { plan: expandedPlan, anchorID: dropAnchor?.node.id }
+  ).plan;
 }
 
 function CustomDragLayer(): JSX.Element | null {

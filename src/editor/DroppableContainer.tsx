@@ -5,6 +5,7 @@ import { NativeTypes } from "react-dnd-html5-backend";
 import { dnd, getDropDestinationFromRows } from "../dnd";
 import { planMaterializeComputedRow } from "../core/plan";
 import { calendarFeedUrl } from "../core/ical";
+import { embeddedTarget } from "../core/nodeSpans";
 import { getWorkspaceNode } from "../core/knowledge";
 import {
   Plan,
@@ -416,6 +417,11 @@ export function useDroppable({
       const isProjectionReorder =
         calendarFeedUrl(dropDestination.parentRow.node) !== undefined &&
         dragRows.some((dragged) => dragged.parentRef?.id === parentId);
+      // Under an embed, position rides as an explicit attr on the dropped
+      // row's placement — the anchor is named, never materialized.
+      const isEmbedDestination =
+        embeddedTarget(dropDestination.parentRow.node) !== undefined ||
+        dropDestination.parentRow.projected === true;
       const [plan, dropIndex] = ((): [Plan, number] => {
         const base = createPlan();
         const withSequence = isProjectionReorder
@@ -432,7 +438,10 @@ export function useDroppable({
               )
           : base;
         const { anchorRow } = dropDestination;
-        if (!anchorRow?.materialize && !isProjectionReorder) {
+        if (
+          isEmbedDestination ||
+          (!anchorRow?.materialize && !isProjectionReorder)
+        ) {
           return [withSequence, dropDestination.insertAtIndex];
         }
         const anchored = anchorRow
@@ -453,7 +462,8 @@ export function useDroppable({
         dragItem,
         paneIndex,
         dropDestination.parentRow,
-        dropIndex
+        dropIndex,
+        dropDestination.anchorRow
       );
       executePlan(
         planSetTemporarySelectionState(dropped, {

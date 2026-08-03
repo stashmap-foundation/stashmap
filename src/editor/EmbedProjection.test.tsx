@@ -130,6 +130,51 @@ Note
   );
 });
 
+test("dragging a projected row writes a position claim", async () => {
+  const workspacePath = writeWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [S](#src) <!-- id:emb embed="true" -->',
+    ].join("\n"),
+    "source.md": [
+      "# Source <!-- id:src -->",
+      "",
+      "- Argument A <!-- id:a -->",
+      "- Argument B <!-- id:b -->",
+      "- Argument C <!-- id:c -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  fireEvent.dragStart(screen.getByRole("treeitem", { name: "Argument A" }));
+  fireEvent.drop(screen.getByRole("treeitem", { name: "Argument C" }));
+
+  await expectTree(`
+Note
+  Source
+    Argument B
+    Argument C
+    Argument A
+  `);
+
+  await waitFor(() => {
+    const note = fs.readFileSync(pathModule.join(workspacePath, "note.md"), {
+      encoding: "utf8",
+    });
+    expect(note).toMatch(
+      /- \[Argument A\]\(#a\) <!-- id:\S+ embed="true" after="c" -->/u
+    );
+  });
+});
+
 test("Log entries are plain links and stay flat", async () => {
   const [alice] = setup([ALICE]);
   const { relayPool } = renderApp(alice());

@@ -366,7 +366,56 @@ Target
   );
 });
 
-test("judging projected rows materializes nested placements", async () => {
+test("a deep relevance mark writes one line and binds in place", async () => {
+  const workspacePath = writeWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [S](#src) <!-- id:emb embed="true" -->',
+    ].join("\n"),
+    "source.md": [
+      "# Source <!-- id:src -->",
+      "",
+      "- Argument B <!-- id:b -->",
+      "  - Beleg B1 <!-- id:b1 -->",
+      "  - Beleg B2 <!-- id:b2 -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await userEvent.click(screen.getByRole("treeitem", { name: "Beleg B1" }));
+  await userEvent.keyboard("!");
+
+  await expectTree(
+    `
+Note
+  Source
+    Argument B
+      {!} Beleg B1
+      Beleg B2
+  `,
+    { showGutter: true }
+  );
+
+  await waitFor(() => {
+    const note = fs.readFileSync(pathModule.join(workspacePath, "note.md"), {
+      encoding: "utf8",
+    });
+    expect(note).toMatch(
+      /- \[S\]\(#src\) <!-- id:emb embed="true" -->\n {2}- \(!\) \[Beleg B1\]\(#b1\) <!-- id:\S+ embed="true" -->/u
+    );
+    expect(note).not.toContain("(#b)");
+  });
+});
+
+test("evidence writes the parent line beneath the embed", async () => {
   const workspacePath = writeWorkspace({
     "note.md": [
       "# Note <!-- id:note -->",
@@ -390,14 +439,14 @@ test("judging projected rows materializes nested placements", async () => {
   await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
 
   await userEvent.click(screen.getByRole("treeitem", { name: "Beleg B1" }));
-  await userEvent.keyboard("!");
+  await userEvent.keyboard("+");
 
   await expectTree(
     `
 Note
   Source
     Argument B
-      {!} Beleg B1
+      {+} Beleg B1
   `,
     { showGutter: true }
   );
@@ -407,9 +456,85 @@ Note
       encoding: "utf8",
     });
     expect(note).toMatch(
-      /- \[S\]\(#src\) <!-- id:emb embed="true" -->\n {2}- \[Argument B\]\(#b\) <!-- id:\S+ embed="true" -->\n {4}- \(!\) \[Beleg B1\]\(#b1\) <!-- id:\S+ embed="true" -->/u
+      /- \[S\]\(#src\) <!-- id:emb embed="true" -->\n {2}- \[Argument B\]\(#b\) <!-- id:\S+ embed="true" -->\n {4}- \(\+\) \[Beleg B1\]\(#b1\) <!-- id:\S+ embed="true" -->/u
     );
   });
+});
+
+test("marking two rows announces the note once, at the top", async () => {
+  const workspacePath = writeWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [S](#src) <!-- id:emb embed="true" -->',
+      '  - (!) [b](#b) <!-- id:o1 embed="true" -->',
+      '  - (!) [c](#c) <!-- id:o2 embed="true" -->',
+    ].join("\n"),
+    "source.md": [
+      "# Source <!-- id:src -->",
+      "",
+      "- Argument B <!-- id:b -->",
+      "  - Beleg B1 <!-- id:b1 -->",
+      "- Argument C <!-- id:c -->",
+      "  - Beleg C1 <!-- id:c1 -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "source.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await expectTree(`
+Source
+  Argument B
+    Beleg B1
+  Argument C
+    Beleg C1
+  [I] Note ↩
+  `);
+});
+
+test("a broken evidence edge suspends instead of re-aiming", async () => {
+  const workspacePath = writeWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [S](#src) <!-- id:emb embed="true" -->',
+      '  - [Argument B](#b) <!-- id:o1 embed="true" -->',
+      '    - (+) [Beleg B1](#b1) <!-- id:o2 embed="true" -->',
+    ].join("\n"),
+    "source.md": [
+      "# Source <!-- id:src -->",
+      "",
+      "- Argument A <!-- id:a -->",
+      "- Argument B <!-- id:b -->",
+      "- Beleg B1 <!-- id:b1 -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await expectTree(
+    `
+Note
+  Source
+    Argument A
+    Argument B
+      {+} Beleg B1
+    Beleg B1
+  `,
+    { showGutter: true }
+  );
 });
 
 test("an embed row opens as a pane root and projects there", async () => {

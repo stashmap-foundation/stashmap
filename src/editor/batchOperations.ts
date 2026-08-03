@@ -11,13 +11,14 @@ import {
   NodeItemMetadata,
 } from "../nodeItemMutations";
 import { planMoveNode } from "../treeMutations";
-import { getNode } from "../core/connections";
+import { createRefTarget, getNode } from "../core/connections";
 import {
   planAddTopTargetsToDocument,
   planMaterializeComputedRow,
 } from "../core/plan";
 import { getDocumentByIdOrFilePath } from "../core/Document";
-import { spansToMarkdown } from "../core/nodeSpans";
+import { getWorkspaceNode } from "../core/knowledge";
+import { nodeText, placementTarget, spansToMarkdown } from "../core/nodeSpans";
 
 export type EditorInfo = {
   spans: InlineSpan[];
@@ -49,6 +50,43 @@ function planUpdateOneMetadata(
   metadata: NodeItemMetadata,
   editorSpans: InlineSpan[] | undefined
 ): Plan {
+  // Evidence names its parent (idea.md, Judging): a +/- on a projected
+  // row writes the parent's line with the marked line beneath — one
+  // level, never a ladder. Relevance stays a single line.
+  const host = row.materialize?.host;
+  if (
+    metadata.argument !== undefined &&
+    row.projected === true &&
+    row.materialize !== undefined &&
+    host !== undefined &&
+    row.parentNode !== undefined &&
+    placementTarget(host.node) !== row.parentNode.id
+  ) {
+    const parentPlacement = {
+      node: row.parentNode,
+      parentRef: row.parentRef,
+      materialize: {
+        precededBy: [...host.node.children.toArray()].reverse(),
+        take: createRefTarget(row.parentNode.id, nodeText(row.parentNode)),
+        host,
+      },
+    };
+    const [planWithParent, parentNode] = planMaterializeComputedRow(
+      acc,
+      parentPlacement
+    );
+    if (getWorkspaceNode(planWithParent.knowledgeDBs, parentNode.id)) {
+      const [planWithEvidence, , tookNow] = planMaterializeComputedRow(
+        planWithParent,
+        row,
+        { relevance: metadata.relevance, argument: metadata.argument },
+        { parentID: parentNode.id }
+      );
+      if (tookNow) {
+        return planWithEvidence;
+      }
+    }
+  }
   // Write gestures take first: a computed row materializes with the
   // judgment applied at creation — one plan, one save.
   const [materializedPlan, , materializedNow] = planMaterializeComputedRow(

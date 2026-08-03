@@ -903,26 +903,149 @@ function getIncomingGroupChildren(
   };
 }
 
-// A touch on a projected row materializes it as a placement in the
-// embedding file: the take snapshots the live text as the frozen label,
-// and the host chain writes nested placements for nested touches
-// (fixture 22).
+// A touch on a projected row materializes it as ONE placement line in
+// the scope-owning placement's file children — never a ladder of
+// ancestors (idea.md, Judging). The take snapshots the live text as the
+// frozen label; the host is the owning placement row itself.
 function withPlacementRecipe(row: Row, parentRow: Row): Row {
   if (row.materialize) {
     return row;
   }
+  const owner =
+    placementTarget(parentRow.node) !== undefined
+      ? {
+          node: parentRow.node,
+          parentRef: parentRow.parentRef,
+          materialize: parentRow.materialize,
+        }
+      : parentRow.materialize?.host ?? {
+          node: parentRow.node,
+          parentRef: parentRow.parentRef,
+          materialize: parentRow.materialize,
+        };
   return {
     ...row,
     materialize: {
-      precededBy: [...parentRow.node.children.toArray()].reverse(),
+      precededBy: [...owner.node.children.toArray()].reverse(),
       take: createRefTarget(row.node.id, nodeText(row.node)),
-      host: {
-        node: parentRow.node,
-        parentRef: parentRow.parentRef,
-        materialize: parentRow.materialize,
-      },
+      host: owner,
     },
   };
+}
+
+// A claim binds beyond its own written level only when it says nothing
+// about position or evidence: relevance and holds ride the row wherever
+// it sits (idea.md, Judging); evidence and anchored claims are
+// statements about their written parent and stay there.
+function deepBindableClaim(node: GraphNode): boolean {
+  return (
+    placementTarget(node) !== undefined &&
+    node.argument === undefined &&
+    node.extraAttrs?.after === undefined &&
+    node.extraAttrs?.front !== "true"
+  );
+}
+
+function subtreeContains(
+  graph: GraphLookup,
+  sourceId: SourceId,
+  node: GraphNode,
+  wanted: ID,
+  seen: globalThis.Set<ID>
+): boolean {
+  return node.children.some((childID) => {
+    if (seen.has(childID)) {
+      return false;
+    }
+    seen.add(childID);
+    if (childID === wanted) {
+      return true;
+    }
+    const child = getNodeInSource(graph, { sourceId, id: childID })?.node;
+    return child
+      ? subtreeContains(graph, sourceId, child, wanted, seen)
+      : false;
+  });
+}
+
+// Deep binding: an unanchored relevance claim written at the scope-owning
+// placement binds its target's occurrence at any depth of the projected
+// subtree — the one-line mark finds its row (idea.md, Judging).
+function composeDeepClaims(
+  data: Data,
+  graph: GraphLookup,
+  parentRow: Row,
+  baseChildRows: List<Row>,
+  typeFilters: Pane["typeFilters"]
+): List<Row> | undefined {
+  if (parentRow.projected !== true) {
+    return undefined;
+  }
+  const hostID = parentRow.materialize?.host?.node.id;
+  const owner = hostID
+    ? lookupNode(graph, hostID, parentRow.ref.sourceId)
+    : undefined;
+  if (!owner) {
+    return undefined;
+  }
+  const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
+  const parentPath = addNodesToLastElement(
+    parentRow.viewPath,
+    parentRow.node.id
+  );
+  const consumedBy = new globalThis.Map<ID, GraphNode>();
+  owner.node.children.toArray().forEach((childID) => {
+    const child = getNodeInSource(graph, {
+      sourceId: owner.ref.sourceId,
+      id: childID,
+    })?.node;
+    if (!child || !deepBindableClaim(child)) {
+      return;
+    }
+    const claimTarget = placementTarget(child);
+    if (claimTarget !== undefined && !consumedBy.has(claimTarget)) {
+      consumedBy.set(claimTarget, child);
+    }
+  });
+  if (consumedBy.size === 0) {
+    return undefined;
+  }
+  return List(
+    baseChildRows.toArray().flatMap((baseRow) => {
+      const placement = consumedBy.get(baseRow.node.id);
+      if (!placement) {
+        return [baseRow];
+      }
+      if (placement.relevance === "not_relevant") {
+        return [];
+      }
+      if (!itemPassesFilters(placement, activeFilters)) {
+        return [];
+      }
+      const row = createRow(
+        data,
+        graph,
+        appendNodeToPath(parentPath, placement.id),
+        placement,
+        owner.ref.sourceId,
+        parentRow,
+        parentRow.node,
+        parentRow.ref,
+        undefined,
+        false,
+        undefined
+      );
+      const occurrenceView =
+        data.views.get(row.viewKey) === undefined
+          ? data.views.get(
+              viewPathToString(appendNodeToPath(parentPath, baseRow.node.id))
+            )
+          : undefined;
+      return [
+        occurrenceView !== undefined ? { ...row, view: occurrenceView } : row,
+      ];
+    })
+  );
 }
 
 // The embed composition at row level (lab RULES): start from base child
@@ -1034,11 +1157,28 @@ function composeEmbedChildren(
         return false;
       }
       const claimTarget = claimTargetOf(row.node);
+      if (claimTarget === undefined) {
+        return true;
+      }
       const rendersAtOccurrence =
-        claimTarget !== undefined &&
         consumedBy.get(claimTarget)?.id === row.node.id &&
         target.node.children.includes(claimTarget);
-      return !rendersAtOccurrence;
+      if (rendersAtOccurrence) {
+        return false;
+      }
+      // A one-line claim whose row lives deeper renders down at its
+      // occurrence, not here at the level it was written.
+      const bindsDeeper =
+        deepBindableClaim(row.node) &&
+        !target.node.children.includes(claimTarget) &&
+        subtreeContains(
+          graph,
+          target.ref.sourceId,
+          target.node,
+          claimTarget,
+          new globalThis.Set<ID>([target.node.id])
+        );
+      return !bindsDeeper;
     })
     .toArray();
   const inSequence = (sequence: Row[], anchor: ID): number =>
@@ -1137,6 +1277,7 @@ function getChildrenForRegularNode(
     : childRows;
   const combinedRows =
     composeEmbedChildren(data, graph, parentRow, ownChildRows, typeFilters) ??
+    composeDeepClaims(data, graph, parentRow, ownChildRows, typeFilters) ??
     ownChildRows;
 
   if (!isFileRow(parentRow)) {

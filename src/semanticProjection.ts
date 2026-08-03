@@ -172,6 +172,61 @@ function sourceRootCoveredByTarget(
   return sourceRoot ? localChildLinksTo(graph, target, sourceRoot) : false;
 }
 
+// One note, one notice (idea.md): a document that also references an
+// ancestor of the target announces itself up there — its deeper links
+// are covered and never queue separately.
+function referencesAncestor(
+  graph: GraphLookup,
+  graphIndex: GraphIndex,
+  noteRoot: ID,
+  targetSourceId: SourceId,
+  ancestorID: ID | undefined,
+  seen: ImmutableSet<ID>
+): boolean {
+  if (ancestorID === undefined || seen.has(ancestorID)) {
+    return false;
+  }
+  const refs = graphIndex.incomingCrefs.get(ancestorID) ?? [];
+  const referenced = refs.some((ref) => {
+    const carrier = getNodeInSource(graph, ref)?.node;
+    return carrier !== undefined && carrier.root === noteRoot;
+  });
+  if (referenced) {
+    return true;
+  }
+  const ancestor = getNodeInSource(graph, {
+    sourceId: targetSourceId,
+    id: ancestorID,
+  })?.node;
+  return referencesAncestor(
+    graph,
+    graphIndex,
+    noteRoot,
+    targetSourceId,
+    ancestor?.parent,
+    seen.add(ancestorID)
+  );
+}
+
+function coveredByAncestorReference(
+  graph: GraphLookup,
+  graphIndex: GraphIndex,
+  source: ResolvedNode,
+  target: ResolvedNode | undefined
+): boolean {
+  if (!target) {
+    return false;
+  }
+  return referencesAncestor(
+    graph,
+    graphIndex,
+    source.node.root,
+    target.ref.sourceId,
+    target.node.parent,
+    ImmutableSet<ID>([target.node.id])
+  );
+}
+
 function pulledSourceOrder(data: Data, sourceId: SourceId): number | undefined {
   const indexes = [...(data.pull?.matchedSourceIdsByPaneId.values() ?? [])]
     .map((sourceIds) => sourceIds.indexOf(sourceId))
@@ -235,6 +290,9 @@ export function getIncomingCrefsForNode(
     // A reference the view is currently looking through — its carrying
     // row sits on the active expansion path — never queues under itself.
     .filter((source) => !expansionPath.includes(source.node.id))
+    .filter(
+      (source) => !coveredByAncestorReference(graph, graphIndex, source, target)
+    )
     .filter(
       (source) =>
         !isCalendarEntryPlacement(source.node, parentOf(graph, source)?.node)

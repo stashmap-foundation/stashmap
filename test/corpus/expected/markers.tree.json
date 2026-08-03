@@ -1,0 +1,86 @@
+{
+  "docId": "doc-markers",
+  "title": "Important heading",
+  "topNodes": [
+    {
+      "id": "u1",
+      "text": "Important heading",
+      "relevance": "relevant",
+      "blockKind": "heading",
+      "headingLevel": 1,
+      "children": [
+        {
+          "id": "u2",
+          "text": "Maybe relevant paragraph.",
+          "relevance": "maybe_relevant",
+          "blockKind": "paragraph",
+          "children": []
+        },
+        {
+          "id": "u3",
+          "text": "relevant row",
+          "relevance": "relevant",
+          "blockKind": "list_item",
+          "children": []
+        },
+        {
+          "id": "u4",
+          "text": "maybe relevant row",
+          "relevance": "maybe_relevant",
+          "blockKind": "list_item",
+          "children": []
+        },
+        {
+          "id": "u5",
+          "text": "little relevant row",
+          "relevance": "little_relevant",
+          "blockKind": "list_item",
+          "children": []
+        },
+        {
+          "id": "u6",
+          "text": "not relevant row",
+          "relevance": "not_relevant",
+          "blockKind": "list_item",
+          "children": []
+        },
+        {
+          "id": "u7",
+          "text": "confirming row",
+          "argument": "confirms",
+          "blockKind": "list_item",
+          "children": []
+        },
+        {
+          "id": "u8",
+          "text": "contra row",
+          "argument": "contra",
+          "blockKind": "list_item",
+          "children": []
+        },
+        {
+          "id": "u9",
+          "text": "confirming and relevant",
+          "relevance": "relevant",
+          "argument": "confirms",
+          "blockKind": "list_item",
+          "children": []
+        },
+        {
+          "id": "u10",
+          "text": "contra and little relevant",
+          "relevance": "little_relevant",
+          "argument": "contra",
+          "blockKind": "list_item",
+          "children": []
+        },
+        {
+          "id": "u11",
+          "text": "plain row",
+          "blockKind": "list_item",
+          "children": []
+        }
+      ]
+    }
+  ]
+}

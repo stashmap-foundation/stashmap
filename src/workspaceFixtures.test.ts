@@ -86,7 +86,7 @@ function fixtureEvent(value: unknown): Event {
 function fixtureCorpus(): Record<string, unknown> {
   const corpusPath = path.resolve(
     __dirname,
-    "../../deedsats-wallet/packages/knowstr_core/test/corpus/events/deposits.json"
+    "../test/corpus/events/deposits.json"
   );
   const parsed: unknown = JSON.parse(fs.readFileSync(corpusPath, "utf8"));
   if (!isRecord(parsed)) {

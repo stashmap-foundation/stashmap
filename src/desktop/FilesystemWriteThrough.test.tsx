@@ -35,7 +35,7 @@ async function expectKnowstrDocIdFrontmatter(
 
 const compositionCorpusPath = pathModule.resolve(
   __dirname,
-  "../../../deedsats-wallet/packages/knowstr_core/test/corpus"
+  "../../test/corpus"
 );
 const compositionFixtures = fs
   .readdirSync(compositionCorpusPath, { withFileTypes: true })

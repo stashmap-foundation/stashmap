@@ -1,0 +1,20 @@
+{
+  "docId": "doc-fm-title",
+  "title": "Holiday Destinations",
+  "topNodes": [
+    {
+      "id": "u1",
+      "text": "Spain",
+      "blockKind": "heading",
+      "headingLevel": 1,
+      "children": [
+        {
+          "id": "u2",
+          "text": "Madrid",
+          "blockKind": "list_item",
+          "children": []
+        }
+      ]
+    }
+  ]
+}

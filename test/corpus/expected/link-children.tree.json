@@ -1,0 +1,40 @@
+{
+  "docId": "doc-link-children",
+  "title": "Travel",
+  "topNodes": [
+    {
+      "id": "u1",
+      "text": "Travel",
+      "blockKind": "heading",
+      "headingLevel": 1,
+      "children": [
+        {
+          "id": "u8",
+          "text": "[Barcelona](#wd:Q1492)",
+          "blockKind": "list_item",
+          "children": [
+            {
+              "id": "u9",
+              "text": "[Sagrada Familia](#wd:Q48435)",
+              "blockKind": "list_item",
+              "children": [
+                {
+                  "id": "u10",
+                  "text": "I want to see it",
+                  "blockKind": "list_item",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "u11",
+              "text": "Book flights",
+              "blockKind": "list_item",
+              "children": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

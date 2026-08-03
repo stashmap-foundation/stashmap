@@ -2,7 +2,7 @@
 /**
  * Generates expected outputs for the shared Knowstr conformance corpus.
  *
- * The corpus lives in the deedsats-wallet repo and keeps the Dart
+ * The public corpus lives under test/corpus and keeps the Dart
  * reimplementation of the parser/serializer nucleus byte-compatible with
  * this reference implementation. For every `inputs/<name>.md` this script
  * writes:

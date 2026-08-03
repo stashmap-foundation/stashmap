@@ -1,0 +1,26 @@
+{
+  "docId": "doc-wrapped-paragraph",
+  "title": "Wrapped text",
+  "topNodes": [
+    {
+      "id": "gen-1",
+      "text": "Wrapped text",
+      "blockKind": "heading",
+      "headingLevel": 1,
+      "children": [
+        {
+          "id": "gen-2",
+          "text": "This paragraph is wrapped across three source lines and should normalize to one node.",
+          "blockKind": "paragraph",
+          "children": []
+        },
+        {
+          "id": "gen-3",
+          "text": "a list item that continues on the next line",
+          "blockKind": "list_item",
+          "children": []
+        }
+      ]
+    }
+  ]
+}

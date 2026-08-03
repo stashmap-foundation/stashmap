@@ -1,0 +1,26 @@
+{
+  "docId": "doc-publish",
+  "title": "Cantillon Essay",
+  "topNodes": [
+    {
+      "id": "u77",
+      "text": "Cantillon Essay",
+      "blockKind": "heading",
+      "headingLevel": 1,
+      "children": [
+        {
+          "id": "u78",
+          "text": "Money printing benefits whoever stands closest to the printer.",
+          "blockKind": "paragraph",
+          "children": []
+        },
+        {
+          "id": "u10",
+          "text": "[Library](#u9)",
+          "blockKind": "list_item",
+          "children": []
+        }
+      ]
+    }
+  ]
+}

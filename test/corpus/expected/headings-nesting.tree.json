@@ -1,0 +1,55 @@
+{
+  "docId": "doc-headings",
+  "title": "Alpha",
+  "topNodes": [
+    {
+      "id": "u1",
+      "text": "Alpha",
+      "blockKind": "heading",
+      "headingLevel": 1,
+      "children": [
+        {
+          "id": "u2",
+          "text": "Intro paragraph under alpha.",
+          "blockKind": "paragraph",
+          "children": []
+        },
+        {
+          "id": "u3",
+          "text": "Beta",
+          "blockKind": "heading",
+          "headingLevel": 2,
+          "children": [
+            {
+              "id": "u4",
+              "text": "Paragraph under beta.",
+              "blockKind": "paragraph",
+              "children": []
+            },
+            {
+              "id": "u5",
+              "text": "Gamma",
+              "blockKind": "heading",
+              "headingLevel": 3,
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "u6",
+          "text": "Delta",
+          "blockKind": "heading",
+          "headingLevel": 2,
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "u7",
+      "text": "Epsilon",
+      "blockKind": "heading",
+      "headingLevel": 1,
+      "children": []
+    }
+  ]
+}

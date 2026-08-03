@@ -1,0 +1,285 @@
+{
+  "events": [
+    {
+      "name": "asset-home",
+      "secretKey": "0000000000000000000000000000000000000000000000000000000000000001",
+      "docId": "fixture-asset-home",
+      "sTags": [
+        "asset:rgb:l7rVx_og-lcMfB5R-C13FD57-9yo7HSq-LzKevkU-pALJ06A"
+      ],
+      "event": {
+        "kind": 34774,
+        "pubkey": "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "created_at": 1750000000,
+        "tags": [
+          [
+            "d",
+            "fixture-asset-home"
+          ],
+          [
+            "S",
+            "asset:rgb:l7rVx_og-lcMfB5R-C13FD57-9yo7HSq-LzKevkU-pALJ06A"
+          ],
+          [
+            "ms",
+            "1750000000000"
+          ]
+        ],
+        "content": "---\nknowstr_doc_id: fixture-asset-home\nediting: |\n  Edit text freely. Never modify <!-- id:... --> comments.\n  Never add <!-- id:... --> to new items. knowstr save will reject invented IDs.\n  Markers: (!) relevant (?) maybe (~) little relevant (x) not relevant (+) confirms (-) contra. Combine: (-!) contra+relevant (-~) contra+little relevant\n  Save changes with: knowstr save\n---\n\n# Asset library <!-- id:asset:rgb:l7rVx_og-lcMfB5R-C13FD57-9yo7HSq-LzKevkU-pALJ06A -->\n\n- Podcast <!-- id:u2 -->\n- Robin Dunbar <!-- id:u3 -->\n",
+        "id": "95daede8e6e836443a87ebe10b4aa8af31d97b92d76a677264839e5d7751694c",
+        "sig": "4939d494884de000be5f1786997db1c6474d830be6d34cad57248997e2ad3ea74e6a6042a60f0fbd227089cde2912d72c2e4c78b8be45398af8ce100038f24d5"
+      }
+    },
+    {
+      "name": "entities-essay",
+      "secretKey": "0000000000000000000000000000000000000000000000000000000000000001",
+      "docId": "fixture-entities-essay",
+      "sTags": [
+        "u1",
+        "wd:Q1492",
+        "wd:Q48435"
+      ],
+      "event": {
+        "kind": 34774,
+        "pubkey": "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "created_at": 1750000100,
+        "tags": [
+          [
+            "d",
+            "fixture-entities-essay"
+          ],
+          [
+            "S",
+            "u1"
+          ],
+          [
+            "S",
+            "wd:Q1492"
+          ],
+          [
+            "S",
+            "wd:Q48435"
+          ],
+          [
+            "ms",
+            "1750000100000"
+          ]
+        ],
+        "content": "---\nknowstr_doc_id: fixture-entities-essay\nediting: |\n  Edit text freely. Never modify <!-- id:... --> comments.\n  Never add <!-- id:... --> to new items. knowstr save will reject invented IDs.\n  Markers: (!) relevant (?) maybe (~) little relevant (x) not relevant (+) confirms (-) contra. Combine: (-!) contra+relevant (-~) contra+little relevant\n  Save changes with: knowstr save\n---\n\n# Travel <!-- id:u1 -->\n\n- [Barcelona](#wd:Q1492) <!-- id:u8 -->\n  - [Sagrada Familia](#wd:Q48435) <!-- id:u9 -->\n    - I want to see it <!-- id:u10 -->\n",
+        "id": "0bb50b6b060600dd7389438c29238e0da4c1140ec842457bbb61137557598851",
+        "sig": "80c31c65f7e9993a548df4e19d9429e62316f3b1afe65dd33f7aac2241eca6f341e0f8c4213d8da797a337157b121a9f5f44d1f044f076ea4f1e66627072d177"
+      }
+    },
+    {
+      "name": "arrangement",
+      "secretKey": "0000000000000000000000000000000000000000000000000000000000000002",
+      "docId": "arr:asset:rgb:l7rVx_og-lcMfB5R-C13FD57-9yo7HSq-LzKevkU-pALJ06A",
+      "sTags": [
+        "a1",
+        "asset:rgb:l7rVx_og-lcMfB5R-C13FD57-9yo7HSq-LzKevkU-pALJ06A"
+      ],
+      "event": {
+        "kind": 34774,
+        "pubkey": "c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+        "created_at": 1750000150,
+        "tags": [
+          [
+            "d",
+            "arr:asset:rgb:l7rVx_og-lcMfB5R-C13FD57-9yo7HSq-LzKevkU-pALJ06A"
+          ],
+          [
+            "S",
+            "a1"
+          ],
+          [
+            "S",
+            "asset:rgb:l7rVx_og-lcMfB5R-C13FD57-9yo7HSq-LzKevkU-pALJ06A"
+          ],
+          [
+            "ms",
+            "1750000150000"
+          ]
+        ],
+        "content": "---\nknowstr_doc_id: arr:asset:rgb:l7rVx_og-lcMfB5R-C13FD57-9yo7HSq-LzKevkU-pALJ06A\nknowstr_sources:\n  - author: npub1operator\n    doc: fixture-asset-home\n    relays:\n      - wss://room.example/\nediting: |\n  Edit text freely. Never modify <!-- id:... --> comments.\n  Never add <!-- id:... --> to new items. knowstr save will reject invented IDs.\n  Markers: (!) relevant (?) maybe (~) little relevant (x) not relevant (+) confirms (-) contra. Combine: (-!) contra+relevant (-~) contra+little relevant\n  Save changes with: knowstr save\n---\n\n- [Asset library](#asset:rgb:l7rVx_og-lcMfB5R-C13FD57-9yo7HSq-LzKevkU-pALJ06A) <!-- id:a1 embed=\"true\" -->\n  - (!) [Podcast](#u2) <!-- id:a2 embed=\"true\" -->\n",
+        "id": "e7c74330d849f13008abafbcf2910da12793a4b720758c80d3e59c4f2a3d4ac5",
+        "sig": "badb7c6876ee41452dda9485d71d6aa901d497e351e208405902a17727d3c7d1dbc16ea8bbe72ff61c1eef80ff87f19f61114b0ea64d8bbc3045e86f9daf1658"
+      }
+    },
+    {
+      "name": "replaceable-old",
+      "secretKey": "0000000000000000000000000000000000000000000000000000000000000001",
+      "docId": "fixture-replaceable",
+      "sTags": [
+        "u20"
+      ],
+      "event": {
+        "kind": 34774,
+        "pubkey": "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "created_at": 1750000200,
+        "tags": [
+          [
+            "d",
+            "fixture-replaceable"
+          ],
+          [
+            "S",
+            "u20"
+          ],
+          [
+            "ms",
+            "1750000200000"
+          ]
+        ],
+        "content": "---\nknowstr_doc_id: fixture-replaceable\nediting: |\n  Edit text freely. Never modify <!-- id:... --> comments.\n  Never add <!-- id:... --> to new items. knowstr save will reject invented IDs.\n  Markers: (!) relevant (?) maybe (~) little relevant (x) not relevant (+) confirms (-) contra. Combine: (-!) contra+relevant (-~) contra+little relevant\n  Save changes with: knowstr save\n---\n\n# Notes <!-- id:u20 -->\n\n- old version <!-- id:u21 -->\n",
+        "id": "849cf16ebcaeea95fbfe8a5594594983d20529b5c9ace278752053d9069ff949",
+        "sig": "0e0041b841bf0e081ee5b91d93dfbfcdcd92f3b2eb01f3262f42fd5096d9a72fb1ce7c739217387484ff521a89bfdf1e9f7bf197ede8d2839c326c826f6aa290"
+      }
+    },
+    {
+      "name": "replaceable-new",
+      "secretKey": "0000000000000000000000000000000000000000000000000000000000000001",
+      "docId": "fixture-replaceable",
+      "sTags": [
+        "u20"
+      ],
+      "event": {
+        "kind": 34774,
+        "pubkey": "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "created_at": 1750000300,
+        "tags": [
+          [
+            "d",
+            "fixture-replaceable"
+          ],
+          [
+            "S",
+            "u20"
+          ],
+          [
+            "ms",
+            "1750000300000"
+          ]
+        ],
+        "content": "---\nknowstr_doc_id: fixture-replaceable\nediting: |\n  Edit text freely. Never modify <!-- id:... --> comments.\n  Never add <!-- id:... --> to new items. knowstr save will reject invented IDs.\n  Markers: (!) relevant (?) maybe (~) little relevant (x) not relevant (+) confirms (-) contra. Combine: (-!) contra+relevant (-~) contra+little relevant\n  Save changes with: knowstr save\n---\n\n# Notes <!-- id:u20 -->\n\n- new version <!-- id:u21 -->\n",
+        "id": "dd750379fa8509dd4d71ab177905ebddf3b63951b3720b6c3273ef353d5703e6",
+        "sig": "a2f94156e9e768b7b74301ce69cd9f74b81aa383dbe8dc0fd3087d7ce164215f348122795f82c47364f93ea3e654f188d75932180e1de0bbe60bc798c16106ff"
+      }
+    },
+    {
+      "name": "tie-low-ms",
+      "secretKey": "0000000000000000000000000000000000000000000000000000000000000001",
+      "docId": "fixture-tie",
+      "sTags": [
+        "u30"
+      ],
+      "event": {
+        "kind": 34774,
+        "pubkey": "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "created_at": 1750000400,
+        "tags": [
+          [
+            "d",
+            "fixture-tie"
+          ],
+          [
+            "S",
+            "u30"
+          ],
+          [
+            "ms",
+            "1750000400000"
+          ]
+        ],
+        "content": "---\nknowstr_doc_id: fixture-tie\nediting: |\n  Edit text freely. Never modify <!-- id:... --> comments.\n  Never add <!-- id:... --> to new items. knowstr save will reject invented IDs.\n  Markers: (!) relevant (?) maybe (~) little relevant (x) not relevant (+) confirms (-) contra. Combine: (-!) contra+relevant (-~) contra+little relevant\n  Save changes with: knowstr save\n---\n\n# Tie <!-- id:u30 -->\n\n- earlier <!-- id:u31 -->\n",
+        "id": "059359072b0828df07361269e5049477e12942e44845e5cc38046cbbd5c22992",
+        "sig": "0201ca2c7120bd39ba3db5358ee09d3df0b6d20c556fb9b4507c04587735d902dd5301d6eadfad843622e51868c62fdd0e70f06554af2b1d29840014170f395f"
+      }
+    },
+    {
+      "name": "tie-high-ms",
+      "secretKey": "0000000000000000000000000000000000000000000000000000000000000001",
+      "docId": "fixture-tie",
+      "sTags": [
+        "u30"
+      ],
+      "event": {
+        "kind": 34774,
+        "pubkey": "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "created_at": 1750000400,
+        "tags": [
+          [
+            "d",
+            "fixture-tie"
+          ],
+          [
+            "S",
+            "u30"
+          ],
+          [
+            "ms",
+            "1750000400500"
+          ]
+        ],
+        "content": "---\nknowstr_doc_id: fixture-tie\nediting: |\n  Edit text freely. Never modify <!-- id:... --> comments.\n  Never add <!-- id:... --> to new items. knowstr save will reject invented IDs.\n  Markers: (!) relevant (?) maybe (~) little relevant (x) not relevant (+) confirms (-) contra. Combine: (-!) contra+relevant (-~) contra+little relevant\n  Save changes with: knowstr save\n---\n\n# Tie <!-- id:u30 -->\n\n- later <!-- id:u31 -->\n",
+        "id": "542105ffa7297a5d6d8088a1246d2d03fda8eb70d56695212e1a55697593cd75",
+        "sig": "1ef710ecd4f75aa779f41664202840524ab12bd04a6a0415c13e1aa766d01b674a095b195d326b4f220814217065f95d917de7a31ef97840c875e7e2c020fedc"
+      }
+    },
+    {
+      "name": "second-author",
+      "secretKey": "0000000000000000000000000000000000000000000000000000000000000002",
+      "docId": "fixture-replaceable",
+      "sTags": [
+        "u20"
+      ],
+      "event": {
+        "kind": 34774,
+        "pubkey": "c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+        "created_at": 1750000250,
+        "tags": [
+          [
+            "d",
+            "fixture-replaceable"
+          ],
+          [
+            "S",
+            "u20"
+          ],
+          [
+            "ms",
+            "1750000250000"
+          ]
+        ],
+        "content": "---\nknowstr_doc_id: fixture-replaceable\nediting: |\n  Edit text freely. Never modify <!-- id:... --> comments.\n  Never add <!-- id:... --> to new items. knowstr save will reject invented IDs.\n  Markers: (!) relevant (?) maybe (~) little relevant (x) not relevant (+) confirms (-) contra. Combine: (-!) contra+relevant (-~) contra+little relevant\n  Save changes with: knowstr save\n---\n\n# Notes <!-- id:u20 -->\n\n- bob's version <!-- id:u21 -->\n",
+        "id": "1e9895883884894e6f226d035d334a659a7372acf2c5ee79b3d552fc056c3a01",
+        "sig": "684ad2a0992b384d339214e1be66e3ef9e2bfa76b816111cf34b4b31114491c0dfb11b808507f73ce6a416f3f627539367e612460b2a6b69133c299095ff2a38"
+      }
+    }
+  ],
+  "selection": [
+    {
+      "docId": "fixture-asset-home",
+      "winner": "asset-home"
+    },
+    {
+      "docId": "fixture-entities-essay",
+      "winner": "entities-essay"
+    },
+    {
+      "docId": "arr:asset:rgb:l7rVx_og-lcMfB5R-C13FD57-9yo7HSq-LzKevkU-pALJ06A",
+      "winner": "arrangement"
+    },
+    {
+      "docId": "fixture-replaceable",
+      "winner": "replaceable-new"
+    },
+    {
+      "docId": "fixture-tie",
+      "winner": "tie-high-ms"
+    },
+    {
+      "docId": "fixture-replaceable",
+      "winner": "second-author"
+    }
+  ]
+}

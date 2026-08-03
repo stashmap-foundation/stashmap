@@ -1,7 +1,7 @@
 /**
  * Conformance: the fixtures under icalFixtures/ are COPIES of the wallet
- * corpus (deedsats-wallet packages/knowstr_core/test/corpus/ical-ids.json
- * and corpus/ical/) — two implementations projecting the same feed MUST
+ * corpus (test/corpus/ical-ids.json and test/corpus/ical/) — two
+ * implementations projecting the same feed MUST
  * derive byte-identical ids and entries. When the corpus changes, re-copy.
  */
 import * as fs from "fs";

@@ -1,0 +1,63 @@
+{
+  "docId": "doc-no-ids",
+  "title": "Holiday Destinations",
+  "topNodes": [
+    {
+      "id": "gen-1",
+      "text": "Holiday Destinations",
+      "blockKind": "heading",
+      "headingLevel": 1,
+      "children": [
+        {
+          "id": "gen-2",
+          "text": "Some intro thoughts about travel.",
+          "blockKind": "paragraph",
+          "children": []
+        },
+        {
+          "id": "gen-3",
+          "text": "Spain",
+          "blockKind": "list_item",
+          "children": [
+            {
+              "id": "gen-4",
+              "text": "Madrid",
+              "blockKind": "list_item",
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "gen-5",
+          "text": "Croatia",
+          "blockKind": "list_item",
+          "children": []
+        },
+        {
+          "id": "gen-6",
+          "text": "Later",
+          "blockKind": "heading",
+          "headingLevel": 2,
+          "children": [
+            {
+              "id": "gen-7",
+              "text": "pack bags",
+              "blockKind": "list_item",
+              "listOrdered": true,
+              "listStart": 1,
+              "children": []
+            },
+            {
+              "id": "gen-8",
+              "text": "book flights",
+              "blockKind": "list_item",
+              "listOrdered": true,
+              "listStart": 1,
+              "children": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

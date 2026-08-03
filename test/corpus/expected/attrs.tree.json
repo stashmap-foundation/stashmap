@@ -1,0 +1,58 @@
+{
+  "docId": "doc-attrs",
+  "title": "Houses",
+  "topNodes": [
+    {
+      "id": "u1",
+      "text": "Houses",
+      "blockKind": "heading",
+      "headingLevel": 1,
+      "basedOn": "a1",
+      "snapshotId": "snap_sha256_1111111111111111111111111111111111111111111111111111111111111111",
+      "children": [
+        {
+          "id": "u2",
+          "text": "Brick house",
+          "blockKind": "list_item",
+          "basedOn": "a2",
+          "snapshotId": "snap_sha256_2222222222222222222222222222222222222222222222222222222222222222",
+          "children": []
+        },
+        {
+          "id": "u3",
+          "text": "Wooden house",
+          "blockKind": "list_item",
+          "basedOn": "a3",
+          "children": []
+        },
+        {
+          "id": "u4",
+          "text": "Straw house",
+          "blockKind": "list_item",
+          "snapshotId": "garbage",
+          "children": []
+        },
+        {
+          "id": "u5",
+          "text": "Unknown attrs are preserved",
+          "blockKind": "list_item",
+          "extraAttrs": {
+            "knowstr_vote_id": "v1"
+          },
+          "children": []
+        },
+        {
+          "id": "u6",
+          "text": "Multiple unknown attrs",
+          "blockKind": "list_item",
+          "basedOn": "a6",
+          "extraAttrs": {
+            "knowstr_vote_id": "v2",
+            "custom": "x y"
+          },
+          "children": []
+        }
+      ]
+    }
+  ]
+}

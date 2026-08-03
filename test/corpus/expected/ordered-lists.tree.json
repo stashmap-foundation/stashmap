@@ -1,0 +1,92 @@
+{
+  "docId": "doc-ordered",
+  "title": "Recipe",
+  "topNodes": [
+    {
+      "id": "u1",
+      "text": "Recipe",
+      "blockKind": "heading",
+      "headingLevel": 1,
+      "children": [
+        {
+          "id": "u2",
+          "text": "Preheat the oven",
+          "blockKind": "list_item",
+          "listOrdered": true,
+          "listStart": 1,
+          "children": []
+        },
+        {
+          "id": "u3",
+          "text": "Mix the dough",
+          "blockKind": "list_item",
+          "listOrdered": true,
+          "listStart": 1,
+          "children": [
+            {
+              "id": "u4",
+              "text": "flour",
+              "blockKind": "list_item",
+              "children": []
+            },
+            {
+              "id": "u5",
+              "text": "water",
+              "blockKind": "list_item",
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "u6",
+          "text": "Bake",
+          "blockKind": "list_item",
+          "listOrdered": true,
+          "listStart": 1,
+          "children": []
+        },
+        {
+          "id": "u7",
+          "text": "Steps continued",
+          "blockKind": "heading",
+          "headingLevel": 2,
+          "children": [
+            {
+              "id": "u8",
+              "text": "Ninth step",
+              "blockKind": "list_item",
+              "listOrdered": true,
+              "listStart": 9,
+              "children": []
+            },
+            {
+              "id": "u9",
+              "text": "Tenth step",
+              "blockKind": "list_item",
+              "listOrdered": true,
+              "listStart": 9,
+              "children": [
+                {
+                  "id": "u10",
+                  "text": "Substep of ten",
+                  "blockKind": "list_item",
+                  "listOrdered": true,
+                  "listStart": 1,
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "u11",
+              "text": "Eleventh step",
+              "blockKind": "list_item",
+              "listOrdered": true,
+              "listStart": 9,
+              "children": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

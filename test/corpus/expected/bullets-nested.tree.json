@@ -1,0 +1,52 @@
+{
+  "docId": "doc-bullets",
+  "title": "Travel plans",
+  "topNodes": [
+    {
+      "id": "u1",
+      "text": "Travel plans",
+      "blockKind": "heading",
+      "headingLevel": 1,
+      "children": [
+        {
+          "id": "u2",
+          "text": "Spain",
+          "blockKind": "list_item",
+          "children": [
+            {
+              "id": "u3",
+              "text": "Madrid",
+              "blockKind": "list_item",
+              "children": [
+                {
+                  "id": "u4",
+                  "text": "Prado museum",
+                  "blockKind": "list_item",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "u5",
+              "text": "Valencia",
+              "blockKind": "list_item",
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "u6",
+          "text": "Croatia",
+          "blockKind": "list_item",
+          "children": []
+        },
+        {
+          "id": "u7",
+          "text": "Montenegro",
+          "blockKind": "list_item",
+          "children": []
+        }
+      ]
+    }
+  ]
+}

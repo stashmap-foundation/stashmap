@@ -1,0 +1,50 @@
+{
+  "docId": "doc-links",
+  "title": "Reading list",
+  "topNodes": [
+    {
+      "id": "u1",
+      "text": "Reading list",
+      "blockKind": "heading",
+      "headingLevel": 1,
+      "children": [
+        {
+          "id": "u2",
+          "text": "[Evolutionary Psychology](#630f1645-5ae6-4f9a-b758-ccb331e96d55)",
+          "blockKind": "list_item",
+          "children": []
+        },
+        {
+          "id": "u3",
+          "text": "[How many friends](#1d3e201f-f00d-46be-88ef-ef4d15747a68)",
+          "relevance": "maybe_relevant",
+          "blockKind": "list_item",
+          "children": []
+        },
+        {
+          "id": "u4",
+          "text": "[Other notes](notes/other.md)",
+          "blockKind": "list_item",
+          "children": []
+        },
+        {
+          "id": "u5",
+          "text": "A row with [an inline link](#93c45a91-525c-4485-9e5b-4d462de36f5b) inside text",
+          "blockKind": "list_item",
+          "children": []
+        },
+        {
+          "id": "u6",
+          "text": "[Tracked link](#8a7c407c-a279-44bc-a05f-976d109744e9)",
+          "blockKind": "list_item",
+          "basedOn": "a6",
+          "snapshotId": "snap_sha256_3333333333333333333333333333333333333333333333333333333333333333",
+          "extraAttrs": {
+            "knowstr_vote_id": "v6"
+          },
+          "children": []
+        }
+      ]
+    }
+  ]
+}

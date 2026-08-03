@@ -1,6 +1,38 @@
+import fs from "fs";
+import os from "os";
+import pathModule from "path";
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ALICE, expectTree, renderApp, setup, type } from "../utils.test";
+import { renderAppTree } from "../appTestUtils.test";
+import { write } from "../testFixtures/workspace";
+import { buildDocumentRouteUrl } from "../navigationUrl";
+import { LOCAL } from "../core/nodeRef";
+
+async function renderNestedFilesystemTree(): Promise<void> {
+  const workspacePath = fs.mkdtempSync(
+    pathModule.join(os.tmpdir(), "knowstr-expand-subtree-")
+  );
+  write(
+    workspacePath,
+    "nested.md",
+    [
+      "# Root <!-- id:root -->",
+      "",
+      "- A <!-- id:a -->",
+      "  - A1 <!-- id:a1 -->",
+      "    - A2 <!-- id:a2 -->",
+      "- B <!-- id:b -->",
+      "  - B1 <!-- id:b1 -->",
+      "",
+    ].join("\n")
+  );
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "nested.md"),
+  });
+  await screen.findByRole("treeitem", { name: "Root" });
+}
 
 describe("Keyboard Navigation", () => {
   test("normal mode pane shortcuts: N new note, P new pane, q close pane", async () => {
@@ -66,6 +98,49 @@ Root
   up
   moved
       `);
+  });
+
+  test("Cmd+Down expands every descendant of the focused root", async () => {
+    await renderNestedFilesystemTree();
+    await expectTree(`
+Root
+  A
+  B
+    `);
+
+    await userEvent.click(
+      await screen.findByRole("treeitem", { name: "Root" })
+    );
+    await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+    await expectTree(`
+Root
+  A
+    A1
+      A2
+  B
+    B1
+    `);
+  });
+
+  test("Cmd+Down expands only the focused row's descendants", async () => {
+    await renderNestedFilesystemTree();
+    await expectTree(`
+Root
+  A
+  B
+    `);
+
+    await userEvent.click(await screen.findByRole("treeitem", { name: "A" }));
+    await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+    await expectTree(`
+Root
+  A
+    A1
+      A2
+  B
+    `);
   });
 
   test("Escape after editing returns focus to the same row", async () => {

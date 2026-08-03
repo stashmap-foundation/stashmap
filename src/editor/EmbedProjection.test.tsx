@@ -80,6 +80,39 @@ Note
   `);
 });
 
+test("Log entries are plain links and stay flat", async () => {
+  const [alice] = setup([ALICE]);
+  const { relayPool } = renderApp(alice());
+
+  await type("My Notes{Enter}{Tab}Child{Escape}");
+  await userEvent.click(await screen.findByLabelText("Navigate to Log"));
+
+  const [logRoot] = await screen.findAllByRole("treeitem");
+  await userEvent.click(logRoot);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await expectTree(`
+~Log
+  My Notes
+  `);
+
+  await waitFor(() => {
+    const logDoc = relayPool
+      .getDecryptedEvents()
+      .filter(
+        (event) =>
+          event.kind === KIND_KNOWLEDGE_DOCUMENT &&
+          event.content.includes("~Log")
+      )
+      .at(-1)?.content;
+    if (!logDoc) {
+      throw new Error("Missing log document event");
+    }
+    expect(logDoc).toContain("[My Notes](#");
+    expect(logDoc).not.toContain('embed="true"');
+  });
+});
+
 test("a dragged row becomes a readonly embed that projects in a drill-down surface", async () => {
   const [alice] = setup([ALICE]);
   renderApp(alice());

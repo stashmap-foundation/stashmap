@@ -140,19 +140,20 @@ export function upsertNodesCore<T extends GraphPlan>(
   );
 }
 
+// Log entries are plain block links — the reserved non-projecting form.
+// They mean "you created this, here's the way there", never "that node
+// here with my overlay below": an unfolding Log would swallow edits as
+// Log-file overlays nobody asked for.
 function addCrefToLog<T extends GraphPlan>(plan: T, nodeID: ID): T {
   const [planWithLog, nodes] = planEnsureSystemRoot(plan, LOG_ROOT_ROLE);
   const targetNode = getWorkspaceNode(planWithLog.knowledgeDBs, nodeID);
-  const crefNode = {
-    ...newGraphNode(
-      [linkSpan(nodeID, targetNode ? nodeText(targetNode) : "")],
-      {
-        root: nodes.root as ID,
-        parent: nodes.id as ID,
-      }
-    ),
-    extraAttrs: { embed: "true" },
-  };
+  const crefNode = newGraphNode(
+    [linkSpan(nodeID, targetNode ? nodeText(targetNode) : "")],
+    {
+      root: nodes.root as ID,
+      parent: nodes.id as ID,
+    }
+  );
   const planWithCref = upsertNodesCore(planWithLog, crefNode);
   return upsertNodesCore(planWithCref, {
     ...nodes,

@@ -9,6 +9,7 @@ import {
   useIsRoot,
   useNodeIndex,
   useDisplayText,
+  getDisplayTextForRow,
   useIsViewingOtherUserContent,
   viewPathToString,
   useCurrentNode,
@@ -30,6 +31,7 @@ import {
 import {
   embeddedTarget,
   isFileLinkHref,
+  placementTarget,
   spansText,
   spansToMarkdown,
 } from "../core/nodeSpans";
@@ -573,7 +575,30 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       viewKey: viewPathToString(targetViewPath),
     });
 
-  const editorSpans = currentNode.spans;
+  // Typing on a node placement or projected row is the rewording gesture:
+  // the editor holds the shown text, and a change saves the reader's
+  // words with the struck bond. Unchanged text never writes. Calendar
+  // placements and entity occurrences keep their own label editing.
+  const placementTargetID = placementTarget(currentNode);
+  const rewordEditing =
+    (placementTargetID !== undefined &&
+      classifyLinkHref(`#${placementTargetID}`) === "node") ||
+    row.projected === true;
+  const bondHref = `#${placementTargetID ?? row.node.id}`;
+  const editorSpans = ((): InlineSpan[] => {
+    if (!rewordEditing) {
+      return currentNode.spans;
+    }
+    if (
+      embeddedTarget(currentNode) !== undefined &&
+      row.standsFor?.liveText !== undefined
+    ) {
+      return [{ kind: "link", href: bondHref, text: row.standsFor.liveText }];
+    }
+    return currentNode.spans.filter(
+      (span) => !(span.kind === "link" && span.struck === true)
+    );
+  })();
   const feedUrl = calendarFeedUrl(currentNode);
   const calendarContent =
     feedUrl !== undefined ||
@@ -595,6 +620,50 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
     const text = spansText(spans).trim();
     if (feedUrl && spans.every((span) => span.kind === "text")) {
       return [{ kind: "link", href: calendarFeedHref(feedUrl), text }];
+    }
+    if (
+      rewordEditing &&
+      !spans.some((span) => span.kind === "link" && span.struck === true)
+    ) {
+      const speak = (edited: InlineSpan[]): InlineSpan[] =>
+        edited.map((span) =>
+          span.kind === "link" && span.href === bondHref
+            ? { kind: "text", text: span.text }
+            : span
+        );
+      const spoken = speak(spans);
+      if (
+        spansText(spoken).trim() === "" ||
+        spansToMarkdown(spoken) === spansToMarkdown(speak(editorSpans))
+      ) {
+        return currentNode.spans;
+      }
+      const keptBond = currentNode.spans.filter(
+        (span) => span.kind === "link" && span.struck === true
+      );
+      const bond: InlineSpan[] =
+        keptBond.length > 0
+          ? keptBond
+          : [
+              {
+                kind: "link",
+                href: bondHref,
+                text: getDisplayTextForRow(row).trim(),
+                struck: true,
+              },
+            ];
+      const last = spoken[spoken.length - 1];
+      const spaced =
+        last?.kind === "text"
+          ? [
+              ...spoken.slice(0, -1),
+              {
+                kind: "text" as const,
+                text: `${last.text.replace(/\s+$/u, "")} `,
+              },
+            ]
+          : [...spoken, { kind: "text" as const, text: " " }];
+      return [...spaced, ...bond];
     }
     return isBareIcalFeedUrl(text)
       ? [{ kind: "link", href: calendarFeedHref(text), text }]
@@ -947,6 +1016,15 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
         onActivateLink={handleActivateLink}
         entityPicker={{ fetchEntityMetadata }}
       />
+      {rewordEditing &&
+        !editorSpans.some((span) => span.kind === "link") &&
+        reciprocals[0] !== undefined && (
+          <IncomingPart
+            relevance={reciprocals[0].relevance}
+            argument={reciprocals[0].argument}
+            ariaHidden
+          />
+        )}
     </>
   );
 }
@@ -961,11 +1039,12 @@ function InteractiveNodeContent({ rows }: { rows: List<Row> }): JSX.Element {
   const isEmptyNode = isEmptyNodeID(row.node.id);
   const displayText = useDisplayText();
 
+  // Projected rows are writable regardless of author: every touch
+  // materializes into the embedding file, never into the source.
   const isReadonly =
     isInSearchView ||
-    isViewingOtherUserContent ||
     virtualType !== undefined ||
-    row.projected === true;
+    (isViewingOtherUserContent && row.projected !== true);
 
   if (isLoading) {
     return <LoadingNode />;
@@ -980,17 +1059,7 @@ function InteractiveNodeContent({ rows }: { rows: List<Row> }): JSX.Element {
     return <ErrorContent />;
   }
 
-  // A node-target embed row displays the target's live text; its stored
-  // label is a frozen machine record. Typing gets its meaning in 3.4b as
-  // the rewording gesture — until then the row's text is not editable.
-  // Calendar feed names and entity occurrence labels stay the user's
-  // wording and keep their editor.
-  const embedTargetID = embeddedTarget(row.node);
-  const displaysLiveTarget =
-    embedTargetID !== undefined &&
-    classifyLinkHref(`#${embedTargetID}`) === "node";
-
-  if (isEditableNode(currentNode) && !isReadonly && !displaysLiveTarget) {
+  if (isEditableNode(currentNode) && !isReadonly) {
     return <EditableContent rows={rows} />;
   }
 

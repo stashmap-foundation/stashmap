@@ -350,6 +350,18 @@ export function MiniEditor({
   useLayoutEffect(() => {
     const editor = editorRef.current;
     if (!editor || document.activeElement === editor) return;
+    // Rebuild by value, not identity: computed initial spans arrive as a
+    // fresh array every render, and replacing unchanged content would
+    // detach link marks mid-interaction.
+    const fingerprint = JSON.stringify([
+      initialSpans,
+      deadLinkIndexes,
+      externalLinkIndexes,
+      calendarLinkIndexes,
+      reciprocalLinks,
+    ]);
+    if (editor.getAttribute("data-spans-fingerprint") === fingerprint) return;
+    editor.setAttribute("data-spans-fingerprint", fingerprint);
     const noChildren: Node[] = [];
     const lastSpan = initialSpans[initialSpans.length - 1];
     const continuation =

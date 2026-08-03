@@ -772,6 +772,26 @@ function classifyRow(row: Element): RowInfo | null {
     });
   }
 
+  // The aria label and the editor carry the plain display text; the
+  // reciprocal ↩ cluster lives in the row content and must survive both
+  // an expand toggle and an at-rest editor. Reference rows already speak
+  // ↩ through their own text, and so does an editor's own link pill.
+  /* eslint-disable testing-library/no-node-access */
+  const clusterText = (excludeContainer: Element | null): string =>
+    Array.from(
+      innerNode?.querySelectorAll(
+        ".incoming-part:not(.external-link-part):not(.dead-link-part)"
+      ) ?? []
+    )
+      .filter((part) => part.closest('[data-testid="reference-row"]') === null)
+      .filter(
+        (part) => excludeContainer === null || !excludeContainer.contains(part)
+      )
+      .map((part) => part.textContent ?? "")
+      .join("");
+  /* eslint-enable testing-library/no-node-access */
+  const reciprocalCluster = clusterText(null);
+
   if (toggleButton) {
     const getRawText = (): string => {
       const labelText = (toggleButton.getAttribute("aria-label") || "").replace(
@@ -792,19 +812,6 @@ function classifyRow(row: Element): RowInfo | null {
     if (!rawText) {
       return null;
     }
-    // The aria label carries the plain display text; the reciprocal ↩
-    // cluster lives in the row content and must survive an expand toggle.
-    // Reference rows already speak ↩ through their own text.
-    /* eslint-disable testing-library/no-node-access */
-    const reciprocalCluster = Array.from(
-      innerNode?.querySelectorAll(
-        ".incoming-part:not(.external-link-part):not(.dead-link-part)"
-      ) ?? []
-    )
-      .filter((part) => part.closest('[data-testid="reference-row"]') === null)
-      .map((part) => part.textContent ?? "")
-      .join("");
-    /* eslint-enable testing-library/no-node-access */
     return withGutter({
       element: toggleButton as HTMLElement,
       text: `${prefix}${rawText}${reciprocalCluster}`,
@@ -849,7 +856,7 @@ function classifyRow(row: Element): RowInfo | null {
     }
     return withGutter({
       element: noteEditor as HTMLElement,
-      text: rawText,
+      text: `${rawText}${clusterText(noteEditor)}`,
       indentLevel: getIndentLevel(noteEditor as HTMLElement),
     });
   }

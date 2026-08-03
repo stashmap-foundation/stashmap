@@ -164,6 +164,57 @@ Note
   `);
 });
 
+test("renaming a projected row materializes a rewording", async () => {
+  const workspacePath = writeWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [S](#src) <!-- id:emb embed="true" -->',
+    ].join("\n"),
+    "source.md": [
+      "# Source <!-- id:src -->",
+      "",
+      "- Argument A <!-- id:a -->",
+      "- Argument C <!-- id:c -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  const editor = await screen.findByRole("textbox", {
+    name: "edit Argument C",
+  });
+  await userEvent.clear(editor);
+  await userEvent.type(editor, "Meine Worte{Escape}");
+
+  await expectTree(`
+Note
+  Source
+    Argument A
+    Meine Worte
+  `);
+
+  await waitFor(() => {
+    const note = fs.readFileSync(pathModule.join(workspacePath, "note.md"), {
+      encoding: "utf8",
+    });
+    expect(note).toMatch(
+      /- Meine Worte ~~\[Argument C\]\(#c\)~~ <!-- id:\S+ embed="true" -->/u
+    );
+  });
+
+  const source = fs.readFileSync(pathModule.join(workspacePath, "source.md"), {
+    encoding: "utf8",
+  });
+  expect(source).toContain("- Argument C <!-- id:c -->");
+});
+
 test("dragging a projected row writes a position claim", async () => {
   const workspacePath = writeWorkspace({
     "note.md": [
@@ -279,14 +330,6 @@ Target
   Source
     Descendant
   `);
-
-  expect(
-    getPane(0).getByRole("textbox", { name: "edit Descendant" })
-  ).toBeDefined();
-  expect(
-    getPane(1).queryByRole("textbox", { name: "edit Descendant" })
-  ).toBeNull();
-  expect(getPane(1).queryByRole("textbox", { name: "edit Source" })).toBeNull();
 
   await userEvent.click(
     getPane(1).getByRole("treeitem", { name: "Descendant" })

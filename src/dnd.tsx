@@ -429,7 +429,7 @@ export function dnd(
     accPlan: Plan,
     sourceRow: Row,
     insertAt: number
-  ): Plan => {
+  ): [Plan, ID | undefined] => {
     // A computed row with a materialization recipe drags as itself: it
     // materializes at the drop position (mint-or-link decides whether
     // that means the node or a link row to its home elsewhere). Already
@@ -441,7 +441,7 @@ export function dnd(
           insertIndex: insertAt,
         });
       if (materializedNow || !sourceRow.parentRef) {
-        return materializedPlan;
+        return [materializedPlan, materializedNode.id];
       }
       // Same-parent: an in-place reorder (planMoveNode is add-then-
       // disconnect and not same-parent-safe). Cross-parent: a move.
@@ -452,27 +452,30 @@ export function dnd(
         );
         const fromIndex = parentNode.children.indexOf(materializedNode.id);
         if (fromIndex < 0) {
-          return materializedPlan;
+          return [materializedPlan, materializedNode.id];
         }
         const reordered = planUpsertNodes(
           materializedPlan,
           moveNodes(parentNode, [fromIndex], insertAt)
         );
-        return planUpdateViews(
-          reordered,
-          updateViewPathsAfterMoveNodes(reordered)
-        );
+        return [
+          planUpdateViews(reordered, updateViewPathsAfterMoveNodes(reordered)),
+          materializedNode.id,
+        ];
       }
-      return planMoveNode(
-        materializedPlan,
+      return [
+        planMoveNode(
+          materializedPlan,
+          materializedNode.id,
+          materializedNode.id,
+          sourceRow.parentRef.id,
+          sourceRow.viewPath,
+          targetParentNode.id,
+          targetParentRow.viewPath,
+          insertAt
+        ),
         materializedNode.id,
-        materializedNode.id,
-        sourceRow.parentRef.id,
-        sourceRow.viewPath,
-        targetParentNode.id,
-        targetParentRow.viewPath,
-        insertAt
-      );
+      ];
     }
     // A substituted claim row is already a written line of this
     // document: the drag moves that line, never writes a second one.
@@ -490,18 +493,21 @@ export function dnd(
       sourceRowDocument.sourceId === targetDocument.sourceId &&
       sourceRowDocument.docId === targetDocument.docId
     ) {
-      return planMoveNode(
-        accPlan,
+      return [
+        planMoveNode(
+          accPlan,
+          sourceRow.node.id,
+          sourceRow.node.id,
+          sourceRow.node.parent,
+          sourceRow.viewPath,
+          targetParentNode.id,
+          targetParentRow.viewPath,
+          insertAt
+        ),
         sourceRow.node.id,
-        sourceRow.node.id,
-        sourceRow.node.parent,
-        sourceRow.viewPath,
-        targetParentNode.id,
-        targetParentRow.viewPath,
-        insertAt
-      );
+      ];
     }
-    return planAddToParent(
+    const [addedPlan, addedIds] = planAddToParent(
       accPlan,
       createRefTarget(
         calendarEntryTarget(sourceRow.node) ?? sourceRow.node.id,
@@ -509,7 +515,8 @@ export function dnd(
       ),
       targetParentNode.id,
       insertAt
-    )[0];
+    );
+    return [addedPlan, addedIds[0]];
   };
 
   if (reorder) {
@@ -538,10 +545,21 @@ export function dnd(
     );
     const updatedViews = updateViewPathsAfterMoveNodes(updatedNodesPlan);
     const reorderedPlan = planUpdateViews(updatedNodesPlan, updatedViews);
-    return virtualRows.reduce((accPlan: Plan, sourceRow, idx) => {
-      const insertAt = dropIndex + sourceIndices.length + idx;
-      return addProjectedSourceAsReference(accPlan, sourceRow, insertAt);
-    }, reorderedPlan);
+    return virtualRows.reduce<{ plan: Plan; anchorID: ID | undefined }>(
+      (acc, sourceRow, idx) => {
+        const insertAt = dropIndex + sourceIndices.length + idx;
+        const [added, placedID] = addProjectedSourceAsReference(
+          acc.plan,
+          sourceRow,
+          insertAt
+        );
+        return {
+          plan: planWithPosition(added, placedID, acc.anchorID),
+          anchorID: placedID ?? acc.anchorID,
+        };
+      },
+      { plan: reorderedPlan, anchorID: dropAnchorID }
+    ).plan;
   }
 
   const sameDocumentMove = isSameDocument && !skipMoveLogic && !sameNode;
@@ -580,7 +598,7 @@ export function dnd(
         insertAt
       );
     }, moveBasePlan);
-    const positionedPlan = realRows.reduce<{
+    const positioned = realRows.reduce<{
       plan: Plan;
       anchorID: ID | undefined;
     }>(
@@ -589,11 +607,22 @@ export function dnd(
         anchorID: sourceRow.node.id,
       }),
       { plan: movedPlan, anchorID: dropAnchorID }
+    );
+    return virtualRows.reduce<{ plan: Plan; anchorID: ID | undefined }>(
+      (acc, sourceRow, idx) => {
+        const insertAt = dropIndex + realRows.length + idx;
+        const [added, placedID] = addProjectedSourceAsReference(
+          acc.plan,
+          sourceRow,
+          insertAt
+        );
+        return {
+          plan: planWithPosition(added, placedID, acc.anchorID),
+          anchorID: placedID ?? acc.anchorID,
+        };
+      },
+      positioned
     ).plan;
-    return virtualRows.reduce((accPlan: Plan, sourceRow, idx) => {
-      const insertAt = dropIndex + realRows.length + idx;
-      return addProjectedSourceAsReference(accPlan, sourceRow, insertAt);
-    }, positionedPlan);
   }
 
   const expandedPlan = targetParentRow.view.expanded

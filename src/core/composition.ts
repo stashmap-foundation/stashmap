@@ -1012,12 +1012,20 @@ export function composeNote(
     ]);
   }
 
-  type AnchorEntry = { path: number[]; row: ComposedRow };
+  type AnchorEntry = { path: number[]; row: ComposedRow; hidden: boolean };
 
-  function entriesOf(row: ComposedRow, prefix: number[]): AnchorEntry[] {
+  function entriesOf(
+    row: ComposedRow,
+    prefix: number[],
+    hidden: boolean
+  ): AnchorEntry[] {
     return row.children.flatMap((child, index) => {
       const path = [...prefix, index];
-      return [{ path, row: child }, ...entriesOf(child, path)];
+      const childHidden = hidden || child.relevance === "not_relevant";
+      return [
+        { path, row: child, hidden: childHidden },
+        ...entriesOf(child, path, childHidden),
+      ];
     });
   }
 
@@ -1049,13 +1057,13 @@ export function composeNote(
   }
 
   function moveOneAnchor(root: ComposedRow): ComposedRow | undefined {
-    const entries = entriesOf(root, []);
+    const entries = entriesOf(root, [], false);
     return entries.reduce<ComposedRow | undefined>((done, entry) => {
       if (done) {
         return done;
       }
       const { path, row } = entry;
-      if (!row.reader) {
+      if (entry.hidden || !row.reader) {
         return undefined;
       }
       const anchor = row.node.extraAttrs?.after;
@@ -1065,6 +1073,7 @@ export function composeNote(
       const scope = scopePrefix(root, path);
       const candidates = entries.filter(
         (candidate) =>
+          !candidate.hidden &&
           isPathPrefix(scope, candidate.path) &&
           candidate.path.join(",") !== path.join(",") &&
           !isPathPrefix(path, candidate.path) &&

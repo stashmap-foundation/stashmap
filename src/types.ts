@@ -4,6 +4,7 @@ import { QueueStatus } from "./infra/nostr/cache/PublishQueue";
 import { Document as DocumentType } from "./core/Document";
 import { IcalEntry } from "./core/ical";
 import type { AddToParentTarget } from "./core/plan";
+import type { ComposedRow } from "./core/composition";
 
 declare global {
   type Children = {
@@ -217,6 +218,7 @@ declare global {
       root?: true;
     };
     standsFor?: { id: ID; liveText?: string };
+    composed?: ComposedRow;
     // Projected embed content: the target's rows rendered at a placement.
     // Readonly in this step — touches materialize diffs in a later one.
     projected?: true;

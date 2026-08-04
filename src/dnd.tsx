@@ -5,7 +5,7 @@ import { HTML5Backend } from "react-dnd-html5-backend";
 import { nip19 } from "nostr-tools";
 import { LOCAL } from "./core/nodeRef";
 import { moveNodes, createRefTarget, getNode } from "./core/connections";
-import { embeddedTarget, nodeText } from "./core/nodeSpans";
+import { embeddedTarget, nodeText, placementTarget } from "./core/nodeSpans";
 import { calendarEntryTarget } from "./core/ical";
 import { getIndependentRows, updateViewPathsAfterMoveNodes } from "./rowModel";
 import { getDocumentForNode } from "./core/Document";
@@ -367,6 +367,13 @@ export function dnd(
       extraAttrs: { ...node.extraAttrs, ...attrs },
     });
   };
+  // An anchor names the base row it stands for: a written claim line at
+  // the slot anchors by its target, so the attr resolves in the written
+  // parent's scope (strict-parent rule), not by the claim line's own id.
+  const dropAnchorID =
+    dropAnchor === undefined
+      ? undefined
+      : placementTarget(dropAnchor.node) ?? dropAnchor.node.id;
   const [plan, targetParentNode] = planMaterializeComputedRow(
     basePlan,
     targetParentRow
@@ -512,7 +519,7 @@ export function dnd(
           plan: planWithPosition(acc.plan, row.node.id, acc.anchorID),
           anchorID: row.node.id,
         }),
-        { plan, anchorID: dropAnchor?.node.id }
+        { plan, anchorID: dropAnchorID }
       ).plan;
     }
     const realRows = independentRows.filter(
@@ -581,7 +588,7 @@ export function dnd(
         plan: planWithPosition(acc.plan, sourceRow.node.id, acc.anchorID),
         anchorID: sourceRow.node.id,
       }),
-      { plan: movedPlan, anchorID: dropAnchor?.node.id }
+      { plan: movedPlan, anchorID: dropAnchorID }
     ).plan;
     return virtualRows.reduce((accPlan: Plan, sourceRow, idx) => {
       const insertAt = dropIndex + realRows.length + idx;
@@ -639,7 +646,7 @@ export function dnd(
         anchorID: ids[0] ?? acc.anchorID,
       };
     },
-    { plan: expandedPlan, anchorID: dropAnchor?.node.id }
+    { plan: expandedPlan, anchorID: dropAnchorID }
   ).plan;
 }
 

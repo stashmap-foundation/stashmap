@@ -73,6 +73,10 @@ function expansionPathOf(viewPath: ViewPath): ID[] {
   return segments;
 }
 
+function appendNodeToPath(path: ViewPath, nodeID: ID): ViewPath {
+  return [path[0], ...path.slice(1), nodeID] as ViewPath;
+}
+
 function footerVisibleSources(
   data: Data,
   paneIndex: number,
@@ -333,11 +337,10 @@ function createChildRow(
   childID: ID,
   childIndex: number
 ): Row | undefined {
-  const viewPath = addNodeToPathWithNodes(
-    parentRow.viewPath,
-    parentNode,
-    childIndex
-  );
+  const viewPath =
+    childID === EMPTY_NODE_ID
+      ? addNodeToPathWithNodes(parentRow.viewPath, parentNode, childIndex)
+      : appendNodeToPath(parentRow.viewPath, childID);
   if (childID === EMPTY_NODE_ID) {
     const emptyNode = getEmptyNodeItem(data, parentNode);
     return emptyNode
@@ -403,10 +406,6 @@ function createVirtualRowNode(
     },
     sourceId: incomingRow?.ref.sourceId ?? input.parentSourceId,
   };
-}
-
-function appendNodeToPath(path: ViewPath, nodeID: ID): ViewPath {
-  return [path[0], ...path.slice(1), nodeID] as ViewPath;
 }
 
 function incomingTakeTarget(
@@ -968,6 +967,58 @@ function subtreeContains(
   });
 }
 
+// One showing per composed note (lab RULES, dedup): a row represented by
+// any non-evidence claim line anywhere in the reader file never also
+// renders as an untouched projection.
+function collectFileClaimedTargets(
+  graph: GraphLookup,
+  sourceId: SourceId,
+  nodeID: ID,
+  seen: globalThis.Set<ID>,
+  acc: globalThis.Set<ID>
+): globalThis.Set<ID> {
+  if (seen.has(nodeID)) {
+    return acc;
+  }
+  seen.add(nodeID);
+  const node = getNodeInSource(graph, { sourceId, id: nodeID })?.node;
+  if (!node) {
+    return acc;
+  }
+  const scopeTargetID = placementTarget(node);
+  const scopeTarget =
+    scopeTargetID !== undefined
+      ? lookupNode(graph, scopeTargetID, sourceId)?.node
+      : undefined;
+  node.children.toArray().forEach((childID) => {
+    const child = getNodeInSource(graph, { sourceId, id: childID })?.node;
+    if (!child) {
+      return;
+    }
+    const claimTarget = placementTarget(child);
+    if (claimTarget !== undefined && child.argument === undefined) {
+      // A lapsed anchor suspends the whole claim: it consumes nothing.
+      const after = child.extraAttrs?.after;
+      const anchorResolves =
+        after === undefined ||
+        scopeTarget?.children.includes(after) === true ||
+        node.children.includes(after) ||
+        node.children.some((siblingID) => {
+          const sibling = getNodeInSource(graph, {
+            sourceId,
+            id: siblingID,
+          })?.node;
+          return sibling !== undefined && placementTarget(sibling) === after;
+        });
+      if (anchorResolves) {
+        acc.add(claimTarget);
+      }
+    }
+    collectFileClaimedTargets(graph, sourceId, childID, seen, acc);
+  });
+  return acc;
+}
+
 // Claims bind through nested placements: a one-line mark written at an
 // outer scope still finds its row inside a written parent line. The pool
 // climbs the reader file's parent chain; the nearest scope wins.
@@ -1020,9 +1071,13 @@ function composeDeepClaims(
     return undefined;
   }
   const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
-  const parentPath = addNodesToLastElement(
-    parentRow.viewPath,
-    parentRow.node.id
+  const parentPath = parentRow.viewPath;
+  const fileClaimed = collectFileClaimedTargets(
+    graph,
+    owner.ref.sourceId,
+    owner.node.root,
+    new globalThis.Set<ID>(),
+    new globalThis.Set<ID>()
   );
   const consumedBy = new globalThis.Map<ID, GraphNode>();
   owner.node.children.toArray().forEach((childID) => {
@@ -1045,14 +1100,16 @@ function composeDeepClaims(
     new globalThis.Set<ID>([owner.node.id]),
     consumedBy
   );
-  if (consumedBy.size === 0) {
+  if (consumedBy.size === 0 && fileClaimed.size === 0) {
     return undefined;
   }
   return List(
     baseChildRows.toArray().flatMap((baseRow) => {
       const placement = consumedBy.get(baseRow.node.id);
       if (!placement) {
-        return [baseRow];
+        // One showing: a row claimed anywhere else in the note never
+        // also renders as an untouched projection.
+        return fileClaimed.has(baseRow.node.id) ? [] : [baseRow];
       }
       if (placement.relevance === "not_relevant") {
         return [];
@@ -1060,27 +1117,20 @@ function composeDeepClaims(
       if (!itemPassesFilters(placement, activeFilters)) {
         return [];
       }
-      const row = createRow(
-        data,
-        graph,
-        appendNodeToPath(parentPath, placement.id),
-        placement,
-        owner.ref.sourceId,
-        parentRow,
-        parentRow.node,
-        parentRow.ref,
-        undefined,
-        false,
-        undefined
-      );
-      const occurrenceView =
-        data.views.get(row.viewKey) === undefined
-          ? data.views.get(
-              viewPathToString(appendNodeToPath(parentPath, baseRow.node.id))
-            )
-          : undefined;
       return [
-        occurrenceView !== undefined ? { ...row, view: occurrenceView } : row,
+        createRow(
+          data,
+          graph,
+          appendNodeToPath(parentPath, baseRow.node.id),
+          placement,
+          owner.ref.sourceId,
+          parentRow,
+          parentRow.node,
+          parentRow.ref,
+          undefined,
+          false,
+          undefined
+        ),
       ];
     })
   );
@@ -1110,17 +1160,18 @@ function composeEmbedChildren(
   }
   const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
   const expansionPath = expansionPathOf(parentRow.viewPath);
-  const parentPath = addNodesToLastElement(
-    parentRow.viewPath,
-    parentRow.node.id
+  const parentPath = parentRow.viewPath;
+  const fileClaimed = collectFileClaimedTargets(
+    graph,
+    parentRow.ref.sourceId,
+    parentRow.node.root,
+    new globalThis.Set<ID>(),
+    new globalThis.Set<ID>()
   );
   const claimTargetOf = (node: GraphNode): ID | undefined =>
     placementTarget(node);
   const dismissedClaim = (node: GraphNode): boolean =>
     node.relevance === "not_relevant" && claimTargetOf(node) !== undefined;
-  const rowsByNodeId = new globalThis.Map<ID, Row>(
-    fileChildRows.toArray().map((row) => [row.node.id, row])
-  );
   // Consumption reads the file's bytes, not the filtered display rows: a
   // dismissed placement suppresses its occurrence even while hidden.
   const consumedBy = new globalThis.Map<ID, GraphNode>();
@@ -1152,39 +1203,29 @@ function composeEmbedChildren(
         if (dismissedClaim(placement)) {
           return [];
         }
-        const placementRow =
-          rowsByNodeId.get(placement.id) ??
-          (itemPassesFilters(placement, activeFilters)
-            ? createRow(
-                data,
-                graph,
-                appendNodeToPath(parentPath, placement.id),
-                placement,
-                parentRow.ref.sourceId,
-                parentRow,
-                target.node,
-                target.ref,
-                undefined,
-                false,
-                undefined
-              )
-            : undefined);
-        if (!placementRow) {
+        if (!itemPassesFilters(placement, activeFilters)) {
           return [];
         }
-        // A fresh placement stands where its occurrence stood — it
-        // inherits that occurrence's expansion state until it has its own.
-        const occurrenceView =
-          data.views.get(placementRow.viewKey) === undefined
-            ? data.views.get(
-                viewPathToString(appendNodeToPath(parentPath, childID))
-              )
-            : undefined;
+        // The substituted placement takes over its occurrence's path
+        // segment, so open/closed state survives materialization.
         return [
-          occurrenceView !== undefined
-            ? { ...placementRow, view: occurrenceView }
-            : placementRow,
+          createRow(
+            data,
+            graph,
+            appendNodeToPath(parentPath, childID),
+            placement,
+            parentRow.ref.sourceId,
+            parentRow,
+            target.node,
+            target.ref,
+            undefined,
+            false,
+            undefined
+          ),
         ];
+      }
+      if (fileClaimed.has(childID)) {
+        return [];
       }
       const child = getNodeInSource(graph, {
         sourceId: target.ref.sourceId,
@@ -1255,7 +1296,7 @@ function composeEmbedChildren(
         return sequence;
       }
       const currentIndex = sequence.findIndex(
-        (candidate) => candidate.viewKey === row.viewKey
+        (candidate) => candidate.node.id === row.node.id
       );
       if (currentIndex < 0) {
         return sequence;

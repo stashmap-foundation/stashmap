@@ -13,7 +13,10 @@ import {
 } from "../nodeItemMutations";
 import { useCurrentPane, usePaneIndex } from "../SplitPanesContext";
 import { useEditorText } from "./EditorTextContext";
-import { nodeText as getNodeSpanText } from "../core/nodeSpans";
+import {
+  nodeText as getNodeSpanText,
+  placementTarget,
+} from "../core/nodeSpans";
 
 type NodeItemContext = {
   // Current state
@@ -70,6 +73,9 @@ export function useNodeItemContext(): NodeItemContext {
     !isInSearchView &&
     (isDocumentTopLevel ||
       (nodeIndex !== undefined && parentView !== undefined) ||
+      // A placement row is the reader's own file row — judgeable
+      // wherever composition displays it.
+      (placementTarget(row.node) !== undefined && parentView !== undefined) ||
       // Computed rows are first-class in behavior: a row carrying a
       // materialization recipe is as interactive as any placed row.
       (row.materialize !== undefined && parentView !== undefined));

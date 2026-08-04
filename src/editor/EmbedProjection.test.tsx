@@ -609,6 +609,57 @@ Note
   });
 });
 
+test("dragging a projected row out of the embed integrates it there", async () => {
+  const workspacePath = writeWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [A](#art) <!-- id:emb embed="true" -->',
+      "- My own row <!-- id:own -->",
+    ].join("\n"),
+    "art.md": [
+      "# Art Noveau <!-- id:art -->",
+      "",
+      "- Spain <!-- id:sp -->",
+      "  - Barcelona <!-- id:bc -->",
+      "    - Gaudi <!-- id:g -->",
+      "      - Sagrada Familia <!-- id:sf -->",
+      "      - Casa Mila <!-- id:cm -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  fireEvent.dragStart(screen.getByRole("treeitem", { name: "Casa Mila" }));
+  fireEvent.drop(screen.getByRole("treeitem", { name: "My own row" }));
+
+  await expectTree(`
+Note
+  Art Noveau
+    Spain
+      Barcelona
+        Gaudi
+          Sagrada Familia
+  My own row
+  Casa Mila
+  `);
+
+  await waitFor(() => {
+    const note = fs.readFileSync(pathModule.join(workspacePath, "note.md"), {
+      encoding: "utf8",
+    });
+    expect(note).toMatch(
+      /- My own row <!-- id:own -->\n- \[Casa Mila\]\(#cm\) <!-- id:\S+ embed="true" -->/u
+    );
+  });
+});
+
 test("a move to the root with a dead anchor suspends whole", async () => {
   const workspacePath = writeWorkspace({
     "note.md": [

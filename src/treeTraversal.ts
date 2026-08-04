@@ -1037,6 +1037,12 @@ function collectOuterDeepClaims(
   if (!parent) {
     return acc;
   }
+  // Scope boundary: claims bind inward only from placement ancestors. A
+  // line written outside every placement renders where it stands and
+  // reaches the projection through consumption alone.
+  if (placementTarget(parent) === undefined) {
+    return acc;
+  }
   parent.children.toArray().forEach((childID) => {
     const child = getNodeInSource(graph, { sourceId, id: childID })?.node;
     if (!child || !deepBindableClaim(child)) {

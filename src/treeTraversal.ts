@@ -967,6 +967,159 @@ function subtreeContains(
   });
 }
 
+function readerSubtreeContains(
+  graph: GraphLookup,
+  sourceId: SourceId,
+  node: GraphNode,
+  wanted: ID
+): boolean {
+  return node.children.some((childID) => {
+    if (childID === wanted) {
+      return true;
+    }
+    const child = getNodeInSource(graph, { sourceId, id: childID })?.node;
+    return child
+      ? readerSubtreeContains(graph, sourceId, child, wanted)
+      : false;
+  });
+}
+
+function scopeRootOf(
+  graph: GraphLookup,
+  sourceId: SourceId,
+  node: GraphNode
+): GraphNode {
+  const parent = node.parent
+    ? getNodeInSource(graph, { sourceId, id: node.parent })?.node
+    : undefined;
+  if (!parent || placementTarget(parent) === undefined) {
+    return node;
+  }
+  return scopeRootOf(graph, sourceId, parent);
+}
+
+// The anchor is the place (lab RULES rules 3 and 4, fixtures 114/117/118):
+// an anchored line renders immediately after its anchor row wherever that
+// row shows inside its own embed, never crossing into a sibling embed;
+// only a dead anchor parks the line where written.
+function collectFollowerClaims(
+  graph: GraphLookup,
+  sourceId: SourceId,
+  start: GraphNode
+): globalThis.Map<ID, GraphNode> {
+  const scopeRoot = scopeRootOf(graph, sourceId, start);
+  const scopeRootTargetID = placementTarget(scopeRoot);
+  const scopeRootTarget =
+    scopeRootTargetID !== undefined
+      ? lookupNode(graph, scopeRootTargetID, sourceId)?.node
+      : undefined;
+  const acc = new globalThis.Map<ID, GraphNode>();
+  const anchorLives = (after: ID): boolean =>
+    (scopeRootTarget !== undefined &&
+      subtreeContains(
+        graph,
+        sourceId,
+        scopeRootTarget,
+        after,
+        new globalThis.Set<ID>([scopeRootTarget.id])
+      )) ||
+    readerSubtreeContains(graph, sourceId, scopeRoot, after);
+  const walk = (node: GraphNode): void => {
+    const scopeTargetID = placementTarget(node);
+    const scopeTarget =
+      scopeTargetID !== undefined
+        ? lookupNode(graph, scopeTargetID, sourceId)?.node
+        : undefined;
+    node.children.toArray().forEach((childID) => {
+      const child = getNodeInSource(graph, { sourceId, id: childID })?.node;
+      if (!child) {
+        return;
+      }
+      const after = child.extraAttrs?.after;
+      if (
+        after !== undefined &&
+        placementTarget(child) !== undefined &&
+        child.argument === undefined
+      ) {
+        const atLevel =
+          scopeTarget?.children.includes(after) === true ||
+          node.children.some((sibID) => {
+            if (sibID === childID) {
+              return false;
+            }
+            const sib = getNodeInSource(graph, { sourceId, id: sibID })?.node;
+            if (!sib) {
+              return false;
+            }
+            const sibTarget = placementTarget(sib);
+            if (sib.id !== after && sibTarget !== after) {
+              return false;
+            }
+            return (
+              sibTarget === undefined ||
+              scopeTarget?.children.includes(sibTarget) === true ||
+              sib.extraAttrs?.front === "true" ||
+              sib.extraAttrs?.after !== undefined
+            );
+          });
+        if (!atLevel && !acc.has(after) && anchorLives(after)) {
+          acc.set(after, child);
+        }
+      }
+      walk(child);
+    });
+  };
+  walk(scopeRoot);
+  return acc;
+}
+
+function followerRowsAfter(
+  data: Data,
+  graph: GraphLookup,
+  producedRow: Row,
+  pool: globalThis.Map<ID, GraphNode>,
+  parentPath: ViewPath,
+  sourceId: SourceId,
+  parentRow: Row,
+  parentNode: GraphNode,
+  parentRef: NodeRef,
+  activeFilters: NonNullable<Pane["typeFilters"]>
+): Row[] {
+  const stands = placementTarget(producedRow.node);
+  const claims = [
+    pool.get(producedRow.node.id),
+    stands !== undefined ? pool.get(stands) : undefined,
+  ].filter(
+    (claim, index, all): claim is GraphNode =>
+      claim !== undefined &&
+      claim.id !== producedRow.node.id &&
+      all.indexOf(claim) === index
+  );
+  return claims.flatMap((claim) => {
+    if (claim.relevance === "not_relevant") {
+      return [];
+    }
+    if (!itemPassesFilters(claim, activeFilters)) {
+      return [];
+    }
+    return [
+      createRow(
+        data,
+        graph,
+        appendNodeToPath(parentPath, claim.id),
+        claim,
+        sourceId,
+        parentRow,
+        parentNode,
+        parentRef,
+        undefined,
+        false,
+        undefined
+      ),
+    ];
+  });
+}
+
 // One showing, scoped (lab RULES rule 6, fixtures 74/112/113): a claim
 // consumes its target's untouched occurrence downward from where it is
 // written — collected by climbing the reader file's parent chain — and
@@ -1086,38 +1239,64 @@ function composeDeepClaims(
     new globalThis.Set<ID>([owner.node.id]),
     consumedBy
   );
-  if (consumedBy.size === 0 && fileClaimed.size === 0) {
+  const followerPool = collectFollowerClaims(
+    graph,
+    owner.ref.sourceId,
+    owner.node
+  );
+  if (
+    consumedBy.size === 0 &&
+    fileClaimed.size === 0 &&
+    followerPool.size === 0
+  ) {
     return undefined;
   }
   return List(
     baseChildRows.toArray().flatMap((baseRow) => {
-      const placement = consumedBy.get(baseRow.node.id);
-      if (!placement) {
-        // One showing: a row claimed anywhere else in the note never
-        // also renders as an untouched projection.
-        return fileClaimed.has(baseRow.node.id) ? [] : [baseRow];
-      }
-      if (placement.relevance === "not_relevant") {
-        return [];
-      }
-      if (!itemPassesFilters(placement, activeFilters)) {
-        return [];
-      }
-      return [
-        createRow(
+      const produced = (() => {
+        const placement = consumedBy.get(baseRow.node.id);
+        if (!placement) {
+          // One showing: a row claimed anywhere else in the note never
+          // also renders as an untouched projection.
+          return fileClaimed.has(baseRow.node.id) ? [] : [baseRow];
+        }
+        if (placement.relevance === "not_relevant") {
+          return [];
+        }
+        if (!itemPassesFilters(placement, activeFilters)) {
+          return [];
+        }
+        return [
+          createRow(
+            data,
+            graph,
+            appendNodeToPath(parentPath, baseRow.node.id),
+            placement,
+            owner.ref.sourceId,
+            parentRow,
+            parentRow.node,
+            parentRow.ref,
+            undefined,
+            false,
+            undefined
+          ),
+        ];
+      })();
+      return produced.flatMap((producedRow) => [
+        producedRow,
+        ...followerRowsAfter(
           data,
           graph,
-          appendNodeToPath(parentPath, baseRow.node.id),
-          placement,
+          producedRow,
+          followerPool,
+          parentPath,
           owner.ref.sourceId,
           parentRow,
           parentRow.node,
           parentRow.ref,
-          undefined,
-          false,
-          undefined
+          activeFilters
         ),
-      ];
+      ]);
     })
   );
 }
@@ -1156,6 +1335,11 @@ function composeEmbedChildren(
   );
   const claimTargetOf = (node: GraphNode): ID | undefined =>
     placementTarget(node);
+  const followerPool = collectFollowerClaims(
+    graph,
+    parentRow.ref.sourceId,
+    parentRow.node
+  );
   const dismissedClaim = (node: GraphNode): boolean =>
     node.relevance === "not_relevant" && claimTargetOf(node) !== undefined;
   // Consumption reads the file's bytes, not the filtered display rows: a
@@ -1184,60 +1368,77 @@ function composeEmbedChildren(
     )
     .toArray()
     .flatMap((childID) => {
-      const placement = consumedBy.get(childID) ?? outerPool.get(childID);
-      if (placement) {
-        if (dismissedClaim(placement)) {
+      const produced = (() => {
+        const placement = consumedBy.get(childID) ?? outerPool.get(childID);
+        if (placement) {
+          if (dismissedClaim(placement)) {
+            return [];
+          }
+          if (!itemPassesFilters(placement, activeFilters)) {
+            return [];
+          }
+          // The substituted placement takes over its occurrence's path
+          // segment, so open/closed state survives materialization.
+          return [
+            createRow(
+              data,
+              graph,
+              appendNodeToPath(parentPath, childID),
+              placement,
+              parentRow.ref.sourceId,
+              parentRow,
+              target.node,
+              target.ref,
+              undefined,
+              false,
+              undefined
+            ),
+          ];
+        }
+        if (fileClaimed.has(childID)) {
           return [];
         }
-        if (!itemPassesFilters(placement, activeFilters)) {
+        const child = getNodeInSource(graph, {
+          sourceId: target.ref.sourceId,
+          id: childID,
+        });
+        if (!child || !itemPassesFilters(child.node, activeFilters)) {
           return [];
         }
-        // The substituted placement takes over its occurrence's path
-        // segment, so open/closed state survives materialization.
         return [
-          createRow(
-            data,
-            graph,
-            appendNodeToPath(parentPath, childID),
-            placement,
-            parentRow.ref.sourceId,
-            parentRow,
-            target.node,
-            target.ref,
-            undefined,
-            false,
-            undefined
+          withPlacementRecipe(
+            createRow(
+              data,
+              graph,
+              appendNodeToPath(parentPath, child.node.id),
+              child.node,
+              child.ref.sourceId,
+              parentRow,
+              target.node,
+              target.ref,
+              undefined,
+              false,
+              undefined
+            ),
+            parentRow
           ),
         ];
-      }
-      if (fileClaimed.has(childID)) {
-        return [];
-      }
-      const child = getNodeInSource(graph, {
-        sourceId: target.ref.sourceId,
-        id: childID,
-      });
-      if (!child || !itemPassesFilters(child.node, activeFilters)) {
-        return [];
-      }
-      return [
-        withPlacementRecipe(
-          createRow(
-            data,
-            graph,
-            appendNodeToPath(parentPath, child.node.id),
-            child.node,
-            child.ref.sourceId,
-            parentRow,
-            target.node,
-            target.ref,
-            undefined,
-            false,
-            undefined
-          ),
-          parentRow
+      })();
+      return produced.flatMap((producedRow) => [
+        producedRow,
+        ...followerRowsAfter(
+          data,
+          graph,
+          producedRow,
+          followerPool,
+          parentPath,
+          parentRow.ref.sourceId,
+          parentRow,
+          target.node,
+          target.ref,
+          activeFilters
         ),
-      ];
+      ]);
     });
   const appended = fileChildRows
     .filter((row) => {
@@ -1273,8 +1474,7 @@ function composeEmbedChildren(
     sequence.findIndex(
       (row) => row.node.id === anchor || claimTargetOf(row.node) === anchor
     );
-  const withAppends = [...baseItems, ...appended];
-  return List(
+  const placeAnchored = (initial: Row[]): Row[] =>
     fileChildRows.toArray().reduce((sequence, row) => {
       const after = row.node.extraAttrs?.after;
       const front = row.node.extraAttrs?.front === "true";
@@ -1296,8 +1496,14 @@ function composeEmbedChildren(
       }
       const anchorIndex = after !== undefined ? inSequence(without, after) : -1;
       if (anchorIndex < 0) {
-        // Lapse: the move suspends where written, never vanishing and
-        // never bouncing home (fixtures 11 and 114).
+        // A live anchor elsewhere in the embed shows the row down there;
+        // only a dead anchor parks it where written (fixtures 118, 120).
+        if (
+          after !== undefined &&
+          followerPool.get(after)?.id === row.node.id
+        ) {
+          return without;
+        }
         return sequence;
       }
       return [
@@ -1305,8 +1511,17 @@ function composeEmbedChildren(
         row,
         ...without.slice(anchorIndex + 1),
       ];
-    }, withAppends)
-  );
+    }, initial);
+  // Chained moves ride together (fixture 10): re-place until stable so a
+  // claim anchored to a row that itself moved follows it.
+  const settle = (sequence: Row[], pass: number): Row[] => {
+    const next = placeAnchored(sequence);
+    const stable =
+      next.length === sequence.length &&
+      next.every((row, index) => row === sequence[index]);
+    return stable || pass >= fileChildRows.size ? next : settle(next, pass + 1);
+  };
+  return List(settle([...baseItems, ...appended], 0));
 }
 
 function getChildrenForRegularNode(

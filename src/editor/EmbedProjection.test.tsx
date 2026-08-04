@@ -956,7 +956,7 @@ Note
   `);
 });
 
-test("a stale anchor keeps the moved row visible where written", async () => {
+test("a stale anchor follows the line it names", async () => {
   const workspacePath = writeWorkspace({
     "note.md": [
       "# Note <!-- id:note -->",
@@ -998,10 +998,102 @@ Note
         {!} Barcelona
           Gaudi
             {!} Casa Mila
-      Casa Battlo
+            Casa Battlo
   `,
     { showGutter: true }
   );
+});
+
+test("a move follows its anchor out of the written list", async () => {
+  const workspacePath = writeWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [A](#art) <!-- id:emb embed="true" -->',
+      '  - [Gaudi](#g) <!-- id:hop embed="true" -->',
+      '    - [Casa Mila](#cm) <!-- id:o3 embed="true" after="sf" -->',
+    ].join("\n"),
+    "art.md": [
+      "# Art Noveau <!-- id:art -->",
+      "",
+      "- Spain <!-- id:sp -->",
+      "  - Barcelona <!-- id:bc -->",
+      "    - Sagrada Familia <!-- id:sf -->",
+      "    - Gaudi <!-- id:g -->",
+      "      - Casa Mila <!-- id:cm -->",
+      "      - Casa Battlo <!-- id:cb -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await expectTree(`
+Note
+  Art Noveau
+    Spain
+      Barcelona
+        Sagrada Familia
+        Casa Mila
+        Gaudi
+          Casa Battlo
+  `);
+});
+
+test("an anchor never crosses into a sibling embed", async () => {
+  const workspacePath = writeWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [A](#art) <!-- id:emb1 embed="true" -->',
+      '  - [Gaudi](#g) <!-- id:hop embed="true" -->',
+      '    - [Casa Mila](#cm) <!-- id:o3 embed="true" after="bc" -->',
+      '- [A](#art) <!-- id:emb2 embed="true" -->',
+    ].join("\n"),
+    "art.md": [
+      "# Art Noveau <!-- id:art -->",
+      "",
+      "- Spain <!-- id:sp -->",
+      "  - Barcelona <!-- id:bc -->",
+      "    - Gaudi <!-- id:g -->",
+      "      - Sagrada Familia <!-- id:sf -->",
+      "      - Casa Mila <!-- id:cm -->",
+      "      - Casa Battlo <!-- id:cb -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await expectTree(`
+Note
+  Art Noveau
+    Spain
+      Barcelona
+        Gaudi
+          Sagrada Familia
+          Casa Battlo
+      Casa Mila
+    [I] Note ↩
+  Art Noveau
+    Spain
+      Barcelona
+        Gaudi
+          Sagrada Familia
+          Casa Mila
+          Casa Battlo
+    [I] Note ↩
+  `);
 });
 
 test("a reorder in a nested list composes where written", async () => {

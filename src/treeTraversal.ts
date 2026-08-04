@@ -967,17 +967,18 @@ function subtreeContains(
   });
 }
 
-// One showing per composed note (lab RULES, dedup): a row represented by
-// any non-evidence claim line anywhere in the reader file never also
-// renders as an untouched projection.
-function collectFileClaimedTargets(
+// One showing, scoped (lab RULES rule 6, fixtures 74/112/113): a claim
+// consumes its target's untouched occurrence downward from where it is
+// written — collected by climbing the reader file's parent chain — and
+// never sideways into a sibling placement's own showing.
+function collectChainClaimedTargets(
   graph: GraphLookup,
   sourceId: SourceId,
-  nodeID: ID,
+  nodeID: ID | undefined,
   seen: globalThis.Set<ID>,
   acc: globalThis.Set<ID>
 ): globalThis.Set<ID> {
-  if (seen.has(nodeID)) {
+  if (nodeID === undefined || seen.has(nodeID)) {
     return acc;
   }
   seen.add(nodeID);
@@ -1014,9 +1015,8 @@ function collectFileClaimedTargets(
         acc.add(claimTarget);
       }
     }
-    collectFileClaimedTargets(graph, sourceId, childID, seen, acc);
   });
-  return acc;
+  return collectChainClaimedTargets(graph, sourceId, node.parent, seen, acc);
 }
 
 // Claims bind through nested placements: a one-line mark written at an
@@ -1078,10 +1078,10 @@ function composeDeepClaims(
   }
   const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
   const parentPath = parentRow.viewPath;
-  const fileClaimed = collectFileClaimedTargets(
+  const fileClaimed = collectChainClaimedTargets(
     graph,
     owner.ref.sourceId,
-    owner.node.root,
+    owner.node.id,
     new globalThis.Set<ID>(),
     new globalThis.Set<ID>()
   );
@@ -1167,10 +1167,10 @@ function composeEmbedChildren(
   const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
   const expansionPath = expansionPathOf(parentRow.viewPath);
   const parentPath = parentRow.viewPath;
-  const fileClaimed = collectFileClaimedTargets(
+  const fileClaimed = collectChainClaimedTargets(
     graph,
     parentRow.ref.sourceId,
-    parentRow.node.root,
+    parentRow.node.id,
     new globalThis.Set<ID>(),
     new globalThis.Set<ID>()
   );

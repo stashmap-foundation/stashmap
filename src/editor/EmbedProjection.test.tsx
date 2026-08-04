@@ -660,6 +660,60 @@ Note
   });
 });
 
+test("a mark in one embed leaves a sibling embed whole", async () => {
+  const workspacePath = writeWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [A](#art) <!-- id:emb1 embed="true" -->',
+      '- [A](#art) <!-- id:emb2 embed="true" -->',
+    ].join("\n"),
+    "art.md": [
+      "# Art Noveau <!-- id:art -->",
+      "",
+      "- Sagrada Familia <!-- id:sf -->",
+      "- Casa Mila <!-- id:cm -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await userEvent.click(
+    screen.getAllByRole("treeitem", { name: "Casa Mila" })[0]
+  );
+  await userEvent.keyboard("!");
+
+  await expectTree(
+    `
+Note
+  Art Noveau
+    Sagrada Familia
+    {!} Casa Mila
+    [I] Note ↩
+  Art Noveau
+    Sagrada Familia
+    Casa Mila
+    [I] Note ↩
+  `,
+    { showGutter: true }
+  );
+
+  await waitFor(() => {
+    const note = fs.readFileSync(pathModule.join(workspacePath, "note.md"), {
+      encoding: "utf8",
+    });
+    expect(note).toMatch(
+      /- \[A\]\(#art\) <!-- id:emb1 embed="true" -->\n {2}- \(!\) \[Casa Mila\]\(#cm\) <!-- id:\S+ embed="true" -->\n- \[A\]\(#art\) <!-- id:emb2 embed="true" -->/u
+    );
+  });
+});
+
 test("a move to the root with a dead anchor suspends whole", async () => {
   const workspacePath = writeWorkspace({
     "note.md": [

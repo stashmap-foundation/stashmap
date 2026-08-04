@@ -986,11 +986,6 @@ function collectChainClaimedTargets(
   if (!node) {
     return acc;
   }
-  const scopeTargetID = placementTarget(node);
-  const scopeTarget =
-    scopeTargetID !== undefined
-      ? lookupNode(graph, scopeTargetID, sourceId)?.node
-      : undefined;
   node.children.toArray().forEach((childID) => {
     const child = getNodeInSource(graph, { sourceId, id: childID })?.node;
     if (!child) {
@@ -998,22 +993,7 @@ function collectChainClaimedTargets(
     }
     const claimTarget = placementTarget(child);
     if (claimTarget !== undefined && child.argument === undefined) {
-      // A lapsed anchor suspends the whole claim: it consumes nothing.
-      const after = child.extraAttrs?.after;
-      const anchorResolves =
-        after === undefined ||
-        scopeTarget?.children.includes(after) === true ||
-        node.children.includes(after) ||
-        node.children.some((siblingID) => {
-          const sibling = getNodeInSource(graph, {
-            sourceId,
-            id: siblingID,
-          })?.node;
-          return sibling !== undefined && placementTarget(sibling) === after;
-        });
-      if (anchorResolves) {
-        acc.add(claimTarget);
-      }
+      acc.add(claimTarget);
     }
   });
   return collectChainClaimedTargets(graph, sourceId, node.parent, seen, acc);
@@ -1316,20 +1296,9 @@ function composeEmbedChildren(
       }
       const anchorIndex = after !== undefined ? inSequence(without, after) : -1;
       if (anchorIndex < 0) {
-        // Lapse: the whole move suspends. A deep row falls back to its
-        // source position; a direct child stays at base order.
-        const claimTarget = claimTargetOf(row.node);
-        const fallsBackDeep =
-          claimTarget !== undefined &&
-          !target.node.children.includes(claimTarget) &&
-          subtreeContains(
-            graph,
-            target.ref.sourceId,
-            target.node,
-            claimTarget,
-            new globalThis.Set<ID>([target.node.id])
-          );
-        return fallsBackDeep ? without : sequence;
+        // Lapse: the move suspends where written, never vanishing and
+        // never bouncing home (fixtures 11 and 114).
+        return sequence;
       }
       return [
         ...without.slice(0, anchorIndex + 1),

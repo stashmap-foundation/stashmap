@@ -922,7 +922,7 @@ Note
   });
 });
 
-test("a move to the root with a dead anchor suspends whole", async () => {
+test("a move with a dead anchor suspends where written", async () => {
   const workspacePath = writeWorkspace({
     "note.md": [
       "# Note <!-- id:note -->",
@@ -952,7 +952,135 @@ Note
   Source
     Barcelona
       Gaudi
-        Sagrada Familia
+    Sagrada Familia
+  `);
+});
+
+test("a stale anchor keeps the moved row visible where written", async () => {
+  const workspacePath = writeWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      "- Studien <!-- id:st -->",
+      '  - [Art Noveau](#art) <!-- id:emb embed="true" -->',
+      '    - (!) [Casa Mila](#cm) <!-- id:cmc embed="true" -->',
+      '    - (!) [Barcelona](#bc) <!-- id:bcc embed="true" -->',
+      '    - (!) [Sagrada Familia](#sf) <!-- id:sfc embed="true" front="true" -->',
+      '    - [Casa Battlo](#cb) <!-- id:cbc embed="true" after="cmc" -->',
+    ].join("\n"),
+    "art.md": [
+      "# Art Noveau <!-- id:art -->",
+      "",
+      "- Spain <!-- id:sp -->",
+      "  - Barcelona <!-- id:bc -->",
+      "    - Gaudi <!-- id:g -->",
+      "      - Sagrada Familia <!-- id:sf -->",
+      "      - Casa Mila <!-- id:cm -->",
+      "      - Casa Battlo <!-- id:cb -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await expectTree(
+    `
+Note
+  Studien
+    Art Noveau
+      {!} Sagrada Familia
+      Spain
+        {!} Barcelona
+          Gaudi
+            {!} Casa Mila
+      Casa Battlo
+  `,
+    { showGutter: true }
+  );
+});
+
+test("a reorder in a nested list composes where written", async () => {
+  const workspacePath = writeWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [A](#art) <!-- id:emb embed="true" -->',
+      '  - [Gaudi](#g) <!-- id:hop embed="true" -->',
+      '    - [Casa Battlo](#cb) <!-- id:o3 embed="true" after="cm" -->',
+    ].join("\n"),
+    "art.md": [
+      "# Art Noveau <!-- id:art -->",
+      "",
+      "- Spain <!-- id:sp -->",
+      "  - Barcelona <!-- id:bc -->",
+      "    - Gaudi <!-- id:g -->",
+      "      - Sagrada Familia <!-- id:sf -->",
+      "      - Casa Battlo <!-- id:cb -->",
+      "      - Casa Mila <!-- id:cm -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await expectTree(`
+Note
+  Art Noveau
+    Spain
+      Barcelona
+        Gaudi
+          Sagrada Familia
+          Casa Mila
+          Casa Battlo
+  `);
+});
+
+test("a deleted anchor keeps the row in its list", async () => {
+  const workspacePath = writeWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [A](#art) <!-- id:emb embed="true" -->',
+      '  - [Gaudi](#g) <!-- id:hop embed="true" -->',
+      '    - [Casa Battlo](#cb) <!-- id:o3 embed="true" after="cm" -->',
+    ].join("\n"),
+    "art.md": [
+      "# Art Noveau <!-- id:art -->",
+      "",
+      "- Spain <!-- id:sp -->",
+      "  - Barcelona <!-- id:bc -->",
+      "    - Gaudi <!-- id:g -->",
+      "      - Sagrada Familia <!-- id:sf -->",
+      "      - Casa Battlo <!-- id:cb -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await expectTree(`
+Note
+  Art Noveau
+    Spain
+      Barcelona
+        Gaudi
+          Sagrada Familia
+          Casa Battlo
   `);
 });
 

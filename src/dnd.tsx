@@ -467,6 +467,33 @@ export function dnd(
         insertAt
       );
     }
+    // A substituted claim row is already a written line of this
+    // document: the drag moves that line, never writes a second one.
+    const sourceRowDocument = getDocumentForNode(
+      accPlan.knowledgeDBs,
+      accPlan.documents,
+      sourceRow.node,
+      sourceRow.sourceId
+    );
+    if (
+      calendarEntryTarget(sourceRow.node) === undefined &&
+      sourceRow.node.parent !== undefined &&
+      sourceRowDocument !== undefined &&
+      targetDocument !== undefined &&
+      sourceRowDocument.sourceId === targetDocument.sourceId &&
+      sourceRowDocument.docId === targetDocument.docId
+    ) {
+      return planMoveNode(
+        accPlan,
+        sourceRow.node.id,
+        sourceRow.node.id,
+        sourceRow.node.parent,
+        sourceRow.viewPath,
+        targetParentNode.id,
+        targetParentRow.viewPath,
+        insertAt
+      );
+    }
     return planAddToParent(
       accPlan,
       createRefTarget(

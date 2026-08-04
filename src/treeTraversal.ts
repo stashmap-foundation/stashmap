@@ -968,6 +968,37 @@ function subtreeContains(
   });
 }
 
+// Claims bind through nested placements: a one-line mark written at an
+// outer scope still finds its row inside a written parent line. The pool
+// climbs the reader file's parent chain; the nearest scope wins.
+function collectOuterDeepClaims(
+  graph: GraphLookup,
+  sourceId: SourceId,
+  parentID: ID | undefined,
+  seen: globalThis.Set<ID>,
+  acc: globalThis.Map<ID, GraphNode>
+): globalThis.Map<ID, GraphNode> {
+  if (parentID === undefined || seen.has(parentID)) {
+    return acc;
+  }
+  seen.add(parentID);
+  const parent = getNodeInSource(graph, { sourceId, id: parentID })?.node;
+  if (!parent) {
+    return acc;
+  }
+  parent.children.toArray().forEach((childID) => {
+    const child = getNodeInSource(graph, { sourceId, id: childID })?.node;
+    if (!child || !deepBindableClaim(child)) {
+      return;
+    }
+    const claimTarget = placementTarget(child);
+    if (claimTarget !== undefined && !acc.has(claimTarget)) {
+      acc.set(claimTarget, child);
+    }
+  });
+  return collectOuterDeepClaims(graph, sourceId, parent.parent, seen, acc);
+}
+
 // Deep binding: an unanchored relevance claim written at the scope-owning
 // placement binds its target's occurrence at any depth of the projected
 // subtree — the one-line mark finds its row (idea.md, Judging).
@@ -1007,6 +1038,13 @@ function composeDeepClaims(
       consumedBy.set(claimTarget, child);
     }
   });
+  collectOuterDeepClaims(
+    graph,
+    owner.ref.sourceId,
+    owner.node.parent,
+    new globalThis.Set<ID>([owner.node.id]),
+    consumedBy
+  );
   if (consumedBy.size === 0) {
     return undefined;
   }
@@ -1096,18 +1134,41 @@ function composeEmbedChildren(
       consumedBy.set(claimTarget, child);
     }
   });
+  const outerPool = collectOuterDeepClaims(
+    graph,
+    parentRow.ref.sourceId,
+    parentRow.node.parent,
+    new globalThis.Set<ID>([parentRow.node.id]),
+    new globalThis.Map<ID, GraphNode>()
+  );
   const baseItems = target.node.children
     .filter(
       (childID) => childID !== EMPTY_NODE_ID && !expansionPath.includes(childID)
     )
     .toArray()
     .flatMap((childID) => {
-      const placement = consumedBy.get(childID);
+      const placement = consumedBy.get(childID) ?? outerPool.get(childID);
       if (placement) {
         if (dismissedClaim(placement)) {
           return [];
         }
-        const placementRow = rowsByNodeId.get(placement.id);
+        const placementRow =
+          rowsByNodeId.get(placement.id) ??
+          (itemPassesFilters(placement, activeFilters)
+            ? createRow(
+                data,
+                graph,
+                appendNodeToPath(parentPath, placement.id),
+                placement,
+                parentRow.ref.sourceId,
+                parentRow,
+                target.node,
+                target.ref,
+                undefined,
+                false,
+                undefined
+              )
+            : undefined);
         if (!placementRow) {
           return [];
         }

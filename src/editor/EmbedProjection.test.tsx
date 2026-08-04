@@ -14,6 +14,7 @@ import {
   readonlyRoute,
   renderApp,
   requireUser,
+  setDropIndentLevel,
   setup,
   type,
 } from "../utils.test";
@@ -496,6 +497,67 @@ Source
     Beleg C1
   [I] Note ↩
   `);
+});
+
+test("moving a row before its marked sibling keeps both claims", async () => {
+  const workspacePath = writeWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [A](#art) <!-- id:emb embed="true" -->',
+    ].join("\n"),
+    "art.md": [
+      "# Art Noveau <!-- id:art -->",
+      "",
+      "- Spain <!-- id:sp -->",
+      "  - Barcelona <!-- id:bc -->",
+      "    - Gaudi <!-- id:g -->",
+      "      - Sagrada Familia <!-- id:sf -->",
+      "      - Casa Battlo <!-- id:cb -->",
+      "      - Casa Mila <!-- id:cm -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await userEvent.click(
+    screen.getByRole("treeitem", { name: "Sagrada Familia" })
+  );
+  await userEvent.keyboard("!");
+
+  fireEvent.dragStart(screen.getByRole("treeitem", { name: "Casa Battlo" }));
+  setDropIndentLevel("Casa Battlo", "Gaudi", 6);
+  fireEvent.drop(screen.getByRole("treeitem", { name: "Gaudi" }));
+
+  await expectTree(
+    `
+Note
+  Art Noveau
+    Spain
+      Barcelona
+        Gaudi
+          Casa Battlo
+          {!} Sagrada Familia
+          Casa Mila
+  `,
+    { showGutter: true }
+  );
+
+  await waitFor(() => {
+    const note = fs.readFileSync(pathModule.join(workspacePath, "note.md"), {
+      encoding: "utf8",
+    });
+    expect(note).toMatch(
+      /- \[Gaudi\]\(#g\) <!-- id:\S+ embed="true" -->\n {4}- \[Casa Battlo\]\(#cb\) <!-- id:\S+ embed="true" front="true" -->/u
+    );
+    expect(note).toMatch(/- \(!\) \[Sagrada Familia\]\(#sf\)/u);
+  });
 });
 
 test("a move to the root with a dead anchor suspends whole", async () => {

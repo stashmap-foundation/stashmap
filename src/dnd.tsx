@@ -262,17 +262,21 @@ function resolveDropByDepth(
   prevRow: Row,
   dropBefore: Row | undefined,
   targetDepth: number
-): { parentRow: Row; insertAtIndex: number } | undefined {
+): DropDestination | undefined {
   const rootDepth = getRootDepth(rows);
   const maxDepth = prevRow.depth + 1;
   const minDepth = dropBefore ? dropBefore.depth : rootDepth + 1;
   const clampedDepth = Math.max(minDepth, Math.min(maxDepth, targetDepth));
 
   if (clampedDepth === prevRow.depth + 1) {
+    // Insertion as prevRow's child. A sibling above the insertion line is
+    // the anchor; dropping as the first child has none (front).
     if (dropBefore && dropBefore.depth === clampedDepth) {
       return {
         parentRow: prevRow,
-        insertAtIndex: dropBefore.childIndex ?? prevRow.node.children.size,
+        insertAtIndex:
+          dropBefore.childIndex ?? placedIndexAfter(rows, dropBefore),
+        anchorRow: prevRow.depth === clampedDepth ? prevRow : undefined,
       };
     }
     return {

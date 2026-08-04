@@ -1084,6 +1084,47 @@ Note
   `);
 });
 
+test("a move rides its anchor through source reorders", async () => {
+  const workspacePath = writeWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [A](#art) <!-- id:emb embed="true" -->',
+      '  - [Gaudi](#g) <!-- id:hop embed="true" -->',
+      '    - [Casa Battlo](#cb) <!-- id:o3 embed="true" after="sf" -->',
+    ].join("\n"),
+    "art.md": [
+      "# Art Noveau <!-- id:art -->",
+      "",
+      "- Spain <!-- id:sp -->",
+      "  - Barcelona <!-- id:bc -->",
+      "    - Gaudi <!-- id:g -->",
+      "      - Sagrada Familia <!-- id:sf -->",
+      "      - Casa Mila <!-- id:cm -->",
+      "      - Casa Battlo <!-- id:cb -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await expectTree(`
+Note
+  Art Noveau
+    Spain
+      Barcelona
+        Gaudi
+          Sagrada Familia
+          Casa Battlo
+          Casa Mila
+  `);
+});
+
 test("a broken evidence edge suspends instead of re-aiming", async () => {
   const workspacePath = writeWorkspace({
     "note.md": [

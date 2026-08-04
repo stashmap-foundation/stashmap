@@ -971,7 +971,9 @@ function composedRowForViewPath(
     const noteRootRef =
       lookupNode(graph, resolved.node.root, resolved.ref.sourceId)?.ref ??
       resolved.ref;
-    const composition = composeNote(graph, noteRootRef);
+    const composition =
+      data.compositions.get(nodeRefKey(noteRootRef)) ??
+      composeNote(graph, noteRootRef);
     const start = locateComposedRow(composition.root, segment);
     return segments
       .slice(index + 1)
@@ -1030,12 +1032,15 @@ function rowFromComposed(
     composed.kind === "placement" && composed.target !== undefined
       ? { id: composed.target, liveText: composed.text }
       : undefined;
+  const mergedNode =
+    lookupNode(graph, composed.id, composed.ref.sourceId)?.node ??
+    composed.node;
   const row: Row = {
     viewPath,
     viewKey: viewPathToString(viewPath),
     index: 0,
     depth: viewPath.length - 1,
-    node: composed.node,
+    node: mergedNode,
     sourceId: composed.ref.sourceId,
     ref: composed.ref,
     view: getViewForNode(data, viewPath, composed.node.id),
@@ -1099,9 +1104,12 @@ function attachComposedRow(data: Data, graph: GraphLookup, row: Row): Row {
     composed.kind === "placement" && composed.target !== undefined
       ? { id: composed.target, liveText: composed.text }
       : undefined;
+  const mergedNode =
+    lookupNode(graph, composed.id, composed.ref.sourceId)?.node ??
+    composed.node;
   return {
     ...row,
-    node: composed.node,
+    node: mergedNode,
     ref: composed.ref,
     sourceId: composed.ref.sourceId,
     composed,

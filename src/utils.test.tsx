@@ -247,6 +247,7 @@ const DEFAULT_DATA_CONTEXT_PROPS: TestDataProps = {
   user: ALICE,
   knowledgeDBs: Map<SourceId, KnowledgeData>(),
   graphIndex: createEmptyGraphIndex(),
+  compositions: new globalThis.Map(),
   documents: Map(),
   documentByFilePath: Map(),
   publishEventsStatus: {

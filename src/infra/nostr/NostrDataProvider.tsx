@@ -11,6 +11,11 @@ import { NavigationStateProvider } from "../../NavigationStateContext";
 import { NostrCacheSync } from "./cache/NostrCacheSync";
 import { NostrExecutorProvider } from "./NostrExecutorProvider";
 
+const EMPTY_DBS = Map<SourceId, KnowledgeData>();
+const EMPTY_GRAPH_INDEX = createEmptyGraphIndex();
+const EMPTY_DOCUMENTS: Data["documents"] = Map();
+const NO_COMPOSITIONS: Data["compositions"] = new globalThis.Map();
+
 export function NostrDataProvider({
   children,
 }: {
@@ -22,10 +27,11 @@ export function NostrDataProvider({
   return (
     <DataContextProvider
       user={user}
-      knowledgeDBs={Map<SourceId, KnowledgeData>()}
-      graphIndex={createEmptyGraphIndex()}
-      documents={Map()}
-      documentByFilePath={Map()}
+      knowledgeDBs={EMPTY_DBS}
+      graphIndex={EMPTY_GRAPH_INDEX}
+      documents={EMPTY_DOCUMENTS}
+      documentByFilePath={EMPTY_DOCUMENTS}
+      compositions={NO_COMPOSITIONS}
       publishEventsStatus={session.publishStatus}
       views={session.views}
       panes={session.panes}

@@ -201,6 +201,7 @@ export function PullSourceProvider({
       user={data.user}
       knowledgeDBs={mergedKnowledgeDBs}
       graphIndex={mergeGraphIndexes(data.graphIndex, overlayGraphIndex)}
+      compositions={data.compositions}
       documents={data.documents.merge(overlayDocuments)}
       documentByFilePath={data.documentByFilePath}
       publishEventsStatus={data.publishEventsStatus}

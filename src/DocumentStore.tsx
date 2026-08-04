@@ -1,7 +1,6 @@
 import React from "react";
 import { List, Map as ImmutableMap } from "immutable";
 import { Event, UnsignedEvent } from "nostr-tools";
-import { LOCAL } from "./core/nodeRef";
 import {
   addNodesToGraphIndex,
   buildGraphIndexFromDocuments,
@@ -17,6 +16,9 @@ import {
   withRealWorldEntitiesForDocuments,
 } from "./core/Document";
 import { newDB } from "./core/knowledge";
+import { CompositionResult, composeNote } from "./core/composition";
+import { graphLookupFromData } from "./core/graphLookup";
+import { LOCAL, nodeRefKey } from "./core/nodeRef";
 
 export type { Document, DocumentDelete, ParsedDocument };
 
@@ -26,6 +28,7 @@ type DocumentState = {
   deletes: ImmutableMap<string, DocumentDelete>;
   knowledgeDBs: KnowledgeDBs;
   graphIndex: GraphIndex;
+  compositions: ReadonlyMap<string, CompositionResult>;
 };
 
 type DocumentStoreState = {
@@ -33,6 +36,7 @@ type DocumentStoreState = {
   graphIndex: GraphIndex;
   documents: ImmutableMap<string, Document>;
   documentByFilePath: ImmutableMap<string, Document>;
+  compositions: ReadonlyMap<string, CompositionResult>;
   upsertDocument: (parsed: ParsedDocument) => void;
   deleteDocument: (del: DocumentDelete) => void;
   addEvents: (events: ImmutableMap<string, Event | UnsignedEvent>) => void;
@@ -53,6 +57,28 @@ function withRealWorldEntities(state: DocumentState): DocumentState {
     documents: derived.documents,
     documentByFilePath: derived.documentByFilePath,
   };
+}
+
+// The composition stage of the pipeline (implementation.md 3.4b route):
+// parsing fills the graph, the index makes it addressable, and every
+// note composes here — once per knowledge change, never per render.
+function withCompositions(state: DocumentState): DocumentState {
+  const graph = graphLookupFromData({
+    user: undefined,
+    knowledgeDBs: state.knowledgeDBs,
+    graphIndex: state.graphIndex,
+  });
+  const compositions = state.documents
+    .valueSeq()
+    .toArray()
+    .reduce((acc, document) => {
+      document.topNodeShortIds.forEach((topNodeShortId) => {
+        const ref = { sourceId: document.sourceId, id: topNodeShortId };
+        acc.set(nodeRefKey(ref), composeNote(graph, ref));
+      });
+      return acc;
+    }, new Map<string, CompositionResult>());
+  return { ...state, compositions };
 }
 
 function createInitialState(
@@ -105,17 +131,20 @@ function createInitialState(
       nodes: db.nodes.merge(parsed.nodes),
     });
   }, ImmutableMap<SourceId, KnowledgeData>());
-  return withRealWorldEntities({
-    documents,
-    documentByFilePath,
-    deletes: ImmutableMap<string, DocumentDelete>(),
-    knowledgeDBs,
-    graphIndex: buildGraphIndexFromDocuments(
-      nodesByDocumentKey,
-      filePathByDocumentKey,
-      sourceIdByDocumentKey
-    ),
-  });
+  return withCompositions(
+    withRealWorldEntities({
+      documents,
+      documentByFilePath,
+      deletes: ImmutableMap<string, DocumentDelete>(),
+      knowledgeDBs,
+      graphIndex: buildGraphIndexFromDocuments(
+        nodesByDocumentKey,
+        filePathByDocumentKey,
+        sourceIdByDocumentKey
+      ),
+      compositions: new Map<string, CompositionResult>(),
+    })
+  );
 }
 
 function nodesForDocument(
@@ -230,6 +259,7 @@ function applyDocumentToState(
       doc.filePath,
       doc.sourceId
     ),
+    compositions: state.compositions,
   };
 }
 
@@ -268,6 +298,7 @@ function applyDeleteToState(
             existingDocument.sourceId
           )
         : state.graphIndex,
+    compositions: state.compositions,
   };
 }
 
@@ -285,7 +316,7 @@ function applyRecordsToState(
     withDocuments
   );
   return records.length > 0 || deletes.length > 0
-    ? withRealWorldEntities(withDeletes)
+    ? withCompositions(withRealWorldEntities(withDeletes))
     : withDeletes;
 }
 
@@ -339,11 +370,15 @@ export function DocumentStoreProvider({
     createInitialState(initialDocuments)
   );
   const upsertDocument = React.useCallback((parsed: ParsedDocument) => {
-    setStoredState((current) => applyDocumentToState(current, parsed));
+    setStoredState((current) =>
+      withCompositions(applyDocumentToState(current, parsed))
+    );
   }, []);
 
   const deleteDocument = React.useCallback((del: DocumentDelete) => {
-    setStoredState((current) => applyDeleteToState(current, del));
+    setStoredState((current) =>
+      withCompositions(applyDeleteToState(current, del))
+    );
   }, []);
 
   const addEvents = React.useCallback(
@@ -374,6 +409,7 @@ export function DocumentStoreProvider({
       graphIndex: activeState.graphIndex,
       documents: activeState.documents,
       documentByFilePath: activeState.documentByFilePath,
+      compositions: activeState.compositions,
       upsertDocument,
       deleteDocument,
       addEvents,
@@ -407,6 +443,17 @@ export function useDocuments(): ImmutableMap<string, Document> {
   return (
     React.useContext(DocumentStoreContext)?.documents ||
     ImmutableMap<string, Document>()
+  );
+}
+
+const NO_COMPOSITIONS: ReadonlyMap<string, CompositionResult> = new Map();
+
+export function useDocumentCompositions(): ReadonlyMap<
+  string,
+  CompositionResult
+> {
+  return (
+    React.useContext(DocumentStoreContext)?.compositions ?? NO_COMPOSITIONS
   );
 }
 

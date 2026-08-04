@@ -943,6 +943,143 @@ Note
   });
 });
 
+test("a second move replaces the position claim whole", async () => {
+  const workspacePath = writeWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [Art Noveau](#art) <!-- id:emb embed="true" -->',
+    ].join("\n"),
+    "art.md": [
+      "# Art Noveau <!-- id:art -->",
+      "",
+      "- Spain <!-- id:sp -->",
+      "  - Barcelona <!-- id:bc -->",
+      "    - Gaudi <!-- id:g -->",
+      "      - Sagrada Familia <!-- id:sf -->",
+      "      - Casa Battlo <!-- id:cb -->",
+      "      - Casa Mila <!-- id:cm -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  fireEvent.dragStart(screen.getByRole("treeitem", { name: "Casa Battlo" }));
+  fireEvent.drop(screen.getByRole("treeitem", { name: "Casa Mila" }));
+
+  await expectTree(`
+Note
+  Art Noveau
+    Spain
+      Barcelona
+        Gaudi
+          Sagrada Familia
+          Casa Mila
+          Casa Battlo
+  `);
+
+  fireEvent.dragStart(screen.getByRole("treeitem", { name: "Casa Battlo" }));
+  fireEvent.drop(screen.getByRole("treeitem", { name: "Barcelona" }));
+
+  await expectTree(`
+Note
+  Art Noveau
+    Spain
+      Barcelona
+        Casa Battlo
+        Gaudi
+          Sagrada Familia
+          Casa Mila
+  `);
+
+  await waitFor(() => {
+    const note = fs.readFileSync(pathModule.join(workspacePath, "note.md"), {
+      encoding: "utf8",
+    });
+    expect(note).toMatch(
+      /- \[Casa Battlo\]\(#cb\) <!-- id:\S+ embed="true" front="true" -->/u
+    );
+    expect(note).not.toContain('after="cm"');
+  });
+});
+
+test("moving a row re-anchors the claims that pointed at it", async () => {
+  const workspacePath = writeWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [Art Noveau](#art) <!-- id:emb embed="true" -->',
+    ].join("\n"),
+    "art.md": [
+      "# Art Noveau <!-- id:art -->",
+      "",
+      "- Spain <!-- id:sp -->",
+      "  - Barcelona <!-- id:bc -->",
+      "    - Gaudi <!-- id:g -->",
+      "      - Sagrada Familia <!-- id:sf -->",
+      "      - Casa Battlo <!-- id:cb -->",
+      "      - Casa Mila <!-- id:cm -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  fireEvent.dragStart(
+    screen.getByRole("treeitem", { name: "Sagrada Familia" })
+  );
+  fireEvent.drop(screen.getByRole("treeitem", { name: "Casa Battlo" }));
+
+  await expectTree(`
+Note
+  Art Noveau
+    Spain
+      Barcelona
+        Gaudi
+          Casa Battlo
+          Sagrada Familia
+          Casa Mila
+  `);
+
+  fireEvent.dragStart(screen.getByRole("treeitem", { name: "Casa Battlo" }));
+  fireEvent.drop(screen.getByRole("treeitem", { name: "Casa Mila" }));
+
+  await expectTree(`
+Note
+  Art Noveau
+    Spain
+      Barcelona
+        Gaudi
+          Sagrada Familia
+          Casa Mila
+          Casa Battlo
+  `);
+
+  await waitFor(() => {
+    const note = fs.readFileSync(pathModule.join(workspacePath, "note.md"), {
+      encoding: "utf8",
+    });
+    expect(note).toMatch(
+      /- \[Sagrada Familia\]\(#sf\) <!-- id:\S+ embed="true" front="true" -->/u
+    );
+    expect(note).toMatch(
+      /- \[Casa Battlo\]\(#cb\) <!-- id:\S+ embed="true" after="cm" -->/u
+    );
+    expect(note).not.toMatch(/\[Sagrada Familia\][^\n]*after=/u);
+  });
+});
+
 test("a mark in one embed leaves a sibling embed whole", async () => {
   const workspacePath = writeWorkspace({
     "note.md": [

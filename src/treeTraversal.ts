@@ -933,7 +933,7 @@ function withPlacementRecipe(row: Row, parentRow: Row): Row {
   };
 }
 
-function seatOf(composed: ComposedRow): ID {
+export function seatOf(composed: ComposedRow): ID {
   return composed.occurrence ?? composed.id;
 }
 
@@ -950,7 +950,7 @@ function locateComposedRow(root: ComposedRow, id: ID): ComposedRow | undefined {
 // The bridge from a view path into the whole-note composition: compose
 // the note holding the outermost resolvable segment, locate that
 // segment's composed row, then follow the remaining segments by seat.
-function composedRowForViewPath(
+export function composedRowForViewPath(
   data: Data,
   graph: GraphLookup,
   viewPath: ViewPath

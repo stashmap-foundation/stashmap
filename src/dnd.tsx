@@ -7,8 +7,14 @@ import { LOCAL } from "./core/nodeRef";
 import { moveNodes, createRefTarget, getNode } from "./core/connections";
 import { embeddedTarget, nodeText, placementTarget } from "./core/nodeSpans";
 import { calendarEntryTarget } from "./core/ical";
-import { getIndependentRows, updateViewPathsAfterMoveNodes } from "./rowModel";
+import {
+  getIndependentRows,
+  getParentView,
+  updateViewPathsAfterMoveNodes,
+} from "./rowModel";
 import { getDocumentForNode } from "./core/Document";
+import { composedRowForViewPath, seatOf } from "./treeTraversal";
+import { graphLookupFromData } from "./core/graphLookup";
 import {
   Plan,
   planUpdateViews,
@@ -320,6 +326,98 @@ export function getDropDestinationFromRows(
   return getDropBeforeParentDestination(rows, dropBefore);
 }
 
+function positionCleared(
+  attrs: Record<string, string> | undefined
+): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(attrs ?? {}).filter(
+      ([key]) => key !== "front" && key !== "after"
+    )
+  );
+}
+
+// Claims don't chase (claim-set maintenance): when a drag takes a row
+// away, every claim anchored on it re-aims to the row's nearest
+// surviving visible predecessor — or the front — so nothing else on
+// screen appears to move.
+function planReaimDependents(plan: Plan, movedRows: Row[]): Plan {
+  const graph = graphLookupFromData(plan);
+  const movedIds = new Set<ID>(
+    movedRows.flatMap((row) => {
+      const stands = placementTarget(row.node);
+      return stands !== undefined ? [row.node.id, stands] : [row.node.id];
+    })
+  );
+  const movedClaimIds = new Set<ID>(movedRows.map((row) => row.node.id));
+  const newAnchorFor = (
+    movedRow: Row,
+    dependentID: ID
+  ): Record<string, string> | undefined => {
+    const parentPath = getParentView(movedRow.viewPath);
+    const parentComposed = parentPath
+      ? composedRowForViewPath(plan, graph, parentPath)
+      : undefined;
+    if (!parentComposed) {
+      return undefined;
+    }
+    const seat = movedRow.viewPath[movedRow.viewPath.length - 1];
+    const index = parentComposed.children.findIndex(
+      (child) => seatOf(child) === seat
+    );
+    if (index < 0) {
+      return undefined;
+    }
+    const predecessor = parentComposed.children
+      .slice(0, index)
+      .reverse()
+      .find(
+        (child) =>
+          child.id !== dependentID &&
+          !movedIds.has(child.id) &&
+          !(child.target !== undefined && movedIds.has(child.target)) &&
+          child.relevance !== "not_relevant"
+      );
+    if (!predecessor) {
+      return { front: "true" };
+    }
+    return {
+      after: predecessor.reader
+        ? predecessor.target ?? predecessor.id
+        : predecessor.id,
+    };
+  };
+  const localNodes = plan.knowledgeDBs.get(LOCAL)?.nodes;
+  if (!localNodes) {
+    return plan;
+  }
+  return localNodes
+    .valueSeq()
+    .toArray()
+    .filter(
+      (node) =>
+        node.extraAttrs?.after !== undefined &&
+        movedIds.has(node.extraAttrs.after) &&
+        !movedClaimIds.has(node.id)
+    )
+    .reduce((accPlan, dependent) => {
+      const movedRow = movedRows.find((row) => {
+        const stands = placementTarget(row.node);
+        return (
+          row.node.id === dependent.extraAttrs?.after ||
+          stands === dependent.extraAttrs?.after
+        );
+      });
+      const attrs = movedRow ? newAnchorFor(movedRow, dependent.id) : undefined;
+      if (!attrs) {
+        return accPlan;
+      }
+      return planUpsertNodes(accPlan, {
+        ...dependent,
+        extraAttrs: { ...positionCleared(dependent.extraAttrs), ...attrs },
+      });
+    }, plan);
+}
+
 export function dnd(
   basePlan: Plan,
   sourceDrag: DragSource,
@@ -362,9 +460,11 @@ export function dnd(
     if (!node) {
       return accPlan;
     }
+    // One row, one place: a move restates the position whole, so the
+    // previous place-note never survives next to the new one.
     return planUpsertNodes(accPlan, {
       ...node,
-      extraAttrs: { ...node.extraAttrs, ...attrs },
+      extraAttrs: { ...positionCleared(node.extraAttrs), ...attrs },
     });
   };
   // An anchor names the base row it stands for: a written claim line at
@@ -374,8 +474,11 @@ export function dnd(
     dropAnchor === undefined
       ? undefined
       : placementTarget(dropAnchor.node) ?? dropAnchor.node.id;
+  const reaimedBase = isEmbedDestination
+    ? planReaimDependents(basePlan, independentRows)
+    : basePlan;
   const [plan, targetParentNode] = planMaterializeComputedRow(
-    basePlan,
+    reaimedBase,
     targetParentRow
   );
 

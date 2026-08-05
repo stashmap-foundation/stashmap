@@ -465,7 +465,7 @@ test("Log entries are plain links and stay flat", async () => {
   });
 });
 
-test("a dragged row becomes a readonly embed that projects in a drill-down surface", async () => {
+test("a dragged row becomes an embed that projects and takes marks in a drill-down surface", async () => {
   const [alice] = setup([ALICE]);
   renderApp(alice());
 

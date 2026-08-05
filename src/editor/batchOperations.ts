@@ -23,6 +23,7 @@ import {
 } from "../core/plan";
 import { getDocumentByIdOrFilePath } from "../core/Document";
 import { spansToMarkdown, plainSpans } from "../core/nodeSpans";
+import type { ComposedRow } from "../core/composition";
 
 export type EditorInfo = {
   spans: InlineSpan[];
@@ -48,6 +49,34 @@ function getEditorSpansForRow(
   return editorInfo.spans;
 }
 
+export function planJudgeComposedRow(
+  plan: Plan,
+  composed: ComposedRow,
+  path: Row["viewPath"],
+  metadata: NodeItemMetadata,
+  editorSpans: InlineSpan[] | undefined
+): Plan {
+  const spans = editorSpans ?? plainSpans(composed.text);
+  if (metadata.relevance === "not_relevant") {
+    return applyGesture(plan, {
+      kind: "dismiss",
+      row: composed,
+      path,
+      spans,
+    });
+  }
+  return applyGesture(plan, {
+    kind: "judge",
+    row: composed,
+    path,
+    relevance:
+      "relevance" in metadata ? metadata.relevance : composed.node.relevance,
+    argument:
+      "argument" in metadata ? metadata.argument : composed.node.argument,
+    spans,
+  });
+}
+
 function planUpdateOneMetadata(
   acc: Plan,
   row: Row,
@@ -55,26 +84,13 @@ function planUpdateOneMetadata(
   editorSpans: InlineSpan[] | undefined
 ): Plan {
   if (row.composed) {
-    if (metadata.relevance === "not_relevant") {
-      return applyGesture(acc, {
-        kind: "dismiss",
-        row: row.composed,
-        path: row.viewPath,
-        spans: editorSpans ?? plainSpans(row.composed.text),
-      });
-    }
-    return applyGesture(acc, {
-      kind: "judge",
-      row: row.composed,
-      path: row.viewPath,
-      relevance:
-        "relevance" in metadata
-          ? metadata.relevance
-          : row.composed.node.relevance,
-      argument:
-        "argument" in metadata ? metadata.argument : row.composed.node.argument,
-      spans: editorSpans ?? plainSpans(row.composed.text),
-    });
+    return planJudgeComposedRow(
+      acc,
+      row.composed,
+      row.viewPath,
+      metadata,
+      editorSpans
+    );
   }
   // Write gestures take first: a computed row materializes with the
   // judgment applied at creation — one plan, one save.

@@ -6,15 +6,16 @@ import {
   useRow,
 } from "../rowModel";
 import { isEmptyNodeID } from "../core/connections";
+import { planJudgeComposedRow } from "./batchOperations";
 import { planMaterializeComputedRow } from "../core/plan";
-import { applyGesture, usePlanner } from "../planner";
+import { usePlanner } from "../planner";
 import {
   planUpdateViewItemMetadata,
   NodeItemMetadata,
 } from "../nodeItemMutations";
 import { useCurrentPane, usePaneIndex } from "../SplitPanesContext";
 import { useEditorText } from "./EditorTextContext";
-import { nodeText as getNodeSpanText, plainSpans } from "../core/nodeSpans";
+import { nodeText as getNodeSpanText } from "../core/nodeSpans";
 
 type NodeItemContext = {
   // Current state
@@ -94,32 +95,14 @@ export function useNodeItemContext(): NodeItemContext {
     const editorSpans = editorTextContext?.spans;
     if (isViewingOtherUserContent || (isEmptyNode && !nodeID)) return;
     if (row.composed) {
-      if (metadata.relevance === "not_relevant") {
-        executePlan(
-          applyGesture(createPlan(), {
-            kind: "dismiss",
-            row: row.composed,
-            path: row.viewPath,
-            spans: editorSpans ?? plainSpans(row.composed.text),
-          })
-        );
-        return;
-      }
       executePlan(
-        applyGesture(createPlan(), {
-          kind: "judge",
-          row: row.composed,
-          path: row.viewPath,
-          relevance:
-            "relevance" in metadata
-              ? metadata.relevance
-              : row.composed.node.relevance,
-          argument:
-            "argument" in metadata
-              ? metadata.argument
-              : row.composed.node.argument,
-          spans: editorSpans ?? plainSpans(row.composed.text),
-        })
+        planJudgeComposedRow(
+          createPlan(),
+          row.composed,
+          row.viewPath,
+          metadata,
+          editorSpans
+        )
       );
       return;
     }

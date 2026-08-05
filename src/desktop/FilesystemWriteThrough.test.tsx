@@ -37,20 +37,100 @@ const compositionCorpusPath = pathModule.resolve(
   __dirname,
   "../../test/corpus"
 );
-const compositionFixtures = fs
-  .readdirSync(compositionCorpusPath, { withFileTypes: true })
-  .filter(
-    (entry) =>
-      entry.isDirectory() &&
-      ["source.md", "diff.md", "expected.tree"].every((file) =>
-        fs.existsSync(pathModule.join(compositionCorpusPath, entry.name, file))
-      )
-  )
-  .map((entry) => entry.name)
-  .sort();
+// Interim list until display reads the composed tree (3.4b step 2): that
+// checkpoint replaces it with full corpus discovery. The rest of
+// test/corpus gates composeNote only, in compositionCorpus.test.ts.
+const compositionFixtures = [
+  "01-empty-overlay",
+  "02-judge-one",
+  "03-comment-under-row",
+  "04-judge-and-comment",
+  "05-reword-speaking",
+  "06-reword-base-renames",
+  "07-sole-base-renames",
+  "08-move-after",
+  "09-move-front",
+  "10-chained-moves",
+  "100-feed-member-reorder",
+  "101-arrangement-asset-room",
+  "102-note-child-embed-dismissal",
+  "103-note-child-embed-reword",
+  "104-note-child-embed-move",
+  "106-note-root-as-child-judgments",
+  "107-note-root-as-child-additions",
+  "109-note-two-sources",
+  "110-evidence-under-parent",
+  "112-placement-outside-embed",
+  "114-anchor-names-deep-claim-line",
+  "115-reorder-in-nested-list",
+  "117-move-rides-its-anchor",
+  "118-anchor-beats-written-parent",
+  "12-move-base-inserts",
+  "121-own-note-rides-its-anchor",
+  "15-dismiss",
+  "16-dismiss-rename",
+  "17-dismiss-deleted",
+  "19-own-row-anchored",
+  "20-own-row-anchorless",
+  "22-deep-judgment",
+  "23-deep-move-front",
+  "24-reparent-by-overlay",
+  "25-base-reparents-judged",
+  "26-swap-texts",
+  "29-ballot-total",
+  "30-ballot-base-adds",
+  "31-move-cycle",
+  "32-speaking-inline-links",
+  "33-comment-on-dismissed",
+  "34-two-comments",
+  "35-base-moved-anchor",
+  "36-unanchored-follows-reorder",
+  "37-duplicate-claims",
+  "40-chained-own-rows",
+  "41-author-parks-under-dismissed",
+  "44-inline-link-inert",
+  "47-placement-dismissal-local",
+  "48-direct-placement-in-own-note",
+  "49-recursive-two-hop",
+  "50-recursive-terminal-rename",
+  "51-recursive-inner-judgment",
+  "52-recursive-outer-judgment",
+  "53-recursive-layered-additions",
+  "56-recursive-outer-restores-dismissed",
+  "57-recursive-outer-reword",
+  "58-recursive-inline-inert",
+  "59-recursive-inline-target-change-inert",
+  "60-recursive-block-target-change",
+  "61-recursive-block-changed-to-inline",
+  "62-recursive-inline-changed-to-block",
+  "63-recursive-inline-in-reword",
+  "68-recursive-deep-acyclic",
+  "69-recursive-inner-reorder",
+  "70-recursive-outer-reorder",
+  "73-recursive-multiple-inline-links-inert",
+  "76-recursive-user-inserts-inline-link",
+  "77-recursive-user-block-changed-to-inline",
+  "78-recursive-user-inline-changed-to-block",
+  "79-recursive-source-placement-retargeted",
+  "80-recursive-source-block-changed-to-inline",
+  "81-recursive-source-inline-changed-to-block",
+  "86-recursive-block-link-targets-reword",
+  "92-adoption-removed-restores-addition",
+  "96-feed-pure-projection",
+  "97-feed-materialized-judgment",
+  "98-feed-admin-layering",
+];
 
-if (compositionFixtures.length === 0) {
-  throw new Error("Composition corpus is empty");
+const missingFixtures = compositionFixtures.filter(
+  (fixture) =>
+    !["source.md", "diff.md", "expected.tree"].every((file) =>
+      fs.existsSync(pathModule.join(compositionCorpusPath, fixture, file))
+    )
+);
+if (missingFixtures.length > 0) {
+  throw new Error(
+    `Display fixtures missing from corpus: ${missingFixtures.join(", ")}`
+  );
 }
 
 function visibleFixtureTree(content: string): string {
@@ -75,6 +155,17 @@ test.each(compositionFixtures)(
       pathModule.join(fixturePath, "diff.md"),
       pathModule.join(workspacePath, "diff.md")
     );
+    const sourcesPath = pathModule.join(fixturePath, "sources");
+    if (fs.existsSync(sourcesPath)) {
+      fs.readdirSync(sourcesPath)
+        .filter((file) => file.endsWith(".md"))
+        .forEach((file) => {
+          fs.copyFileSync(
+            pathModule.join(sourcesPath, file),
+            pathModule.join(workspacePath, file)
+          );
+        });
+    }
 
     await renderAppTree({
       path: workspacePath,

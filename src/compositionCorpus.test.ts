@@ -8,16 +8,24 @@ import { createEmptyGraphIndex } from "./graphIndex";
 import { LOCAL } from "./core/nodeRef";
 
 const corpusPath = pathModule.resolve(__dirname, "../test/corpus");
-const compositionFixtures = fs
+const fixtureFiles = ["source.md", "diff.md", "expected.tree"];
+const corpusDirs = fs
   .readdirSync(corpusPath, { withFileTypes: true })
-  .filter(
-    (entry) =>
-      entry.isDirectory() &&
-      ["source.md", "diff.md", "expected.tree"].every((file) =>
-        fs.existsSync(pathModule.join(corpusPath, entry.name, file))
-      )
-  )
-  .map((entry) => entry.name)
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => entry.name);
+const presentFiles = (dir: string): string[] =>
+  fixtureFiles.filter((file) =>
+    fs.existsSync(pathModule.join(corpusPath, dir, file))
+  );
+const incomplete = corpusDirs.filter((dir) => {
+  const present = presentFiles(dir);
+  return present.length > 0 && present.length < fixtureFiles.length;
+});
+if (incomplete.length > 0) {
+  throw new Error(`Incomplete composition fixtures: ${incomplete.join(", ")}`);
+}
+const compositionFixtures = corpusDirs
+  .filter((dir) => presentFiles(dir).length === fixtureFiles.length)
   .sort();
 
 if (compositionFixtures.length === 0) {
@@ -65,6 +73,7 @@ test.each(compositionFixtures)(
       diffContent,
       { docIdFallback: "doc-diff", updatedMsOverride: 0 }
     );
+    expect(document.topNodeShortIds).toHaveLength(1);
 
     const knowledgeDBs = ImmutableMap<SourceId, KnowledgeData>([
       [LOCAL, { nodes: sourceNodes.merge(diffNodes) }],

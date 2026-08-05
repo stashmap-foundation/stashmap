@@ -1,0 +1,5 @@
+Alice question <!-- id:bob -->
+  Options <!-- id:bob-list -->
+    B <!-- id:bob-b -->
+    A <!-- base:a -->
+    C <!-- base:c -->

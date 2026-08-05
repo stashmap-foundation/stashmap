@@ -1,0 +1,7 @@
+Salon programme <!-- id:member-programme -->
+  Salon calendar <!-- id:member-calendar -->
+    20.08.2026 Salon assembly <!-- base:ical:salon-assembly@scholarium.at -->
+    Reading packet <!-- base:admin-packet -->
+    {!} 03.09.2026 Reading group <!-- id:member-reading -->
+    Member question <!-- id:member-question -->
+    Salon announcements <!-- base:ical:salon-announcements@scholarium.at -->

@@ -1,0 +1,2 @@
+Entry <!-- id:bob -->
+  A <!-- base:entry-a flag:cycle -->

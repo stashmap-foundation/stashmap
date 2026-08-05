@@ -1,0 +1,8 @@
+My note <!-- id:note -->
+  Art Noveau <!-- id:o1 -->
+    {!} Sagrada Familia <!-- id:o4 -->
+    Spain <!-- base:sp -->
+      {!} Barcelona <!-- id:o3 -->
+        Gaudi <!-- base:g -->
+          {!} Casa Mila <!-- id:o2 -->
+          Casa Battlo <!-- id:o5 -->

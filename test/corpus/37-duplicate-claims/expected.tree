@@ -1,0 +1,12 @@
+Argumentationsethik <!-- id:o0 -->
+  Argument A <!-- base:a -->
+  {!} Argument B <!-- id:o1 -->
+    Beleg B1 <!-- base:b1 -->
+    Nur an dieser wichtigen Platzierung <!-- id:o1a -->
+  {?} Argument B <!-- id:o2 -->
+    Beleg B1 <!-- base:b1 -->
+    Nur an dieser fraglichen Platzierung <!-- id:o2a -->
+  Argument C <!-- base:c -->
+  Argument D <!-- base:d -->
+  Argument E <!-- base:e -->
+  Argument F <!-- base:f -->

@@ -468,9 +468,6 @@ export function planMaterializeComputedRow<T extends GraphPlan>(
     );
     return [planWithRoot, materializedRoot ?? rootNode, true];
   }
-  // A host names where the materialized row belongs — the placement
-  // chain, not the row's graph parent: a projected row's parentRef is the
-  // source-side node and must never receive the write.
   const { host } = row.materialize;
   if (placement?.parentID === undefined && host !== undefined) {
     const [planWithHost, hostNode] = planMaterializeComputedRow(plan, host);

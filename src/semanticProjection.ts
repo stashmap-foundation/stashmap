@@ -172,9 +172,6 @@ function sourceRootCoveredByTarget(
   return sourceRoot ? localChildLinksTo(graph, target, sourceRoot) : false;
 }
 
-// One note, one notice (idea.md): a document that also references an
-// ancestor of the target announces itself up there — its deeper links
-// are covered and never queue separately.
 function referencesAncestor(
   graph: GraphLookup,
   graphIndex: GraphIndex,

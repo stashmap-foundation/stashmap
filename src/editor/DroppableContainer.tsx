@@ -417,8 +417,6 @@ export function useDroppable({
       const isProjectionReorder =
         calendarFeedUrl(dropDestination.parentRow.node) !== undefined &&
         dragRows.some((dragged) => dragged.parentRef?.id === parentId);
-      // Under an embed, position rides as an explicit attr on the dropped
-      // row's placement — the anchor is named, never materialized.
       const isEmbedDestination =
         embeddedTarget(dropDestination.parentRow.node) !== undefined ||
         dropDestination.parentRow.projected === true;

@@ -73,8 +73,6 @@ export function useNodeItemContext(): NodeItemContext {
     !isInSearchView &&
     (isDocumentTopLevel ||
       (nodeIndex !== undefined && parentView !== undefined) ||
-      // A placement row is the reader's own file row — judgeable
-      // wherever composition displays it.
       (placementTarget(row.node) !== undefined && parentView !== undefined) ||
       // Computed rows are first-class in behavior: a row carrying a
       // materialization recipe is as interactive as any placed row.

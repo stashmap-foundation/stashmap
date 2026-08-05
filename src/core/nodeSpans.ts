@@ -7,8 +7,6 @@ export const plainSpans = (text: string): InlineSpan[] => [
 export const nodeText = (node: GraphNode): string =>
   node.spans.map((span) => span.text).join("");
 
-// The row's effective text (lab RULES): a rewording speaks the reader's
-// words — the struck bond is provenance, never display.
 export const effectiveText = (node: GraphNode): string =>
   node.spans
     .filter((span) => !(span.kind === "link" && span.struck === true))
@@ -67,8 +65,6 @@ export const rewordingTarget = (
   return struck.length === 1 ? struck[0] : undefined;
 };
 
-// A placement row is either an explicit embed or a rewording of one —
-// both bind their declared target (lab RULES, target join).
 export const placementTarget = (node: GraphNode | undefined): ID | undefined =>
   embeddedTarget(node) ?? rewordingTarget(node);
 

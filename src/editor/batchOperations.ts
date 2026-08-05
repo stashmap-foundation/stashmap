@@ -50,9 +50,6 @@ function planUpdateOneMetadata(
   metadata: NodeItemMetadata,
   editorSpans: InlineSpan[] | undefined
 ): Plan {
-  // Evidence names its parent (idea.md, Judging): a +/- on a projected
-  // row writes the parent's line with the marked line beneath — one
-  // level, never a ladder. Relevance stays a single line.
   const host = row.materialize?.host;
   if (
     metadata.argument !== undefined &&

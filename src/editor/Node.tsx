@@ -459,8 +459,6 @@ function InlineSpans({
       {node.spans.map((span, index) => {
         const key = `${index}-${span.kind}-${span.text}`;
         if (span.kind === "link") {
-          // The rewording bond is quiet provenance: the reader's words
-          // carry the row, the struck link stays in the file only.
           if (span.struck === true) {
             return null;
           }
@@ -575,10 +573,6 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       viewKey: viewPathToString(targetViewPath),
     });
 
-  // Typing on a node placement or projected row is the rewording gesture:
-  // the editor holds the shown text, and a change saves the reader's
-  // words with the struck bond. Unchanged text never writes. Calendar
-  // placements and entity occurrences keep their own label editing.
   const placementTargetID = placementTarget(currentNode);
   const rewordEditing =
     (placementTargetID !== undefined &&
@@ -1039,8 +1033,6 @@ function InteractiveNodeContent({ rows }: { rows: List<Row> }): JSX.Element {
   const isEmptyNode = isEmptyNodeID(row.node.id);
   const displayText = useDisplayText();
 
-  // Projected rows are writable regardless of author: every touch
-  // materializes into the embedding file, never into the source.
   const isReadonly =
     isInSearchView ||
     virtualType !== undefined ||

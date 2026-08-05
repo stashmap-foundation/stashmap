@@ -482,6 +482,58 @@ Note
   });
 });
 
+test("marking a great-grandchild folds nothing", async () => {
+  const workspacePath = writeWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [S](#src) <!-- id:emb embed="true" -->',
+    ].join("\n"),
+    "source.md": [
+      "# Source <!-- id:src -->",
+      "",
+      "- Argument A <!-- id:a -->",
+      "  - Detail B <!-- id:b -->",
+      "    - Fact C <!-- id:c -->",
+      "      - Source D <!-- id:d -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await userEvent.click(screen.getByRole("treeitem", { name: "Fact C" }));
+  await userEvent.keyboard("!");
+
+  await expectTree(
+    `
+Note
+  Source
+    Argument A
+      Detail B
+        {!} Fact C
+          Source D
+  `,
+    { showGutter: true }
+  );
+
+  await waitFor(() => {
+    const note = fs.readFileSync(pathModule.join(workspacePath, "note.md"), {
+      encoding: "utf8",
+    });
+    expect(note).toMatch(
+      /- \[S\]\(#src\) <!-- id:emb embed="true" -->\n {2}- \(!\) \[Fact C\]\(#c\) <!-- id:\S+ embed="true" -->/u
+    );
+    expect(note).not.toContain("(#a)");
+    expect(note).not.toContain("(#b)");
+  });
+});
+
 test("evidence writes the parent line beneath the embed", async () => {
   const workspacePath = writeWorkspace({
     "note.md": [

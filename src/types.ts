@@ -189,6 +189,7 @@ declare global {
   type Row = {
     viewPath: readonly [number, ...ID[]];
     viewKey: string;
+    viewStateKey: string;
     index: number;
     depth: number;
     node: GraphNode;

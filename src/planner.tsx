@@ -41,10 +41,9 @@ import {
   updateView,
   getParentView,
   addNodeToPathWithNodes,
-  addNodesToLastElement,
+  bulkUpdateViewPathsAfterAddNode,
   copyViewsWithNewPrefix,
   viewPathToString,
-  bulkUpdateViewPathsAfterAddNode,
 } from "./rowModel";
 import {
   nodeText,
@@ -210,10 +209,6 @@ function migrateViewPath(
       viewPathToString(destination)
     )
   );
-}
-
-function migrateViews(plan: Plan, source: ViewPath, nodeID: ID): Plan {
-  return migrateViewPath(plan, source, addNodesToLastElement(source, nodeID));
 }
 
 function positionRows(
@@ -425,24 +420,17 @@ function judge(plan: Plan, gesture: Extract<Gesture, { kind: "judge" }>): Plan {
   if (!parent) {
     return plan;
   }
-  const parentPath = getParentView(gesture.path);
-  const withParentViews =
-    evidenceParent && parentPath && parent.id !== evidenceParent.id
-      ? migrateViews(withParent, parentPath, parent.id)
-      : withParent;
   const [withRow, row] = ensurePlacement(
-    withParentViews,
+    withParent,
     parent.id,
     gesture.row.target ?? gesture.row.id,
     gesture.row.text,
     gesture.relevance,
     gesture.argument
   );
-  const updated =
-    row && rewording ? planUpdateNodeSpans(withRow, row.id, spans) : withRow;
-  return row && row.id !== gesture.row.id
-    ? migrateViews(updated, gesture.path, row.id)
-    : updated;
+  return row && rewording
+    ? planUpdateNodeSpans(withRow, row.id, spans)
+    : withRow;
 }
 
 function move(plan: Plan, gesture: Extract<Gesture, { kind: "move" }>): Plan {
@@ -450,10 +438,6 @@ function move(plan: Plan, gesture: Extract<Gesture, { kind: "move" }>): Plan {
   if (!parent) {
     return plan;
   }
-  const parentPlan =
-    parent.id === gesture.parent.id
-      ? withParent
-      : migrateViews(withParent, gesture.parentPath, parent.id);
   const materialized = gesture.rows.reduce(
     (current, entry) => {
       const existing =
@@ -491,7 +475,7 @@ function move(plan: Plan, gesture: Extract<Gesture, { kind: "move" }>): Plan {
       };
     },
     {
-      plan: parentPlan,
+      plan: withParent,
       ids: new globalThis.Map<ID, ID>(),
       afterID: gesture.after?.reader ? gesture.after.id : undefined,
     }
@@ -556,14 +540,11 @@ export function applyGesture(plan: Plan, gesture: Gesture): Plan {
   if (!node) {
     return plan;
   }
-  const withSpans = planUpdateNodeSpans(
+  return planUpdateNodeSpans(
     materialized,
     node.id,
     rewordingSpans(gesture.row, gesture.spans)
   );
-  return node.id !== gesture.row.id
-    ? migrateViews(withSpans, gesture.path, node.id)
-    : withSpans;
 }
 
 function soleEmbedLinkHref(spans: InlineSpan[]): string | undefined {

@@ -5,7 +5,7 @@ import {
   addNodeToPathWithNodes,
   addNodesToLastElement,
   getParentView,
-  getViewForNode,
+  resolveRowView,
   isEmptyViewPathID,
   isFileRow,
   viewPathToString,
@@ -182,15 +182,19 @@ function createRow(
           );
         })()
       : undefined;
+  const resolvedView = resolveRowView(data, viewPath, parentRow?.viewStateKey, [
+    viewPath[viewPath.length - 1] as ID,
+  ]);
   return {
     viewPath,
     viewKey: viewPathToString(viewPath),
+    viewStateKey: resolvedView.key,
     index: 0,
     depth: viewPath.length - 1,
     node,
     sourceId,
     ref: { sourceId, id: node.id },
-    view: getViewForNode(data, viewPath, nodeID),
+    view: resolvedView.view,
     parentViewPath: parentRow?.viewPath ?? getParentView(viewPath),
     parentRef,
     parentNode,
@@ -298,9 +302,14 @@ function rowFromComposed(
     false,
     undefined
   );
+  const resolvedView = resolveRowView(data, viewPath, parentRow.viewStateKey, [
+    composed.id,
+    ...(composed.target !== undefined ? [composed.target] : []),
+  ]);
   return {
     ...attachComposed(row, composed),
-    view: getViewForNode(data, viewPath, composed.id),
+    view: resolvedView.view,
+    viewStateKey: resolvedView.key,
   };
 }
 

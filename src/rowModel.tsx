@@ -120,11 +120,6 @@ export function getParentView(viewContext: ViewPath): ViewPath | undefined {
   return viewContext.slice(0, -1) as unknown as ViewPath;
 }
 
-function getViewExactMatch(views: Views, path: ViewPath): View | undefined {
-  const viewKey = viewPathToString(path);
-  return views.get(viewKey);
-}
-
 export function getLast(viewContext: ViewPath): ViewPathSegment {
   return viewContext[viewContext.length - 1] as ViewPathSegment;
 }
@@ -143,9 +138,53 @@ export function getPaneRootItemID(pane: Pane): ID {
   );
 }
 
+function getViewExactMatch(views: Views, path: ViewPath): View | undefined {
+  const viewKey = viewPathToString(path);
+  return views.get(viewKey);
+}
+
 export function getViewForNode(data: Data, path: ViewPath, nodeID: ID): View {
   return (
     getViewExactMatch(data.views, path) || getDefaultView(nodeID, isRoot(path))
+  );
+}
+
+// A row's view state lives under its full path of stable ids. When a touch
+// swaps a row's id (a judged base row becomes the reader's claim line), the
+// swapped-in row inherits state through its target: each candidate joins the
+// parent's resolved key with the row's id or its target, so the takeover
+// chains to every depth without rewriting stored keys.
+export function resolveRowView(
+  data: Data,
+  path: ViewPath,
+  parentStateKey: string | undefined,
+  candidates: ID[]
+): { view: View; key: string } {
+  const exactParent = getParentView(path);
+  const parentKeys = [
+    ...(exactParent ? [viewPathToString(exactParent)] : []),
+    ...(parentStateKey !== undefined ? [parentStateKey] : []),
+  ].filter((key, index, keys) => keys.indexOf(key) === index);
+  const prefixes =
+    parentKeys.length > 0 ? parentKeys : [`p${getPaneIndex(path)}`];
+  const keys = prefixes.flatMap((prefix) =>
+    candidates.map((candidate) => `${prefix}:${encodePathID(candidate)}`)
+  );
+  const found = keys.reduce<{ view: View; key: string } | undefined>(
+    (hit, key) => {
+      if (hit) {
+        return hit;
+      }
+      const view = data.views.get(key);
+      return view ? { view, key } : undefined;
+    },
+    undefined
+  );
+  return (
+    found ?? {
+      view: getDefaultView(candidates[0], isRoot(path)),
+      key: keys[0],
+    }
   );
 }
 

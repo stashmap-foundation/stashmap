@@ -4,7 +4,7 @@ import { QueueStatus } from "./infra/nostr/cache/PublishQueue";
 import { Document as DocumentType } from "./core/Document";
 import { IcalEntry } from "./core/ical";
 import type { AddToParentTarget } from "./core/plan";
-import type { ComposedRow, CompositionResult } from "./core/composition";
+import type { ComposedRow } from "./core/composition";
 
 declare global {
   type Children = {
@@ -166,9 +166,6 @@ declare global {
     // and never enter knowledgeDBs.
     calendarFeeds?: Map<string, IcalEntry[]>;
     pull?: PullOverlayData;
-    // Composed once per knowledge change, keyed by note-root ref: the
-    // read side and the write door look compositions up, never recompose.
-    compositions: ReadonlyMap<string, CompositionResult>;
 
     views: Views;
     panes: Pane[];
@@ -272,8 +269,6 @@ declare global {
 
   type InlineSpan =
     | { kind: "text"; text: string }
-    // struck: the rewording bond `~~[frozen label](#t)~~` — the reader's
-    // words carry the row, the struck link keeps target and drift baseline.
     | { kind: "link"; href: string; text: string; struck?: true };
 
   type GraphNode = {

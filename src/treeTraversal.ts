@@ -903,10 +903,6 @@ function getIncomingGroupChildren(
   };
 }
 
-// A touch on a projected row materializes it as ONE placement line in
-// the scope-owning placement's file children — never a ladder of
-// ancestors (idea.md, Judging). The take snapshots the live text as the
-// frozen label; the host is the owning placement row itself.
 function withPlacementRecipe(row: Row, parentRow: Row): Row {
   if (row.materialize) {
     return row;
@@ -947,9 +943,6 @@ function locateComposedRow(root: ComposedRow, id: ID): ComposedRow | undefined {
   );
 }
 
-// The bridge from a view path into the whole-note composition: compose
-// the note holding the outermost resolvable segment, locate that
-// segment's composed row, then follow the remaining segments by seat.
 export function composedRowForViewPath(
   data: Data,
   graph: GraphLookup,
@@ -971,9 +964,7 @@ export function composedRowForViewPath(
     const noteRootRef =
       lookupNode(graph, resolved.node.root, resolved.ref.sourceId)?.ref ??
       resolved.ref;
-    const composition =
-      data.compositions.get(nodeRefKey(noteRootRef)) ??
-      composeNote(graph, noteRootRef);
+    const composition = composeNote(graph, noteRootRef);
     const start = locateComposedRow(composition.root, segment);
     return segments
       .slice(index + 1)

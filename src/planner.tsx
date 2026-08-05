@@ -65,7 +65,7 @@ export {
 } from "./core/plan";
 
 type WorkspacePlan = GraphPlan &
-  Pick<Data, "publishEventsStatus" | "compositions" | "views" | "panes"> & {
+  Pick<Data, "publishEventsStatus" | "views" | "panes"> & {
     temporaryView: TemporaryViewState;
     temporaryEvents: List<TemporaryEvent>;
     paneUpdate: boolean;
@@ -671,7 +671,6 @@ export function createPlan(
   return {
     ...createGraphPlan(props),
     publishEventsStatus: props.publishEventsStatus,
-    compositions: props.compositions,
     views: props.views,
     panes: props.panes,
     temporaryView: props.publishEventsStatus.temporaryView,

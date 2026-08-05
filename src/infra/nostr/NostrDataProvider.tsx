@@ -14,7 +14,6 @@ import { NostrExecutorProvider } from "./NostrExecutorProvider";
 const EMPTY_DBS = Map<SourceId, KnowledgeData>();
 const EMPTY_GRAPH_INDEX = createEmptyGraphIndex();
 const EMPTY_DOCUMENTS: Data["documents"] = Map();
-const NO_COMPOSITIONS: Data["compositions"] = new globalThis.Map();
 
 export function NostrDataProvider({
   children,
@@ -31,7 +30,6 @@ export function NostrDataProvider({
       graphIndex={EMPTY_GRAPH_INDEX}
       documents={EMPTY_DOCUMENTS}
       documentByFilePath={EMPTY_DOCUMENTS}
-      compositions={NO_COMPOSITIONS}
       publishEventsStatus={session.publishStatus}
       views={session.views}
       panes={session.panes}

@@ -247,7 +247,6 @@ const DEFAULT_DATA_CONTEXT_PROPS: TestDataProps = {
   user: ALICE,
   knowledgeDBs: Map<SourceId, KnowledgeData>(),
   graphIndex: createEmptyGraphIndex(),
-  compositions: new globalThis.Map(),
   documents: Map(),
   documentByFilePath: Map(),
   publishEventsStatus: {
@@ -773,10 +772,6 @@ function classifyRow(row: Element): RowInfo | null {
     });
   }
 
-  // The aria label and the editor carry the plain display text; the
-  // reciprocal ↩ cluster lives in the row content and must survive both
-  // an expand toggle and an at-rest editor. Reference rows already speak
-  // ↩ through their own text, and so does an editor's own link pill.
   /* eslint-disable testing-library/no-node-access */
   const clusterText = (excludeContainer: Element | null): string =>
     Array.from(

@@ -53,7 +53,6 @@ function indexedData(entries: ReadonlyArray<[PublicKey, GraphNode[]]>): Data {
     user: { publicKey: LOCAL },
     knowledgeDBs,
     graphIndex,
-    compositions: new globalThis.Map(),
     documents: Map(),
     documentByFilePath: Map(),
     publishEventsStatus: {

@@ -6,16 +6,11 @@ import { injectEmptyNodesIntoKnowledgeDBs } from "./core/connections";
 import {
   useDocumentKnowledgeDBs,
   useDocumentGraphIndex,
-  useDocumentCompositions,
   useDocuments,
   useDocumentByFilePath,
 } from "./DocumentStore";
 import { mergeGraphIndexes } from "./graphIndex";
 import type { Document as KnowstrDocument } from "./core/Document";
-import type { CompositionResult } from "./core/composition";
-
-const NO_COMPOSITIONS: ReadonlyMap<string, CompositionResult> =
-  new globalThis.Map();
 
 export type DataContextProps = Data;
 
@@ -82,16 +77,8 @@ export function MergeKnowledgeDB({
 
   const documentDBs = useDocumentKnowledgeDBs();
   const documentGraphIndex = useDocumentGraphIndex();
-  const documentCompositions = useDocumentCompositions();
   const documentRecords = useDocuments();
   const documentsByPath = useDocumentByFilePath();
-  // Store compositions cover the store's graph only. Knowledge merged in
-  // above the store (seeded DBs, search synthetics) invalidates them; the
-  // traversal then composes from the merged graph at read time.
-  const compositions =
-    knowledgeDBs !== undefined || !data.knowledgeDBs.isEmpty()
-      ? NO_COMPOSITIONS
-      : documentCompositions;
   const mergedDataDBs = mergeKnowledgeDBs(data.knowledgeDBs, documentDBs);
   const baseDBs = knowledgeDBs
     ? mergeKnowledgeDBs(knowledgeDBs, mergedDataDBs)
@@ -120,7 +107,6 @@ export function MergeKnowledgeDB({
         ...data,
         knowledgeDBs: injectedDBs,
         graphIndex: mergedGraphIndex,
-        compositions,
         documents: mergedDocuments,
         documentByFilePath: mergedDocumentByFilePath,
         pull: pull ?? data.pull,

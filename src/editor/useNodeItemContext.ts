@@ -14,7 +14,7 @@ import {
 } from "../nodeItemMutations";
 import { useCurrentPane, usePaneIndex } from "../SplitPanesContext";
 import { useEditorText } from "./EditorTextContext";
-import { nodeText as getNodeSpanText } from "../core/nodeSpans";
+import { nodeText as getNodeSpanText, plainSpans } from "../core/nodeSpans";
 
 type NodeItemContext = {
   // Current state
@@ -100,7 +100,7 @@ export function useNodeItemContext(): NodeItemContext {
             kind: "dismiss",
             row: row.composed,
             path: row.viewPath,
-            spans: editorSpans ?? row.node.spans,
+            spans: editorSpans ?? plainSpans(row.composed.text),
           })
         );
         return;
@@ -118,7 +118,7 @@ export function useNodeItemContext(): NodeItemContext {
             "argument" in metadata
               ? metadata.argument
               : row.composed.node.argument,
-          spans: editorSpans ?? row.node.spans,
+          spans: editorSpans ?? plainSpans(row.composed.text),
         })
       );
       return;

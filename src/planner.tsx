@@ -57,6 +57,7 @@ import { classifyLinkHref } from "./core/linkPath";
 import { LOCAL } from "./core/nodeRef";
 import { entityIdForText } from "./core/entityRecognition";
 import { getWorkspaceNode } from "./core/knowledge";
+import { planRemoveNodeItemById } from "./dataPlanner";
 import { Gesture, ComposedRow } from "./core/composition";
 import {
   MultiSelectionState,
@@ -369,6 +370,24 @@ function isRewording(row: ComposedRow, spans: InlineSpan[]): boolean {
   );
 }
 
+function evidenceParentFor(
+  plan: Plan,
+  gesture: Extract<Gesture, { kind: "judge" }>
+): GraphNode | undefined {
+  return gesture.argument === undefined ||
+    gesture.row.sourceParent === undefined
+    ? undefined
+    : getNode(
+        plan.knowledgeDBs,
+        gesture.row.sourceParent.id,
+        gesture.row.sourceParent.sourceId
+      );
+}
+
+function containingScope(row: ComposedRow): ID {
+  return row.scope === row.id ? row.writeParent : row.scope;
+}
+
 function judge(plan: Plan, gesture: Extract<Gesture, { kind: "judge" }>): Plan {
   const existing =
     gesture.row.reader && gesture.row.ref.sourceId === LOCAL
@@ -379,29 +398,68 @@ function judge(plan: Plan, gesture: Extract<Gesture, { kind: "judge" }>): Plan {
     ? rewordingSpans(gesture.row, gesture.spans)
     : gesture.spans;
   if (existing) {
-    return planUpsertNodes(plan, {
-      ...existing,
-      spans:
-        (gesture.row.kind === "placement" || gesture.row.kind === "speaking") &&
-        !rewording
-          ? existing.spans
-          : spansText(spans).trim() === ""
-          ? existing.spans
-          : spans,
-      relevance: gesture.relevance,
-      argument: gesture.argument,
-      updated: nextUpdated(existing),
-    });
+    const stamp = (current: Plan, node: GraphNode): Plan =>
+      planUpsertNodes(current, {
+        ...node,
+        spans:
+          (gesture.row.kind === "placement" ||
+            gesture.row.kind === "speaking") &&
+          !rewording
+            ? node.spans
+            : spansText(spans).trim() === ""
+            ? node.spans
+            : spans,
+        relevance: gesture.relevance,
+        argument: gesture.argument,
+        updated: nextUpdated(node),
+      });
+    const evidenceParent = evidenceParentFor(plan, gesture);
+    const scope = getWorkspaceNode(
+      plan.knowledgeDBs,
+      containingScope(gesture.row)
+    );
+    const writtenParent =
+      existing.parent !== undefined
+        ? getWorkspaceNode(plan.knowledgeDBs, existing.parent)
+        : undefined;
+    const boundAlready =
+      evidenceParent === undefined ||
+      scope === undefined ||
+      placementTarget(scope) === evidenceParent.id ||
+      placementTarget(writtenParent) === evidenceParent.id;
+    if (boundAlready) {
+      return stamp(plan, existing);
+    }
+    const withoutFlat =
+      existing.parent !== undefined
+        ? planRemoveNodeItemById(plan, existing.parent, existing.id)
+        : plan;
+    const [withParent, parentLine] = ensurePlacement(
+      withoutFlat,
+      scope.id,
+      evidenceParent.id,
+      nodeText(evidenceParent),
+      undefined,
+      undefined
+    );
+    if (!parentLine) {
+      return stamp(plan, existing);
+    }
+    const [rebound, reboundRow] = ensurePlacement(
+      withParent,
+      parentLine.id,
+      gesture.row.target ?? gesture.row.id,
+      gesture.row.text,
+      gesture.relevance,
+      gesture.argument
+    );
+    return reboundRow ? rebound : stamp(plan, existing);
   }
-  const evidenceParent =
-    gesture.argument === undefined || gesture.row.sourceParent === undefined
-      ? undefined
-      : getNode(
-          plan.knowledgeDBs,
-          gesture.row.sourceParent.id,
-          gesture.row.sourceParent.sourceId
-        );
-  const scope = getWorkspaceNode(plan.knowledgeDBs, gesture.row.scope);
+  const evidenceParent = evidenceParentFor(plan, gesture);
+  const scope = getWorkspaceNode(
+    plan.knowledgeDBs,
+    containingScope(gesture.row)
+  );
   if (!scope) {
     return plan;
   }
@@ -523,7 +581,10 @@ export function applyGesture(plan: Plan, gesture: Gesture): Plan {
     gesture.row.reader && gesture.row.ref.sourceId === LOCAL
       ? getWorkspaceNode(plan.knowledgeDBs, gesture.row.id)
       : undefined;
-  const scope = getWorkspaceNode(plan.knowledgeDBs, gesture.row.scope);
+  const scope = getWorkspaceNode(
+    plan.knowledgeDBs,
+    containingScope(gesture.row)
+  );
   if (!scope) {
     return plan;
   }

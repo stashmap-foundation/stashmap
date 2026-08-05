@@ -231,6 +231,111 @@ Note
   expect(source).toContain("- Argument C <!-- id:c -->");
 });
 
+test("marking a drifted placement keeps the placement form", async () => {
+  const workspacePath = writeWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [S](#src) <!-- id:emb embed="true" -->',
+      '  - [Old Label](#a) <!-- id:cl embed="true" -->',
+    ].join("\n"),
+    "source.md": [
+      "# Source <!-- id:src -->",
+      "",
+      "- Renamed Argument <!-- id:a -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await userEvent.click(
+    screen.getByRole("treeitem", { name: "Renamed Argument" })
+  );
+  await userEvent.keyboard("!");
+
+  await expectTree(
+    `
+Note
+  Source
+    {!} Renamed Argument
+  `,
+    { showGutter: true }
+  );
+
+  await waitFor(() => {
+    const note = fs.readFileSync(pathModule.join(workspacePath, "note.md"), {
+      encoding: "utf8",
+    });
+    expect(note).toMatch(
+      /- \(!\) \[Old Label\]\(#a\) <!-- id:cl embed="true" -->/u
+    );
+    expect(note).not.toContain("~~");
+  });
+});
+
+test("evidence on a relevance-marked row gains the parent line", async () => {
+  const workspacePath = writeWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [S](#src) <!-- id:emb embed="true" -->',
+    ].join("\n"),
+    "source.md": [
+      "# Source <!-- id:src -->",
+      "",
+      "- Argument B <!-- id:b -->",
+      "  - Beleg B1 <!-- id:b1 -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await userEvent.click(screen.getByRole("treeitem", { name: "Beleg B1" }));
+  await userEvent.keyboard("!");
+
+  await waitFor(() => {
+    const note = fs.readFileSync(pathModule.join(workspacePath, "note.md"), {
+      encoding: "utf8",
+    });
+    expect(note).toMatch(/- \(!\) \[Beleg B1\]\(#b1\)/u);
+    expect(note).not.toContain("(#b)");
+  });
+
+  await userEvent.keyboard("+");
+
+  await expectTree(
+    `
+Note
+  Source
+    Argument B
+      {!+} Beleg B1
+  `,
+    { showGutter: true }
+  );
+
+  await waitFor(() => {
+    const note = fs.readFileSync(pathModule.join(workspacePath, "note.md"), {
+      encoding: "utf8",
+    });
+    expect(note).toMatch(
+      /- \[Argument B\]\(#b\) <!-- id:\S+ embed="true" -->\n {4}- \(\+!\) \[Beleg B1\]\(#b1\) <!-- id:\S+ embed="true" -->/u
+    );
+    expect(note.match(/\(#b1\)/gu)).toHaveLength(1);
+  });
+});
+
 test("rewording twice keeps the original source bond", async () => {
   const workspacePath = writeWorkspace({
     "note.md": [

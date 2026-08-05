@@ -22,7 +22,7 @@ import {
   planMaterializeComputedRow,
 } from "../core/plan";
 import { getDocumentByIdOrFilePath } from "../core/Document";
-import { spansToMarkdown } from "../core/nodeSpans";
+import { spansToMarkdown, plainSpans } from "../core/nodeSpans";
 
 export type EditorInfo = {
   spans: InlineSpan[];
@@ -60,7 +60,7 @@ function planUpdateOneMetadata(
         kind: "dismiss",
         row: row.composed,
         path: row.viewPath,
-        spans: editorSpans ?? row.node.spans,
+        spans: editorSpans ?? plainSpans(row.composed.text),
       });
     }
     return applyGesture(acc, {
@@ -73,7 +73,7 @@ function planUpdateOneMetadata(
           : row.composed.node.relevance,
       argument:
         "argument" in metadata ? metadata.argument : row.composed.node.argument,
-      spans: editorSpans ?? row.node.spans,
+      spans: editorSpans ?? plainSpans(row.composed.text),
     });
   }
   // Write gestures take first: a computed row materializes with the

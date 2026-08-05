@@ -216,36 +216,25 @@ function locateComposedRow(root: ComposedRow, id: ID): ComposedRow | undefined {
   );
 }
 
-export function composedRowForViewPath(
-  data: Data,
+function composedAt(
   graph: GraphLookup,
-  viewPath: ViewPath
+  segment: ID,
+  sourceId: SourceId
 ): ComposedRow | undefined {
-  const sourceId = sourceIdForPath(data, viewPath);
-  const segments = expansionPathOf(viewPath);
-  return segments.reduce<ComposedRow | undefined>((found, segment, index) => {
-    if (found || isSearchId(segment) || isEmptyViewPathID(segment)) {
-      return found;
-    }
-    const resolved = lookupNode(graph, segment, sourceId);
-    if (!resolved) {
-      return undefined;
-    }
-    const root = getNodeInSource(graph, {
-      sourceId: resolved.ref.sourceId,
-      id: resolved.node.root,
-    });
-    if (!root) {
-      return undefined;
-    }
-    const start = locateComposedRow(composeNote(graph, root.ref).root, segment);
-    return segments
-      .slice(index + 1)
-      .reduce<ComposedRow | undefined>(
-        (row, id) => row?.children.find((child) => child.id === id),
-        start
-      );
-  }, undefined);
+  if (isSearchId(segment) || isEmptyViewPathID(segment)) {
+    return undefined;
+  }
+  const resolved = lookupNode(graph, segment, sourceId);
+  if (!resolved) {
+    return undefined;
+  }
+  const root = getNodeInSource(graph, {
+    sourceId: resolved.ref.sourceId,
+    id: resolved.node.root,
+  });
+  return root
+    ? locateComposedRow(composeNote(graph, root.ref).root, segment)
+    : undefined;
 }
 
 function graphParent(
@@ -261,6 +250,27 @@ function graphParent(
   return composed.sourceParent
     ? getNodeInSource(graph, composed.sourceParent)
     : undefined;
+}
+
+function attachComposed(row: Row, composed: ComposedRow): Row {
+  const standsFor =
+    composed.target === undefined ||
+    (composed.kind !== "placement" && composed.kind !== "speaking")
+      ? undefined
+      : { id: composed.target, liveText: composed.text };
+  return {
+    ...row,
+    node: {
+      ...composed.node,
+      relevance: composed.relevance,
+      argument: composed.argument,
+    },
+    ref: composed.ref,
+    sourceId: composed.ref.sourceId,
+    composed,
+    ...(standsFor && { standsFor }),
+    projected: composed.reader ? undefined : true,
+  };
 }
 
 function rowFromComposed(
@@ -288,49 +298,9 @@ function rowFromComposed(
     false,
     undefined
   );
-  const standsFor =
-    composed.target === undefined ||
-    (composed.kind !== "placement" && composed.kind !== "speaking")
-      ? undefined
-      : { id: composed.target, liveText: composed.text };
   return {
-    ...row,
-    ref: composed.ref,
-    sourceId: composed.ref.sourceId,
-    node: {
-      ...composed.node,
-      relevance: composed.relevance,
-      argument: composed.argument,
-    },
+    ...attachComposed(row, composed),
     view: getViewForNode(data, viewPath, composed.id),
-    composed,
-    ...(standsFor && { standsFor }),
-    projected: composed.reader ? undefined : true,
-  };
-}
-
-function attachComposedRow(data: Data, graph: GraphLookup, row: Row): Row {
-  const composed = composedRowForViewPath(data, graph, row.viewPath);
-  if (!composed) {
-    return row;
-  }
-  const standsFor =
-    composed.target === undefined ||
-    (composed.kind !== "placement" && composed.kind !== "speaking")
-      ? undefined
-      : { id: composed.target, liveText: composed.text };
-  return {
-    ...row,
-    node: {
-      ...composed.node,
-      relevance: composed.relevance,
-      argument: composed.argument,
-    },
-    ref: composed.ref,
-    sourceId: composed.ref.sourceId,
-    composed,
-    ...(standsFor && { standsFor }),
-    projected: composed.reader ? undefined : true,
   };
 }
 
@@ -377,30 +347,23 @@ function emptyRootNode(): GraphNode {
   };
 }
 
-function resolveRowForPath(
+function resolveRowStep(
   data: Data,
   graph: GraphLookup,
   viewPath: ViewPath,
-  parentRow?: Row,
+  parentRow: Row | undefined,
   options?: TreeTraversalOptions
 ): Row | undefined {
   const paneSourceId = sourceIdForPath(data, viewPath);
-  const [, ...segments] = viewPath;
-  if (segments.length === 0) {
-    return undefined;
-  }
+  const segments = expansionPathOf(viewPath);
   const pathID = segments[segments.length - 1];
-  const composed = composedRowForViewPath(data, graph, viewPath);
+  const composed = parentRow?.composed
+    ? parentRow.composed.children.find((child) => child.id === pathID)
+    : composedAt(graph, pathID, paneSourceId);
+  if (composed && parentRow) {
+    return rowFromComposed(data, graph, parentRow, composed);
+  }
   if (composed) {
-    const parentPath = getParentView(viewPath);
-    const composedParent =
-      parentRow ??
-      (parentPath
-        ? resolveRowForPath(data, graph, parentPath, undefined, options)
-        : undefined);
-    if (composedParent) {
-      return rowFromComposed(data, graph, composedParent, composed);
-    }
     const root = createRow(
       data,
       graph,
@@ -414,7 +377,7 @@ function resolveRowForPath(
       false,
       undefined
     );
-    return attachComposedRow(data, graph, root);
+    return attachComposed(root, composed);
   }
   if (segments.length === 1 && options?.projectedRoot?.id === pathID) {
     const row = createRow(
@@ -432,28 +395,22 @@ function resolveRowForPath(
     );
     return { ...row, materialize: { precededBy: [], root: true } };
   }
-  const parentPath = getParentView(viewPath);
-  const resolvedParentRow =
-    parentRow ??
-    (parentPath
-      ? resolveRowForPath(data, graph, parentPath, undefined, options)
-      : undefined);
-  const childIndex = resolvedParentRow
-    ? getNodeIndexForPath(resolvedParentRow.node, pathID)
+  const childIndex = parentRow
+    ? getNodeIndexForPath(parentRow.node, pathID)
     : undefined;
   const childID =
     childIndex === undefined
       ? undefined
-      : resolvedParentRow?.node.children.get(childIndex);
+      : parentRow?.node.children.get(childIndex);
   const edgeNode = (() => {
-    if (!resolvedParentRow || childID === undefined) {
+    if (!parentRow || childID === undefined) {
       return undefined;
     }
     if (childID === EMPTY_NODE_ID) {
-      return getEmptyNodeItem(data, resolvedParentRow.node);
+      return getEmptyNodeItem(data, parentRow.node);
     }
     return getNodeInSource(graph, {
-      sourceId: resolvedParentRow.sourceId,
+      sourceId: parentRow.sourceId,
       id: childID,
     })?.node;
   })();
@@ -468,21 +425,41 @@ function resolveRowForPath(
   // A path segment that is not a file child of its parent (a projected
   // row) belongs to the source that resolved it, not to the parent.
   const rowSourceId = edgeNode
-    ? resolvedParentRow?.sourceId ?? resolved?.ref.sourceId ?? paneSourceId
-    : resolved?.ref.sourceId ?? resolvedParentRow?.sourceId ?? paneSourceId;
+    ? parentRow?.sourceId ?? resolved?.ref.sourceId ?? paneSourceId
+    : resolved?.ref.sourceId ?? parentRow?.sourceId ?? paneSourceId;
   return createRow(
     data,
     graph,
     viewPath,
     node,
     rowSourceId,
-    resolvedParentRow,
-    resolvedParentRow?.node,
-    resolvedParentRow?.ref,
+    parentRow,
+    parentRow?.node,
+    parentRow?.ref,
     childIndex,
     false,
     undefined
   );
+}
+
+function resolveRowForPath(
+  data: Data,
+  graph: GraphLookup,
+  viewPath: ViewPath,
+  parentRow?: Row,
+  options?: TreeTraversalOptions
+): Row | undefined {
+  const segments = expansionPathOf(viewPath);
+  if (segments.length === 0) {
+    return undefined;
+  }
+  if (parentRow) {
+    return resolveRowStep(data, graph, viewPath, parentRow, options);
+  }
+  return segments.reduce<Row | undefined>((row, _, index) => {
+    const prefix: ViewPath = [viewPath[0], ...segments.slice(0, index + 1)];
+    return resolveRowStep(data, graph, prefix, row, options);
+  }, undefined);
 }
 
 function createChildRow(

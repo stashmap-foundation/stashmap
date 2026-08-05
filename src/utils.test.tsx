@@ -692,6 +692,7 @@ type RowInfo = {
   text: string;
   indentLevel: number;
   gutter?: string;
+  isReference?: true;
 };
 
 function getItemPrefix(innerNode: Element | null, isRef: boolean): string {
@@ -808,9 +809,20 @@ function classifyRow(row: Element): RowInfo | null {
     if (!rawText) {
       return null;
     }
+    /* eslint-disable testing-library/no-node-access */
+    const furniture = Array.from(
+      innerNode?.querySelectorAll(".dead-link-part, .external-link-part") ?? []
+    )
+      .filter((part) => part.closest('[data-testid="reference-row"]') === null)
+      .map((part) => part.textContent ?? "")
+      .join("");
+    /* eslint-enable testing-library/no-node-access */
+    const withFurniture = rawText.endsWith(furniture)
+      ? rawText
+      : `${rawText}${furniture}`;
     return withGutter({
       element: toggleButton as HTMLElement,
-      text: `${prefix}${rawText}${reciprocalCluster}`,
+      text: `${prefix}${withFurniture}${reciprocalCluster}`,
       indentLevel: getIndentLevel(toggleButton as HTMLElement),
     });
   }
@@ -829,6 +841,7 @@ function classifyRow(row: Element): RowInfo | null {
       element: referenceRow as HTMLElement,
       text: `${prefix}${displayText}`.trimEnd(),
       indentLevel: getIndentLevel(referenceRow as HTMLElement),
+      isReference: true,
     });
   }
 
@@ -877,6 +890,7 @@ function classifyRow(row: Element): RowInfo | null {
 
 type TreeOptions = {
   showGutter?: boolean;
+  withoutReferenceRows?: boolean;
 };
 
 async function getTreeStructure(options?: TreeOptions): Promise<string> {
@@ -890,7 +904,8 @@ async function getTreeStructure(options?: TreeOptions): Promise<string> {
 
   const rowInfos: RowInfo[] = Array.from(allRows)
     .map((row) => classifyRow(row))
-    .filter((info): info is RowInfo => info !== null);
+    .filter((info): info is RowInfo => info !== null)
+    .filter((info) => !(options?.withoutReferenceRows && info.isReference));
 
   const lines = rowInfos.map(({ text, indentLevel, gutter }) => {
     const indent = "  ".repeat(indentLevel);

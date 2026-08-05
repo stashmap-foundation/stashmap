@@ -2134,6 +2134,602 @@ ${Array.from({ length: 15 }, (_, index) => `    Row ${14 - index}`).join("\n")}
   `);
 });
 
+test("dropping at the front demotes the previous front claim", async () => {
+  const workspacePath = writeWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [Gaudi](#g) <!-- id:emb embed="true" -->',
+    ].join("\n"),
+    "gaudi.md": [
+      "# Gaudi <!-- id:g -->",
+      "",
+      "- Sagrada Familia <!-- id:sf -->",
+      "- Casa Mila <!-- id:cm -->",
+      "- Casa Battlo <!-- id:cb -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  fireEvent.dragStart(screen.getByRole("treeitem", { name: "Casa Mila" }));
+  fireEvent.drop(screen.getByRole("treeitem", { name: "Gaudi" }));
+
+  await expectTree(`
+Note
+  Gaudi
+    Casa Mila
+    Sagrada Familia
+    Casa Battlo
+  `);
+
+  fireEvent.dragStart(screen.getByRole("treeitem", { name: "Casa Battlo" }));
+  fireEvent.drop(screen.getByRole("treeitem", { name: "Gaudi" }));
+
+  await expectTree(`
+Note
+  Gaudi
+    Casa Battlo
+    Casa Mila
+    Sagrada Familia
+  `);
+
+  await waitFor(() => {
+    const note = fs.readFileSync(pathModule.join(workspacePath, "note.md"), {
+      encoding: "utf8",
+    });
+    expect(note).toMatch(
+      /- \[Casa Battlo\]\(#cb\) <!-- id:\S+ embed="true" front="true" -->/u
+    );
+    expect(note).toMatch(
+      /- \[Casa Mila\]\(#cm\) <!-- id:\S+ embed="true" after="cb" -->/u
+    );
+    expect(note.match(/front="true"/gu)).toHaveLength(1);
+  });
+});
+
+test("dropping after a placed row anchors instead of jumping to the front", async () => {
+  const workspacePath = writeWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [Gaudi](#g) <!-- id:emb embed="true" -->',
+    ].join("\n"),
+    "gaudi.md": [
+      "# Gaudi <!-- id:g -->",
+      "",
+      "- Sagrada Familia <!-- id:sf -->",
+      "- Casa Mila <!-- id:cm -->",
+      "- Casa Battlo <!-- id:cb -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  fireEvent.dragStart(screen.getByRole("treeitem", { name: "Casa Battlo" }));
+  fireEvent.drop(screen.getByRole("treeitem", { name: "Gaudi" }));
+
+  await expectTree(`
+Note
+  Gaudi
+    Casa Battlo
+    Sagrada Familia
+    Casa Mila
+  `);
+
+  fireEvent.dragStart(screen.getByRole("treeitem", { name: "Casa Mila" }));
+  fireEvent.drop(screen.getByRole("treeitem", { name: "Casa Battlo" }));
+
+  await expectTree(`
+Note
+  Gaudi
+    Casa Battlo
+    Casa Mila
+    Sagrada Familia
+  `);
+
+  await waitFor(() => {
+    const note = fs.readFileSync(pathModule.join(workspacePath, "note.md"), {
+      encoding: "utf8",
+    });
+    expect(note).toMatch(
+      /- \[Casa Battlo\]\(#cb\) <!-- id:\S+ embed="true" front="true" -->/u
+    );
+    expect(note).toMatch(
+      /- \[Casa Mila\]\(#cm\) <!-- id:\S+ embed="true" after="cb" -->/u
+    );
+    expect(note.match(/front="true"/gu)).toHaveLength(1);
+  });
+});
+
+test("a drop heals a scope where every claim says front", async () => {
+  const workspacePath = writeWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [Gaudi](#g) <!-- id:emb embed="true" -->',
+      '  - [Sagrada Familia](#sf) <!-- id:msf embed="true" front="true" -->',
+      '  - [Casa Mila](#cm) <!-- id:mcm embed="true" front="true" -->',
+      '  - [Casa Battlo](#cb) <!-- id:mcb embed="true" front="true" -->',
+    ].join("\n"),
+    "gaudi.md": [
+      "# Gaudi <!-- id:g -->",
+      "",
+      "- Sagrada Familia <!-- id:sf -->",
+      "- Casa Mila <!-- id:cm -->",
+      "- Casa Battlo <!-- id:cb -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await expectTree(`
+Note
+  Gaudi
+    Casa Battlo
+    Casa Mila
+    Sagrada Familia
+  `);
+
+  fireEvent.dragStart(
+    screen.getByRole("treeitem", { name: "Sagrada Familia" })
+  );
+  fireEvent.drop(screen.getByRole("treeitem", { name: "Gaudi" }));
+
+  await expectTree(`
+Note
+  Gaudi
+    Sagrada Familia
+    Casa Battlo
+    Casa Mila
+  `);
+
+  await waitFor(() => {
+    const note = fs.readFileSync(pathModule.join(workspacePath, "note.md"), {
+      encoding: "utf8",
+    });
+    expect(note).toMatch(
+      /- \[Sagrada Familia\]\(#sf\) <!-- id:msf embed="true" front="true" -->/u
+    );
+    expect(note).toMatch(
+      /- \[Casa Battlo\]\(#cb\) <!-- id:mcb embed="true" after="sf" -->/u
+    );
+    expect(note).toMatch(
+      /- \[Casa Mila\]\(#cm\) <!-- id:mcm embed="true" after="cb" -->/u
+    );
+    expect(note.match(/front="true"/gu)).toHaveLength(1);
+  });
+});
+
+test("a move re-aims claims in its own embed only", async () => {
+  const workspacePath = writeWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [Gaudi](#g) <!-- id:emb1 embed="true" -->',
+      '  - [Casa Mila](#cm) <!-- id:p1 embed="true" after="cb" -->',
+      '- [Gaudi](#g) <!-- id:emb2 embed="true" -->',
+      '  - [Sagrada Familia](#sf) <!-- id:p2 embed="true" after="cb" -->',
+    ].join("\n"),
+    "gaudi.md": [
+      "# Gaudi <!-- id:g -->",
+      "",
+      "- Sagrada Familia <!-- id:sf -->",
+      "- Casa Mila <!-- id:cm -->",
+      "- Casa Battlo <!-- id:cb -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await expectTree(`
+Note
+  Gaudi
+    Sagrada Familia
+    Casa Battlo
+    Casa Mila
+    [I] Note ↩
+  Gaudi
+    Casa Mila
+    Casa Battlo
+    Sagrada Familia
+    [I] Note ↩
+  `);
+
+  fireEvent.dragStart(
+    screen.getAllByRole("treeitem", { name: "Casa Battlo" })[0]
+  );
+  fireEvent.drop(screen.getAllByRole("treeitem", { name: "Gaudi" })[0]);
+
+  await expectTree(`
+Note
+  Gaudi
+    Casa Battlo
+    Sagrada Familia
+    Casa Mila
+    [I] Note ↩
+  Gaudi
+    Casa Mila
+    Casa Battlo
+    Sagrada Familia
+    [I] Note ↩
+  `);
+
+  await waitFor(() => {
+    const note = fs.readFileSync(pathModule.join(workspacePath, "note.md"), {
+      encoding: "utf8",
+    });
+    expect(note).toMatch(
+      /- \[Casa Mila\]\(#cm\) <!-- id:p1 embed="true" after="sf" -->/u
+    );
+    expect(note).toMatch(
+      /- \[Sagrada Familia\]\(#sf\) <!-- id:p2 embed="true" after="cb" -->/u
+    );
+    expect(note.match(/front="true"/gu)).toHaveLength(1);
+  });
+});
+
+test("a drop into the middle of a chain re-anchors only the displaced link", async () => {
+  const workspacePath = writeWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [Gaudi](#g) <!-- id:emb embed="true" -->',
+      '  - [Sagrada Familia](#sf) <!-- id:msf embed="true" front="true" -->',
+      '  - [Casa Mila](#cm) <!-- id:mcm embed="true" after="sf" -->',
+      '  - [Casa Battlo](#cb) <!-- id:mcb embed="true" after="cm" -->',
+    ].join("\n"),
+    "gaudi.md": [
+      "# Gaudi <!-- id:g -->",
+      "",
+      "- Sagrada Familia <!-- id:sf -->",
+      "- Casa Mila <!-- id:cm -->",
+      "- Casa Battlo <!-- id:cb -->",
+      "- Park Guell <!-- id:pg -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await expectTree(`
+Note
+  Gaudi
+    Sagrada Familia
+    Casa Mila
+    Casa Battlo
+    Park Guell
+  `);
+
+  fireEvent.dragStart(screen.getByRole("treeitem", { name: "Park Guell" }));
+  fireEvent.drop(screen.getByRole("treeitem", { name: "Sagrada Familia" }));
+
+  await expectTree(`
+Note
+  Gaudi
+    Sagrada Familia
+    Park Guell
+    Casa Mila
+    Casa Battlo
+  `);
+
+  await waitFor(() => {
+    const note = fs.readFileSync(pathModule.join(workspacePath, "note.md"), {
+      encoding: "utf8",
+    });
+    expect(note).toMatch(
+      /- \[Sagrada Familia\]\(#sf\) <!-- id:msf embed="true" front="true" -->/u
+    );
+    expect(note).toMatch(
+      /- \[Park Guell\]\(#pg\) <!-- id:\S+ embed="true" after="sf" -->/u
+    );
+    expect(note).toMatch(
+      /- \[Casa Mila\]\(#cm\) <!-- id:mcm embed="true" after="pg" -->/u
+    );
+    expect(note).toMatch(
+      /- \[Casa Battlo\]\(#cb\) <!-- id:mcb embed="true" after="cm" -->/u
+    );
+    expect(note.match(/front="true"/gu)).toHaveLength(1);
+  });
+});
+
+test("dragging the front holder away hands the front to its successor", async () => {
+  const workspacePath = writeWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [Gaudi](#g) <!-- id:emb embed="true" -->',
+      '  - [Sagrada Familia](#sf) <!-- id:msf embed="true" front="true" -->',
+      '  - [Casa Mila](#cm) <!-- id:mcm embed="true" after="sf" -->',
+      '  - [Casa Battlo](#cb) <!-- id:mcb embed="true" after="cm" -->',
+    ].join("\n"),
+    "gaudi.md": [
+      "# Gaudi <!-- id:g -->",
+      "",
+      "- Sagrada Familia <!-- id:sf -->",
+      "- Casa Mila <!-- id:cm -->",
+      "- Casa Battlo <!-- id:cb -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  fireEvent.dragStart(
+    screen.getByRole("treeitem", { name: "Sagrada Familia" })
+  );
+  fireEvent.drop(screen.getByRole("treeitem", { name: "Casa Battlo" }));
+
+  await expectTree(`
+Note
+  Gaudi
+    Casa Mila
+    Casa Battlo
+    Sagrada Familia
+  `);
+
+  await waitFor(() => {
+    const note = fs.readFileSync(pathModule.join(workspacePath, "note.md"), {
+      encoding: "utf8",
+    });
+    expect(note).toMatch(
+      /- \[Casa Mila\]\(#cm\) <!-- id:mcm embed="true" front="true" -->/u
+    );
+    expect(note).toMatch(
+      /- \[Casa Battlo\]\(#cb\) <!-- id:mcb embed="true" after="cm" -->/u
+    );
+    expect(note).toMatch(
+      /- \[Sagrada Familia\]\(#sf\) <!-- id:msf embed="true" after="cb" -->/u
+    );
+    expect(note.match(/front="true"/gu)).toHaveLength(1);
+  });
+});
+
+test("dropping a row where it already sits changes nothing", async () => {
+  const noteContent = [
+    "# Note <!-- id:note -->",
+    "",
+    '- [Gaudi](#g) <!-- id:emb embed="true" -->',
+    '  - [Sagrada Familia](#sf) <!-- id:msf embed="true" front="true" -->',
+    '  - [Casa Mila](#cm) <!-- id:mcm embed="true" after="sf" -->',
+  ].join("\n");
+  const workspacePath = writeWorkspace({
+    "note.md": noteContent,
+    "gaudi.md": [
+      "# Gaudi <!-- id:g -->",
+      "",
+      "- Sagrada Familia <!-- id:sf -->",
+      "- Casa Mila <!-- id:cm -->",
+      "- Casa Battlo <!-- id:cb -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await expectTree(`
+Note
+  Gaudi
+    Sagrada Familia
+    Casa Mila
+    Casa Battlo
+  `);
+
+  fireEvent.dragStart(screen.getByRole("treeitem", { name: "Casa Mila" }));
+  fireEvent.drop(screen.getByRole("treeitem", { name: "Sagrada Familia" }));
+
+  await expectTree(`
+Note
+  Gaudi
+    Sagrada Familia
+    Casa Mila
+    Casa Battlo
+  `);
+
+  await waitFor(() => {
+    const note = fs.readFileSync(pathModule.join(workspacePath, "note.md"), {
+      encoding: "utf8",
+    });
+    const body = note.slice(note.indexOf("# Note"));
+    expect(body.trimEnd()).toBe(noteContent.trimEnd());
+  });
+});
+
+test("a drop breaks a mutual anchor cycle", async () => {
+  const workspacePath = writeWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [Gaudi](#g) <!-- id:emb embed="true" -->',
+      '  - [Casa Mila](#cm) <!-- id:mcm embed="true" after="cb" -->',
+      '  - [Casa Battlo](#cb) <!-- id:mcb embed="true" after="cm" -->',
+    ].join("\n"),
+    "gaudi.md": [
+      "# Gaudi <!-- id:g -->",
+      "",
+      "- Sagrada Familia <!-- id:sf -->",
+      "- Casa Mila <!-- id:cm -->",
+      "- Casa Battlo <!-- id:cb -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  fireEvent.dragStart(screen.getByRole("treeitem", { name: "Casa Mila" }));
+  fireEvent.drop(screen.getByRole("treeitem", { name: "Gaudi" }));
+
+  await expectTree(`
+Note
+  Gaudi
+    Casa Mila
+    Sagrada Familia
+    Casa Battlo
+  `);
+
+  await waitFor(() => {
+    const note = fs.readFileSync(pathModule.join(workspacePath, "note.md"), {
+      encoding: "utf8",
+    });
+    expect(note).toMatch(
+      /- \[Casa Mila\]\(#cm\) <!-- id:mcm embed="true" front="true" -->/u
+    );
+    expect(note).toMatch(
+      /- \[Casa Battlo\]\(#cb\) <!-- id:mcb embed="true" after="sf" -->/u
+    );
+    expect(note.match(/front="true"/gu)).toHaveLength(1);
+  });
+});
+
+test("an unrelated drop never rewrites a dangling anchor", async () => {
+  const workspacePath = writeWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [Gaudi](#g) <!-- id:emb embed="true" -->',
+      '  - [Casa Mila](#cm) <!-- id:mcm embed="true" after="ghost" -->',
+    ].join("\n"),
+    "gaudi.md": [
+      "# Gaudi <!-- id:g -->",
+      "",
+      "- Sagrada Familia <!-- id:sf -->",
+      "- Casa Mila <!-- id:cm -->",
+      "- Casa Battlo <!-- id:cb -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  fireEvent.dragStart(
+    screen.getByRole("treeitem", { name: "Sagrada Familia" })
+  );
+  fireEvent.drop(screen.getByRole("treeitem", { name: "Gaudi" }));
+
+  await waitFor(() => {
+    const note = fs.readFileSync(pathModule.join(workspacePath, "note.md"), {
+      encoding: "utf8",
+    });
+    expect(note).toMatch(
+      /- \[Sagrada Familia\]\(#sf\) <!-- id:\S+ embed="true" front="true" -->/u
+    );
+    expect(note).toMatch(
+      /- \[Casa Mila\]\(#cm\) <!-- id:mcm embed="true" after="ghost" -->/u
+    );
+    expect(note.match(/front="true"/gu)).toHaveLength(1);
+  });
+});
+
+test("marking a moved row keeps its place", async () => {
+  const workspacePath = writeWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [Gaudi](#g) <!-- id:emb embed="true" -->',
+    ].join("\n"),
+    "gaudi.md": [
+      "# Gaudi <!-- id:g -->",
+      "",
+      "- Sagrada Familia <!-- id:sf -->",
+      "- Casa Mila <!-- id:cm -->",
+      "- Casa Battlo <!-- id:cb -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  fireEvent.dragStart(screen.getByRole("treeitem", { name: "Casa Mila" }));
+  fireEvent.drop(screen.getByRole("treeitem", { name: "Gaudi" }));
+
+  await expectTree(`
+Note
+  Gaudi
+    Casa Mila
+    Sagrada Familia
+    Casa Battlo
+  `);
+
+  await userEvent.click(screen.getByRole("treeitem", { name: "Casa Mila" }));
+  fireEvent.click(screen.getByLabelText("set Casa Mila to relevant"));
+
+  await waitFor(() => {
+    const note = fs.readFileSync(pathModule.join(workspacePath, "note.md"), {
+      encoding: "utf8",
+    });
+    expect(note).toMatch(
+      /- \(!\) \[Casa Mila\]\(#cm\) <!-- id:\S+ embed="true" front="true" -->/u
+    );
+    expect(note.match(/\[Casa Mila\]/gu)).toHaveLength(1);
+    expect(note.match(/front="true"/gu)).toHaveLength(1);
+  });
+
+  await expectTree(
+    `
+Note
+  Gaudi
+    {!} Casa Mila
+    Sagrada Familia
+    Casa Battlo
+  `,
+    { showGutter: true }
+  );
+});
+
 test("an embed row opens as a pane root and projects there", async () => {
   const [alice] = setup([ALICE]);
   renderApp(alice());

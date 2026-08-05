@@ -246,32 +246,90 @@ function positionRows(
     ...movedRows,
     ...stationary.slice(anchorIndex + 1),
   ];
-  const movedLocalIds = new globalThis.Set(moved.values());
+  const localIDFor = (row: ComposedRow): ID | undefined =>
+    moved.get(row.id) ?? (row.reader ? row.id : undefined);
+  const signatureAt = (index: number): string => {
+    const predecessor = desired[index - 1];
+    return predecessor
+      ? `after:${predecessor.target ?? predecessor.id}`
+      : "front";
+  };
+  const currentSignature = (node: GraphNode): string | undefined =>
+    node.extraAttrs?.front === "true"
+      ? "front"
+      : node.extraAttrs?.after === undefined
+      ? undefined
+      : `after:${node.extraAttrs.after}`;
+  const movedSeats = new globalThis.Set(
+    movedRows.flatMap((row) => [row.id, ...(row.target ? [row.target] : [])])
+  );
+  const affected = new globalThis.Set<ID>(moved.values());
+  desired.forEach((row) => {
+    const localID = localIDFor(row);
+    const node =
+      localID === undefined
+        ? undefined
+        : getWorkspaceNode(plan.knowledgeDBs, localID);
+    if (
+      localID !== undefined &&
+      node?.extraAttrs?.after &&
+      movedSeats.has(node.extraAttrs.after)
+    ) {
+      affected.add(localID);
+    }
+  });
+  const expandAffected = (): void => {
+    const occupied = new globalThis.Set(
+      desired.flatMap((row, index) => {
+        const localID = localIDFor(row);
+        return localID !== undefined && affected.has(localID)
+          ? [signatureAt(index)]
+          : [];
+      })
+    );
+    const displaced = desired.flatMap((row) => {
+      const localID = localIDFor(row);
+      const node =
+        localID === undefined
+          ? undefined
+          : getWorkspaceNode(plan.knowledgeDBs, localID);
+      const signature = node ? currentSignature(node) : undefined;
+      return localID !== undefined &&
+        !affected.has(localID) &&
+        signature !== undefined &&
+        occupied.has(signature)
+        ? [localID]
+        : [];
+    });
+    displaced.forEach((id) => affected.add(id));
+    if (displaced.length > 0) {
+      expandAffected();
+    }
+  };
+  expandAffected();
   return desired.reduce((current, row, index) => {
-    const localID = moved.get(row.id) ?? (row.reader ? row.id : undefined);
-    if (localID === undefined) {
+    const localID = localIDFor(row);
+    if (localID === undefined || !affected.has(localID)) {
       return current;
     }
     const node = getWorkspaceNode(current.knowledgeDBs, localID);
-    if (
-      !node ||
-      (!movedLocalIds.has(localID) &&
-        node.extraAttrs?.front !== "true" &&
-        node.extraAttrs?.after === undefined)
-    ) {
+    if (!node) {
       return current;
     }
     const predecessor = desired[index - 1];
-    return planUpsertNodes(current, {
-      ...node,
-      extraAttrs: predecessor
-        ? {
-            ...clearPosition(node.extraAttrs),
-            after: predecessor.target ?? predecessor.id,
-          }
-        : { ...clearPosition(node.extraAttrs), front: "true" },
-      updated: nextUpdated(node),
-    });
+    const extraAttrs = predecessor
+      ? {
+          ...clearPosition(node.extraAttrs),
+          after: predecessor.target ?? predecessor.id,
+        }
+      : { ...clearPosition(node.extraAttrs), front: "true" };
+    return currentSignature(node) === signatureAt(index)
+      ? current
+      : planUpsertNodes(current, {
+          ...node,
+          extraAttrs,
+          updated: nextUpdated(node),
+        });
   }, plan);
 }
 

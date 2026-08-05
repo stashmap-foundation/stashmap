@@ -1,6 +1,6 @@
 import { LOCAL } from "./core/nodeRef";
 import { isEmptyNodeID, getNode } from "./core/connections";
-import { spansText, spansToMarkdown } from "./core/nodeSpans";
+import { placementTarget, spansText, spansToMarkdown } from "./core/nodeSpans";
 import { planUpdateNodeItemMetadataById } from "./dataPlanner";
 import { NodeItemMetadata, updateNodeItemMetadata } from "./nodeItemMetadata";
 import { ViewPath } from "./rowModel";
@@ -119,7 +119,9 @@ export function planUpdateViewItemMetadata(
   }
 
   if (childIndex === undefined) {
-    return plan;
+    return node.parent !== undefined && placementTarget(node) !== undefined
+      ? planUpdateNodeItemMetadataById(plan, node.parent, nodeID, metadata)
+      : plan;
   }
 
   const basePlan =

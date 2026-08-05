@@ -11,6 +11,7 @@ import {
   getIndependentRows,
   getParentView,
   updateViewPathsAfterMoveNodes,
+  viewPathToString,
 } from "./rowModel";
 import { getDocumentForNode } from "./core/Document";
 import { composedRowForViewPath, seatOf } from "./treeTraversal";
@@ -115,21 +116,23 @@ function isDraggedOccurrence(row: Row, sources: Row[]): boolean {
   );
 }
 
-// The visible parent of a projected row is the embed row standing for
-// its source-side parent, not that parent itself.
+function sameVisibleParent(a: Row, b: Row): boolean {
+  return (
+    a.parentViewPath !== undefined &&
+    b.parentViewPath !== undefined &&
+    viewPathToString(a.parentViewPath) === viewPathToString(b.parentViewPath)
+  );
+}
+
 function getVisibleParentRow(rows: List<Row>, row: Row): Row | undefined {
-  if (!row.parentRef) {
+  if (!row.parentViewPath) {
     return undefined;
   }
+  const parentKey = viewPathToString(row.parentViewPath);
   return rows
     .slice(0, row.index)
     .reverse()
-    .find(
-      (candidate) =>
-        candidate.depth < row.depth &&
-        (refsEqual(candidate.ref, row.parentRef) ||
-          candidate.standsFor?.id === row.parentRef?.id)
-    );
+    .find((candidate) => candidate.viewKey === parentKey);
 }
 
 function getVisibleRootRow(rows: List<Row>): Row | undefined {
@@ -140,14 +143,33 @@ function getVisibleRootRow(rows: List<Row>): Row | undefined {
   return firstRow;
 }
 
+function lastVisibleChildRow(
+  rows: List<Row>,
+  parentRow: Row,
+  sources: Row[]
+): Row | undefined {
+  return rows
+    .slice(parentRow.index + 1)
+    .takeWhile((candidate) => candidate.depth > parentRow.depth)
+    .reverse()
+    .find(
+      (candidate) =>
+        candidate.parentViewPath !== undefined &&
+        viewPathToString(candidate.parentViewPath) === parentRow.viewKey &&
+        !isDraggedOccurrence(candidate, sources)
+    );
+}
+
 function getDropDestinationEndOfVisibleRoot(
-  rows: List<Row>
-): { parentRow: Row; insertAtIndex: number } | undefined {
+  rows: List<Row>,
+  sources: Row[]
+): DropDestination | undefined {
   const rootRow = getVisibleRootRow(rows);
   return rootRow
     ? {
         parentRow: rootRow,
         insertAtIndex: rootRow.node.children.size || 0,
+        anchorRow: lastVisibleChildRow(rows, rootRow, sources),
       }
     : undefined;
 }
@@ -161,9 +183,7 @@ function placedIndexAfter(rows: List<Row>, row: Row): number {
     .reverse()
     .find(
       (candidate) =>
-        candidate.childIndex !== undefined &&
-        candidate.parentRef?.sourceId === row.parentRef?.sourceId &&
-        candidate.parentRef?.id === row.parentRef?.id
+        candidate.childIndex !== undefined && sameVisibleParent(candidate, row)
     );
   return previousPlaced?.childIndex !== undefined
     ? previousPlaced.childIndex + 1
@@ -223,19 +243,18 @@ function getAncestorAtDepth(
 
 function getDropBeforeParentDestination(
   rows: List<Row>,
-  dropBefore: Row
+  dropBefore: Row,
+  sources: Row[]
 ): DropDestination | undefined {
   const parentRow = getVisibleParentRow(rows, dropBefore);
   if (!parentRow) {
-    return getDropDestinationEndOfVisibleRoot(rows);
+    return getDropDestinationEndOfVisibleRoot(rows, sources);
   }
   // Inserting before a row = after its display predecessor under the
   // same parent, which may be a computed row.
   const displayPredecessor = rows.get(dropBefore.index - 1);
   const anchorRow =
-    displayPredecessor &&
-    displayPredecessor.parentRef?.sourceId === dropBefore.parentRef?.sourceId &&
-    displayPredecessor.parentRef?.id === dropBefore.parentRef?.id
+    displayPredecessor && sameVisibleParent(displayPredecessor, dropBefore)
       ? displayPredecessor
       : undefined;
   return {
@@ -267,7 +286,8 @@ function resolveDropByDepth(
   rows: List<Row>,
   prevRow: Row,
   dropBefore: Row | undefined,
-  targetDepth: number
+  targetDepth: number,
+  sources: Row[]
 ): DropDestination | undefined {
   const rootDepth = getRootDepth(rows);
   const maxDepth = prevRow.depth + 1;
@@ -275,8 +295,6 @@ function resolveDropByDepth(
   const clampedDepth = Math.max(minDepth, Math.min(maxDepth, targetDepth));
 
   if (clampedDepth === prevRow.depth + 1) {
-    // Insertion as prevRow's child. A sibling above the insertion line is
-    // the anchor; dropping as the first child has none (front).
     if (dropBefore && dropBefore.depth === clampedDepth) {
       return {
         parentRow: prevRow,
@@ -288,6 +306,7 @@ function resolveDropByDepth(
     return {
       parentRow: prevRow,
       insertAtIndex: prevRow.node.children.size || 0,
+      anchorRow: lastVisibleChildRow(rows, prevRow, sources),
     };
   }
 
@@ -299,7 +318,7 @@ function resolveDropByDepth(
     }
   }
 
-  return getDropDestinationEndOfVisibleRoot(rows);
+  return getDropDestinationEndOfVisibleRoot(rows, sources);
 }
 
 export function getDropDestinationFromRows(
@@ -311,7 +330,13 @@ export function getDropDestinationFromRows(
   const dropBefore = findNextNonDraggedRow(rows, targetRow.index + 1, sources);
 
   if (targetDepth !== undefined) {
-    return resolveDropByDepth(rows, targetRow, dropBefore, targetDepth);
+    return resolveDropByDepth(
+      rows,
+      targetRow,
+      dropBefore,
+      targetDepth,
+      sources
+    );
   }
 
   if (!dropBefore) {
@@ -323,7 +348,7 @@ export function getDropDestinationFromRows(
       return afterTarget;
     }
   }
-  return getDropBeforeParentDestination(rows, dropBefore);
+  return getDropBeforeParentDestination(rows, dropBefore, sources);
 }
 
 function positionCleared(
@@ -336,10 +361,6 @@ function positionCleared(
   );
 }
 
-// Claims don't chase (claim-set maintenance): when a drag takes a row
-// away, every claim anchored on it re-aims to the row's nearest
-// surviving visible predecessor — or the front — so nothing else on
-// screen appears to move.
 function planReaimDependents(plan: Plan, movedRows: Row[]): Plan {
   const graph = graphLookupFromData(plan);
   const movedIds = new Set<ID>(
@@ -351,13 +372,13 @@ function planReaimDependents(plan: Plan, movedRows: Row[]): Plan {
   const movedClaimIds = new Set<ID>(movedRows.map((row) => row.node.id));
   const newAnchorFor = (
     movedRow: Row,
-    dependentID: ID
+    dependent: GraphNode
   ): Record<string, string> | undefined => {
     const parentPath = getParentView(movedRow.viewPath);
     const parentComposed = parentPath
       ? composedRowForViewPath(plan, graph, parentPath)
       : undefined;
-    if (!parentComposed) {
+    if (!parentComposed || dependent.parent !== parentComposed.id) {
       return undefined;
     }
     const seat = movedRow.viewPath[movedRow.viewPath.length - 1];
@@ -372,7 +393,7 @@ function planReaimDependents(plan: Plan, movedRows: Row[]): Plan {
       .reverse()
       .find(
         (child) =>
-          child.id !== dependentID &&
+          child.id !== dependent.id &&
           !movedIds.has(child.id) &&
           !(child.target !== undefined && movedIds.has(child.target)) &&
           child.relevance !== "not_relevant"
@@ -407,7 +428,7 @@ function planReaimDependents(plan: Plan, movedRows: Row[]): Plan {
           stands === dependent.extraAttrs?.after
         );
       });
-      const attrs = movedRow ? newAnchorFor(movedRow, dependent.id) : undefined;
+      const attrs = movedRow ? newAnchorFor(movedRow, dependent) : undefined;
       if (!attrs) {
         return accPlan;
       }
@@ -431,45 +452,9 @@ export function dnd(
     ? sourceDrag.draggedRows
     : [sourceDrag.row];
   const independentRows = getIndependentRows(sources);
-  // Under an embed the composed order is carried by explicit position
-  // attrs, never by where rows sit in the file (lab RULES, K-010).
   const isEmbedDestination =
     embeddedTarget(targetParentRow.node) !== undefined ||
     targetParentRow.projected === true;
-  const positionAttrs = (
-    anchorID: ID | undefined
-  ): Record<string, string> | undefined => {
-    if (!isEmbedDestination) {
-      return undefined;
-    }
-    if (anchorID !== undefined) {
-      return { after: anchorID };
-    }
-    return dropIndex === 0 ? { front: "true" } : undefined;
-  };
-  const planWithPosition = (
-    accPlan: Plan,
-    placedID: ID | undefined,
-    anchorID: ID | undefined
-  ): Plan => {
-    const attrs = positionAttrs(anchorID);
-    if (attrs === undefined || placedID === undefined) {
-      return accPlan;
-    }
-    const node = getNode(accPlan.knowledgeDBs, placedID, LOCAL);
-    if (!node) {
-      return accPlan;
-    }
-    // One row, one place: a move restates the position whole, so the
-    // previous place-note never survives next to the new one.
-    return planUpsertNodes(accPlan, {
-      ...node,
-      extraAttrs: { ...positionCleared(node.extraAttrs), ...attrs },
-    });
-  };
-  // An anchor names the base row it stands for: a written claim line at
-  // the slot anchors by its target, so the attr resolves in the written
-  // parent's scope (strict-parent rule), not by the claim line's own id.
   const dropAnchorID =
     dropAnchor === undefined
       ? undefined
@@ -481,6 +466,80 @@ export function dnd(
     reaimedBase,
     targetParentRow
   );
+  const baseOf = (accPlan: Plan, placedID: ID): ID => {
+    const node = getNode(accPlan.knowledgeDBs, placedID, LOCAL);
+    return node ? placementTarget(node) ?? node.id : placedID;
+  };
+  const planDemoteDisplaced = (
+    accPlan: Plan,
+    placedID: ID,
+    anchorID: ID | undefined
+  ): Plan => {
+    const scopeOwner =
+      getNode(accPlan.knowledgeDBs, targetParentNode.id, LOCAL) ??
+      targetParentNode;
+    const displaced = scopeOwner.children
+      .toArray()
+      .filter((childID) => childID !== placedID)
+      .map((childID) => getNode(accPlan.knowledgeDBs, childID, LOCAL))
+      .filter(
+        (child): child is GraphNode =>
+          child !== undefined &&
+          (anchorID === undefined
+            ? child.extraAttrs?.front === "true"
+            : child.extraAttrs?.after === anchorID)
+      );
+    if (displaced.length === 0) {
+      return accPlan;
+    }
+    const composedScope = composedRowForViewPath(
+      accPlan,
+      graphLookupFromData(accPlan),
+      targetParentRow.viewPath
+    );
+    const displayIndex = (id: ID): number => {
+      const index = composedScope
+        ? composedScope.children.findIndex((child) => child.id === id)
+        : -1;
+      return index < 0 ? Number.MAX_SAFE_INTEGER : index;
+    };
+    const placedNode = getNode(accPlan.knowledgeDBs, placedID, LOCAL);
+    return [...displaced]
+      .sort((a, b) => displayIndex(a.id) - displayIndex(b.id))
+      .reduce((demotedPlan, dependent, index, ordered) => {
+        const previous = index === 0 ? placedNode : ordered[index - 1];
+        if (!previous) {
+          return demotedPlan;
+        }
+        return planUpsertNodes(demotedPlan, {
+          ...dependent,
+          extraAttrs: {
+            ...positionCleared(dependent.extraAttrs),
+            after: placementTarget(previous) ?? previous.id,
+          },
+        });
+      }, accPlan);
+  };
+  const planWithPosition = (
+    accPlan: Plan,
+    placedID: ID | undefined,
+    anchorID: ID | undefined
+  ): Plan => {
+    if (!isEmbedDestination || placedID === undefined) {
+      return accPlan;
+    }
+    const node = getNode(accPlan.knowledgeDBs, placedID, LOCAL);
+    if (!node) {
+      return accPlan;
+    }
+    const attrs: Record<string, string> =
+      anchorID !== undefined ? { after: anchorID } : { front: "true" };
+    const placedPlan = planUpsertNodes(accPlan, {
+      ...node,
+      extraAttrs: { ...positionCleared(node.extraAttrs), ...attrs },
+    });
+    return planDemoteDisplaced(placedPlan, placedID, anchorID);
+  };
 
   const sourcePane = plan.panes[sourceDrag.sourcePaneIndex];
   const targetPane = plan.panes[targetPaneIndex];
@@ -580,8 +639,6 @@ export function dnd(
         materializedNode.id,
       ];
     }
-    // A substituted claim row is already a written line of this
-    // document: the drag moves that line, never writes a second one.
     const sourceRowDocument = getDocumentForNode(
       accPlan.knowledgeDBs,
       accPlan.documents,
@@ -627,7 +684,7 @@ export function dnd(
       return independentRows.reduce<{ plan: Plan; anchorID: ID | undefined }>(
         (acc, row) => ({
           plan: planWithPosition(acc.plan, row.node.id, acc.anchorID),
-          anchorID: row.node.id,
+          anchorID: placementTarget(row.node) ?? row.node.id,
         }),
         { plan, anchorID: dropAnchorID }
       ).plan;
@@ -658,7 +715,7 @@ export function dnd(
         );
         return {
           plan: planWithPosition(added, placedID, acc.anchorID),
-          anchorID: placedID ?? acc.anchorID,
+          anchorID: placedID ? baseOf(added, placedID) : acc.anchorID,
         };
       },
       { plan: reorderedPlan, anchorID: dropAnchorID }
@@ -707,7 +764,7 @@ export function dnd(
     }>(
       (acc, sourceRow) => ({
         plan: planWithPosition(acc.plan, sourceRow.node.id, acc.anchorID),
-        anchorID: sourceRow.node.id,
+        anchorID: placementTarget(sourceRow.node) ?? sourceRow.node.id,
       }),
       { plan: movedPlan, anchorID: dropAnchorID }
     );
@@ -721,7 +778,7 @@ export function dnd(
         );
         return {
           plan: planWithPosition(added, placedID, acc.anchorID),
-          anchorID: placedID ?? acc.anchorID,
+          anchorID: placedID ? baseOf(added, placedID) : acc.anchorID,
         };
       },
       positioned
@@ -775,7 +832,7 @@ export function dnd(
       );
       return {
         plan: planWithPosition(added, ids[0], acc.anchorID),
-        anchorID: ids[0] ?? acc.anchorID,
+        anchorID: ids[0] ? baseOf(added, ids[0]) : acc.anchorID,
       };
     },
     { plan: expandedPlan, anchorID: dropAnchorID }

@@ -843,9 +843,7 @@ Target
   Source↩
   `);
 
-  await userEvent.click(
-    await screen.findByRole("link", { name: "Navigate to Source" })
-  );
+  await userEvent.click(await screen.findByRole("link", { name: "Source" }));
 
   await expectTree(`
 Source
@@ -1077,9 +1075,7 @@ Pack List
   await userEvent.click(incomingRow);
   await userEvent.keyboard("!");
 
-  await userEvent.click(
-    await screen.findByRole("link", { name: "Navigate to Links" })
-  );
+  await userEvent.click(await screen.findByRole("link", { name: "Links" }));
 
   await expectTree(`
 Links
@@ -1114,7 +1110,7 @@ Spain <!-- id:... -->
 
   cleanup();
   await renderDocumentRoute(workspacePath, "holidays.md");
-  await screen.findByRole("link", { name: "Navigate to Links" });
+  await screen.findByRole("link", { name: "Links" });
 
   cleanup();
 });
@@ -1146,9 +1142,7 @@ Pack List
   await userEvent.click(incomingRow);
   await userEvent.keyboard("!");
 
-  await userEvent.click(
-    await screen.findByRole("link", { name: "Navigate to Links" })
-  );
+  await userEvent.click(await screen.findByRole("link", { name: "Links" }));
 
   await expectTree(`
 Links
@@ -1178,7 +1172,7 @@ Links
 
   cleanup();
   await renderDocumentRoute(workspacePath, "holidays.md");
-  await screen.findByRole("link", { name: "Navigate to Links" });
+  await screen.findByRole("link", { name: "Links" });
 
   cleanup();
 });

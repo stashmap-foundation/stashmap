@@ -11,6 +11,7 @@ import { getIndependentRows, updateViewPathsAfterMoveNodes } from "./rowModel";
 import { getDocumentForNode } from "./core/Document";
 import {
   Plan,
+  applyGesture,
   planUpdateViews,
   planExpandNode,
   planAddToParent,
@@ -118,7 +119,9 @@ function getVisibleParentRow(rows: List<Row>, row: Row): Row | undefined {
     .reverse()
     .find(
       (candidate) =>
-        candidate.depth < row.depth && refsEqual(candidate.ref, row.parentRef)
+        candidate.depth < row.depth &&
+        (refsEqual(candidate.ref, row.parentRef) ||
+          candidate.standsFor?.id === row.parentRef?.id)
     );
 }
 
@@ -317,15 +320,47 @@ export function dnd(
   sourceDrag: DragSource,
   targetPaneIndex: number,
   targetParentRow: Row,
-  dropIndex: number
+  dropIndex: number,
+  dropAnchor: Row | undefined
 ): Plan {
   const source = sourceDrag.row.viewKey;
   const sources = sourceDrag.draggedRows.length
     ? sourceDrag.draggedRows
     : [sourceDrag.row];
   const independentRows = getIndependentRows(sources);
-  // Projected embed content is readonly: nothing drops into it, and its
-  // rows don't drag out yet — materializing from an embed is later work.
+  const composedRows = independentRows.flatMap((row) =>
+    row.composed ? [row.composed] : []
+  );
+  const composedMove =
+    targetParentRow.composed !== undefined &&
+    composedRows.length === independentRows.length &&
+    (dropAnchor === undefined || dropAnchor.composed !== undefined) &&
+    ((independentRows.every((row) =>
+      refsEqual(row.parentRef, independentRows[0]?.parentRef)
+    ) &&
+      composedRows.every(
+        (row) => row.scope === targetParentRow.composed?.scope
+      )) ||
+      independentRows.some(
+        (row) =>
+          row.projected === true ||
+          row.composed?.kind === "placement" ||
+          row.composed?.kind === "speaking"
+      ));
+  if (composedMove && targetParentRow.composed) {
+    return applyGesture(
+      planExpandNode(basePlan, targetParentRow.view, targetParentRow.viewPath),
+      {
+        kind: "move",
+        rows: independentRows.flatMap((row) =>
+          row.composed ? [{ row: row.composed, path: row.viewPath }] : []
+        ),
+        parent: targetParentRow.composed,
+        parentPath: targetParentRow.viewPath,
+        after: dropAnchor?.composed,
+      }
+    );
+  }
   if (
     targetParentRow.projected ||
     independentRows.some((row) => row.projected)

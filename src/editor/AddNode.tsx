@@ -4,7 +4,7 @@ import { useEditorText } from "./EditorTextContext";
 import { isEditableElement } from "./keyboardNavigation";
 import { useEntityLabels } from "../EntityLabelContext";
 import { ParsedLine, parseClipboardText } from "../planner";
-import { spansText } from "../core/nodeSpans";
+import { spansText, spansToMarkdown } from "../core/nodeSpans";
 import { parseInlineSpans } from "../core/markdownTree";
 import { argumentColor, relevanceColor } from "./referenceDisplay";
 import { INCOMING_ARROW, argumentChar, relevanceChar } from "./referenceText";
@@ -410,7 +410,7 @@ export function MiniEditor({
       ...continuation
     );
   }, [
-    initialSpans,
+    spansToMarkdown(initialSpans),
     deadLinkIndexes.join(","),
     externalLinkIndexes.join(","),
     calendarLinkIndexes.join(","),

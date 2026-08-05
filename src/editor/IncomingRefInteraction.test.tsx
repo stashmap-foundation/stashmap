@@ -20,11 +20,11 @@ async function clickRow(name: string): Promise<void> {
 
 async function followSourceLinkChain(): Promise<void> {
   const first = await screen.findByRole("link", {
-    name: "Navigate to Target",
+    name: "Target",
   });
   await userEvent.click(first);
   const second = await screen.findByRole("link", {
-    name: "Navigate to Source",
+    name: "Source",
   });
   await userEvent.click(second);
 }

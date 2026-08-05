@@ -1,12 +1,13 @@
 import {
   useIsInSearchView,
   useCurrentNode,
+  useIsViewingOtherUserContent,
   ViewPath,
   useRow,
 } from "../rowModel";
 import { isEmptyNodeID } from "../core/connections";
 import { planMaterializeComputedRow } from "../core/plan";
-import { usePlanner } from "../planner";
+import { applyGesture, usePlanner } from "../planner";
 import {
   planUpdateViewItemMetadata,
   NodeItemMetadata,
@@ -46,6 +47,7 @@ export function useNodeItemContext(): NodeItemContext {
   const nodeIndex = row.childIndex;
   const { createPlan, executePlan } = usePlanner();
   const isInSearchView = useIsInSearchView();
+  const isViewingOtherUserContent = useIsViewingOtherUserContent();
   const currentNode = useCurrentNode();
   const parentView = row.parentViewPath;
   const pane = useCurrentPane();
@@ -70,6 +72,9 @@ export function useNodeItemContext(): NodeItemContext {
     !isInSearchView &&
     (isDocumentTopLevel ||
       (nodeIndex !== undefined && parentView !== undefined) ||
+      (row.composed !== undefined &&
+        parentView !== undefined &&
+        !isViewingOtherUserContent) ||
       // Computed rows are first-class in behavior: a row carrying a
       // materialization recipe is as interactive as any placed row.
       (row.materialize !== undefined && parentView !== undefined));
@@ -87,7 +92,37 @@ export function useNodeItemContext(): NodeItemContext {
 
   const updateMetadata = (metadata: NodeItemMetadata): void => {
     const editorSpans = editorTextContext?.spans;
-    if (isEmptyNode && !nodeID) return;
+    if (isViewingOtherUserContent || (isEmptyNode && !nodeID)) return;
+    if (row.composed) {
+      if (metadata.relevance === "not_relevant") {
+        executePlan(
+          applyGesture(createPlan(), {
+            kind: "dismiss",
+            row: row.composed,
+            path: row.viewPath,
+            spans: editorSpans ?? row.node.spans,
+          })
+        );
+        return;
+      }
+      executePlan(
+        applyGesture(createPlan(), {
+          kind: "judge",
+          row: row.composed,
+          path: row.viewPath,
+          relevance:
+            "relevance" in metadata
+              ? metadata.relevance
+              : row.composed.node.relevance,
+          argument:
+            "argument" in metadata
+              ? metadata.argument
+              : row.composed.node.argument,
+          spans: editorSpans ?? row.node.spans,
+        })
+      );
+      return;
+    }
     // Write gestures take first: the selector's judgment on a computed
     // row materializes it with the judgment, one plan.
     if (row.materialize !== undefined) {

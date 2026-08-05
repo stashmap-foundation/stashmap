@@ -22,6 +22,8 @@ import {
   EMPTY_NODE_ID,
   isEmptyNodeID,
   computeEmptyNodeMetadata,
+  createRefTarget,
+  getNode,
   isSearchId,
 } from "./core/connections";
 import type { TextSeed } from "./core/connections";
@@ -38,14 +40,25 @@ import {
   ViewPath,
   updateView,
   getParentView,
+  addNodeToPathWithNodes,
+  addNodesToLastElement,
+  copyViewsWithNewPrefix,
+  viewPathToString,
   bulkUpdateViewPathsAfterAddNode,
 } from "./rowModel";
-import { plainSpans, spansText, spansToMarkdown } from "./core/nodeSpans";
+import {
+  nodeText,
+  placementTarget,
+  plainSpans,
+  spansText,
+  spansToMarkdown,
+} from "./core/nodeSpans";
 import { calendarEntryEditedSpans } from "./core/ical";
 import { classifyLinkHref } from "./core/linkPath";
 import { LOCAL } from "./core/nodeRef";
 import { entityIdForText } from "./core/entityRecognition";
 import { getWorkspaceNode } from "./core/knowledge";
+import { Gesture, ComposedRow } from "./core/composition";
 import {
   MultiSelectionState,
   clearSelection,
@@ -72,6 +85,428 @@ type WorkspacePlan = GraphPlan &
   };
 
 export type Plan = WorkspacePlan;
+
+function localPlacement(
+  plan: Plan,
+  parentID: ID,
+  target: ID
+): GraphNode | undefined {
+  const parent = getWorkspaceNode(plan.knowledgeDBs, parentID);
+  return parent?.children
+    .map((id) => getWorkspaceNode(plan.knowledgeDBs, id))
+    .find((node) => placementTarget(node) === target);
+}
+
+function ensurePlacement(
+  plan: Plan,
+  parentID: ID,
+  target: ID,
+  text: string,
+  relevance: Relevance,
+  argument: Argument
+): [Plan, GraphNode | undefined] {
+  const existing = localPlacement(plan, parentID, target);
+  if (existing) {
+    return [plan, existing];
+  }
+  const [next, ids] = planAddTargetsToNode(
+    plan,
+    parentID,
+    createRefTarget(target, text),
+    undefined,
+    relevance,
+    argument
+  );
+  return [next, getWorkspaceNode(next.knowledgeDBs, ids[0])];
+}
+
+function localParentFor(
+  plan: Plan,
+  row: ComposedRow
+): [Plan, GraphNode | undefined] {
+  const direct =
+    row.ref.sourceId === LOCAL
+      ? getWorkspaceNode(plan.knowledgeDBs, row.id)
+      : undefined;
+  if (row.reader && direct) {
+    return [plan, direct];
+  }
+  const parent = getWorkspaceNode(plan.knowledgeDBs, row.writeParent);
+  return parent
+    ? ensurePlacement(
+        plan,
+        parent.id,
+        row.target ?? row.id,
+        row.text,
+        undefined,
+        undefined
+      )
+    : [plan, undefined];
+}
+
+function nextUpdated(node: GraphNode): number {
+  return Math.max(Date.now(), node.updated + 1);
+}
+
+function moveLocalNode(
+  plan: Plan,
+  node: GraphNode,
+  parent: GraphNode,
+  afterID: ID | undefined
+): Plan {
+  const oldParent = node.parent
+    ? getWorkspaceNode(plan.knowledgeDBs, node.parent)
+    : undefined;
+  const withoutOld = oldParent
+    ? planUpsertNodes(plan, {
+        ...oldParent,
+        children: oldParent.children.filter((id) => id !== node.id),
+        updated: nextUpdated(oldParent),
+      })
+    : plan;
+  const currentParent = getWorkspaceNode(withoutOld.knowledgeDBs, parent.id);
+  if (!currentParent) {
+    return plan;
+  }
+  const siblings = currentParent.children.filter((id) => id !== node.id);
+  const afterIndex = afterID === undefined ? -1 : siblings.indexOf(afterID);
+  const index = afterID === undefined ? 0 : afterIndex + 1;
+  const withParent = planUpsertNodes(withoutOld, {
+    ...currentParent,
+    children:
+      afterID !== undefined && afterIndex < 0
+        ? siblings.push(node.id)
+        : siblings.insert(index, node.id),
+    updated: nextUpdated(currentParent),
+  });
+  return planUpsertNodes(withParent, {
+    ...node,
+    parent: currentParent.id,
+    root: currentParent.root,
+    updated: nextUpdated(node),
+  });
+}
+
+function clearPosition(
+  attrs: Record<string, string> | undefined
+): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(attrs ?? {}).filter(
+      ([key]) => key !== "front" && key !== "after"
+    )
+  );
+}
+
+function migrateViewPath(
+  plan: Plan,
+  source: ViewPath,
+  destination: ViewPath
+): Plan {
+  return planUpdateViews(
+    plan,
+    copyViewsWithNewPrefix(
+      plan.views,
+      viewPathToString(source),
+      viewPathToString(destination)
+    )
+  );
+}
+
+function migrateViews(plan: Plan, source: ViewPath, nodeID: ID): Plan {
+  return migrateViewPath(plan, source, addNodesToLastElement(source, nodeID));
+}
+
+function positionRows(
+  plan: Plan,
+  parent: ComposedRow,
+  movedRows: ComposedRow[],
+  moved: ReadonlyMap<ID, ID>,
+  after: ComposedRow | undefined
+): Plan {
+  const scope = getWorkspaceNode(plan.knowledgeDBs, parent.scope);
+  if (!scope || placementTarget(scope) === undefined) {
+    return [...moved.values()].reduce((current, id) => {
+      const node = getWorkspaceNode(current.knowledgeDBs, id);
+      return node
+        ? planUpsertNodes(current, {
+            ...node,
+            extraAttrs: clearPosition(node.extraAttrs),
+            updated: nextUpdated(node),
+          })
+        : current;
+    }, plan);
+  }
+  const stationary = parent.children.filter((row) => !moved.has(row.id));
+  const anchorIndex =
+    after === undefined
+      ? -1
+      : stationary.findIndex((row) => row.id === after.id);
+  const desired = [
+    ...stationary.slice(0, anchorIndex + 1),
+    ...movedRows,
+    ...stationary.slice(anchorIndex + 1),
+  ];
+  const movedLocalIds = new globalThis.Set(moved.values());
+  return desired.reduce((current, row, index) => {
+    const localID = moved.get(row.id) ?? (row.reader ? row.id : undefined);
+    if (localID === undefined) {
+      return current;
+    }
+    const node = getWorkspaceNode(current.knowledgeDBs, localID);
+    if (
+      !node ||
+      (!movedLocalIds.has(localID) &&
+        node.extraAttrs?.front !== "true" &&
+        node.extraAttrs?.after === undefined)
+    ) {
+      return current;
+    }
+    const predecessor = desired[index - 1];
+    return planUpsertNodes(current, {
+      ...node,
+      extraAttrs: predecessor
+        ? {
+            ...clearPosition(node.extraAttrs),
+            after: predecessor.target ?? predecessor.id,
+          }
+        : { ...clearPosition(node.extraAttrs), front: "true" },
+      updated: nextUpdated(node),
+    });
+  }, plan);
+}
+
+function rewordingSpans(row: ComposedRow, spans: InlineSpan[]): InlineSpan[] {
+  const spoken = spans.map(
+    (span): InlineSpan =>
+      span.kind === "link" ? { kind: "text", text: span.text } : span
+  );
+  const last = spoken[spoken.length - 1];
+  const words: InlineSpan[] =
+    last?.kind === "text"
+      ? [
+          ...spoken.slice(0, -1),
+          { kind: "text", text: `${last.text.trimEnd()} ` },
+        ]
+      : [...spoken, { kind: "text", text: " " }];
+  const existingBonds =
+    row.reader && row.kind === "speaking"
+      ? row.node.spans.filter(
+          (span) => span.kind === "link" && span.struck === true
+        )
+      : [];
+  const bonds: InlineSpan[] =
+    existingBonds.length > 0
+      ? existingBonds
+      : [
+          {
+            kind: "link",
+            href: `#${row.target ?? row.id}`,
+            text: row.text.trim(),
+            struck: true,
+          },
+        ];
+  return [...words, ...bonds];
+}
+
+function isRewording(row: ComposedRow, spans: InlineSpan[]): boolean {
+  return (
+    spansText(spans).trim() !== "" &&
+    (!row.reader || row.kind === "placement" || row.kind === "speaking") &&
+    spansText(spans).trim() !== row.text.trim()
+  );
+}
+
+function judge(plan: Plan, gesture: Extract<Gesture, { kind: "judge" }>): Plan {
+  const existing =
+    gesture.row.reader && gesture.row.ref.sourceId === LOCAL
+      ? getWorkspaceNode(plan.knowledgeDBs, gesture.row.id)
+      : undefined;
+  const rewording = isRewording(gesture.row, gesture.spans);
+  const spans = rewording
+    ? rewordingSpans(gesture.row, gesture.spans)
+    : gesture.spans;
+  if (existing) {
+    return planUpsertNodes(plan, {
+      ...existing,
+      spans:
+        (gesture.row.kind === "placement" || gesture.row.kind === "speaking") &&
+        !rewording
+          ? existing.spans
+          : spansText(spans).trim() === ""
+          ? existing.spans
+          : spans,
+      relevance: gesture.relevance,
+      argument: gesture.argument,
+      updated: nextUpdated(existing),
+    });
+  }
+  const evidenceParent =
+    gesture.argument === undefined || gesture.row.sourceParent === undefined
+      ? undefined
+      : getNode(
+          plan.knowledgeDBs,
+          gesture.row.sourceParent.id,
+          gesture.row.sourceParent.sourceId
+        );
+  const scope = getWorkspaceNode(plan.knowledgeDBs, gesture.row.scope);
+  if (!scope) {
+    return plan;
+  }
+  const [withParent, parent] = evidenceParent
+    ? placementTarget(scope) === evidenceParent.id
+      ? [plan, scope]
+      : ensurePlacement(
+          plan,
+          scope.id,
+          evidenceParent.id,
+          nodeText(evidenceParent),
+          undefined,
+          undefined
+        )
+    : [plan, scope];
+  if (!parent) {
+    return plan;
+  }
+  const parentPath = getParentView(gesture.path);
+  const withParentViews =
+    evidenceParent && parentPath && parent.id !== evidenceParent.id
+      ? migrateViews(withParent, parentPath, parent.id)
+      : withParent;
+  const [withRow, row] = ensurePlacement(
+    withParentViews,
+    parent.id,
+    gesture.row.target ?? gesture.row.id,
+    gesture.row.text,
+    gesture.relevance,
+    gesture.argument
+  );
+  const updated =
+    row && rewording ? planUpdateNodeSpans(withRow, row.id, spans) : withRow;
+  return row && row.id !== gesture.row.id
+    ? migrateViews(updated, gesture.path, row.id)
+    : updated;
+}
+
+function move(plan: Plan, gesture: Extract<Gesture, { kind: "move" }>): Plan {
+  const [withParent, parent] = localParentFor(plan, gesture.parent);
+  if (!parent) {
+    return plan;
+  }
+  const parentPlan =
+    parent.id === gesture.parent.id
+      ? withParent
+      : migrateViews(withParent, gesture.parentPath, parent.id);
+  const materialized = gesture.rows.reduce(
+    (current, entry) => {
+      const existing =
+        entry.row.reader && entry.row.ref.sourceId === LOCAL
+          ? getWorkspaceNode(current.plan.knowledgeDBs, entry.row.id)
+          : undefined;
+      const [withRow, node] = existing
+        ? [current.plan, existing]
+        : ensurePlacement(
+            current.plan,
+            parent.id,
+            entry.row.target ?? entry.row.id,
+            entry.row.text,
+            entry.row.node.relevance,
+            entry.row.node.argument
+          );
+      if (!node) {
+        return current;
+      }
+      const moved = moveLocalNode(withRow, node, parent, current.afterID);
+      const currentParent = getWorkspaceNode(moved.knowledgeDBs, parent.id);
+      const index = currentParent?.children.indexOf(node.id) ?? -1;
+      const withViews =
+        currentParent && index >= 0
+          ? migrateViewPath(
+              moved,
+              entry.path,
+              addNodeToPathWithNodes(gesture.parentPath, currentParent, index)
+            )
+          : moved;
+      return {
+        plan: withViews,
+        ids: new globalThis.Map([...current.ids, [entry.row.id, node.id]]),
+        afterID: node.id,
+      };
+    },
+    {
+      plan: parentPlan,
+      ids: new globalThis.Map<ID, ID>(),
+      afterID: gesture.after?.reader ? gesture.after.id : undefined,
+    }
+  );
+  return positionRows(
+    materialized.plan,
+    gesture.parent,
+    gesture.rows.map((entry) => entry.row),
+    materialized.ids,
+    gesture.after
+  );
+}
+
+export function applyGesture(plan: Plan, gesture: Gesture): Plan {
+  if (gesture.kind === "judge") {
+    return judge(plan, gesture);
+  }
+  if (gesture.kind === "dismiss") {
+    return judge(plan, {
+      kind: "judge",
+      row: gesture.row,
+      path: gesture.path,
+      relevance: "not_relevant",
+      argument: gesture.row.argument,
+      spans: gesture.spans,
+    });
+  }
+  if (gesture.kind === "move") {
+    return move(plan, gesture);
+  }
+  if (gesture.kind === "place") {
+    const [withParent, parent] = localParentFor(plan, gesture.parent);
+    return parent
+      ? ensurePlacement(
+          withParent,
+          parent.id,
+          gesture.row.target ?? gesture.row.id,
+          gesture.row.text,
+          gesture.row.relevance,
+          gesture.row.argument
+        )[0]
+      : plan;
+  }
+  const existing =
+    gesture.row.reader && gesture.row.ref.sourceId === LOCAL
+      ? getWorkspaceNode(plan.knowledgeDBs, gesture.row.id)
+      : undefined;
+  const scope = getWorkspaceNode(plan.knowledgeDBs, gesture.row.scope);
+  if (!scope) {
+    return plan;
+  }
+  const [materialized, node] = existing
+    ? [plan, existing]
+    : ensurePlacement(
+        plan,
+        scope.id,
+        gesture.row.target ?? gesture.row.id,
+        gesture.row.text,
+        gesture.row.relevance,
+        gesture.row.argument
+      );
+  if (!node) {
+    return plan;
+  }
+  const withSpans = planUpdateNodeSpans(
+    materialized,
+    node.id,
+    rewordingSpans(gesture.row, gesture.spans)
+  );
+  return node.id !== gesture.row.id
+    ? migrateViews(withSpans, gesture.path, node.id)
+    : withSpans;
+}
 
 function soleEmbedLinkHref(spans: InlineSpan[]): string | undefined {
   const span =
@@ -111,7 +546,7 @@ export function planUpdateNodeSpans(
     ...(stampEmbed && {
       extraAttrs: { ...currentNode.extraAttrs, embed: "true" },
     }),
-    updated: Date.now(),
+    updated: nextUpdated(currentNode),
   });
 }
 

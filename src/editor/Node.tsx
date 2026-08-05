@@ -58,6 +58,7 @@ import { planMaterializeComputedRow } from "../core/plan";
 import { getWorkspaceNode } from "../core/knowledge";
 import {
   Plan,
+  applyGesture,
   usePlanner,
   planSetEmptyNodePosition,
   planSaveNodeAndEnsureNodes,
@@ -457,6 +458,9 @@ function InlineSpans({
       {node.spans.map((span, index) => {
         const key = `${index}-${span.kind}-${span.text}`;
         if (span.kind === "link") {
+          if (span.struck === true) {
+            return null;
+          }
           return (
             <InlineLinkSpan
               key={key}
@@ -568,7 +572,28 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       viewKey: viewPathToString(targetViewPath),
     });
 
-  const editorSpans = currentNode.spans;
+  const rewordEditing =
+    row.composed !== undefined &&
+    (row.projected === true ||
+      ((row.composed.kind === "placement" ||
+        row.composed.kind === "speaking") &&
+        row.composed.target !== undefined &&
+        classifyLinkHref(`#${row.composed.target}`) === "node"));
+  const bondHref = `#${row.composed?.target ?? row.node.id}`;
+  const editorSpans: InlineSpan[] = (() => {
+    if (!rewordEditing) {
+      return currentNode.spans;
+    }
+    if (
+      embeddedTarget(currentNode) !== undefined &&
+      row.standsFor?.liveText !== undefined
+    ) {
+      return [{ kind: "link", href: bondHref, text: row.standsFor.liveText }];
+    }
+    return currentNode.spans.filter(
+      (span) => !(span.kind === "link" && span.struck === true)
+    );
+  })();
   const feedUrl = calendarFeedUrl(currentNode);
   const calendarContent =
     feedUrl !== undefined ||
@@ -601,6 +626,22 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
     submitted?: boolean
   ): Promise<void> => {
     const nextSpans = persistedSpans(spans);
+    if (rewordEditing && row.composed) {
+      const unchanged =
+        spansText(nextSpans).trim() === row.composed.text.trim();
+      if (unchanged) {
+        return;
+      }
+      await executePlan(
+        applyGesture(createPlan(), {
+          kind: "reword",
+          row: row.composed,
+          path: row.viewPath,
+          spans: nextSpans,
+        })
+      );
+      return;
+    }
     // Write gestures take first; read gestures read. A computed row's
     // save materializes the row before the text lands — and an unchanged
     // text writes nothing at all (blur/Escape must not take).
@@ -942,6 +983,15 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
         onActivateLink={handleActivateLink}
         entityPicker={{ fetchEntityMetadata }}
       />
+      {rewordEditing &&
+        !editorSpans.some((span) => span.kind === "link") &&
+        reciprocals[0] !== undefined && (
+          <IncomingPart
+            relevance={reciprocals[0].relevance}
+            argument={reciprocals[0].argument}
+            ariaHidden
+          />
+        )}
     </>
   );
 }
@@ -960,7 +1010,7 @@ function InteractiveNodeContent({ rows }: { rows: List<Row> }): JSX.Element {
     isInSearchView ||
     isViewingOtherUserContent ||
     virtualType !== undefined ||
-    row.projected === true;
+    (row.projected === true && row.composed === undefined);
 
   if (isLoading) {
     return <LoadingNode />;
@@ -975,17 +1025,7 @@ function InteractiveNodeContent({ rows }: { rows: List<Row> }): JSX.Element {
     return <ErrorContent />;
   }
 
-  // A node-target embed row displays the target's live text; its stored
-  // label is a frozen machine record. Typing gets its meaning in 3.4b as
-  // the rewording gesture — until then the row's text is not editable.
-  // Calendar feed names and entity occurrence labels stay the user's
-  // wording and keep their editor.
-  const embedTargetID = embeddedTarget(row.node);
-  const displaysLiveTarget =
-    embedTargetID !== undefined &&
-    classifyLinkHref(`#${embedTargetID}`) === "node";
-
-  if (isEditableNode(currentNode) && !isReadonly && !displaysLiveTarget) {
+  if (isEditableNode(currentNode) && !isReadonly) {
     return <EditableContent rows={rows} />;
   }
 

@@ -453,7 +453,8 @@ export function useDroppable({
         dragItem,
         paneIndex,
         dropDestination.parentRow,
-        dropIndex
+        dropIndex,
+        dropDestination.anchorRow
       );
       executePlan(
         planSetTemporarySelectionState(dropped, {

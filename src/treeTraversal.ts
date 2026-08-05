@@ -46,6 +46,7 @@ import {
   graphLookupFromData,
   lookupNode,
 } from "./core/graphLookup";
+import { ComposedRow, composeNote } from "./core/composition";
 
 export type TreeResult = {
   rows: List<Row>;
@@ -70,6 +71,13 @@ function sourceIdForPath(data: Data, path: ViewPath): SourceId {
 function expansionPathOf(viewPath: ViewPath): ID[] {
   const [, ...segments] = viewPath;
   return segments;
+}
+
+function appendNodeToPath(
+  [paneIndex, ...segments]: ViewPath,
+  nodeID: ID
+): ViewPath {
+  return [paneIndex, ...segments, nodeID];
 }
 
 function footerVisibleSources(
@@ -198,6 +206,134 @@ function createRow(
   };
 }
 
+function locateComposedRow(root: ComposedRow, id: ID): ComposedRow | undefined {
+  if (root.id === id) {
+    return root;
+  }
+  return root.children.reduce<ComposedRow | undefined>(
+    (found, child) => found ?? locateComposedRow(child, id),
+    undefined
+  );
+}
+
+export function composedRowForViewPath(
+  data: Data,
+  graph: GraphLookup,
+  viewPath: ViewPath
+): ComposedRow | undefined {
+  const sourceId = sourceIdForPath(data, viewPath);
+  const segments = expansionPathOf(viewPath);
+  return segments.reduce<ComposedRow | undefined>((found, segment, index) => {
+    if (found || isSearchId(segment) || isEmptyViewPathID(segment)) {
+      return found;
+    }
+    const resolved = lookupNode(graph, segment, sourceId);
+    if (!resolved) {
+      return undefined;
+    }
+    const root = getNodeInSource(graph, {
+      sourceId: resolved.ref.sourceId,
+      id: resolved.node.root,
+    });
+    if (!root) {
+      return undefined;
+    }
+    const start = locateComposedRow(composeNote(graph, root.ref).root, segment);
+    return segments
+      .slice(index + 1)
+      .reduce<ComposedRow | undefined>(
+        (row, id) => row?.children.find((child) => child.id === id),
+        start
+      );
+  }, undefined);
+}
+
+function graphParent(
+  graph: GraphLookup,
+  composed: ComposedRow
+): ResolvedNode | undefined {
+  if (composed.reader && composed.writtenParent !== undefined) {
+    return getNodeInSource(graph, {
+      sourceId: composed.ref.sourceId,
+      id: composed.writtenParent,
+    });
+  }
+  return composed.sourceParent
+    ? getNodeInSource(graph, composed.sourceParent)
+    : undefined;
+}
+
+function rowFromComposed(
+  data: Data,
+  graph: GraphLookup,
+  parentRow: Row,
+  composed: ComposedRow
+): Row {
+  const viewPath = appendNodeToPath(parentRow.viewPath, composed.id);
+  const parent = graphParent(graph, composed);
+  const childIndex =
+    composed.reader && parent
+      ? parent.node.children.findIndex((id) => id === composed.id)
+      : -1;
+  const row = createRow(
+    data,
+    graph,
+    viewPath,
+    composed.node,
+    composed.ref.sourceId,
+    parentRow,
+    parentRow.node,
+    parentRow.ref,
+    childIndex >= 0 ? childIndex : undefined,
+    false,
+    undefined
+  );
+  const standsFor =
+    composed.target === undefined ||
+    (composed.kind !== "placement" && composed.kind !== "speaking")
+      ? undefined
+      : { id: composed.target, liveText: composed.text };
+  return {
+    ...row,
+    ref: composed.ref,
+    sourceId: composed.ref.sourceId,
+    node: {
+      ...composed.node,
+      relevance: composed.relevance,
+      argument: composed.argument,
+    },
+    view: getViewForNode(data, viewPath, composed.id),
+    composed,
+    ...(standsFor && { standsFor }),
+    projected: composed.reader ? undefined : true,
+  };
+}
+
+function attachComposedRow(data: Data, graph: GraphLookup, row: Row): Row {
+  const composed = composedRowForViewPath(data, graph, row.viewPath);
+  if (!composed) {
+    return row;
+  }
+  const standsFor =
+    composed.target === undefined ||
+    (composed.kind !== "placement" && composed.kind !== "speaking")
+      ? undefined
+      : { id: composed.target, liveText: composed.text };
+  return {
+    ...row,
+    node: {
+      ...composed.node,
+      relevance: composed.relevance,
+      argument: composed.argument,
+    },
+    ref: composed.ref,
+    sourceId: composed.ref.sourceId,
+    composed,
+    ...(standsFor && { standsFor }),
+    projected: composed.reader ? undefined : true,
+  };
+}
+
 function reindexRows(rows: List<Row>): List<Row> {
   return rows.map((row, index) => ({
     ...row,
@@ -254,6 +390,32 @@ function resolveRowForPath(
     return undefined;
   }
   const pathID = segments[segments.length - 1];
+  const composed = composedRowForViewPath(data, graph, viewPath);
+  if (composed) {
+    const parentPath = getParentView(viewPath);
+    const composedParent =
+      parentRow ??
+      (parentPath
+        ? resolveRowForPath(data, graph, parentPath, undefined, options)
+        : undefined);
+    if (composedParent) {
+      return rowFromComposed(data, graph, composedParent, composed);
+    }
+    const root = createRow(
+      data,
+      graph,
+      viewPath,
+      composed.node,
+      composed.ref.sourceId,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      false,
+      undefined
+    );
+    return attachComposedRow(data, graph, root);
+  }
   if (segments.length === 1 && options?.projectedRoot?.id === pathID) {
     const row = createRow(
       data,
@@ -402,10 +564,6 @@ function createVirtualRowNode(
     },
     sourceId: incomingRow?.ref.sourceId ?? input.parentSourceId,
   };
-}
-
-function appendNodeToPath(path: ViewPath, nodeID: ID): ViewPath {
-  return [path[0], ...path.slice(1), nodeID] as ViewPath;
 }
 
 function incomingTakeTarget(
@@ -902,56 +1060,38 @@ function getIncomingGroupChildren(
   };
 }
 
-// The embed projection at row level (idea.md: an embed means "that node,
-// here" and shows the target's live text and children). Graph-only walks
-// from the displayed row — no pane or document lookups — so it works in
-// every surface. Composition terminates when an id repeats on the active
-// expansion path.
-function getProjectedGraphChildren(
+function spliceEmptyRows(
   data: Data,
   graph: GraphLookup,
   parentRow: Row,
-  typeFilters: Pane["typeFilters"]
+  rows: List<Row>
 ): List<Row> {
-  const targetID = embeddedTarget(parentRow.node);
-  if (targetID === undefined) {
-    return List<Row>();
-  }
-  const target = lookupNode(graph, targetID, parentRow.ref.sourceId);
-  if (!target) {
-    return List<Row>();
-  }
-  const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
-  const expansionPath = expansionPathOf(parentRow.viewPath);
-  const parentPath = addNodesToLastElement(
-    parentRow.viewPath,
-    parentRow.node.id
-  );
-  return target.node.children
-    .filter(
-      (childID) => childID !== EMPTY_NODE_ID && !expansionPath.includes(childID)
-    )
-    .map((childID) =>
-      getNodeInSource(graph, { sourceId: target.ref.sourceId, id: childID })
-    )
-    .filter((child): child is ResolvedNode => child !== undefined)
-    .filter((child) => itemPassesFilters(child.node, activeFilters))
-    .map((child) =>
-      createRow(
-        data,
-        graph,
-        appendNodeToPath(parentPath, child.node.id),
-        child.node,
-        child.ref.sourceId,
-        parentRow,
-        target.node,
-        target.ref,
-        undefined,
-        false,
-        undefined
-      )
-    )
-    .toList();
+  return parentRow.node.children.toArray().reduce((current, id, index) => {
+    if (id !== EMPTY_NODE_ID) {
+      return current;
+    }
+    const empty = createChildRow(
+      data,
+      graph,
+      parentRow,
+      parentRow.node,
+      parentRow.ref,
+      id,
+      index
+    );
+    if (!empty) {
+      return current;
+    }
+    const preceding = parentRow.node.children.slice(0, index).reverse();
+    const anchor = preceding.reduce<number>(
+      (found, candidate) =>
+        found >= 0
+          ? found
+          : current.findIndex((row) => row.node.id === candidate),
+      -1
+    );
+    return current.insert(anchor + 1, empty);
+  }, rows);
 }
 
 function getChildrenForRegularNode(
@@ -1007,12 +1147,27 @@ function getChildrenForRegularNode(
     return { rows: childRows };
   }
 
-  const combinedRows = getProjectedGraphChildren(
-    data,
-    graph,
-    parentRow,
-    typeFilters
-  ).concat(childRows);
+  const combinedRows = parentRow.composed
+    ? spliceEmptyRows(
+        data,
+        graph,
+        parentRow,
+        List(
+          parentRow.composed.children
+            .filter((child) =>
+              itemPassesFilters(
+                {
+                  ...child.node,
+                  relevance: child.relevance,
+                  argument: child.argument,
+                },
+                activeFilters
+              )
+            )
+            .map((child) => rowFromComposed(data, graph, parentRow, child))
+        )
+      )
+    : childRows;
 
   if (!isFileRow(parentRow)) {
     return { rows: combinedRows };

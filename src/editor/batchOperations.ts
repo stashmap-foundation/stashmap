@@ -5,7 +5,12 @@ import {
   addNodesToLastElement,
   viewPathToString,
 } from "../rowModel";
-import { Plan, planExpandNode, planUpdateNodeSpans } from "../planner";
+import {
+  Plan,
+  applyGesture,
+  planExpandNode,
+  planUpdateNodeSpans,
+} from "../planner";
 import {
   planUpdateViewItemMetadata,
   NodeItemMetadata,
@@ -49,10 +54,27 @@ function planUpdateOneMetadata(
   metadata: NodeItemMetadata,
   editorSpans: InlineSpan[] | undefined
 ): Plan {
-  // Projected embed content is readonly: a judgment there must never
-  // write through to the source node.
-  if (row.projected) {
-    return acc;
+  if (row.composed) {
+    if (metadata.relevance === "not_relevant") {
+      return applyGesture(acc, {
+        kind: "dismiss",
+        row: row.composed,
+        path: row.viewPath,
+        spans: editorSpans ?? row.node.spans,
+      });
+    }
+    return applyGesture(acc, {
+      kind: "judge",
+      row: row.composed,
+      path: row.viewPath,
+      relevance:
+        "relevance" in metadata
+          ? metadata.relevance
+          : row.composed.node.relevance,
+      argument:
+        "argument" in metadata ? metadata.argument : row.composed.node.argument,
+      spans: editorSpans ?? row.node.spans,
+    });
   }
   // Write gestures take first: a computed row materializes with the
   // judgment applied at creation — one plan, one save.

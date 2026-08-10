@@ -84,9 +84,14 @@ Note
   `;
   await expectTree(expected, { showGutter: true });
   await expectSourceUnchanged(workspacePath, sourceBefore);
-  const note = readOverlayFile(workspacePath, "note.md");
-  expect(note.match(/\[B\]\(#b\)/gu)).toHaveLength(1);
-  expect(note).not.toMatch(/^\s+- \([^)]*[+-][^)]*\) \[B\]\(#b\)/mu);
+  await waitFor(() =>
+    expect(
+      readOverlayFile(workspacePath, "note.md").match(/\[B\]\(#b\)/gu)
+    ).toHaveLength(1)
+  );
+  expect(readOverlayFile(workspacePath, "note.md")).not.toMatch(
+    /^\s+- \([^)]*[+-][^)]*\) \[B\]\(#b\)/mu
+  );
   await expectOverlayTreeAfterReload(workspacePath, expected, true);
 }
 

@@ -12,6 +12,7 @@ import {
 } from "./core/connections";
 import { isCanonicalId } from "./core/entityRecognition";
 import { nodeText } from "./core/nodeSpans";
+import { graphLookupFromData, lookupNode } from "./core/graphLookup";
 import { EditorNavigationTarget } from "./editor/linkOperations";
 import { searchTargetID } from "./localSearch";
 
@@ -189,11 +190,43 @@ export function resolveRowView(
 }
 
 export function buildPaneTarget(data: Data, row: Row): EditorNavigationTarget {
+  const composedPlacement =
+    row.composed?.kind === "placement" || row.composed?.kind === "speaking";
+  const terminalTarget =
+    composedPlacement &&
+    row.composed?.flags.some(
+      (flag) =>
+        flag === "cycle" || flag === "dangling" || flag === "orphan-source"
+    )
+      ? row.composed.chain[row.composed.chain.length - 1]
+      : undefined;
   const targetID =
-    row.virtualType === "search" ? searchTargetID(row.node) : row.reference?.id;
-  const refInfo = targetID
-    ? getRefTargetInfo(targetID, data.knowledgeDBs, row.sourceId)
+    row.virtualType === "search"
+      ? searchTargetID(row.node)
+      : row.reference?.id ?? terminalTarget;
+  const targetSourceId =
+    terminalTarget === undefined
+      ? row.sourceId
+      : row.composed?.sourceParent?.sourceId ?? row.sourceId;
+  const resolvedTarget = terminalTarget
+    ? lookupNode(graphLookupFromData(data), terminalTarget, targetSourceId)
     : undefined;
+  const refInfo = targetID
+    ? getRefTargetInfo(
+        targetID,
+        data.knowledgeDBs,
+        resolvedTarget?.ref.sourceId ?? targetSourceId
+      )
+    : undefined;
+  if (terminalTarget !== undefined && resolvedTarget === undefined) {
+    return isCanonicalId(terminalTarget)
+      ? {
+          sourceId: targetSourceId,
+          rootNodeId: terminalTarget,
+          fallbackLabel: nodeText(row.node),
+        }
+      : { sourceId: targetSourceId };
+  }
   return refInfo
     ? {
         sourceId: refInfo.sourceId,

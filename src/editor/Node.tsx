@@ -34,6 +34,7 @@ import {
   spansToMarkdown,
 } from "../core/nodeSpans";
 import { classifyLinkHref, externalLinkUrl } from "../core/linkPath";
+import { isCanonicalId } from "../core/entityRecognition";
 import {
   calendarEntryTarget,
   calendarFeedHref,
@@ -297,6 +298,18 @@ function reciprocalLinks(
   }, initial).links;
 }
 
+function hasBrokenTarget(row: Row): boolean {
+  const terminal = row.composed?.chain[row.composed.chain.length - 1];
+  return (
+    (row.composed?.kind === "placement" || row.composed?.kind === "speaking") &&
+    terminal !== undefined &&
+    !isCanonicalId(terminal) &&
+    row.composed.flags.some(
+      (flag) => flag === "dangling" || flag === "orphan-source"
+    )
+  );
+}
+
 function InlineLinkSpan({
   span,
   node,
@@ -324,7 +337,8 @@ function InlineLinkSpan({
     (calendarFeedUrl(node) !== undefined ||
       (row.standsFor !== undefined && isCalendarEntryId(row.standsFor.id)));
   const externalUrl = calendarContent ? undefined : externalLinkUrl(span.href);
-  const dead = isDeadLinkTarget(data, span.href, node, sourceId);
+  const dead =
+    hasBrokenTarget(row) || isDeadLinkTarget(data, span.href, node, sourceId);
   const internalHref =
     dead || calendarContent
       ? undefined
@@ -601,7 +615,8 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
   const reciprocals = reciprocalLinks(data, row.node, row.sourceId);
   const deadLinkIndexes = editorSpans.flatMap((span, index) =>
     span.kind === "link" &&
-    isDeadLinkTarget(data, span.href, row.node, row.sourceId)
+    (hasBrokenTarget(row) ||
+      isDeadLinkTarget(data, span.href, row.node, row.sourceId))
       ? [index]
       : []
   );

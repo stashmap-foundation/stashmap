@@ -491,8 +491,59 @@ function judge(plan: Plan, gesture: Extract<Gesture, { kind: "judge" }>): Plan {
     : withRow;
 }
 
+function repairSourceDependents(
+  plan: Plan,
+  rows: Extract<Gesture, { kind: "move" }>["rows"]
+): Plan {
+  const moved = new globalThis.Set(rows.map((entry) => entry.row));
+  const repairs = rows
+    .flatMap((entry) => {
+      const seats = [
+        entry.row.id,
+        ...(entry.row.target ? [entry.row.target] : []),
+      ];
+      return (entry.sourceParent?.children ?? [])
+        .filter(
+          (candidate) =>
+            !moved.has(candidate) &&
+            !candidate.flags.includes("ambiguous-anchor") &&
+            !candidate.flags.includes("lapsed") &&
+            candidate.node.extraAttrs?.after !== undefined &&
+            seats.includes(candidate.node.extraAttrs.after)
+        )
+        .map((dependent) => ({
+          dependent,
+          predecessor: entry.predecessor,
+        }));
+    })
+    .filter(
+      (repair, index, all) =>
+        all.findIndex(
+          (candidate) => candidate.dependent === repair.dependent
+        ) === index
+    );
+  return repairs.reduce((current, repair) => {
+    const node =
+      repair.dependent.reader && repair.dependent.ref.sourceId === LOCAL
+        ? getWorkspaceNode(current.knowledgeDBs, repair.dependent.id)
+        : undefined;
+    if (!node) {
+      return current;
+    }
+    const position: Record<string, string> = repair.predecessor
+      ? { after: repair.predecessor.target ?? repair.predecessor.id }
+      : { front: "true" };
+    return planUpsertNodes(current, {
+      ...node,
+      extraAttrs: { ...clearPosition(node.extraAttrs), ...position },
+      updated: nextUpdated(node),
+    });
+  }, plan);
+}
+
 function move(plan: Plan, gesture: Extract<Gesture, { kind: "move" }>): Plan {
-  const [withParent, parent] = localParentFor(plan, gesture.parent);
+  const repaired = repairSourceDependents(plan, gesture.rows);
+  const [withParent, parent] = localParentFor(repaired, gesture.parent);
   if (!parent) {
     return plan;
   }
@@ -509,8 +560,8 @@ function move(plan: Plan, gesture: Extract<Gesture, { kind: "move" }>): Plan {
             parent.id,
             entry.row.target ?? entry.row.id,
             entry.row.text,
-            entry.row.node.relevance,
-            entry.row.node.argument
+            entry.row.reader ? entry.row.node.relevance : undefined,
+            entry.row.reader ? entry.row.node.argument : undefined
           );
       if (!node) {
         return current;

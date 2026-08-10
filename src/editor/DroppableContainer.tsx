@@ -27,6 +27,7 @@ import {
 type DragItemType = {
   row: Row;
   draggedRows: Row[];
+  orderedRows: List<Row>;
   sourcePaneIndex: number;
   isCopyDrag?: boolean;
   nodeId?: ID;

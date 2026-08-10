@@ -1232,7 +1232,7 @@ Note
   });
 });
 
-test("moving a row re-anchors the claims that pointed at it", async () => {
+test("moving a source row re-anchors claims that pointed at it", async () => {
   const workspacePath = writeWorkspace({
     "note.md": [
       "# Note <!-- id:note -->",
@@ -1245,9 +1245,9 @@ test("moving a row re-anchors the claims that pointed at it", async () => {
       "- Spain <!-- id:sp -->",
       "  - Barcelona <!-- id:bc -->",
       "    - Gaudi <!-- id:g -->",
-      "      - Sagrada Familia <!-- id:sf -->",
+      "      - (!) Sagrada Familia <!-- id:sf -->",
       "      - Casa Battlo <!-- id:cb -->",
-      "      - Casa Mila <!-- id:cm -->",
+      "      - (+~) Casa Mila <!-- id:cm -->",
     ].join("\n"),
   });
 
@@ -1262,44 +1262,51 @@ test("moving a row re-anchors the claims that pointed at it", async () => {
   fireEvent.dragStart(
     screen.getByRole("treeitem", { name: "Sagrada Familia" })
   );
-  fireEvent.drop(screen.getByRole("treeitem", { name: "Casa Battlo" }));
-
-  await expectTree(`
-Note
-  Art Noveau
-    Spain
-      Barcelona
-        Gaudi
-          Casa Battlo
-          Sagrada Familia
-          Casa Mila
-  `);
-
-  fireEvent.dragStart(screen.getByRole("treeitem", { name: "Casa Battlo" }));
   fireEvent.drop(screen.getByRole("treeitem", { name: "Casa Mila" }));
 
-  await expectTree(`
+  await expectTree(
+    `
 Note
   Art Noveau
     Spain
       Barcelona
         Gaudi
-          Sagrada Familia
-          Casa Mila
           Casa Battlo
-  `);
+          {~+} Casa Mila
+          {!} Sagrada Familia
+  `,
+    { showGutter: true }
+  );
+
+  fireEvent.dragStart(screen.getByRole("treeitem", { name: "Casa Mila" }));
+  setDropIndentLevel("Casa Mila", "Spain", 4);
+  fireEvent.drop(screen.getByRole("treeitem", { name: "Spain" }));
+
+  await expectTree(
+    `
+Note
+  Art Noveau
+    Spain
+      {~+} Casa Mila
+      Barcelona
+        Gaudi
+          Casa Battlo
+          {!} Sagrada Familia
+  `,
+    { showGutter: true }
+  );
 
   await waitFor(() => {
     const note = fs.readFileSync(pathModule.join(workspacePath, "note.md"), {
       encoding: "utf8",
     });
     expect(note).toMatch(
-      /- \[Sagrada Familia\]\(#sf\) <!-- id:\S+ embed="true" front="true" -->/u
+      /- \[Sagrada Familia\]\(#sf\) <!-- id:\S+ embed="true" after="cb" -->/u
     );
     expect(note).toMatch(
-      /- \[Casa Battlo\]\(#cb\) <!-- id:\S+ embed="true" after="cm" -->/u
+      /- \[Casa Mila\]\(#cm\) <!-- id:\S+ embed="true" front="true" -->/u
     );
-    expect(note).not.toMatch(/\[Sagrada Familia\][^\n]*after=/u);
+    expect(note).not.toMatch(/\[Sagrada Familia\][^\n]*after="cm"/u);
   });
 });
 
@@ -2290,6 +2297,112 @@ Note
 ${Array.from({ length: 15 }, (_, index) => `    Row ${14 - index}`).join("\n")}
   `);
 });
+
+test.each([
+  {
+    destination: "Spain",
+    depth: 4,
+    expectedTree: `
+Note
+  Art Noveau
+    Spain
+      {~+} Casa Mila (La Pedrera)
+      Barcelona
+        Gaudi
+          {!} Sagrada Familia
+          Casa Battlo
+  `,
+  },
+  {
+    destination: "Barcelona",
+    depth: 5,
+    expectedTree: `
+Note
+  Art Noveau
+    Spain
+      Barcelona
+        {~+} Casa Mila (La Pedrera)
+        Gaudi
+          {!} Sagrada Familia
+          Casa Battlo
+  `,
+  },
+])(
+  "moving marked Casa Mila into $destination does not leave its source copy",
+  async ({ destination, depth, expectedTree }) => {
+    const source = [
+      "- Art Noveau <!-- id:art -->",
+      "  - Spain <!-- id:sp -->",
+      "    - Barcelona <!-- id:bc -->",
+      "      - Gaudi <!-- id:g -->",
+      "        - (!) Sagrada Familia <!-- id:sf -->",
+      "        - Casa Battlo <!-- id:cb -->",
+      "        - (+~) Casa Mila (La Pedrera) <!-- id:cm -->",
+      "- Austria <!-- id:at -->",
+    ].join("\n");
+    const workspacePath = writeWorkspace({
+      "note.md": "# Note <!-- id:note -->",
+      "art.md": source,
+    });
+    await renderAppTree({
+      path: workspacePath,
+      initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+    });
+    await screen.findByRole("treeitem", { name: "Note" });
+    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+    await navigateToNodeViaSearch(0, "Art Noveau");
+    await openNodeInFullscreen(0, "Art Noveau");
+    await navigateToNodeViaSearch(1, "Note");
+    await openNodeInFullscreen(1, "Note");
+
+    fireEvent.dragStart(
+      getPane(0).getByRole("treeitem", { name: "Art Noveau" })
+    );
+    fireEvent.drop(getPane(1).getByRole("treeitem", { name: "Note" }));
+    await userEvent.click(getPane(0).getByLabelText("Close pane"));
+    const [embeddedRoot] = await screen.findAllByRole("treeitem");
+    await userEvent.click(embeddedRoot);
+    await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+    fireEvent.dragStart(
+      screen.getByRole("treeitem", { name: "Casa Mila (La Pedrera)" })
+    );
+    setDropIndentLevel("Casa Mila (La Pedrera)", destination, depth);
+    fireEvent.drop(screen.getByRole("treeitem", { name: destination }));
+
+    await expectTree(expectedTree, { showGutter: true });
+    expect(
+      screen.getAllByRole("treeitem", { name: "Casa Mila (La Pedrera)" })
+    ).toHaveLength(1);
+    await waitFor(() => {
+      const persistedSource = fs.readFileSync(
+        pathModule.join(workspacePath, "art.md"),
+        "utf8"
+      );
+      expect(
+        persistedSource.slice(persistedSource.indexOf("- Art Noveau")).trimEnd()
+      ).toBe(source);
+      const note = fs.readFileSync(pathModule.join(workspacePath, "note.md"), {
+        encoding: "utf8",
+      });
+      expect(note.match(/\(#cm\)/gu)).toHaveLength(1);
+      expect(note).toMatch(
+        /- \[Casa Mila \(La Pedrera\)\]\(#cm\)[^\n]*front="true"/u
+      );
+      expect(note).not.toMatch(/\(\+~\) \[Casa Mila \(La Pedrera\)\]\(#cm\)/u);
+    });
+
+    cleanup();
+    await renderAppTree({
+      path: workspacePath,
+      initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+    });
+    const [root] = await screen.findAllByRole("treeitem");
+    await userEvent.click(root);
+    await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+    await expectTree(expectedTree, { showGutter: true });
+  }
+);
 
 test("dropping at the front demotes the previous front claim", async () => {
   const workspacePath = writeWorkspace({

@@ -73,7 +73,12 @@ export type Gesture =
     }
   | {
       kind: "move";
-      rows: { row: ComposedRow; path: readonly [number, ...ID[]] }[];
+      rows: {
+        row: ComposedRow;
+        sourceParent: ComposedRow | undefined;
+        predecessor: ComposedRow | undefined;
+        path: readonly [number, ...ID[]];
+      }[];
       parent: ComposedRow;
       parentPath: readonly [number, ...ID[]];
       after: ComposedRow | undefined;

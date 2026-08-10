@@ -29,6 +29,7 @@ import { decodePublicKeyInputSync } from "./infra/nostr/publicKeys";
 type DragSource = {
   row: Row;
   draggedRows: Row[];
+  orderedRows: List<Row>;
   sourcePaneIndex: number;
   text?: string;
   isCopyDrag?: boolean;
@@ -348,13 +349,35 @@ export function dnd(
           row.composed?.kind === "speaking"
       ));
   if (composedMove && targetParentRow.composed) {
+    const moved = new globalThis.Set(composedRows);
+    const rows = independentRows.flatMap((row) => {
+      if (!row.composed) {
+        return [];
+      }
+      const sourceParent = sourceDrag.orderedRows
+        .slice(0, row.index)
+        .reverse()
+        .find((candidate) => candidate.depth === row.depth - 1)?.composed;
+      const siblings = sourceParent?.children ?? [];
+      const index = siblings.indexOf(row.composed);
+      const predecessor = siblings
+        .slice(0, index)
+        .reverse()
+        .find((candidate) => !moved.has(candidate));
+      return [
+        {
+          row: row.composed,
+          sourceParent,
+          predecessor,
+          path: row.viewPath,
+        },
+      ];
+    });
     return applyGesture(
       planExpandNode(basePlan, targetParentRow.view, targetParentRow.viewPath),
       {
         kind: "move",
-        rows: independentRows.flatMap((row) =>
-          row.composed ? [{ row: row.composed, path: row.viewPath }] : []
-        ),
+        rows,
         parent: targetParentRow.composed,
         parentPath: targetParentRow.viewPath,
         after: dropAnchor?.composed,

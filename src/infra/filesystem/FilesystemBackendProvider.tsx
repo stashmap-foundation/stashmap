@@ -69,12 +69,12 @@ export function FilesystemBackendProvider({
 
   useEffect(() => {
     const controller = new AbortController();
-    ipc.load().then((data) => {
+    ipc.load().then(async (data) => {
+      if (data && ipc.ready) {
+        await ipc.ready().catch(() => undefined);
+      }
       if (!controller.signal.aborted) {
         setState({ status: "loaded", data });
-      }
-      if (data && ipc.ready) {
-        ipc.ready().catch(() => undefined);
       }
     });
     return () => controller.abort();

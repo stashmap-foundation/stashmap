@@ -41,6 +41,7 @@ import {
   updateView,
   getParentView,
   addNodeToPathWithNodes,
+  addNodesToLastElement,
   bulkUpdateViewPathsAfterAddNode,
   copyViewsWithNewPrefix,
   viewPathToString,
@@ -85,6 +86,10 @@ type WorkspacePlan = GraphPlan &
   };
 
 export type Plan = WorkspacePlan;
+
+function writeTarget(row: ComposedRow): ID {
+  return row.reader ? row.target ?? row.id : row.id;
+}
 
 function localPlacement(
   plan: Plan,
@@ -136,7 +141,7 @@ function localParentFor(
     ? ensurePlacement(
         plan,
         parent.id,
-        row.target ?? row.id,
+        writeTarget(row),
         row.text,
         undefined,
         undefined
@@ -212,6 +217,22 @@ function migrateViewPath(
   );
 }
 
+function migrateComposedViewPath(
+  plan: Plan,
+  row: ComposedRow,
+  source: ViewPath,
+  destination: ViewPath
+): Plan {
+  const migrated = migrateViewPath(plan, source, destination);
+  return row.target
+    ? migrateViewPath(
+        migrated,
+        addNodesToLastElement(source, row.target),
+        destination
+      )
+    : migrated;
+}
+
 function positionRows(
   plan: Plan,
   parent: ComposedRow,
@@ -244,11 +265,10 @@ function positionRows(
   ];
   const localIDFor = (row: ComposedRow): ID | undefined =>
     moved.get(row.id) ?? (row.reader ? row.id : undefined);
+  const anchorIDFor = (row: ComposedRow): ID => localIDFor(row) ?? row.id;
   const signatureAt = (index: number): string => {
     const predecessor = desired[index - 1];
-    return predecessor
-      ? `after:${predecessor.target ?? predecessor.id}`
-      : "front";
+    return predecessor ? `after:${anchorIDFor(predecessor)}` : "front";
   };
   const currentSignature = (node: GraphNode): string | undefined =>
     node.extraAttrs?.front === "true"
@@ -275,25 +295,26 @@ function positionRows(
     }
   });
   const expandAffected = (): void => {
-    const occupied = new globalThis.Set(
-      desired.flatMap((row, index) => {
-        const localID = localIDFor(row);
-        return localID !== undefined && affected.has(localID)
-          ? [signatureAt(index)]
-          : [];
-      })
-    );
+    const occupied = desired.flatMap((row, index) => {
+      const localID = localIDFor(row);
+      return localID !== undefined && affected.has(localID)
+        ? [desired[index - 1]]
+        : [];
+    });
     const displaced = desired.flatMap((row) => {
       const localID = localIDFor(row);
       const node =
         localID === undefined
           ? undefined
           : getWorkspaceNode(plan.knowledgeDBs, localID);
-      const signature = node ? currentSignature(node) : undefined;
-      return localID !== undefined &&
-        !affected.has(localID) &&
-        signature !== undefined &&
-        occupied.has(signature)
+      const occupies = occupied.some((predecessor) =>
+        predecessor
+          ? node?.extraAttrs?.after === predecessor.id ||
+            (node?.extraAttrs?.after !== undefined &&
+              predecessor.chain.includes(node.extraAttrs.after))
+          : node?.extraAttrs?.front === "true"
+      );
+      return localID !== undefined && !affected.has(localID) && occupies
         ? [localID]
         : [];
     });
@@ -316,7 +337,7 @@ function positionRows(
     const extraAttrs = predecessor
       ? {
           ...clearPosition(node.extraAttrs),
-          after: predecessor.target ?? predecessor.id,
+          after: anchorIDFor(predecessor),
         }
       : { ...clearPosition(node.extraAttrs), front: "true" };
     return currentSignature(node) === signatureAt(index)
@@ -354,7 +375,7 @@ function rewordingSpans(row: ComposedRow, spans: InlineSpan[]): InlineSpan[] {
       : [
           {
             kind: "link",
-            href: `#${row.target ?? row.id}`,
+            href: `#${writeTarget(row)}`,
             text: row.text.trim(),
             struck: true,
           },
@@ -448,7 +469,7 @@ function judge(plan: Plan, gesture: Extract<Gesture, { kind: "judge" }>): Plan {
     const [rebound, reboundRow] = ensurePlacement(
       withParent,
       parentLine.id,
-      gesture.row.target ?? gesture.row.id,
+      writeTarget(gesture.row),
       gesture.row.text,
       gesture.relevance,
       gesture.argument
@@ -478,13 +499,17 @@ function judge(plan: Plan, gesture: Extract<Gesture, { kind: "judge" }>): Plan {
   if (!parent) {
     return plan;
   }
+  const relevance =
+    gesture.relevance !== gesture.row.relevance ? gesture.relevance : undefined;
+  const argument =
+    gesture.argument !== gesture.row.argument ? gesture.argument : undefined;
   const [withRow, row] = ensurePlacement(
     withParent,
     parent.id,
-    gesture.row.target ?? gesture.row.id,
+    writeTarget(gesture.row),
     gesture.row.text,
-    gesture.relevance,
-    gesture.argument
+    relevance,
+    argument
   );
   return row && rewording
     ? planUpdateNodeSpans(withRow, row.id, spans)
@@ -531,7 +556,7 @@ function repairSourceDependents(
       return current;
     }
     const position: Record<string, string> = repair.predecessor
-      ? { after: repair.predecessor.target ?? repair.predecessor.id }
+      ? { after: repair.predecessor.id }
       : { front: "true" };
     return planUpsertNodes(current, {
       ...node,
@@ -547,6 +572,12 @@ function move(plan: Plan, gesture: Extract<Gesture, { kind: "move" }>): Plan {
   if (!parent) {
     return plan;
   }
+  const withParentView = migrateComposedViewPath(
+    withParent,
+    gesture.parent,
+    gesture.parentPath,
+    addNodesToLastElement(gesture.parentPath, parent.id)
+  );
   const materialized = gesture.rows.reduce(
     (current, entry) => {
       const existing =
@@ -558,7 +589,7 @@ function move(plan: Plan, gesture: Extract<Gesture, { kind: "move" }>): Plan {
         : ensurePlacement(
             current.plan,
             parent.id,
-            entry.row.target ?? entry.row.id,
+            writeTarget(entry.row),
             entry.row.text,
             entry.row.reader ? entry.row.node.relevance : undefined,
             entry.row.reader ? entry.row.node.argument : undefined
@@ -571,8 +602,9 @@ function move(plan: Plan, gesture: Extract<Gesture, { kind: "move" }>): Plan {
       const index = currentParent?.children.indexOf(node.id) ?? -1;
       const withViews =
         currentParent && index >= 0
-          ? migrateViewPath(
+          ? migrateComposedViewPath(
               moved,
+              entry.row,
               entry.path,
               addNodeToPathWithNodes(gesture.parentPath, currentParent, index)
             )
@@ -584,7 +616,7 @@ function move(plan: Plan, gesture: Extract<Gesture, { kind: "move" }>): Plan {
       };
     },
     {
-      plan: withParent,
+      plan: withParentView,
       ids: new globalThis.Map<ID, ID>(),
       afterID: gesture.after?.reader ? gesture.after.id : undefined,
     }
@@ -621,7 +653,7 @@ export function applyGesture(plan: Plan, gesture: Gesture): Plan {
       ? ensurePlacement(
           withParent,
           parent.id,
-          gesture.row.target ?? gesture.row.id,
+          writeTarget(gesture.row),
           gesture.row.text,
           gesture.row.relevance,
           gesture.row.argument
@@ -644,7 +676,7 @@ export function applyGesture(plan: Plan, gesture: Gesture): Plan {
     : ensurePlacement(
         plan,
         scope.id,
-        gesture.row.target ?? gesture.row.id,
+        writeTarget(gesture.row),
         gesture.row.text,
         gesture.row.relevance,
         gesture.row.argument

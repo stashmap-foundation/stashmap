@@ -483,7 +483,10 @@ export function composeNote(
   graph: GraphLookup,
   rootRef: NodeRef
 ): CompositionResult {
-  const claimedParent = new globalThis.Map<ID, ID>();
+  const claimedParent = new globalThis.Map<
+    ID,
+    { parent: ID; readerPath: ID[] }[]
+  >();
   const fileOrder = new globalThis.Map<string, number>();
   const absorbed = new globalThis.Set<ID>();
 
@@ -497,6 +500,45 @@ export function composeNote(
 
   const resolvable = (id: ID, sourceId: SourceId): boolean =>
     lookupNode(graph, id, sourceId) !== undefined;
+
+  const sourceAncestors = (
+    id: ID,
+    sourceId: SourceId,
+    seen: ID[] = []
+  ): ID[] => {
+    if (seen.includes(id)) {
+      return seen;
+    }
+    const resolved = lookupNode(graph, id, sourceId);
+    const next = [...seen, id];
+    return resolved?.node.parent === undefined
+      ? next
+      : sourceAncestors(resolved.node.parent, resolved.ref.sourceId, next);
+  };
+
+  const readerScope = (
+    readerPath: ID[],
+    target: ID,
+    sourceId: SourceId
+  ): ID[] => {
+    const ancestors = sourceAncestors(target, sourceId);
+    return readerPath.reduce<{ ids: ID[]; open: boolean }>(
+      (state, id) => {
+        if (!state.open) {
+          return state;
+        }
+        const represented = readerNode(id);
+        const representedTarget = represented
+          ? targetOf(represented.node)
+          : undefined;
+        return representedTarget !== undefined &&
+          ancestors.includes(representedTarget)
+          ? { ids: [...state.ids, id], open: true }
+          : { ...state, open: false };
+      },
+      { ids: [], open: true }
+    ).ids;
+  };
 
   const childRows = (owner: ResolvedNode): ResolvedNode[] =>
     owner.node.children
@@ -580,7 +622,8 @@ export function composeNote(
 
   const collect = (
     owner: ResolvedNode,
-    scope: ID
+    scope: ID,
+    readerPath: ID[]
   ): CompositionResult["claims"] =>
     childRows(owner).flatMap((child, order) => {
       fileOrder.set(`${owner.node.id} ${child.node.id}`, order);
@@ -591,13 +634,32 @@ export function composeNote(
         anchored(child.node) &&
         child.node.argument === undefined &&
         target !== undefined &&
-        resolvable(target, child.ref.sourceId) &&
-        !claimedParent.has(target)
+        resolvable(target, child.ref.sourceId)
       ) {
-        claimedParent.set(target, scope);
+        const claimReaderPath = readerScope(
+          readerPath,
+          target,
+          child.ref.sourceId
+        );
+        const existing = claimedParent.get(target) ?? [];
+        if (
+          !existing.some(
+            (claim) =>
+              claim.readerPath.join("\0") === claimReaderPath.join("\0")
+          )
+        ) {
+          claimedParent.set(target, [
+            ...existing,
+            { parent: scope, readerPath: claimReaderPath },
+          ]);
+        }
       }
       const childScope =
         projects(child.node) && target !== undefined ? target : child.node.id;
+      const childReaderPath =
+        isReaderRow(child, rootRef) && projects(child.node)
+          ? [...readerPath, child.node.id]
+          : readerPath;
       return [
         {
           id: child.node.id,
@@ -609,10 +671,10 @@ export function composeNote(
           context: scope,
           parent: owner.node.id,
         },
-        ...collect(child, childScope),
+        ...collect(child, childScope, childReaderPath),
       ];
     });
-  const claims = collect(rootResolved, rootScope);
+  const claims = collect(rootResolved, rootScope, []);
 
   function resolveRow(
     start: ResolvedNode,
@@ -786,7 +848,13 @@ export function composeNote(
           if (absorbed.has(child.node.id)) {
             return [];
           }
-          const destination = claimedParent.get(child.node.id);
+          const destination = (claimedParent.get(child.node.id) ?? [])
+            .filter((claim) =>
+              claim.readerPath.every((id) => activeChain.includes(id))
+            )
+            .sort(
+              (left, right) => right.readerPath.length - left.readerPath.length
+            )[0]?.parent;
           if (destination !== undefined && destination !== terminal.node.id) {
             return [];
           }

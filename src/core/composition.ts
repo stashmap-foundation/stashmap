@@ -11,6 +11,7 @@ import {
 } from "./graphLookup";
 import {
   effectiveText,
+  embeddedTarget,
   nodeText,
   plainSpans,
   rewordingTargets,
@@ -107,9 +108,11 @@ export type Gesture =
     };
 
 function rowKind(node: GraphNode): ComposedRow["kind"] {
-  const struck = rewordingTargets(node);
-  if (node.extraAttrs?.embed === "true" && struck.length > 0) {
+  if (rewordingTargets(node).length > 0) {
     return "speaking";
+  }
+  if (embeddedTarget(node) !== undefined) {
+    return "placement";
   }
   if (
     node.spans.length === 1 &&
@@ -117,17 +120,20 @@ function rowKind(node: GraphNode): ComposedRow["kind"] {
     node.spans[0].struck !== true &&
     node.spans[0].href.startsWith("#")
   ) {
-    return node.extraAttrs?.embed === "true" ? "placement" : "link";
+    return "link";
   }
   return "own";
 }
 
 function rowTargets(node: GraphNode): ID[] {
-  if (rowKind(node) === "speaking") {
-    return rewordingTargets(node);
+  const rewording = rewordingTargets(node);
+  if (rewording.length > 0) {
+    return rewording;
   }
   const span = node.spans.length === 1 ? node.spans[0] : undefined;
-  return span?.kind === "link" && span.href.startsWith("#")
+  return span?.kind === "link" &&
+    span.struck !== true &&
+    span.href.startsWith("#")
     ? [span.href.slice(1)]
     : [];
 }
@@ -145,6 +151,29 @@ function anchored(node: GraphNode): boolean {
   return (
     node.extraAttrs?.front === "true" || node.extraAttrs?.after !== undefined
   );
+}
+
+export function clearPosition(
+  attrs: Record<string, string> | undefined
+): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(attrs ?? {}).filter(
+      ([key]) => key !== "front" && key !== "after"
+    )
+  );
+}
+
+export function positionAttrs(after: ID | undefined): Record<string, string> {
+  return after === undefined ? { front: "true" } : { after };
+}
+
+export function positionOf(node: GraphNode): string | undefined {
+  if (node.extraAttrs?.front === "true") {
+    return "front";
+  }
+  return node.extraAttrs?.after === undefined
+    ? undefined
+    : `after:${node.extraAttrs.after}`;
 }
 
 function hasMarker(node: GraphNode): boolean {
@@ -475,8 +504,14 @@ function collectDiagnostics(
       : []),
     ...row.children.flatMap(walk),
   ];
+  return walk(root);
+}
+
+function dedupeDiagnostics(
+  entries: CompositionResult["diagnostics"]
+): CompositionResult["diagnostics"] {
   const seen = new globalThis.Set<string>();
-  return walk(root).filter((entry) => {
+  return entries.filter((entry) => {
     const key = `${entry.code}:${entry.rowId}:${entry.details?.frozen ?? ""}:${
       entry.details?.current ?? ""
     }`;
@@ -566,37 +601,57 @@ export function composeNote(
         return resolved ? [resolved] : [];
       });
 
-  const rootResolved = getNodeInSource(graph, rootRef);
-  if (!rootResolved) {
+  const danglingRow = (id: ID, sourceId: SourceId, scope: ID): ComposedRow => {
     const node: GraphNode = {
       children: List<ID>(),
-      id: rootRef.id,
-      spans: plainSpans(rootRef.id),
+      id,
+      spans: plainSpans(id),
       updated: 0,
-      root: rootRef.id,
+      root: id,
       relevance: undefined,
     };
     return {
-      root: {
-        id: rootRef.id,
-        ref: rootRef,
-        node,
-        reader: false,
-        kind: "placement",
-        target: rootRef.id,
-        chain: [rootRef.id],
-        text: rootRef.id,
-        relevance: undefined,
-        argument: undefined,
-        judgments: [],
-        flags: ["dangling"],
-        drift: undefined,
-        children: [],
-        scope: rootRef.id,
-        writeParent: rootRef.id,
-        writtenParent: undefined,
-        sourceParent: undefined,
-      },
+      id,
+      ref: { sourceId, id },
+      node,
+      reader: false,
+      kind: "placement",
+      target: id,
+      chain: [id],
+      text: id,
+      relevance: undefined,
+      argument: undefined,
+      judgments: [],
+      flags: ["dangling"],
+      drift: undefined,
+      children: [],
+      scope,
+      writeParent: scope,
+      writtenParent: undefined,
+      sourceParent: undefined,
+    };
+  };
+
+  const makeRow = (
+    source: ResolvedNode,
+    fields: Omit<
+      ComposedRow,
+      "id" | "ref" | "node" | "reader" | "kind" | "target"
+    >
+  ): ComposedRow => ({
+    id: source.node.id,
+    ref: source.ref,
+    node: source.node,
+    reader: isReaderRow(source, rootRef),
+    kind: rowKind(source.node),
+    target: targetOf(source.node),
+    ...fields,
+  });
+
+  const rootResolved = getNodeInSource(graph, rootRef);
+  if (!rootResolved) {
+    return {
+      root: danglingRow(rootRef.id, rootRef.sourceId, rootRef.id),
       claims: [],
       diagnostics: [],
     };
@@ -849,31 +904,42 @@ export function composeNote(
         );
       }
       if (terminal) {
-        const terminalResults = childRows(terminal).flatMap<
-          [ComposedRow, Pending[]]
-        >((child) => {
-          if (absorbed.has(child.node.id)) {
-            return [];
-          }
-          const destination = (claimedParent.get(child.node.id) ?? [])
-            .filter((claim) =>
-              claim.readerPath.every((id) => activeChain.includes(id))
-            )
-            .sort(
-              (left, right) => right.readerPath.length - left.readerPath.length
-            )[0]?.parent;
-          if (destination !== undefined && destination !== terminal.node.id) {
-            return [];
-          }
-          return [
-            resolveRow(
-              child,
-              activeChain,
-              childScope,
-              isReaderRow(child, rootRef) ? terminal.node.id : undefined
-            ),
-          ];
-        });
+        const terminalResults = terminal.node.children
+          .toArray()
+          .filter((id) => id !== EMPTY_NODE_ID)
+          .flatMap<[ComposedRow, Pending[]]>((childId) => {
+            const child = getNodeInSource(graph, {
+              sourceId: terminal.ref.sourceId,
+              id: childId,
+            });
+            if (!child) {
+              return [
+                [danglingRow(childId, terminal.ref.sourceId, childScope), []],
+              ];
+            }
+            if (absorbed.has(child.node.id)) {
+              return [];
+            }
+            const destination = (claimedParent.get(child.node.id) ?? [])
+              .filter((claim) =>
+                claim.readerPath.every((id) => activeChain.includes(id))
+              )
+              .sort(
+                (left, right) =>
+                  right.readerPath.length - left.readerPath.length
+              )[0]?.parent;
+            if (destination !== undefined && destination !== terminal.node.id) {
+              return [];
+            }
+            return [
+              resolveRow(
+                child,
+                activeChain,
+                childScope,
+                isReaderRow(child, rootRef) ? terminal.node.id : undefined
+              ),
+            ];
+          });
         return composeDelegated(
           [
             terminalResults.map(([row]) => row),
@@ -909,13 +975,7 @@ export function composeNote(
     const source = layers[0] ?? start;
     const sourceIsReader = isReaderRow(source, rootRef);
     return [
-      {
-        id: source.node.id,
-        ref: source.ref,
-        node: source.node,
-        reader: sourceIsReader,
-        kind: rowKind(source.node),
-        target: targetOf(source.node),
+      makeRow(source, {
         chain,
         text,
         relevance: effective?.relevance,
@@ -931,7 +991,7 @@ export function composeNote(
           !sourceIsReader && source.node.parent !== undefined
             ? { sourceId: source.ref.sourceId, id: source.node.parent }
             : undefined,
-      },
+      }),
       pending,
     ];
   }
@@ -973,13 +1033,7 @@ export function composeNote(
         ? { frozen: frozenText(claim.node), current: source.text }
         : undefined;
     return [
-      {
-        id: claim.node.id,
-        ref: claim.ref,
-        node: claim.node,
-        reader: claimIsReader,
-        kind,
-        target,
+      makeRow(claim, {
         chain: [claim.node.id, ...source.chain],
         text,
         relevance: effective?.relevance,
@@ -992,7 +1046,7 @@ export function composeNote(
         writeParent: scope,
         writtenParent: claimIsReader ? writtenParent : undefined,
         sourceParent: source.sourceParent,
-      },
+      }),
       pending,
     ];
   }
@@ -1392,11 +1446,11 @@ export function composeNote(
       : []),
     ...childRows(row).flatMap(scanShapes),
   ];
-  const diagnostics = [
+  const diagnostics = dedupeDiagnostics([
     ...collectDiagnostics(root),
     ...scanShapes(rootResolved),
     ...(baseRoot ? scanShapes(baseRoot) : []),
-  ];
+  ]);
 
   return { root, claims, diagnostics };
 }

@@ -4,13 +4,13 @@ import { deleteNodes } from "./core/connections";
 import { placementTarget } from "./core/nodeSpans";
 import {
   GraphPlan,
-  clearPosition,
   nextUpdated,
   planDeleteDescendantNodes,
   planDeleteNodes,
   planMoveDescendantNodes,
   planUpsertNodes,
 } from "./planner";
+import { clearPosition, positionAttrs } from "./core/composition";
 
 function getWritableNode(plan: GraphPlan, nodeId: ID): GraphNode | undefined {
   return getWorkspaceNode(plan.knowledgeDBs, nodeId);
@@ -42,17 +42,17 @@ function reAnchorForRemoved(
 ): Record<string, string> {
   const target = placementTarget(item);
   if (target !== undefined) {
-    return { after: target };
+    return positionAttrs(target);
   }
   if (item.extraAttrs?.after !== undefined) {
-    return { after: item.extraAttrs.after };
+    return positionAttrs(item.extraAttrs.after);
   }
   if (item.extraAttrs?.front === "true") {
-    return { front: "true" };
+    return positionAttrs(undefined);
   }
   const predecessor =
     index > 0 ? parentNode.children.get(index - 1) : undefined;
-  return predecessor !== undefined ? { after: predecessor } : { front: "true" };
+  return positionAttrs(predecessor);
 }
 
 function repairDependentAnchors<T extends GraphPlan>(

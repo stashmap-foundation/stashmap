@@ -57,7 +57,13 @@ import { LOCAL } from "./core/nodeRef";
 import { entityIdForText } from "./core/entityRecognition";
 import { getWorkspaceNode } from "./core/knowledge";
 import { planRepairDependentAnchors } from "./dataPlanner";
-import { Gesture, ComposedRow } from "./core/composition";
+import {
+  Gesture,
+  ComposedRow,
+  clearPosition,
+  positionAttrs,
+  positionOf,
+} from "./core/composition";
 import {
   MultiSelectionState,
   clearSelection,
@@ -199,12 +205,6 @@ function withoutAttrs(
   );
 }
 
-export function clearPosition(
-  attrs: Record<string, string> | undefined
-): Record<string, string> {
-  return withoutAttrs(attrs, ["front", "after"]);
-}
-
 function migrateViewPath(
   plan: Plan,
   source: ViewPath,
@@ -280,12 +280,6 @@ function positionRows(
     const predecessor = desired[index - 1];
     return predecessor ? `after:${anchorIDFor(predecessor)}` : "front";
   };
-  const currentSignature = (node: GraphNode): string | undefined =>
-    node.extraAttrs?.front === "true"
-      ? "front"
-      : node.extraAttrs?.after === undefined
-      ? undefined
-      : `after:${node.extraAttrs.after}`;
   const movedSeats = new globalThis.Set(
     moved.flatMap((seat) => [
       seat.id,
@@ -354,7 +348,7 @@ function positionRows(
       (placementTarget(node) === undefined ||
         (!anchorMoved && movedIds.has(seat.id)))
     ) {
-      return currentSignature(node) === undefined
+      return positionOf(node) === undefined
         ? current
         : planUpsertNodes(current, {
             ...node,
@@ -363,17 +357,16 @@ function positionRows(
           });
     }
     const predecessor = desired[index - 1];
-    const extraAttrs = predecessor
-      ? {
-          ...clearPosition(node.extraAttrs),
-          after: anchorIDFor(predecessor),
-        }
-      : { ...clearPosition(node.extraAttrs), front: "true" };
-    return currentSignature(node) === signatureAt(index)
+    return positionOf(node) === signatureAt(index)
       ? current
       : planUpsertNodes(current, {
           ...node,
-          extraAttrs,
+          extraAttrs: {
+            ...clearPosition(node.extraAttrs),
+            ...positionAttrs(
+              predecessor === undefined ? undefined : anchorIDFor(predecessor)
+            ),
+          },
           updated: nextUpdated(node),
         });
   }, plan);
@@ -586,12 +579,12 @@ function repairSourceDependents(
     if (!node) {
       return current;
     }
-    const position: Record<string, string> = repair.predecessor
-      ? { after: repair.predecessor.id }
-      : { front: "true" };
     return planUpsertNodes(current, {
       ...node,
-      extraAttrs: { ...clearPosition(node.extraAttrs), ...position },
+      extraAttrs: {
+        ...clearPosition(node.extraAttrs),
+        ...positionAttrs(repair.predecessor?.id),
+      },
       updated: nextUpdated(node),
     });
   }, plan);

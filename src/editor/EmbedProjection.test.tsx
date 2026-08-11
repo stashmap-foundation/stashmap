@@ -528,7 +528,7 @@ Note
       encoding: "utf8",
     });
     expect(note).toMatch(
-      /- \[Argument A\]\(#a\) <!-- id:\S+ embed="true" after="c" parent="src" -->/u
+      /- \[Argument A\]\(#a\) <!-- id:\S+ embed="true" after="c" -->/u
     );
   });
 });
@@ -878,7 +878,7 @@ Note
       encoding: "utf8",
     });
     expect(note).toMatch(
-      /- \[Gaudi\]\(#g\) <!-- id:\S+ embed="true" -->\n {4}- \[Casa Battlo\]\(#cb\) <!-- id:\S+ embed="true" before="\S+" parent="g" -->/u
+      /- \[Gaudi\]\(#g\) <!-- id:\S+ embed="true" -->\n {4}- \[Casa Battlo\]\(#cb\) <!-- id:\S+ embed="true" before="\S+" -->/u
     );
     expect(note).toMatch(/- \(!\) \[Sagrada Familia\]\(#sf\)/u);
   });
@@ -1262,7 +1262,7 @@ Note
       encoding: "utf8",
     });
     expect(note).toMatch(
-      /- \(!\) \[Sagrada Familia\]\(#sf\) <!-- id:\S+ embed="true" after="cm" parent="g" -->/u
+      /- \(!\) \[Sagrada Familia\]\(#sf\) <!-- id:\S+ embed="true" after="cm" -->/u
     );
   });
 });
@@ -1402,7 +1402,7 @@ Note
       encoding: "utf8",
     });
     expect(note).toMatch(
-      /- \[Sagrada Familia\]\(#sf\) <!-- id:\S+ embed="true" after="cb" parent="g" -->/u
+      /- \[Sagrada Familia\]\(#sf\) <!-- id:\S+ embed="true" after="cb" -->/u
     );
     expect(note).toMatch(
       /- \[Casa Mila\]\(#cm\) <!-- id:\S+ embed="true" before="bc" parent="sp" -->/u
@@ -1463,13 +1463,13 @@ Note
       encoding: "utf8",
     });
     expect(note).toMatch(
-      /- \[Sagrada Familia\]\(#sf\) <!-- id:sfc embed="true" before="cbc" parent="g" -->/u
+      /- \[Sagrada Familia\]\(#sf\) <!-- id:sfc embed="true" before="cbc" -->/u
     );
     expect(note).toMatch(
-      /- \(!\) \[Casa Battlo\]\(#cb\) <!-- id:cbc embed="true" after="sfc" before="cmc" parent="g" -->/u
+      /- \(!\) \[Casa Battlo\]\(#cb\) <!-- id:cbc embed="true" after="sfc" before="cmc" -->/u
     );
     expect(note).toMatch(
-      /- \[Casa Mila\]\(#cm\) <!-- id:cmc embed="true" after="cbc" parent="g" -->/u
+      /- \[Casa Mila\]\(#cm\) <!-- id:cmc embed="true" after="cbc" -->/u
     );
   });
 });
@@ -2264,7 +2264,7 @@ Note
     });
     expect(note.match(/\(#c\)/gu)).toHaveLength(1);
     expect(note).toMatch(
-      /\(!\) Final wording ~~\[Argument C\]\(#c\)~~[^\n]*before="a" parent="src"/u
+      /\(!\) Final wording ~~\[Argument C\]\(#c\)~~[^\n]*before="a"/u
     );
   });
 });
@@ -2564,7 +2564,7 @@ Note
       encoding: "utf8",
     });
     expect(note).toMatch(
-      /- \[Casa Battlo\]\(#cb\) <!-- id:\S+ embed="true" before="(\S+)" parent="g" -->\n\s+- \[Casa Mila\]\(#cm\) <!-- id:\1 embed="true" before="sf" parent="g" -->/u
+      /- \[Casa Battlo\]\(#cb\) <!-- id:\S+ embed="true" before="(\S+)" -->\n\s+- \[Casa Mila\]\(#cm\) <!-- id:\1 embed="true" before="sf" -->/u
     );
   });
 });
@@ -2620,7 +2620,7 @@ Note
       encoding: "utf8",
     });
     expect(note).toMatch(
-      /- \[Casa Battlo\]\(#cb\) <!-- id:(\S+) embed="true" before="sf" parent="g" -->\n\s+- \[Casa Mila\]\(#cm\) <!-- id:\S+ embed="true" after="\1" before="sf" parent="g" -->/u
+      /- \[Casa Battlo\]\(#cb\) <!-- id:(\S+) embed="true" before="sf" -->\n\s+- \[Casa Mila\]\(#cm\) <!-- id:\S+ embed="true" after="\1" before="sf" -->/u
     );
   });
 });
@@ -2678,13 +2678,13 @@ Note
       encoding: "utf8",
     });
     expect(note).toMatch(
-      /- \[Sagrada Familia\]\(#sf\) <!-- id:msf embed="true" before="mcb" parent="g" -->/u
+      /- \[Sagrada Familia\]\(#sf\) <!-- id:msf embed="true" before="mcb" -->/u
     );
     expect(note).toMatch(
-      /- \[Casa Battlo\]\(#cb\) <!-- id:mcb embed="true" after="msf" before="mcm" parent="g" -->/u
+      /- \[Casa Battlo\]\(#cb\) <!-- id:mcb embed="true" after="msf" before="mcm" -->/u
     );
     expect(note).toMatch(
-      /- \[Casa Mila\]\(#cm\) <!-- id:mcm embed="true" after="mcb" parent="g" -->/u
+      /- \[Casa Mila\]\(#cm\) <!-- id:mcm embed="true" after="mcb" -->/u
     );
   });
 });
@@ -2754,7 +2754,7 @@ Note
       encoding: "utf8",
     });
     expect(note).toMatch(
-      /- \[Casa Mila\]\(#cm\) <!-- id:p1 embed="true" after="sf" parent="g" -->/u
+      /- \[Casa Mila\]\(#cm\) <!-- id:p1 embed="true" after="sf" -->/u
     );
     expect(note).toMatch(
       /- \[Sagrada Familia\]\(#sf\) <!-- id:p2 embed="true" after="cb" -->/u
@@ -2819,7 +2819,7 @@ Note
       /- \[Sagrada Familia\]\(#sf\) <!-- id:msf embed="true" parent="g" -->/u
     );
     expect(note).toMatch(
-      /- \[Park Guell\]\(#pg\) <!-- id:(\S+) embed="true" after="msf" before="mcm" parent="g" -->\n\s+- \[Casa Mila\]\(#cm\) <!-- id:mcm embed="true" after="\1" before="mcb" parent="g" -->/u
+      /- \[Park Guell\]\(#pg\) <!-- id:(\S+) embed="true" after="msf" before="mcm" -->\n\s+- \[Casa Mila\]\(#cm\) <!-- id:mcm embed="true" after="\1" before="mcb" -->/u
     );
     expect(note).toMatch(
       /- \[Casa Battlo\]\(#cb\) <!-- id:mcb embed="true" after="cm" -->/u
@@ -2872,13 +2872,13 @@ Note
       encoding: "utf8",
     });
     expect(note).toMatch(
-      /- \[Casa Mila\]\(#cm\) <!-- id:mcm embed="true" before="mcb" parent="g" -->/u
+      /- \[Casa Mila\]\(#cm\) <!-- id:mcm embed="true" before="mcb" -->/u
     );
     expect(note).toMatch(
       /- \[Casa Battlo\]\(#cb\) <!-- id:mcb embed="true" after="cm" -->/u
     );
     expect(note).toMatch(
-      /- \[Sagrada Familia\]\(#sf\) <!-- id:msf embed="true" after="mcb" parent="g" -->/u
+      /- \[Sagrada Familia\]\(#sf\) <!-- id:msf embed="true" after="mcb" -->/u
     );
   });
 });
@@ -2888,8 +2888,8 @@ test("dropping a row where it already sits changes nothing", async () => {
     "# Note <!-- id:note -->",
     "",
     '- [Gaudi](#g) <!-- id:emb embed="true" -->',
-    '  - [Sagrada Familia](#sf) <!-- id:msf embed="true" before="mcm" parent="g" -->',
-    '  - [Casa Mila](#cm) <!-- id:mcm embed="true" after="msf" before="cb" parent="g" -->',
+    '  - [Sagrada Familia](#sf) <!-- id:msf embed="true" before="mcm" -->',
+    '  - [Casa Mila](#cm) <!-- id:mcm embed="true" after="msf" before="cb" -->',
   ].join("\n");
   const workspacePath = writeWorkspace({
     "note.md": noteContent,
@@ -2980,10 +2980,10 @@ Note
       encoding: "utf8",
     });
     expect(note).toMatch(
-      /- \[Casa Mila\]\(#cm\) <!-- id:mcm embed="true" before="sf" parent="g" -->/u
+      /- \[Casa Mila\]\(#cm\) <!-- id:mcm embed="true" before="sf" -->/u
     );
     expect(note).toMatch(
-      /- \[Casa Battlo\]\(#cb\) <!-- id:mcb embed="true" after="sf" parent="g" -->/u
+      /- \[Casa Battlo\]\(#cb\) <!-- id:mcb embed="true" after="sf" -->/u
     );
   });
 });
@@ -3023,7 +3023,7 @@ test("an unrelated drop never rewrites a dangling anchor", async () => {
       encoding: "utf8",
     });
     expect(note).toMatch(
-      /- \[Sagrada Familia\]\(#sf\) <!-- id:\S+ embed="true" before="mcm" parent="g" -->/u
+      /- \[Sagrada Familia\]\(#sf\) <!-- id:\S+ embed="true" before="mcm" -->/u
     );
     expect(note).toMatch(
       /- \[Casa Mila\]\(#cm\) <!-- id:mcm embed="true" after="ghost" -->/u
@@ -3074,7 +3074,7 @@ Note
       encoding: "utf8",
     });
     expect(note).toMatch(
-      /- \(!\) \[Casa Mila\]\(#cm\) <!-- id:\S+ embed="true" before="sf" parent="g" -->/u
+      /- \(!\) \[Casa Mila\]\(#cm\) <!-- id:\S+ embed="true" before="sf" -->/u
     );
     expect(note.match(/\[Casa Mila\]/gu)).toHaveLength(1);
   });

@@ -243,14 +243,20 @@ type Seat = {
   localID: ID | undefined;
   target: ID | undefined;
   chain: ID[];
+  reparented: boolean;
 };
 
-function rowSeat(row: ComposedRow, localID: ID | undefined): Seat {
+function rowSeat(
+  row: ComposedRow,
+  localID: ID | undefined,
+  reparented: boolean
+): Seat {
   return {
     id: row.id,
     localID: localID ?? (row.reader ? row.id : undefined),
     target: row.target,
     chain: row.chain,
+    reparented,
   };
 }
 
@@ -267,7 +273,7 @@ function positionRows(
   const movedIds = new globalThis.Set(moved.map((seat) => seat.id));
   const stationary = parent.children
     .filter((row) => !movedIds.has(row.id))
-    .map((row) => rowSeat(row, undefined));
+    .map((row) => rowSeat(row, undefined, false));
   const anchorIndex =
     after === undefined
       ? -1
@@ -280,18 +286,24 @@ function positionRows(
   const anchorIDFor = (seat: Seat): ID => seat.localID ?? seat.id;
   const parentAnchor = parent.target ?? parent.id;
   const namesAt = (index: number): PositionName[] => {
+    const seat = desired[index];
     const predecessor = desired[index - 1];
-    const successor = movedIds.has(desired[index].id)
-      ? desired.slice(index + 1).find((seat) => !movedIds.has(seat.id))
+    const successor = movedIds.has(seat.id)
+      ? desired.slice(index + 1).find((other) => !movedIds.has(other.id))
       : desired[index + 1];
-    return [
+    const siblings: PositionName[] = [
       ...(predecessor
         ? [{ kind: "after" as const, id: anchorIDFor(predecessor) }]
         : []),
       ...(successor
         ? [{ kind: "before" as const, id: anchorIDFor(successor) }]
         : []),
-      { kind: "parent" as const, id: parentAnchor },
+    ];
+    return [
+      ...siblings,
+      ...(seat.reparented || (movedIds.has(seat.id) && siblings.length === 0)
+        ? [{ kind: "parent" as const, id: parentAnchor }]
+        : []),
     ];
   };
   const signatureAt = (index: number): string =>
@@ -578,7 +590,6 @@ function repairSourceDependents(
     .filter((parent, index, all) => all.indexOf(parent) === index);
   return parents.reduce((current, sourceParent) => {
     const remaining = sourceParent.children.filter((row) => !moved.has(row));
-    const parentAnchor = sourceParent.target ?? sourceParent.id;
     return remaining.reduce((acc, row, index) => {
       const node =
         row.reader && row.ref.sourceId === LOCAL
@@ -599,7 +610,6 @@ function repairSourceDependents(
           ? [{ kind: "after" as const, id: predecessor.id }]
           : []),
         ...(successor ? [{ kind: "before" as const, id: successor.id }] : []),
-        { kind: "parent" as const, id: parentAnchor },
       ];
       return planUpsertNodes(acc, {
         ...node,
@@ -760,7 +770,11 @@ function move(plan: Plan, gesture: Extract<Gesture, { kind: "move" }>): Plan {
     materialized.plan,
     gesture.parent,
     gesture.rows.map((entry) =>
-      rowSeat(entry.row, materialized.ids.get(entry.row.id))
+      rowSeat(
+        entry.row,
+        materialized.ids.get(entry.row.id),
+        entry.sourceParent !== gesture.parent
+      )
     ),
     gesture.after,
     true
@@ -831,6 +845,7 @@ function place(plan: Plan, gesture: Extract<Gesture, { kind: "place" }>): Plan {
             localID: node.id,
             target,
             chain: [node.id, ...(target !== undefined ? [target] : [])],
+            reparented: false,
           },
         ],
       };

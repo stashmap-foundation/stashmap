@@ -586,7 +586,12 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       viewKey: viewPathToString(targetViewPath),
     });
 
+  const feedUrl = calendarFeedUrl(currentNode);
+  const calendarContent =
+    feedUrl !== undefined ||
+    isCalendarEntryPlacement(currentNode, parentNode ?? undefined);
   const rewordEditing =
+    !calendarContent &&
     row.composed !== undefined &&
     (row.projected === true ||
       ((row.composed.kind === "placement" ||
@@ -608,10 +613,6 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       (span) => !(span.kind === "link" && span.struck === true)
     );
   })();
-  const feedUrl = calendarFeedUrl(currentNode);
-  const calendarContent =
-    feedUrl !== undefined ||
-    isCalendarEntryPlacement(currentNode, parentNode ?? undefined);
   const reciprocals = reciprocalLinks(data, row.node, row.sourceId);
   const deadLinkIndexes = editorSpans.flatMap((span, index) =>
     span.kind === "link" &&

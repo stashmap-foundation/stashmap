@@ -11,7 +11,6 @@ import {
   planMoveDescendantNodes,
   planUpsertNodes,
 } from "./planner";
-import { NodeItemMetadata, updateNodeItemMetadata } from "./nodeItemMetadata";
 
 function getWritableNode(plan: GraphPlan, nodeId: ID): GraphNode | undefined {
   return getWorkspaceNode(plan.knowledgeDBs, nodeId);
@@ -30,26 +29,6 @@ function requireNodeItem(
   const index = getNodeItemIndex(node, itemId);
   const childID = index === undefined ? undefined : node.children.get(index);
   return childID ? getWorkspaceNode(plan.knowledgeDBs, childID) : undefined;
-}
-
-export function planUpdateNodeItemMetadataById<T extends GraphPlan>(
-  plan: T,
-  parentNodeId: ID,
-  itemId: ID,
-  metadata: NodeItemMetadata
-): T {
-  const parentNode = getWritableNode(plan, parentNodeId);
-  if (!parentNode) {
-    return plan;
-  }
-  const nodeIndex = getNodeItemIndex(parentNode, itemId);
-  if (nodeIndex === undefined) {
-    return plan;
-  }
-  const item = requireNodeItem(plan, parentNode, itemId);
-  return item
-    ? planUpsertNodes(plan, updateNodeItemMetadata(item, metadata))
-    : plan;
 }
 
 // A deleted row takes its anchor seat with it. Dependents re-aim to the

@@ -329,32 +329,87 @@ export function dnd(
     ? sourceDrag.draggedRows
     : [sourceDrag.row];
   const independentRows = getIndependentRows(sources);
-  const composedRows = independentRows.flatMap((row) =>
-    row.composed ? [row.composed] : []
+  const dropIntoOwnDescendant = independentRows.some(
+    (row) =>
+      targetParentRow.viewKey === row.viewKey ||
+      targetParentRow.viewKey.startsWith(`${row.viewKey}:`)
   );
-  const composedMove =
-    targetParentRow.composed !== undefined &&
-    composedRows.length === independentRows.length &&
-    (dropAnchor === undefined || dropAnchor.composed !== undefined) &&
-    ((independentRows.every((row) =>
-      refsEqual(row.parentRef, independentRows[0]?.parentRef)
-    ) &&
-      composedRows.every(
-        (row) => row.scope === targetParentRow.composed?.scope
-      )) ||
-      independentRows.some(
-        (row) =>
-          row.projected === true ||
-          row.composed?.kind === "placement" ||
-          row.composed?.kind === "speaking"
-      ) ||
-      (composedRows.every((row) => row.reader) &&
-        independentRows.every(
-          (row) => row.viewPath[1] === targetParentRow.viewPath[1]
-        )));
-  if (composedMove && targetParentRow.composed) {
-    const moved = new globalThis.Set(composedRows);
-    const rows = independentRows.flatMap((row) => {
+  if (dropIntoOwnDescendant) {
+    return basePlan;
+  }
+  const sourcePane = basePlan.panes[sourceDrag.sourcePaneIndex];
+  const rootOf = (row: Row): ID | undefined => {
+    if (!row.composed) {
+      return undefined;
+    }
+    if (row.composed.reader) {
+      return row.node.root;
+    }
+    return getNode(basePlan.knowledgeDBs, row.composed.scope, LOCAL)?.root;
+  };
+  const targetRoot = rootOf(targetParentRow);
+  const localRoot =
+    targetRoot === undefined
+      ? undefined
+      : getNode(basePlan.knowledgeDBs, targetRoot, LOCAL);
+  const recordForeignSources = (plan: Plan): Plan =>
+    localRoot
+      ? independentRows.reduce(
+          (acc, row) =>
+            row.sourceId === LOCAL
+              ? acc
+              : planRecordForeignSource(acc, sourcePane, row, localRoot),
+          plan
+        )
+      : plan;
+  if (
+    sourceDrag.isCopyDrag !== true &&
+    independentRows.some((row) => !row.parentRef)
+  ) {
+    const sourceDocument = getDocumentForNode(
+      basePlan.knowledgeDBs,
+      basePlan.documents,
+      sourceDrag.row.node,
+      sourceDrag.row.sourceId
+    );
+    const targetDocument = getDocumentForNode(
+      basePlan.knowledgeDBs,
+      basePlan.documents,
+      targetParentRow.node,
+      targetParentRow.sourceId
+    );
+    if (
+      sourceDocument !== undefined &&
+      targetDocument !== undefined &&
+      sourceDocument.sourceId === targetDocument.sourceId &&
+      sourceDocument.docId === targetDocument.docId
+    ) {
+      return basePlan;
+    }
+  }
+  const composedAnchor =
+    dropAnchor === undefined || dropAnchor.composed !== undefined;
+  const doorTarget =
+    composedAnchor && targetParentRow.composed !== undefined
+      ? targetParentRow.composed
+      : undefined;
+  const moveRows =
+    doorTarget !== undefined &&
+    sourceDrag.isCopyDrag !== true &&
+    targetRoot !== undefined
+      ? independentRows.filter(
+          (row) => row.composed !== undefined && rootOf(row) === targetRoot
+        )
+      : [];
+  const rest = independentRows.filter((row) => !moveRows.includes(row));
+  const movedPlan = (() => {
+    if (moveRows.length === 0 || doorTarget === undefined) {
+      return basePlan;
+    }
+    const moved = new globalThis.Set(
+      moveRows.flatMap((row) => (row.composed ? [row.composed] : []))
+    );
+    const rows = moveRows.flatMap((row) => {
       if (!row.composed) {
         return [];
       }
@@ -378,28 +433,69 @@ export function dnd(
       ];
     });
     return applyGesture(
-      planExpandNode(basePlan, targetParentRow.view, targetParentRow.viewPath),
+      recordForeignSources(
+        planExpandNode(basePlan, targetParentRow.view, targetParentRow.viewPath)
+      ),
       {
         kind: "move",
         rows,
-        parent: targetParentRow.composed,
+        parent: doorTarget,
         parentPath: targetParentRow.viewPath,
         after: dropAnchor?.composed,
       }
     );
+  })();
+  if (rest.length === 0) {
+    return movedPlan;
   }
-  if (
-    targetParentRow.projected ||
-    independentRows.some((row) => row.projected)
-  ) {
-    return basePlan;
+  const projectionReorder = rest.some(
+    (row) =>
+      row.materialize !== undefined &&
+      row.parentRef?.id === targetParentRow.node.id
+  );
+  if (doorTarget !== undefined && !projectionReorder) {
+    const targets = rest.map((row) => {
+      const isPrimarySource = row.viewKey === source;
+      const insertTarget =
+        (isPrimarySource ? sourceDrag.insertTarget : undefined) ??
+        row.materialize?.take;
+      const dragTargetID = isPrimarySource
+        ? sourceDrag.targetId || sourceDrag.nodeId
+        : undefined;
+      const target = insertTarget
+        ? addFallbackLinkText(insertTarget, sourceDrag.text)
+        : createRefTarget(
+            dragTargetID ?? calendarEntryTarget(row.node) ?? row.node.id,
+            nodeText(row.node)
+          );
+      const edge = row.composed ? row.composed.node : row.node;
+      return { target, relevance: edge.relevance, argument: edge.argument };
+    });
+    return applyGesture(
+      recordForeignSources(
+        planExpandNode(
+          movedPlan,
+          targetParentRow.view,
+          targetParentRow.viewPath
+        )
+      ),
+      {
+        kind: "place",
+        targets,
+        parent: doorTarget,
+        at: dropIndex + moveRows.length,
+        after: dropAnchor?.composed,
+      }
+    );
+  }
+  if (targetParentRow.projected || rest.some((row) => row.projected)) {
+    return movedPlan;
   }
   const [plan, targetParentNode] = planMaterializeComputedRow(
-    basePlan,
+    movedPlan,
     targetParentRow
   );
 
-  const sourcePane = plan.panes[sourceDrag.sourcePaneIndex];
   const targetPane = plan.panes[targetPaneIndex];
   if (!sourcePane || !targetPane) {
     return plan;
@@ -437,7 +533,7 @@ export function dnd(
   const sourceParentRef = sourceDrag.row.parentRef;
   const allSourcesSameParent =
     sourceParentRef !== undefined &&
-    independentRows.every((row) => refsEqual(row.parentRef, sourceParentRef));
+    rest.every((row) => refsEqual(row.parentRef, sourceParentRef));
   const targetParentRef = { sourceId: targetSourceId, id: targetParentNode.id };
   const sameNode =
     allSourcesSameParent && refsEqual(sourceParentRef, targetParentRef);
@@ -506,12 +602,8 @@ export function dnd(
   };
 
   if (reorder) {
-    const realRows = independentRows.filter(
-      (row) => row.childIndex !== undefined
-    );
-    const virtualRows = independentRows.filter(
-      (row) => row.childIndex === undefined
-    );
+    const realRows = rest.filter((row) => row.childIndex !== undefined);
+    const virtualRows = rest.filter((row) => row.childIndex === undefined);
     const sourceIndices = realRows.flatMap((row) =>
       row.childIndex === undefined ? [] : [row.childIndex]
     );
@@ -531,7 +623,7 @@ export function dnd(
   const sameDocumentMove = isSameDocument && !skipMoveLogic && !sameNode;
 
   if (sameDocumentMove) {
-    const isDropIntoOwnDescendant = independentRows.some(
+    const isDropIntoOwnDescendant = rest.some(
       (row) =>
         targetParentRow.viewKey === row.viewKey ||
         targetParentRow.viewKey.startsWith(`${row.viewKey}:`)
@@ -539,16 +631,12 @@ export function dnd(
     if (isDropIntoOwnDescendant) {
       return plan;
     }
-    const realRows = independentRows.filter(
-      (row) => row.childIndex !== undefined
-    );
-    const virtualRows = independentRows.filter(
-      (row) => row.childIndex === undefined
-    );
+    const realRows = rest.filter((row) => row.childIndex !== undefined);
+    const virtualRows = rest.filter((row) => row.childIndex === undefined);
     const moveBasePlan = targetParentRow.view.expanded
       ? plan
       : planExpandNode(plan, targetParentRow.view, targetParentRow.viewPath);
-    const movedPlan = realRows.reduce((accPlan: Plan, sourceRow, idx) => {
+    const rawMovedPlan = realRows.reduce((accPlan: Plan, sourceRow, idx) => {
       if (!sourceRow.parentNode) {
         return accPlan;
       }
@@ -567,7 +655,7 @@ export function dnd(
     return virtualRows.reduce((accPlan: Plan, sourceRow, idx) => {
       const insertAt = dropIndex + realRows.length + idx;
       return addProjectedSourceAsReference(accPlan, sourceRow, insertAt);
-    }, movedPlan);
+    }, rawMovedPlan);
   }
 
   const expandedPlan = targetParentRow.view.expanded
@@ -580,7 +668,7 @@ export function dnd(
       nodeText(sourceRow.node)
     );
 
-  return independentRows.reduce((accPlan: Plan, sourceRow, idx) => {
+  return rest.reduce((accPlan: Plan, sourceRow, idx) => {
     const sourceNode = sourceRow.node;
     const sourceEdgeRelevance = sourceNode.relevance;
     const sourceEdgeArgument = sourceNode.argument;

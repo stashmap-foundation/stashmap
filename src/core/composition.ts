@@ -1,6 +1,7 @@
 import { List } from "immutable";
 import { formatPrefixMarkers } from "../documentFormat";
 import { EMPTY_NODE_ID } from "./connections";
+import type { AddToParentTarget } from "./plan";
 import {
   GraphLookup,
   ResolvedNode,
@@ -89,7 +90,17 @@ export type Gesture =
       path: readonly [number, ...ID[]];
       spans: InlineSpan[];
     }
-  | { kind: "place"; row: ComposedRow; parent: ComposedRow }
+  | {
+      kind: "place";
+      targets: {
+        target: AddToParentTarget;
+        relevance: Relevance;
+        argument: Argument;
+      }[];
+      parent: ComposedRow;
+      at: number | undefined;
+      after: ComposedRow | undefined;
+    }
   | {
       kind: "dismiss";
       row: ComposedRow;

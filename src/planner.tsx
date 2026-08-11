@@ -238,27 +238,46 @@ function migrateComposedViewPath(
     : migrated;
 }
 
+type Seat = {
+  id: ID;
+  localID: ID | undefined;
+  target: ID | undefined;
+  chain: ID[];
+};
+
+function rowSeat(row: ComposedRow, localID: ID | undefined): Seat {
+  return {
+    id: row.id,
+    localID: localID ?? (row.reader ? row.id : undefined),
+    target: row.target,
+    chain: row.chain,
+  };
+}
+
 function positionRows(
   plan: Plan,
   parent: ComposedRow,
-  movedRows: ComposedRow[],
-  moved: ReadonlyMap<ID, ID>,
-  after: ComposedRow | undefined
+  moved: Seat[],
+  after: ComposedRow | undefined,
+  anchorMoved: boolean
 ): Plan {
   const scope = getWorkspaceNode(plan.knowledgeDBs, parent.scope);
-  const stationary = parent.children.filter((row) => !moved.has(row.id));
+  const placementScope =
+    scope !== undefined && placementTarget(scope) !== undefined;
+  const movedIds = new globalThis.Set(moved.map((seat) => seat.id));
+  const stationary = parent.children
+    .filter((row) => !movedIds.has(row.id))
+    .map((row) => rowSeat(row, undefined));
   const anchorIndex =
     after === undefined
       ? -1
-      : stationary.findIndex((row) => row.id === after.id);
+      : stationary.findIndex((seat) => seat.id === after.id);
   const desired = [
     ...stationary.slice(0, anchorIndex + 1),
-    ...movedRows,
+    ...moved,
     ...stationary.slice(anchorIndex + 1),
   ];
-  const localIDFor = (row: ComposedRow): ID | undefined =>
-    moved.get(row.id) ?? (row.reader ? row.id : undefined);
-  const anchorIDFor = (row: ComposedRow): ID => localIDFor(row) ?? row.id;
+  const anchorIDFor = (seat: Seat): ID => seat.localID ?? seat.id;
   const signatureAt = (index: number): string => {
     const predecessor = desired[index - 1];
     return predecessor ? `after:${anchorIDFor(predecessor)}` : "front";
@@ -269,75 +288,38 @@ function positionRows(
       : node.extraAttrs?.after === undefined
       ? undefined
       : `after:${node.extraAttrs.after}`;
-  // Outside a placement scope the file order carries sibling order, but a
-  // moved placement still needs its anchor: only an anchored placement
-  // consumes its projected occurrence from here (rule 6/11).
-  if (!scope || placementTarget(scope) === undefined) {
-    return desired.reduce((current, row, index) => {
-      const localID = moved.get(row.id);
-      if (localID === undefined) {
-        return current;
-      }
-      const node = getWorkspaceNode(current.knowledgeDBs, localID);
-      if (!node) {
-        return current;
-      }
-      if (placementTarget(node) === undefined) {
-        return currentSignature(node) === undefined
-          ? current
-          : planUpsertNodes(current, {
-              ...node,
-              extraAttrs: clearPosition(node.extraAttrs),
-              updated: nextUpdated(node),
-            });
-      }
-      const predecessor = desired[index - 1];
-      const extraAttrs = predecessor
-        ? {
-            ...clearPosition(node.extraAttrs),
-            after: anchorIDFor(predecessor),
-          }
-        : { ...clearPosition(node.extraAttrs), front: "true" };
-      return currentSignature(node) === signatureAt(index)
-        ? current
-        : planUpsertNodes(current, {
-            ...node,
-            extraAttrs,
-            updated: nextUpdated(node),
-          });
-    }, plan);
-  }
   const movedSeats = new globalThis.Set(
-    movedRows.flatMap((row) => [row.id, ...(row.target ? [row.target] : [])])
+    moved.flatMap((seat) => [
+      seat.id,
+      ...(seat.localID !== undefined ? [seat.localID] : []),
+      ...(seat.target !== undefined ? [seat.target] : []),
+    ])
   );
-  const affected = new globalThis.Set<ID>(moved.values());
-  desired.forEach((row) => {
-    const localID = localIDFor(row);
-    const node =
-      localID === undefined
-        ? undefined
-        : getWorkspaceNode(plan.knowledgeDBs, localID);
+  const localNode = (seat: Seat): GraphNode | undefined =>
+    seat.localID === undefined
+      ? undefined
+      : getWorkspaceNode(plan.knowledgeDBs, seat.localID);
+  const affected = new globalThis.Set<ID>(
+    moved.flatMap((seat) => (seat.localID !== undefined ? [seat.localID] : []))
+  );
+  desired.forEach((seat) => {
+    const node = localNode(seat);
     if (
-      localID !== undefined &&
-      node?.extraAttrs?.after &&
+      seat.localID !== undefined &&
+      node?.extraAttrs?.after !== undefined &&
       movedSeats.has(node.extraAttrs.after)
     ) {
-      affected.add(localID);
+      affected.add(seat.localID);
     }
   });
   const expandAffected = (): void => {
-    const occupied = desired.flatMap((row, index) => {
-      const localID = localIDFor(row);
-      return localID !== undefined && affected.has(localID)
+    const occupied = desired.flatMap((seat, index) =>
+      seat.localID !== undefined && affected.has(seat.localID)
         ? [desired[index - 1]]
-        : [];
-    });
-    const displaced = desired.flatMap((row) => {
-      const localID = localIDFor(row);
-      const node =
-        localID === undefined
-          ? undefined
-          : getWorkspaceNode(plan.knowledgeDBs, localID);
+        : []
+    );
+    const displaced = desired.flatMap((seat) => {
+      const node = localNode(seat);
       const occupies = occupied.some((predecessor) =>
         predecessor
           ? node?.extraAttrs?.after === predecessor.id ||
@@ -345,8 +327,10 @@ function positionRows(
               predecessor.chain.includes(node.extraAttrs.after))
           : node?.extraAttrs?.front === "true"
       );
-      return localID !== undefined && !affected.has(localID) && occupies
-        ? [localID]
+      return seat.localID !== undefined &&
+        !affected.has(seat.localID) &&
+        occupies
+        ? [seat.localID]
         : [];
     });
     displaced.forEach((id) => affected.add(id));
@@ -355,14 +339,30 @@ function positionRows(
     }
   };
   expandAffected();
-  return desired.reduce((current, row, index) => {
-    const localID = localIDFor(row);
-    if (localID === undefined || !affected.has(localID)) {
+  return desired.reduce((current, seat, index) => {
+    if (seat.localID === undefined || !affected.has(seat.localID)) {
       return current;
     }
-    const node = getWorkspaceNode(current.knowledgeDBs, localID);
+    const node = getWorkspaceNode(current.knowledgeDBs, seat.localID);
     if (!node) {
       return current;
+    }
+    // Outside a placement scope the file order carries own rows and fresh
+    // placements; a MOVED placement keeps a truthful front=/after= anywhere,
+    // because only an anchored placement consumes its projected occurrence
+    // (rule 6/11). Displaced anchored siblings re-aim in every scope.
+    if (
+      !placementScope &&
+      (placementTarget(node) === undefined ||
+        (!anchorMoved && movedIds.has(seat.id)))
+    ) {
+      return currentSignature(node) === undefined
+        ? current
+        : planUpsertNodes(current, {
+            ...node,
+            extraAttrs: clearPosition(node.extraAttrs),
+            updated: nextUpdated(node),
+          });
     }
     const predecessor = desired[index - 1];
     const extraAttrs = predecessor
@@ -453,14 +453,21 @@ function judge(plan: Plan, gesture: Extract<Gesture, { kind: "judge" }>): Plan {
     const stamp = (current: Plan, node: GraphNode): Plan =>
       planUpsertNodes(current, {
         ...node,
-        spans:
-          (gesture.row.kind === "placement" ||
-            gesture.row.kind === "speaking") &&
-          !rewording
+        spans: (() => {
+          if (
+            (gesture.row.kind === "placement" ||
+              gesture.row.kind === "speaking") &&
+            !rewording
+          ) {
+            return node.spans;
+          }
+          if (spansText(spans).trim() === "") {
+            return node.spans;
+          }
+          return spansText(spans).trim() === nodeText(node).trim()
             ? node.spans
-            : spansText(spans).trim() === ""
-            ? node.spans
-            : spans,
+            : spans;
+        })(),
         relevance: gesture.relevance,
         argument: gesture.argument,
         updated: nextUpdated(node),
@@ -740,9 +747,58 @@ function move(plan: Plan, gesture: Extract<Gesture, { kind: "move" }>): Plan {
   return positionRows(
     materialized.plan,
     gesture.parent,
-    gesture.rows.map((entry) => entry.row),
-    materialized.ids,
-    gesture.after
+    gesture.rows.map((entry) =>
+      rowSeat(entry.row, materialized.ids.get(entry.row.id))
+    ),
+    gesture.after,
+    true
+  );
+}
+
+function place(plan: Plan, gesture: Extract<Gesture, { kind: "place" }>): Plan {
+  const [withParent, parent] = localParentFor(plan, gesture.parent);
+  if (!parent) {
+    return plan;
+  }
+  const added = gesture.targets.reduce<{ plan: Plan; seats: Seat[] }>(
+    (acc, entry, index) => {
+      const [next, ids] = planAddTargetsToNode(
+        acc.plan,
+        parent.id,
+        entry.target,
+        gesture.at === undefined ? undefined : gesture.at + index,
+        entry.relevance,
+        entry.argument
+      );
+      const node =
+        ids[0] === undefined
+          ? undefined
+          : getWorkspaceNode(next.knowledgeDBs, ids[0]);
+      if (!node) {
+        return { plan: next, seats: acc.seats };
+      }
+      const target = placementTarget(node);
+      return {
+        plan: next,
+        seats: [
+          ...acc.seats,
+          {
+            id: node.id,
+            localID: node.id,
+            target,
+            chain: [node.id, ...(target !== undefined ? [target] : [])],
+          },
+        ],
+      };
+    },
+    { plan: withParent, seats: [] }
+  );
+  return positionRows(
+    added.plan,
+    gesture.parent,
+    added.seats,
+    gesture.after,
+    false
   );
 }
 
@@ -764,17 +820,7 @@ export function applyGesture(plan: Plan, gesture: Gesture): Plan {
     return move(plan, gesture);
   }
   if (gesture.kind === "place") {
-    const [withParent, parent] = localParentFor(plan, gesture.parent);
-    return parent
-      ? ensurePlacement(
-          withParent,
-          parent.id,
-          writeTarget(gesture.row),
-          gesture.row.text,
-          gesture.row.relevance,
-          gesture.row.argument
-        )[0]
-      : plan;
+    return place(plan, gesture);
   }
   const existing =
     gesture.row.reader && gesture.row.ref.sourceId === LOCAL

@@ -9,20 +9,19 @@ import {
   Plan,
   applyGesture,
   planExpandNode,
+  planSaveNodeAndEnsureNodes,
+  planUpdateEmptyNodeMetadata,
   planUpdateNodeSpans,
 } from "../planner";
-import {
-  planUpdateViewItemMetadata,
-  NodeItemMetadata,
-} from "../nodeItemMutations";
+import { NodeItemMetadata } from "../nodeItemMetadata";
 import { planMoveNode } from "../treeMutations";
-import { getNode } from "../core/connections";
+import { getNode, isEmptyNodeID } from "../core/connections";
 import {
   planAddTopTargetsToDocument,
   planMaterializeComputedRow,
 } from "../core/plan";
 import { getDocumentByIdOrFilePath } from "../core/Document";
-import { spansToMarkdown, plainSpans } from "../core/nodeSpans";
+import { spansText, spansToMarkdown, plainSpans } from "../core/nodeSpans";
 import type { ComposedRow } from "../core/composition";
 
 export type EditorInfo = {
@@ -77,7 +76,7 @@ export function planJudgeComposedRow(
   });
 }
 
-function planUpdateOneMetadata(
+export function planUpdateOneMetadata(
   acc: Plan,
   row: Row,
   metadata: NodeItemMetadata,
@@ -92,8 +91,28 @@ function planUpdateOneMetadata(
       editorSpans
     );
   }
-  // Write gestures take first: a computed row materializes with the
-  // judgment applied at creation — one plan, one save.
+  if (isEmptyNodeID(row.node.id)) {
+    if (!row.parentViewPath) {
+      return acc;
+    }
+    if (editorSpans && spansText(editorSpans).trim() !== "") {
+      return planSaveNodeAndEnsureNodes(
+        acc,
+        editorSpans,
+        row.node.id,
+        row.node,
+        row.viewPath,
+        row.parentNode,
+        row.parentViewPath,
+        row.viewPath[0],
+        metadata.relevance,
+        metadata.argument
+      ).plan;
+    }
+    return row.parentNode
+      ? planUpdateEmptyNodeMetadata(acc, row.parentNode.id, metadata)
+      : acc;
+  }
   const [materializedPlan, , materializedNow] = planMaterializeComputedRow(
     acc,
     row,
@@ -102,8 +121,7 @@ function planUpdateOneMetadata(
   if (materializedNow) {
     return materializedPlan;
   }
-  const paneIndex = row.viewPath[0];
-  const pane = acc.panes[paneIndex];
+  const pane = acc.panes[row.viewPath[0]];
   const document = pane.documentId
     ? getDocumentByIdOrFilePath(
         acc.documents,
@@ -121,23 +139,7 @@ function planUpdateOneMetadata(
       metadata.argument
     )[0];
   }
-  return planUpdateViewItemMetadata(
-    acc,
-    {
-      node: row.node,
-      nodeID: row.node.id,
-      viewPath: row.viewPath,
-      parentNode: row.parentNode,
-      parentViewPath: row.parentViewPath,
-      childIndex: row.childIndex,
-      paneIndex,
-      paneAuthor: pane.sourceId,
-      documentId: pane.documentId,
-      isDocumentTopLevel: pane.documentId !== undefined && !row.parentViewPath,
-    },
-    metadata,
-    editorSpans
-  );
+  return acc;
 }
 
 function materializationFirst(rows: Row[]): Row[] {

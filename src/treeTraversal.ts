@@ -1160,7 +1160,11 @@ function getChildrenForRegularNode(
   }
 
   const rowsByChildId = Map<ID, Row>(
-    childRowPairs.map(({ childID, row }) => [childID, row])
+    parentRow.composed
+      ? combinedRows
+          .toArray()
+          .map((row): [ID, Row] => [row.composed?.id ?? row.node.id, row])
+      : childRowPairs.map(({ childID, row }) => [childID, row])
   );
   const { rows: rowsWithProjections, actionRow } = interleaveProjectionRows(
     data,

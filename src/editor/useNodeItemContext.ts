@@ -6,14 +6,10 @@ import {
   useRow,
 } from "../rowModel";
 import { isEmptyNodeID } from "../core/connections";
-import { planJudgeComposedRow } from "./batchOperations";
-import { planMaterializeComputedRow } from "../core/plan";
+import { planUpdateOneMetadata } from "./batchOperations";
 import { usePlanner } from "../planner";
-import {
-  planUpdateViewItemMetadata,
-  NodeItemMetadata,
-} from "../nodeItemMutations";
-import { useCurrentPane, usePaneIndex } from "../SplitPanesContext";
+import { NodeItemMetadata } from "../nodeItemMetadata";
+import { useCurrentPane } from "../SplitPanesContext";
 import { useEditorText } from "./EditorTextContext";
 import { nodeText as getNodeSpanText } from "../core/nodeSpans";
 
@@ -52,7 +48,6 @@ export function useNodeItemContext(): NodeItemContext {
   const currentNode = useCurrentNode();
   const parentView = row.parentViewPath;
   const pane = useCurrentPane();
-  const paneIndex = usePaneIndex();
   const isDocumentTopLevel =
     pane.documentId !== undefined && parentView === undefined && !!currentNode;
 
@@ -92,60 +87,13 @@ export function useNodeItemContext(): NodeItemContext {
   })();
 
   const updateMetadata = (metadata: NodeItemMetadata): void => {
-    const editorSpans = editorTextContext?.spans;
     if (isViewingOtherUserContent || (isEmptyNode && !nodeID)) return;
-    if (row.composed) {
-      executePlan(
-        planJudgeComposedRow(
-          createPlan(),
-          row.composed,
-          row.viewPath,
-          metadata,
-          editorSpans
-        )
-      );
-      return;
-    }
-    // Write gestures take first: the selector's judgment on a computed
-    // row materializes it with the judgment, one plan.
-    if (row.materialize !== undefined) {
-      const [materializedPlan, , materializedNow] = planMaterializeComputedRow(
+    executePlan(
+      planUpdateOneMetadata(
         createPlan(),
         row,
-        {
-          relevance: metadata.relevance,
-          argument: metadata.argument,
-        }
-      );
-      if (materializedNow) {
-        executePlan(materializedPlan);
-        return;
-      }
-    }
-    if (
-      !isEmptyNode &&
-      !isDocumentTopLevel &&
-      (!isVisible || !parentView || nodeIndex === undefined)
-    )
-      return;
-
-    executePlan(
-      planUpdateViewItemMetadata(
-        createPlan(),
-        {
-          node: row.node,
-          nodeID: row.node.id,
-          viewPath,
-          parentNode: row.parentNode,
-          parentViewPath: row.parentViewPath,
-          childIndex: row.childIndex,
-          paneIndex,
-          paneAuthor: pane.sourceId,
-          documentId: pane.documentId,
-          isDocumentTopLevel,
-        },
         metadata,
-        editorSpans
+        editorTextContext?.spans
       )
     );
   };

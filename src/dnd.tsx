@@ -7,13 +7,12 @@ import { LOCAL } from "./core/nodeRef";
 import { moveNodes, createRefTarget, getNode } from "./core/connections";
 import { nodeText } from "./core/nodeSpans";
 import { calendarEntryTarget } from "./core/ical";
-import { getIndependentRows, updateViewPathsAfterMoveNodes } from "./rowModel";
+import { getIndependentRows } from "./rowModel";
 import { getDocumentForNode } from "./core/Document";
 import {
   Plan,
   applyGesture,
   moveGestureRows,
-  planUpdateViews,
   planExpandNode,
   planAddToParent,
   planUpsertNodes,
@@ -546,13 +545,9 @@ export function dnd(
         if (fromIndex < 0) {
           return materializedPlan;
         }
-        const reordered = planUpsertNodes(
+        return planUpsertNodes(
           materializedPlan,
           moveNodes(parentNode, [fromIndex], insertAt)
-        );
-        return planUpdateViews(
-          reordered,
-          updateViewPathsAfterMoveNodes(reordered)
         );
       }
       return planMoveNode(
@@ -584,12 +579,10 @@ export function dnd(
       row.childIndex === undefined ? [] : [row.childIndex]
     );
     const targetNode = getCurrentPlanNode(plan, targetParentNode);
-    const updatedNodesPlan = planUpsertNodes(
+    const reorderedPlan = planUpsertNodes(
       plan,
       moveNodes(targetNode, sourceIndices, dropIndex)
     );
-    const updatedViews = updateViewPathsAfterMoveNodes(updatedNodesPlan);
-    const reorderedPlan = planUpdateViews(updatedNodesPlan, updatedViews);
     return virtualRows.reduce((accPlan: Plan, sourceRow, idx) => {
       const insertAt = dropIndex + sourceIndices.length + idx;
       return addProjectedSourceAsReference(accPlan, sourceRow, insertAt);

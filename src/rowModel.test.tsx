@@ -8,7 +8,6 @@ import {
   updateViewPathsAfterDisconnect,
   updateViewPathsAfterPaneDelete,
   updateViewPathsAfterPaneInsert,
-  updateViewPathsAfterMoveNodes,
   ViewPath,
 } from "./rowModel";
 
@@ -229,30 +228,4 @@ test("updateViewPathsAfterPaneInsert shifts pane indices at and after insertion 
 
   expect(updatedViews.has("p3:root")).toBe(true);
   expect(updatedViews.get("p3:root")?.expanded).toBe(true);
-});
-
-test("updateViewPathsAfterMoveNodes preserves paths when nodeID starts with digit", () => {
-  const relID = "3abc_uuid" as ID;
-  const childAPath = `p0:root:${relID}:childA`;
-  const childADeepPath = `p0:root:${relID}:childA:innerRel:grand`;
-  const childBPath = `p0:root:${relID}:childB`;
-
-  const views = Map<string, View>({
-    "p0:root:0": { expanded: true },
-    [childAPath]: { expanded: true },
-    [childADeepPath]: { expanded: true },
-    [childBPath]: { expanded: false },
-  });
-
-  const data = { views } as unknown as Data;
-
-  const updatedViews = updateViewPathsAfterMoveNodes(data);
-
-  expect(updatedViews.has(childAPath)).toBe(true);
-  expect(updatedViews.get(childAPath)?.expanded).toBe(true);
-  expect(updatedViews.has(childADeepPath)).toBe(true);
-  expect(updatedViews.get(childADeepPath)?.expanded).toBe(true);
-  expect(updatedViews.has(childBPath)).toBe(true);
-
-  expect(updatedViews).toEqual(views);
 });

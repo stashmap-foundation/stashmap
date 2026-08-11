@@ -42,7 +42,6 @@ import {
   getParentView,
   addNodeToPathWithNodes,
   addNodesToLastElement,
-  bulkUpdateViewPathsAfterAddNode,
   copyViewsWithNewPrefix,
   viewPathToString,
 } from "./rowModel";
@@ -842,7 +841,6 @@ export function applyGesture(plan: Plan, gesture: Gesture): Plan {
     return judge(plan, {
       kind: "judge",
       row: gesture.row,
-      path: gesture.path,
       relevance: "not_relevant",
       argument: gesture.row.argument,
       spans: gesture.spans,
@@ -1133,9 +1131,7 @@ export function planAddToParent(
     relevance,
     argument
   );
-  const updatedViews = bulkUpdateViewPathsAfterAddNode(updatedNodesPlan);
-
-  return [planUpdateViews(updatedNodesPlan, updatedViews), actualItemIDs];
+  return [updatedNodesPlan, actualItemIDs];
 }
 
 export function planAddSpansToParent(

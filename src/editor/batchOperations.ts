@@ -46,7 +46,6 @@ function getEditorSpansForRow(
 export function planJudgeComposedRow(
   plan: Plan,
   composed: ComposedRow,
-  path: Row["viewPath"],
   metadata: NodeItemMetadata,
   editorSpans: InlineSpan[] | undefined
 ): Plan {
@@ -55,14 +54,12 @@ export function planJudgeComposedRow(
     return applyGesture(plan, {
       kind: "dismiss",
       row: composed,
-      path,
       spans,
     });
   }
   return applyGesture(plan, {
     kind: "judge",
     row: composed,
-    path,
     relevance:
       "relevance" in metadata ? metadata.relevance : composed.node.relevance,
     argument:
@@ -78,13 +75,7 @@ export function planUpdateOneMetadata(
   editorSpans: InlineSpan[] | undefined
 ): Plan {
   if (row.composed) {
-    return planJudgeComposedRow(
-      acc,
-      row.composed,
-      row.viewPath,
-      metadata,
-      editorSpans
-    );
+    return planJudgeComposedRow(acc, row.composed, metadata, editorSpans);
   }
   if (isEmptyNodeID(row.node.id)) {
     if (!row.parentViewPath) {

@@ -652,7 +652,6 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
         applyGesture(createPlan(), {
           kind: "reword",
           row: row.composed,
-          path: row.viewPath,
           spans: nextSpans,
         })
       );

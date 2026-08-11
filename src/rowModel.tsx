@@ -95,16 +95,13 @@ export function parseViewPath(path: string): ViewPath {
   return [paneIndex, ...pathPieces];
 }
 
-function convertViewPathToString(viewContext: ViewPath): string {
+export function viewPathToString(viewContext: ViewPath): string {
   const paneIndex = viewContext[0] as number;
   const pathPart = (viewContext.slice(1) as readonly ViewPathSegment[])
     .map((segment) => encodePathID(segment))
     .join(":");
   return `p${paneIndex}:${pathPart}`;
 }
-
-// TODO: delete this export
-export const viewPathToString = convertViewPathToString;
 
 export function isRoot(viewPath: ViewPath): boolean {
   return viewPath.length === 2;
@@ -136,17 +133,6 @@ export function getPaneRootItemID(pane: Pane): ID {
     pane.rootNodeId ||
     (pane.searchQuery ? createSearchId(pane.searchQuery) : undefined) ||
     EMPTY_NODE_ID
-  );
-}
-
-function getViewExactMatch(views: Views, path: ViewPath): View | undefined {
-  const viewKey = viewPathToString(path);
-  return views.get(viewKey);
-}
-
-export function getViewForNode(data: Data, path: ViewPath, nodeID: ID): View {
-  return (
-    getViewExactMatch(data.views, path) || getDefaultView(nodeID, isRoot(path))
   );
 }
 
@@ -382,12 +368,6 @@ function pathContainsSubpath(
   );
 }
 
-export function updateViewPathsAfterMoveNodes(
-  data: Pick<Data, "views">
-): Views {
-  return data.views;
-}
-
 export function updateViewPathsAfterDisconnect(
   views: Views,
   disconnectNode: ID,
@@ -436,8 +416,4 @@ export function updateViewPathsAfterPaneInsert(
     }
     return key;
   });
-}
-
-export function bulkUpdateViewPathsAfterAddNode(data: Data): Views {
-  return data.views;
 }

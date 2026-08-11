@@ -67,7 +67,6 @@ export type Gesture =
   | {
       kind: "judge";
       row: ComposedRow;
-      path: readonly [number, ...ID[]];
       relevance: Relevance;
       argument: Argument;
       spans: InlineSpan[];
@@ -87,7 +86,6 @@ export type Gesture =
   | {
       kind: "reword";
       row: ComposedRow;
-      path: readonly [number, ...ID[]];
       spans: InlineSpan[];
     }
   | {
@@ -104,7 +102,6 @@ export type Gesture =
   | {
       kind: "dismiss";
       row: ComposedRow;
-      path: readonly [number, ...ID[]];
       spans: InlineSpan[];
     };
 

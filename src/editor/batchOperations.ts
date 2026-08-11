@@ -1,21 +1,16 @@
 import { List, OrderedSet } from "immutable";
-import { LOCAL } from "../core/nodeRef";
-import {
-  addNodeToPathWithNodes,
-  addNodesToLastElement,
-  viewPathToString,
-} from "../rowModel";
+import { appendToPath, viewPathToString } from "../rowModel";
 import {
   Plan,
   applyGesture,
+  moveGestureRows,
   planExpandNode,
   planSaveNodeAndEnsureNodes,
   planUpdateEmptyNodeMetadata,
   planUpdateNodeSpans,
 } from "../planner";
 import { NodeItemMetadata } from "../nodeItemMetadata";
-import { planMoveNode } from "../treeMutations";
-import { getNode, isEmptyNodeID } from "../core/connections";
+import { isEmptyNodeID } from "../core/connections";
 import {
   planAddTopTargetsToDocument,
   planMaterializeComputedRow,
@@ -279,8 +274,32 @@ function getPreviousSiblingFromRows(
     );
 }
 
-function getCurrentPlanNode(plan: Plan, node: GraphNode): GraphNode {
-  return getNode(plan.knowledgeDBs, node.id, LOCAL) ?? node;
+function planBatchMove(
+  plan: Plan,
+  sortedRows: Row[],
+  moved: Plan,
+  parentPath: Row["viewPath"],
+  editorInfo: EditorInfo | undefined
+): Plan {
+  const withEdits = sortedRows.reduce((acc, row) => {
+    const editorSpans = getEditorSpansForRow(editorInfo, row);
+    return !editorSpans ||
+      row.composed?.reader !== true ||
+      spansToMarkdown(editorSpans) === spansToMarkdown(row.node.spans)
+      ? acc
+      : planUpdateNodeSpans(acc, row.node.id, editorSpans);
+  }, moved);
+  const remappedKeys = sortedRows.flatMap((row) =>
+    row.composed?.reader === true
+      ? [
+          {
+            fromKey: row.viewKey,
+            toKey: viewPathToString(appendToPath(parentPath, row.node.id)),
+          },
+        ]
+      : []
+  );
+  return remapSelectionForMovedKeys(plan, withEdits, remappedKeys);
 }
 
 export function planBatchIndent(
@@ -290,84 +309,30 @@ export function planBatchIndent(
   editorInfo?: EditorInfo
 ): Plan | undefined {
   if (!allSameParent(rows)) return undefined;
-
   const sortedRows = sortByNodeIndex(rows);
   const firstRow = sortedRows[0];
-
   const prevSibling = getPreviousSiblingFromRows(orderedRows, firstRow);
-  if (!prevSibling) return undefined;
-
-  // Indenting onto a computed row takes it first.
-  const [planMaterialized, takenPrevSibling] = planMaterializeComputedRow(
+  const parent = prevSibling?.composed;
+  if (!prevSibling || !parent) return undefined;
+  const gestureRows = moveGestureRows(sortedRows, orderedRows);
+  if (gestureRows.length !== sortedRows.length) return undefined;
+  const movedPlan = applyGesture(
+    planExpandNode(plan, prevSibling.view, prevSibling.viewPath),
+    {
+      kind: "move",
+      rows: gestureRows,
+      parent,
+      parentPath: prevSibling.viewPath,
+      after: parent.children[parent.children.length - 1],
+    }
+  );
+  return planBatchMove(
     plan,
-    prevSibling
-  );
-
-  const takenViewPath = addNodesToLastElement(
+    sortedRows,
+    movedPlan,
     prevSibling.viewPath,
-    takenPrevSibling.id
+    editorInfo
   );
-
-  const planWithExpand = planExpandNode(
-    planMaterialized,
-    prevSibling.view,
-    takenViewPath
-  );
-
-  const { plan: updated, remappedKeys } = sortedRows.reduce<{
-    plan: Plan;
-    remappedKeys: { fromKey: string; toKey: string }[];
-  }>(
-    (state, row) => {
-      const { viewPath } = row;
-      const fromKey = row.viewKey;
-      if (!row.parentNode) {
-        return state;
-      }
-      const targetNodeBefore = getCurrentPlanNode(state.plan, takenPrevSibling);
-      const insertAt = targetNodeBefore.children.size;
-      const moved = planMoveNode(
-        state.plan,
-        row.node.id,
-        row.node.id,
-        row.parentNode.id,
-        viewPath,
-        targetNodeBefore.id,
-        takenViewPath,
-        insertAt
-      );
-      const targetNodeAfter = getCurrentPlanNode(moved, takenPrevSibling);
-      const updatedViewPath =
-        targetNodeAfter && insertAt < targetNodeAfter.children.size
-          ? addNodeToPathWithNodes(takenViewPath, targetNodeAfter, insertAt)
-          : undefined;
-      const nextRemappedKeys = updatedViewPath
-        ? [
-            ...state.remappedKeys,
-            {
-              fromKey,
-              toKey: viewPathToString(updatedViewPath),
-            },
-          ]
-        : state.remappedKeys;
-      const editorSpans = getEditorSpansForRow(editorInfo, row);
-      if (
-        !editorSpans ||
-        spansToMarkdown(editorSpans) === spansToMarkdown(row.node.spans)
-      ) {
-        return { plan: moved, remappedKeys: nextRemappedKeys };
-      }
-      return {
-        plan: updatedViewPath
-          ? planUpdateNodeSpans(moved, row.node.id, editorSpans)
-          : moved,
-        remappedKeys: nextRemappedKeys,
-      };
-    },
-    { plan: planWithExpand, remappedKeys: [] }
-  );
-
-  return remapSelectionForMovedKeys(plan, updated, remappedKeys);
 }
 
 export function planBatchOutdent(
@@ -377,71 +342,27 @@ export function planBatchOutdent(
   editorInfo?: EditorInfo
 ): Plan | undefined {
   if (!allSameParent(rows)) return undefined;
-
   const sortedRows = sortByNodeIndex(rows);
   const firstRow = sortedRows[0];
   const parentRow = getVisibleParentRow(orderedRows, firstRow);
-  if (!parentRow?.parentNode) return undefined;
+  if (!parentRow?.composed) return undefined;
   const grandParentRow = getVisibleParentRow(orderedRows, parentRow);
-  if (!grandParentRow) return undefined;
-
-  const grandParentNode = parentRow.parentNode;
-  const grandParentPath = grandParentRow.viewPath;
-
-  const parentNodeIndex = firstRow.parentChildIndex;
-  if (parentNodeIndex === undefined) return undefined;
-
-  const { plan: updated, remappedKeys } = sortedRows.reduce<{
-    plan: Plan;
-    remappedKeys: { fromKey: string; toKey: string }[];
-  }>(
-    (state, row, idx) => {
-      const { viewPath } = row;
-      const fromKey = row.viewKey;
-      if (!row.parentNode) {
-        return state;
-      }
-      const insertAt = parentNodeIndex + 1 + idx;
-      const moved = planMoveNode(
-        state.plan,
-        row.node.id,
-        row.node.id,
-        row.parentNode.id,
-        viewPath,
-        grandParentNode.id,
-        grandParentPath,
-        insertAt
-      );
-      const targetNodeAfter = getCurrentPlanNode(moved, grandParentNode);
-      const updatedViewPath =
-        targetNodeAfter && insertAt < targetNodeAfter.children.size
-          ? addNodeToPathWithNodes(grandParentPath, targetNodeAfter, insertAt)
-          : undefined;
-      const nextRemappedKeys = updatedViewPath
-        ? [
-            ...state.remappedKeys,
-            {
-              fromKey,
-              toKey: viewPathToString(updatedViewPath),
-            },
-          ]
-        : state.remappedKeys;
-      const editorSpans = getEditorSpansForRow(editorInfo, row);
-      if (
-        !editorSpans ||
-        spansToMarkdown(editorSpans) === spansToMarkdown(row.node.spans)
-      ) {
-        return { plan: moved, remappedKeys: nextRemappedKeys };
-      }
-      return {
-        plan: updatedViewPath
-          ? planUpdateNodeSpans(moved, row.node.id, editorSpans)
-          : moved,
-        remappedKeys: nextRemappedKeys,
-      };
-    },
-    { plan, remappedKeys: [] }
+  const parent = grandParentRow?.composed;
+  if (!grandParentRow || !parent) return undefined;
+  const gestureRows = moveGestureRows(sortedRows, orderedRows);
+  if (gestureRows.length !== sortedRows.length) return undefined;
+  const movedPlan = applyGesture(plan, {
+    kind: "move",
+    rows: gestureRows,
+    parent,
+    parentPath: grandParentRow.viewPath,
+    after: parentRow.composed,
+  });
+  return planBatchMove(
+    plan,
+    sortedRows,
+    movedPlan,
+    grandParentRow.viewPath,
+    editorInfo
   );
-
-  return remapSelectionForMovedKeys(plan, updated, remappedKeys);
 }

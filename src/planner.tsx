@@ -755,6 +755,38 @@ function move(plan: Plan, gesture: Extract<Gesture, { kind: "move" }>): Plan {
   );
 }
 
+export function moveGestureRows(
+  rows: Row[],
+  orderedRows: List<Row>
+): Extract<Gesture, { kind: "move" }>["rows"] {
+  const moved = new globalThis.Set(
+    rows.flatMap((row) => (row.composed ? [row.composed] : []))
+  );
+  return rows.flatMap((row) => {
+    if (!row.composed) {
+      return [];
+    }
+    const sourceParent = orderedRows
+      .slice(0, row.index)
+      .reverse()
+      .find((candidate) => candidate.depth === row.depth - 1)?.composed;
+    const siblings = sourceParent?.children ?? [];
+    const index = siblings.indexOf(row.composed);
+    const predecessor = siblings
+      .slice(0, index)
+      .reverse()
+      .find((candidate) => !moved.has(candidate));
+    return [
+      {
+        row: row.composed,
+        sourceParent,
+        predecessor,
+        path: row.viewPath,
+      },
+    ];
+  });
+}
+
 function place(plan: Plan, gesture: Extract<Gesture, { kind: "place" }>): Plan {
   const [withParent, parent] = localParentFor(plan, gesture.parent);
   if (!parent) {

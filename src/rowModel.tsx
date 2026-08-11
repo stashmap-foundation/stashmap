@@ -257,6 +257,13 @@ export function useIsInSearchView(): boolean {
   return useSearchDepth() !== undefined;
 }
 
+export function appendToPath(
+  [paneIndex, ...segments]: ViewPath,
+  nodeID: ID
+): ViewPath {
+  return [paneIndex, ...segments, nodeID];
+}
+
 export function addNodesToLastElement(path: ViewPath, nodeID: ID): ViewPath {
   const last = getLast(path);
   if (last === nodeID) {

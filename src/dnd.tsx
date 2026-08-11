@@ -12,6 +12,7 @@ import { getDocumentForNode } from "./core/Document";
 import {
   Plan,
   applyGesture,
+  moveGestureRows,
   planUpdateViews,
   planExpandNode,
   planAddToParent,
@@ -406,32 +407,7 @@ export function dnd(
     if (moveRows.length === 0 || doorTarget === undefined) {
       return basePlan;
     }
-    const moved = new globalThis.Set(
-      moveRows.flatMap((row) => (row.composed ? [row.composed] : []))
-    );
-    const rows = moveRows.flatMap((row) => {
-      if (!row.composed) {
-        return [];
-      }
-      const sourceParent = sourceDrag.orderedRows
-        .slice(0, row.index)
-        .reverse()
-        .find((candidate) => candidate.depth === row.depth - 1)?.composed;
-      const siblings = sourceParent?.children ?? [];
-      const index = siblings.indexOf(row.composed);
-      const predecessor = siblings
-        .slice(0, index)
-        .reverse()
-        .find((candidate) => !moved.has(candidate));
-      return [
-        {
-          row: row.composed,
-          sourceParent,
-          predecessor,
-          path: row.viewPath,
-        },
-      ];
-    });
+    const rows = moveGestureRows(moveRows, sourceDrag.orderedRows);
     return applyGesture(
       recordForeignSources(
         planExpandNode(basePlan, targetParentRow.view, targetParentRow.viewPath)

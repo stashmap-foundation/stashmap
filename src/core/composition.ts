@@ -147,10 +147,22 @@ function projects(node: GraphNode): boolean {
   return kind === "placement" || kind === "speaking";
 }
 
-function anchored(node: GraphNode): boolean {
-  return (
-    node.extraAttrs?.front === "true" || node.extraAttrs?.after !== undefined
+export type PositionName = { kind: "after" | "before" | "parent"; id: ID };
+
+export function positionNames(node: GraphNode): PositionName[] {
+  return Object.entries(node.extraAttrs ?? {}).flatMap(([key, value]) =>
+    key === "after" || key === "before" || key === "parent"
+      ? [{ kind: key, id: value }]
+      : []
   );
+}
+
+function siblingNamed(names: PositionName[]): boolean {
+  return names.some((name) => name.kind !== "parent");
+}
+
+function anchored(node: GraphNode): boolean {
+  return positionNames(node).length > 0;
 }
 
 export function clearPosition(
@@ -158,22 +170,20 @@ export function clearPosition(
 ): Record<string, string> {
   return Object.fromEntries(
     Object.entries(attrs ?? {}).filter(
-      ([key]) => key !== "front" && key !== "after"
+      ([key]) => key !== "after" && key !== "before" && key !== "parent"
     )
   );
 }
 
-export function positionAttrs(after: ID | undefined): Record<string, string> {
-  return after === undefined ? { front: "true" } : { after };
+export function positionAttrs(names: PositionName[]): Record<string, string> {
+  return Object.fromEntries(names.map((name) => [name.kind, name.id]));
 }
 
 export function positionOf(node: GraphNode): string | undefined {
-  if (node.extraAttrs?.front === "true") {
-    return "front";
-  }
-  return node.extraAttrs?.after === undefined
+  const names = positionNames(node);
+  return names.length === 0
     ? undefined
-    : `after:${node.extraAttrs.after}`;
+    : names.map((name) => `${name.kind}:${name.id}`).join(" ");
 }
 
 function hasMarker(node: GraphNode): boolean {
@@ -353,31 +363,58 @@ function followAnchors(root: ComposedRow): ComposedRow {
     if (entry.hidden || !entry.row.reader) {
       return undefined;
     }
-    const anchor = entry.row.node.extraAttrs?.after;
-    if (anchor === undefined) {
+    const names = positionNames(entry.row.node);
+    if (names.length === 0) {
       return undefined;
     }
     const scope = scopePrefix(tree.children, entry.path);
-    const candidates = entries.filter(
-      (candidate) =>
-        !candidate.hidden &&
-        isPathPrefix(scope, candidate.path) &&
-        candidate.path.join(",") !== entry.path.join(",") &&
-        !isPathPrefix(entry.path, candidate.path) &&
-        !candidate.row.flags.some((flag) => BROKEN_FLAGS.includes(flag)) &&
-        (candidate.row.id === anchor || candidate.row.chain.includes(anchor))
-    );
-    const exact = candidates.filter((candidate) => candidate.row.id === anchor);
-    const chosen = exact.length > 0 ? exact : candidates;
-    if (chosen.length !== 1) {
+    const candidatesFor = (
+      name: PositionName
+    ): { path: number[]; row: ComposedRow; hidden: boolean }[] =>
+      entries.filter(
+        (candidate) =>
+          !candidate.hidden &&
+          isPathPrefix(scope, candidate.path) &&
+          candidate.path.join(",") !== entry.path.join(",") &&
+          !isPathPrefix(entry.path, candidate.path) &&
+          !candidate.row.flags.some((flag) => BROKEN_FLAGS.includes(flag)) &&
+          (candidate.row.id === name.id ||
+            candidate.row.chain.includes(name.id))
+      );
+    const decided = names.reduce<
+      { name: PositionName; chosen: { path: number[] }[] } | undefined
+    >((done, name) => {
+      if (done !== undefined) {
+        return done;
+      }
+      const candidates = candidatesFor(name);
+      const exact = candidates.filter(
+        (candidate) => candidate.row.id === name.id
+      );
+      const chosen = exact.length > 0 ? exact : candidates;
+      return chosen.length > 0 ? { name, chosen } : undefined;
+    }, undefined);
+    if (decided === undefined || decided.chosen.length !== 1) {
       return undefined;
     }
-    const anchorPath = chosen[0].path;
-    if (
+    const { name } = decided;
+    const anchorPath = decided.chosen[0].path;
+    const bare = !siblingNamed(names);
+    const entryIndex = entry.path[entry.path.length - 1];
+    const anchorIndex = anchorPath[anchorPath.length - 1];
+    const sameLevel =
       anchorPath.length === entry.path.length &&
-      isPathPrefix(anchorPath.slice(0, -1), entry.path) &&
-      entry.path[entry.path.length - 1] ===
-        anchorPath[anchorPath.length - 1] + 1
+      isPathPrefix(anchorPath.slice(0, -1), entry.path);
+    if (name.kind === "after" && sameLevel && entryIndex === anchorIndex + 1) {
+      return undefined;
+    }
+    if (name.kind === "before" && sameLevel && entryIndex === anchorIndex - 1) {
+      return undefined;
+    }
+    if (
+      name.kind === "parent" &&
+      entry.path.length === anchorPath.length + 1 &&
+      isPathPrefix(anchorPath, entry.path)
     ) {
       return undefined;
     }
@@ -395,7 +432,24 @@ function followAnchors(root: ComposedRow): ComposedRow {
       ...entry.row,
       flags: entry.row.flags.filter((flag) => flag !== "lapsed"),
     };
-    const insertIndex = shifted[shifted.length - 1] + 1;
+    if (name.kind === "parent") {
+      const anchorRow = at(without, shifted);
+      return {
+        ...tree,
+        children: replace(without, shifted, [
+          {
+            ...anchorRow,
+            children: bare
+              ? [view, ...anchorRow.children]
+              : [...anchorRow.children, view],
+          },
+        ]),
+      };
+    }
+    const insertIndex =
+      name.kind === "after"
+        ? shifted[shifted.length - 1] + 1
+        : shifted[shifted.length - 1];
     if (shifted.length === 1) {
       return {
         ...tree,
@@ -423,8 +477,7 @@ function followAnchors(root: ComposedRow): ComposedRow {
   };
 
   const anchoredCount = entriesOf(root, [], false).filter(
-    (entry) =>
-      entry.row.reader && entry.row.node.extraAttrs?.after !== undefined
+    (entry) => entry.row.reader && anchored(entry.row.node)
   ).length;
   const bound = globalThis.Math.max(10, 2 * anchoredCount * anchoredCount);
 
@@ -1285,19 +1338,41 @@ export function composeNote(
         ...current.slice(0, currentIndex),
         ...current.slice(currentIndex + 1),
       ];
-      if (claim.node.extraAttrs?.front === "true") {
-        return [view, ...without];
-      }
-      const anchor = claim.node.extraAttrs?.after;
-      const { positions, ambiguous } = validAnchorPositions(
-        without,
-        anchor ?? ""
+      const names = positionNames(claim.node);
+      const ownerTarget = targetOf(owner.node);
+      const placed = names.reduce<ComposedRow[] | "ambiguous" | undefined>(
+        (done, name) => {
+          if (done !== undefined) {
+            return done;
+          }
+          if (name.kind === "parent") {
+            if (name.id !== owner.node.id && name.id !== ownerTarget) {
+              return undefined;
+            }
+            return siblingNamed(names)
+              ? [...without, view]
+              : [view, ...without];
+          }
+          const { positions, ambiguous } = validAnchorPositions(
+            without,
+            name.id
+          );
+          if (positions.length === 1) {
+            const index =
+              name.kind === "after" ? positions[0] + 1 : positions[0];
+            return [...without.slice(0, index), view, ...without.slice(index)];
+          }
+          return ambiguous ? "ambiguous" : undefined;
+        },
+        undefined
       );
-      if (positions.length === 1) {
-        const index = positions[0] + 1;
-        return [...without.slice(0, index), view, ...without.slice(index)];
+      if (globalThis.Array.isArray(placed)) {
+        return placed;
       }
-      const flagged = withFlag(view, ambiguous ? "ambiguous-anchor" : "lapsed");
+      const flagged = withFlag(
+        view,
+        placed === "ambiguous" ? "ambiguous-anchor" : "lapsed"
+      );
       const index = globalThis.Math.min(
         baseline.get(claim.node.id) ?? without.length,
         without.length

@@ -38,7 +38,7 @@ test.each(variants)(
   "dropping after an anchored own row inside an embed [%s]",
   async (variant) => {
     const workspacePath = simpleSourceWorkspace(
-      '  - Own anchor <!-- id:own front="true" -->'
+      '  - Own anchor <!-- id:own before="a" parent="source" -->'
     );
     await expandOverlayWorkspace(workspacePath, "note.md");
     await materializeOverlayRow(variant, "C");
@@ -58,7 +58,7 @@ Note
 
 test.each(variants)("dropping after a rewording [%s]", async (variant) => {
   const workspacePath = simpleSourceWorkspace(
-    '  - Reader A ~~[A](#a)~~ <!-- id:reader-a embed="true" front="true" -->'
+    '  - Reader A ~~[A](#a)~~ <!-- id:reader-a embed="true" before="b" parent="source" -->'
   );
   await expandOverlayWorkspace(workspacePath, "note.md");
   await materializeOverlayRow(variant, "C");

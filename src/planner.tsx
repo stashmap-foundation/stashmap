@@ -60,8 +60,10 @@ import { planRepairDependentAnchors } from "./dataPlanner";
 import {
   Gesture,
   ComposedRow,
+  PositionName,
   clearPosition,
   positionAttrs,
+  positionNames,
   positionOf,
 } from "./core/composition";
 import {
@@ -276,10 +278,26 @@ function positionRows(
     ...stationary.slice(anchorIndex + 1),
   ];
   const anchorIDFor = (seat: Seat): ID => seat.localID ?? seat.id;
-  const signatureAt = (index: number): string => {
+  const parentAnchor = parent.target ?? parent.id;
+  const namesAt = (index: number): PositionName[] => {
     const predecessor = desired[index - 1];
-    return predecessor ? `after:${anchorIDFor(predecessor)}` : "front";
+    const successor = movedIds.has(desired[index].id)
+      ? desired.slice(index + 1).find((seat) => !movedIds.has(seat.id))
+      : desired[index + 1];
+    return [
+      ...(predecessor
+        ? [{ kind: "after" as const, id: anchorIDFor(predecessor) }]
+        : []),
+      ...(successor
+        ? [{ kind: "before" as const, id: anchorIDFor(successor) }]
+        : []),
+      { kind: "parent" as const, id: parentAnchor },
+    ];
   };
+  const signatureAt = (index: number): string =>
+    namesAt(index)
+      .map((name) => `${name.kind}:${name.id}`)
+      .join(" ");
   const movedSeats = new globalThis.Set(
     moved.flatMap((seat) => [
       seat.id,
@@ -298,8 +316,8 @@ function positionRows(
     const node = localNode(seat);
     if (
       seat.localID !== undefined &&
-      node?.extraAttrs?.after !== undefined &&
-      movedSeats.has(node.extraAttrs.after)
+      node !== undefined &&
+      positionNames(node).some((name) => movedSeats.has(name.id))
     ) {
       affected.add(seat.localID);
     }
@@ -312,12 +330,16 @@ function positionRows(
     );
     const displaced = desired.flatMap((seat) => {
       const node = localNode(seat);
+      const names = node ? positionNames(node) : [];
       const occupies = occupied.some((predecessor) =>
         predecessor
-          ? node?.extraAttrs?.after === predecessor.id ||
-            (node?.extraAttrs?.after !== undefined &&
-              predecessor.chain.includes(node.extraAttrs.after))
-          : node?.extraAttrs?.front === "true"
+          ? names.some(
+              (name) =>
+                name.kind === "after" &&
+                (name.id === predecessor.id ||
+                  predecessor.chain.includes(name.id))
+            )
+          : names.length > 0 && names.every((name) => name.kind === "parent")
       );
       return seat.localID !== undefined &&
         !affected.has(seat.localID) &&
@@ -340,9 +362,9 @@ function positionRows(
       return current;
     }
     // Outside a placement scope the file order carries own rows and fresh
-    // placements; a MOVED placement keeps a truthful front=/after= anywhere,
-    // because only an anchored placement consumes its projected occurrence
-    // (rule 6/11). Displaced anchored siblings re-aim in every scope.
+    // placements; a MOVED placement keeps a truthful name ladder anywhere,
+    // because only a named placement consumes its projected occurrence.
+    // Displaced named siblings re-aim in every scope.
     if (
       !placementScope &&
       (placementTarget(node) === undefined ||
@@ -356,16 +378,13 @@ function positionRows(
             updated: nextUpdated(node),
           });
     }
-    const predecessor = desired[index - 1];
     return positionOf(node) === signatureAt(index)
       ? current
       : planUpsertNodes(current, {
           ...node,
           extraAttrs: {
             ...clearPosition(node.extraAttrs),
-            ...positionAttrs(
-              predecessor === undefined ? undefined : anchorIDFor(predecessor)
-            ),
+            ...positionAttrs(namesAt(index)),
           },
           updated: nextUpdated(node),
         });
@@ -540,53 +559,57 @@ function judge(plan: Plan, gesture: Extract<Gesture, { kind: "judge" }>): Plan {
     : withRow;
 }
 
+// A drag takes its rows' seats with it. Dependents left behind restamp
+// against their remaining visible neighbors, so the source list reads
+// back exactly as the screen shows it after the move.
 function repairSourceDependents(
   plan: Plan,
   rows: Extract<Gesture, { kind: "move" }>["rows"]
 ): Plan {
   const moved = new globalThis.Set(rows.map((entry) => entry.row));
-  const repairs = rows
-    .flatMap((entry) => {
-      const seats = [
-        entry.row.id,
-        ...(entry.row.target ? [entry.row.target] : []),
+  const seatIds = new globalThis.Set(
+    rows.flatMap((entry) => [
+      entry.row.id,
+      ...(entry.row.target ? [entry.row.target] : []),
+    ])
+  );
+  const parents = rows
+    .flatMap((entry) => (entry.sourceParent ? [entry.sourceParent] : []))
+    .filter((parent, index, all) => all.indexOf(parent) === index);
+  return parents.reduce((current, sourceParent) => {
+    const remaining = sourceParent.children.filter((row) => !moved.has(row));
+    const parentAnchor = sourceParent.target ?? sourceParent.id;
+    return remaining.reduce((acc, row, index) => {
+      const node =
+        row.reader && row.ref.sourceId === LOCAL
+          ? getWorkspaceNode(acc.knowledgeDBs, row.id)
+          : undefined;
+      if (
+        !node ||
+        row.flags.includes("ambiguous-anchor") ||
+        row.flags.includes("lapsed") ||
+        !positionNames(node).some((name) => seatIds.has(name.id))
+      ) {
+        return acc;
+      }
+      const predecessor = remaining[index - 1];
+      const successor = remaining[index + 1];
+      const names: PositionName[] = [
+        ...(predecessor
+          ? [{ kind: "after" as const, id: predecessor.id }]
+          : []),
+        ...(successor ? [{ kind: "before" as const, id: successor.id }] : []),
+        { kind: "parent" as const, id: parentAnchor },
       ];
-      return (entry.sourceParent?.children ?? [])
-        .filter(
-          (candidate) =>
-            !moved.has(candidate) &&
-            !candidate.flags.includes("ambiguous-anchor") &&
-            !candidate.flags.includes("lapsed") &&
-            candidate.node.extraAttrs?.after !== undefined &&
-            seats.includes(candidate.node.extraAttrs.after)
-        )
-        .map((dependent) => ({
-          dependent,
-          predecessor: entry.predecessor,
-        }));
-    })
-    .filter(
-      (repair, index, all) =>
-        all.findIndex(
-          (candidate) => candidate.dependent === repair.dependent
-        ) === index
-    );
-  return repairs.reduce((current, repair) => {
-    const node =
-      repair.dependent.reader && repair.dependent.ref.sourceId === LOCAL
-        ? getWorkspaceNode(current.knowledgeDBs, repair.dependent.id)
-        : undefined;
-    if (!node) {
-      return current;
-    }
-    return planUpsertNodes(current, {
-      ...node,
-      extraAttrs: {
-        ...clearPosition(node.extraAttrs),
-        ...positionAttrs(repair.predecessor?.id),
-      },
-      updated: nextUpdated(node),
-    });
+      return planUpsertNodes(acc, {
+        ...node,
+        extraAttrs: {
+          ...clearPosition(node.extraAttrs),
+          ...positionAttrs(names),
+        },
+        updated: nextUpdated(node),
+      });
+    }, current);
   }, plan);
 }
 
@@ -644,7 +667,10 @@ function scopeCoversTarget(
 }
 
 function move(plan: Plan, gesture: Extract<Gesture, { kind: "move" }>): Plan {
-  const repaired = repairSourceDependents(plan, gesture.rows);
+  const repaired = repairSourceDependents(
+    plan,
+    gesture.rows.filter((entry) => entry.sourceParent !== gesture.parent)
+  );
   const [withParent, parent] = localParentFor(repaired, gesture.parent);
   if (!parent) {
     return plan;

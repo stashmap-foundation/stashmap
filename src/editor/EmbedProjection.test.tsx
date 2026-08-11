@@ -528,7 +528,7 @@ Note
       encoding: "utf8",
     });
     expect(note).toMatch(
-      /- \[Argument A\]\(#a\) <!-- id:\S+ embed="true" after="c" -->/u
+      /- \[Argument A\]\(#a\) <!-- id:\S+ embed="true" after="c" parent="src" -->/u
     );
   });
 });
@@ -878,7 +878,7 @@ Note
       encoding: "utf8",
     });
     expect(note).toMatch(
-      /- \[Gaudi\]\(#g\) <!-- id:\S+ embed="true" -->\n {4}- \[Casa Battlo\]\(#cb\) <!-- id:\S+ embed="true" front="true" -->/u
+      /- \[Gaudi\]\(#g\) <!-- id:\S+ embed="true" -->\n {4}- \[Casa Battlo\]\(#cb\) <!-- id:\S+ embed="true" before="\S+" parent="g" -->/u
     );
     expect(note).toMatch(/- \(!\) \[Sagrada Familia\]\(#sf\)/u);
   });
@@ -928,7 +928,7 @@ Note
       encoding: "utf8",
     });
     expect(note).toMatch(
-      /- \[Barcelona\]\(#bc\) <!-- id:\S+ embed="true" -->\n {4}- \[Casa Mila\]\(#cm\) <!-- id:\S+ embed="true" front="true" -->/u
+      /- \[Barcelona\]\(#bc\) <!-- id:\S+ embed="true" -->\n {4}- \[Casa Mila\]\(#cm\) <!-- id:\S+ embed="true" before="g" parent="bc" -->/u
     );
   });
 });
@@ -979,7 +979,7 @@ Note
       encoding: "utf8",
     });
     expect(note).toMatch(
-      /- My own row <!-- id:own -->\n- \[Casa Mila\]\(#cm\) <!-- id:\S+ embed="true" from="emb" after="own" -->/u
+      /- My own row <!-- id:own -->\n- \[Casa Mila\]\(#cm\) <!-- id:\S+ embed="true" from="emb" after="own" parent="note" -->/u
     );
   });
 });
@@ -1053,7 +1053,7 @@ Note
       encoding: "utf8",
     });
     expect(note).toMatch(
-      /- \[A\]\(#art\) <!-- id:emb embed="true" -->\n- My own row <!-- id:own -->\n- \(!\) \[Sagrada Familia\]\(#sf\) <!-- id:\S+ embed="true" from="emb" after="own" -->/u
+      /- \[A\]\(#art\) <!-- id:emb embed="true" -->\n- My own row <!-- id:own -->\n- \(!\) \[Sagrada Familia\]\(#sf\) <!-- id:\S+ embed="true" from="emb" after="own" parent="note" -->/u
     );
   });
 });
@@ -1126,7 +1126,7 @@ Note
       encoding: "utf8",
     });
     expect(note).toMatch(
-      /- \(!\) \[Barcelona\]\(#bc\) <!-- id:bcc embed="true" -->\n {6}- \[Gaudi\]\(#g\) <!-- id:\S+ embed="true" -->\n {8}- \(!\) \[Sagrada Familia\]\(#sf\) <!-- id:moved embed="true" front="true" -->/u
+      /- \(!\) \[Barcelona\]\(#bc\) <!-- id:bcc embed="true" -->\n {6}- \[Gaudi\]\(#g\) <!-- id:\S+ embed="true" -->\n {8}- \(!\) \[Sagrada Familia\]\(#sf\) <!-- id:moved embed="true" before="cmc" parent="g" -->/u
     );
     expect(note).not.toMatch(/^ {2}- \(!\) \[Sagrada Familia\]/mu);
   });
@@ -1186,7 +1186,7 @@ Note
       encoding: "utf8",
     });
     expect(note).toMatch(
-      /- \(!\) \[Sagrada Familia\]\(#sf\) <!-- id:moved embed="true" after="cmc" -->/u
+      /- \(!\) \[Sagrada Familia\]\(#sf\) <!-- id:moved embed="true" after="cmc" parent="g" -->/u
     );
     expect(note).not.toMatch(/^ {2}- \(!\) \[Sagrada Familia\]/mu);
   });
@@ -1262,7 +1262,7 @@ Note
       encoding: "utf8",
     });
     expect(note).toMatch(
-      /- \(!\) \[Sagrada Familia\]\(#sf\) <!-- id:\S+ embed="true" after="cm" -->/u
+      /- \(!\) \[Sagrada Familia\]\(#sf\) <!-- id:\S+ embed="true" after="cm" parent="g" -->/u
     );
   });
 });
@@ -1327,7 +1327,7 @@ Note
       encoding: "utf8",
     });
     expect(note).toMatch(
-      /- \[Casa Battlo\]\(#cb\) <!-- id:\S+ embed="true" front="true" -->/u
+      /- \[Casa Battlo\]\(#cb\) <!-- id:\S+ embed="true" before="\S+" parent="bc" -->/u
     );
     expect(note).not.toContain('after="cm"');
   });
@@ -1402,25 +1402,25 @@ Note
       encoding: "utf8",
     });
     expect(note).toMatch(
-      /- \[Sagrada Familia\]\(#sf\) <!-- id:\S+ embed="true" after="cb" -->/u
+      /- \[Sagrada Familia\]\(#sf\) <!-- id:\S+ embed="true" after="cb" parent="g" -->/u
     );
     expect(note).toMatch(
-      /- \[Casa Mila\]\(#cm\) <!-- id:\S+ embed="true" front="true" -->/u
+      /- \[Casa Mila\]\(#cm\) <!-- id:\S+ embed="true" before="bc" parent="sp" -->/u
     );
     expect(note).not.toMatch(/\[Sagrada Familia\][^\n]*after="cm"/u);
   });
 });
 
-test("moving an existing front claim to the top resolves competing front claims", async () => {
+test("moving a claim to the top demotes competing first claims", async () => {
   const workspacePath = writeWorkspace({
     "note.md": [
       "# Note <!-- id:note -->",
       "",
       '- [Art Noveau](#art) <!-- id:emb embed="true" -->',
       '  - [Gaudi](#g) <!-- id:gc embed="true" -->',
-      '    - [Sagrada Familia](#sf) <!-- id:sfc embed="true" front="true" -->',
-      '    - [Casa Mila](#cm) <!-- id:cmc embed="true" front="true" -->',
-      '    - (!) [Casa Battlo](#cb) <!-- id:cbc embed="true" front="true" -->',
+      '    - [Sagrada Familia](#sf) <!-- id:sfc embed="true" parent="g" -->',
+      '    - [Casa Mila](#cm) <!-- id:cmc embed="true" parent="g" -->',
+      '    - (!) [Casa Battlo](#cb) <!-- id:cbc embed="true" parent="g" -->',
     ].join("\n"),
     "art.md": [
       "# Art Noveau <!-- id:art -->",
@@ -1462,7 +1462,15 @@ Note
     const note = fs.readFileSync(pathModule.join(workspacePath, "note.md"), {
       encoding: "utf8",
     });
-    expect(note.match(/front="true"/gu)).toHaveLength(1);
+    expect(note).toMatch(
+      /- \[Sagrada Familia\]\(#sf\) <!-- id:sfc embed="true" before="cbc" parent="g" -->/u
+    );
+    expect(note).toMatch(
+      /- \(!\) \[Casa Battlo\]\(#cb\) <!-- id:cbc embed="true" after="sfc" before="cmc" parent="g" -->/u
+    );
+    expect(note).toMatch(
+      /- \[Casa Mila\]\(#cm\) <!-- id:cmc embed="true" after="cbc" parent="g" -->/u
+    );
   });
 });
 
@@ -1479,7 +1487,7 @@ test("moving a shared anchor changes only the containing note", async () => {
       "",
       '- [Art Noveau](#art) <!-- id:emb embed="true" -->',
       '  - [Sagrada Familia](#sf) <!-- id:sfc embed="true" after="cb" -->',
-      '  - [Casa Battlo](#cb) <!-- id:cbc embed="true" front="true" -->',
+      '  - [Casa Battlo](#cb) <!-- id:cbc embed="true" before="sf" -->',
     ].join("\n"),
     "other.md": other,
     "art.md": [
@@ -1606,7 +1614,7 @@ test("a stale anchor follows the line it names", async () => {
       '  - [Art Noveau](#art) <!-- id:emb embed="true" -->',
       '    - (!) [Casa Mila](#cm) <!-- id:cmc embed="true" -->',
       '    - (!) [Barcelona](#bc) <!-- id:bcc embed="true" -->',
-      '    - (!) [Sagrada Familia](#sf) <!-- id:sfc embed="true" front="true" -->',
+      '    - (!) [Sagrada Familia](#sf) <!-- id:sfc embed="true" before="sp" -->',
       '    - [Casa Battlo](#cb) <!-- id:cbc embed="true" after="cmc" -->',
     ].join("\n"),
     "art.md": [
@@ -1969,7 +1977,7 @@ Note
     expect(note.match(/\(#a\)/gu)).toHaveLength(1);
     expect(note.match(/\(#b\)/gu)).toHaveLength(1);
     expect(note).toMatch(
-      /\(!\) \[Argument A\]\(#a\) <!-- id:(\S+)[^\n]*front="true"[^\n]*\n\s+- \(!\) \[Argument B\]\(#b\)[^\n]*after="\1"/u
+      /\(!\) \[Argument A\]\(#a\) <!-- id:(\S+)[^\n]*\n\s+- \(!\) \[Argument B\]\(#b\)[^\n]*after="\1"/u
     );
   });
 
@@ -2193,7 +2201,6 @@ Note
     });
     expect(note.match(/\(#b\)/gu)).toHaveLength(1);
     expect(note).toMatch(/\(\?\) \[Argument B\]\(#b\)[^\n]*after="a"/u);
-    expect(note).not.toMatch(/\[Argument B\][^\n]*front="true"/u);
   });
 });
 
@@ -2257,7 +2264,7 @@ Note
     });
     expect(note.match(/\(#c\)/gu)).toHaveLength(1);
     expect(note).toMatch(
-      /\(!\) Final wording ~~\[Argument C\]\(#c\)~~[^\n]*front="true"/u
+      /\(!\) Final wording ~~\[Argument C\]\(#c\)~~[^\n]*before="a" parent="src"/u
     );
   });
 });
@@ -2489,7 +2496,7 @@ Note
       });
       expect(note.match(/\(#cm\)/gu)).toHaveLength(1);
       expect(note).toMatch(
-        /- \[Casa Mila \(La Pedrera\)\]\(#cm\)[^\n]*front="true"/u
+        /- \[Casa Mila \(La Pedrera\)\]\(#cm\)[^\n]*before="\S+" parent="\S+"/u
       );
       expect(note).not.toMatch(/\(\+~\) \[Casa Mila \(La Pedrera\)\]\(#cm\)/u);
     });
@@ -2506,7 +2513,7 @@ Note
   }
 );
 
-test("dropping at the front demotes the previous front claim", async () => {
+test("dropping at the front chains onto the previous first claim", async () => {
   const workspacePath = writeWorkspace({
     "note.md": [
       "# Note <!-- id:note -->",
@@ -2557,9 +2564,8 @@ Note
       encoding: "utf8",
     });
     expect(note).toMatch(
-      /- \[Casa Battlo\]\(#cb\) <!-- id:(\S+) embed="true" front="true" -->\n\s+- \[Casa Mila\]\(#cm\) <!-- id:\S+ embed="true" after="\1" -->/u
+      /- \[Casa Battlo\]\(#cb\) <!-- id:\S+ embed="true" before="(\S+)" parent="g" -->\n\s+- \[Casa Mila\]\(#cm\) <!-- id:\1 embed="true" before="sf" parent="g" -->/u
     );
-    expect(note.match(/front="true"/gu)).toHaveLength(1);
   });
 });
 
@@ -2614,21 +2620,20 @@ Note
       encoding: "utf8",
     });
     expect(note).toMatch(
-      /- \[Casa Battlo\]\(#cb\) <!-- id:(\S+) embed="true" front="true" -->\n\s+- \[Casa Mila\]\(#cm\) <!-- id:\S+ embed="true" after="\1" -->/u
+      /- \[Casa Battlo\]\(#cb\) <!-- id:(\S+) embed="true" before="sf" parent="g" -->\n\s+- \[Casa Mila\]\(#cm\) <!-- id:\S+ embed="true" after="\1" before="sf" parent="g" -->/u
     );
-    expect(note.match(/front="true"/gu)).toHaveLength(1);
   });
 });
 
-test("a drop heals a scope where every claim says front", async () => {
+test("a drop heals a scope where every claim says first", async () => {
   const workspacePath = writeWorkspace({
     "note.md": [
       "# Note <!-- id:note -->",
       "",
       '- [Gaudi](#g) <!-- id:emb embed="true" -->',
-      '  - [Sagrada Familia](#sf) <!-- id:msf embed="true" front="true" -->',
-      '  - [Casa Mila](#cm) <!-- id:mcm embed="true" front="true" -->',
-      '  - [Casa Battlo](#cb) <!-- id:mcb embed="true" front="true" -->',
+      '  - [Sagrada Familia](#sf) <!-- id:msf embed="true" parent="g" -->',
+      '  - [Casa Mila](#cm) <!-- id:mcm embed="true" parent="g" -->',
+      '  - [Casa Battlo](#cb) <!-- id:mcb embed="true" parent="g" -->',
     ].join("\n"),
     "gaudi.md": [
       "# Gaudi <!-- id:g -->",
@@ -2673,15 +2678,14 @@ Note
       encoding: "utf8",
     });
     expect(note).toMatch(
-      /- \[Sagrada Familia\]\(#sf\) <!-- id:msf embed="true" front="true" -->/u
+      /- \[Sagrada Familia\]\(#sf\) <!-- id:msf embed="true" before="mcb" parent="g" -->/u
     );
     expect(note).toMatch(
-      /- \[Casa Battlo\]\(#cb\) <!-- id:mcb embed="true" after="msf" -->/u
+      /- \[Casa Battlo\]\(#cb\) <!-- id:mcb embed="true" after="msf" before="mcm" parent="g" -->/u
     );
     expect(note).toMatch(
-      /- \[Casa Mila\]\(#cm\) <!-- id:mcm embed="true" after="mcb" -->/u
+      /- \[Casa Mila\]\(#cm\) <!-- id:mcm embed="true" after="mcb" parent="g" -->/u
     );
-    expect(note.match(/front="true"/gu)).toHaveLength(1);
   });
 });
 
@@ -2750,12 +2754,11 @@ Note
       encoding: "utf8",
     });
     expect(note).toMatch(
-      /- \[Casa Mila\]\(#cm\) <!-- id:p1 embed="true" after="sf" -->/u
+      /- \[Casa Mila\]\(#cm\) <!-- id:p1 embed="true" after="sf" parent="g" -->/u
     );
     expect(note).toMatch(
       /- \[Sagrada Familia\]\(#sf\) <!-- id:p2 embed="true" after="cb" -->/u
     );
-    expect(note.match(/front="true"/gu)).toHaveLength(1);
   });
 });
 
@@ -2765,7 +2768,7 @@ test("a drop into the middle of a chain re-anchors only the displaced link", asy
       "# Note <!-- id:note -->",
       "",
       '- [Gaudi](#g) <!-- id:emb embed="true" -->',
-      '  - [Sagrada Familia](#sf) <!-- id:msf embed="true" front="true" -->',
+      '  - [Sagrada Familia](#sf) <!-- id:msf embed="true" parent="g" -->',
       '  - [Casa Mila](#cm) <!-- id:mcm embed="true" after="sf" -->',
       '  - [Casa Battlo](#cb) <!-- id:mcb embed="true" after="cm" -->',
     ].join("\n"),
@@ -2813,25 +2816,24 @@ Note
       encoding: "utf8",
     });
     expect(note).toMatch(
-      /- \[Sagrada Familia\]\(#sf\) <!-- id:msf embed="true" front="true" -->/u
+      /- \[Sagrada Familia\]\(#sf\) <!-- id:msf embed="true" parent="g" -->/u
     );
     expect(note).toMatch(
-      /- \[Park Guell\]\(#pg\) <!-- id:(\S+) embed="true" after="msf" -->\n\s+- \[Casa Mila\]\(#cm\) <!-- id:mcm embed="true" after="\1" -->/u
+      /- \[Park Guell\]\(#pg\) <!-- id:(\S+) embed="true" after="msf" before="mcm" parent="g" -->\n\s+- \[Casa Mila\]\(#cm\) <!-- id:mcm embed="true" after="\1" before="mcb" parent="g" -->/u
     );
     expect(note).toMatch(
       /- \[Casa Battlo\]\(#cb\) <!-- id:mcb embed="true" after="cm" -->/u
     );
-    expect(note.match(/front="true"/gu)).toHaveLength(1);
   });
 });
 
-test("dragging the front holder away hands the front to its successor", async () => {
+test("dragging the first row away restamps its dependent", async () => {
   const workspacePath = writeWorkspace({
     "note.md": [
       "# Note <!-- id:note -->",
       "",
       '- [Gaudi](#g) <!-- id:emb embed="true" -->',
-      '  - [Sagrada Familia](#sf) <!-- id:msf embed="true" front="true" -->',
+      '  - [Sagrada Familia](#sf) <!-- id:msf embed="true" parent="g" -->',
       '  - [Casa Mila](#cm) <!-- id:mcm embed="true" after="sf" -->',
       '  - [Casa Battlo](#cb) <!-- id:mcb embed="true" after="cm" -->',
     ].join("\n"),
@@ -2870,15 +2872,14 @@ Note
       encoding: "utf8",
     });
     expect(note).toMatch(
-      /- \[Casa Mila\]\(#cm\) <!-- id:mcm embed="true" front="true" -->/u
+      /- \[Casa Mila\]\(#cm\) <!-- id:mcm embed="true" before="mcb" parent="g" -->/u
     );
     expect(note).toMatch(
       /- \[Casa Battlo\]\(#cb\) <!-- id:mcb embed="true" after="cm" -->/u
     );
     expect(note).toMatch(
-      /- \[Sagrada Familia\]\(#sf\) <!-- id:msf embed="true" after="mcb" -->/u
+      /- \[Sagrada Familia\]\(#sf\) <!-- id:msf embed="true" after="mcb" parent="g" -->/u
     );
-    expect(note.match(/front="true"/gu)).toHaveLength(1);
   });
 });
 
@@ -2887,8 +2888,8 @@ test("dropping a row where it already sits changes nothing", async () => {
     "# Note <!-- id:note -->",
     "",
     '- [Gaudi](#g) <!-- id:emb embed="true" -->',
-    '  - [Sagrada Familia](#sf) <!-- id:msf embed="true" front="true" -->',
-    '  - [Casa Mila](#cm) <!-- id:mcm embed="true" after="msf" -->',
+    '  - [Sagrada Familia](#sf) <!-- id:msf embed="true" before="mcm" parent="g" -->',
+    '  - [Casa Mila](#cm) <!-- id:mcm embed="true" after="msf" before="cb" parent="g" -->',
   ].join("\n");
   const workspacePath = writeWorkspace({
     "note.md": noteContent,
@@ -2979,12 +2980,11 @@ Note
       encoding: "utf8",
     });
     expect(note).toMatch(
-      /- \[Casa Mila\]\(#cm\) <!-- id:mcm embed="true" front="true" -->/u
+      /- \[Casa Mila\]\(#cm\) <!-- id:mcm embed="true" before="sf" parent="g" -->/u
     );
     expect(note).toMatch(
-      /- \[Casa Battlo\]\(#cb\) <!-- id:mcb embed="true" after="sf" -->/u
+      /- \[Casa Battlo\]\(#cb\) <!-- id:mcb embed="true" after="sf" parent="g" -->/u
     );
-    expect(note.match(/front="true"/gu)).toHaveLength(1);
   });
 });
 
@@ -3023,12 +3023,11 @@ test("an unrelated drop never rewrites a dangling anchor", async () => {
       encoding: "utf8",
     });
     expect(note).toMatch(
-      /- \[Sagrada Familia\]\(#sf\) <!-- id:\S+ embed="true" front="true" -->/u
+      /- \[Sagrada Familia\]\(#sf\) <!-- id:\S+ embed="true" before="mcm" parent="g" -->/u
     );
     expect(note).toMatch(
       /- \[Casa Mila\]\(#cm\) <!-- id:mcm embed="true" after="ghost" -->/u
     );
-    expect(note.match(/front="true"/gu)).toHaveLength(1);
   });
 });
 
@@ -3075,10 +3074,9 @@ Note
       encoding: "utf8",
     });
     expect(note).toMatch(
-      /- \(!\) \[Casa Mila\]\(#cm\) <!-- id:\S+ embed="true" front="true" -->/u
+      /- \(!\) \[Casa Mila\]\(#cm\) <!-- id:\S+ embed="true" before="sf" parent="g" -->/u
     );
     expect(note.match(/\[Casa Mila\]/gu)).toHaveLength(1);
-    expect(note.match(/front="true"/gu)).toHaveLength(1);
   });
 
   await expectTree(

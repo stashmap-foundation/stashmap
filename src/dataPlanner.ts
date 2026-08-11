@@ -10,7 +10,11 @@ import {
   planMoveDescendantNodes,
   planUpsertNodes,
 } from "./planner";
-import { clearPosition, positionAttrs } from "./core/composition";
+import {
+  clearPosition,
+  positionAttrs,
+  positionNames,
+} from "./core/composition";
 
 function getWritableNode(plan: GraphPlan, nodeId: ID): GraphNode | undefined {
   return getWorkspaceNode(plan.knowledgeDBs, nodeId);
@@ -33,26 +37,22 @@ function requireNodeItem(
 
 // A deleted row takes its anchor seat with it. Dependents re-aim to the
 // row the seat stands for — the claim's target that resurfaces as a base
-// row, the deleted row's own anchor, or its file predecessor — so a
+// row, the deleted row's own first name, or its file predecessor — so a
 // deletion never moves the rows anchored behind it.
 function reAnchorForRemoved(
   parentNode: GraphNode,
   item: GraphNode,
   index: number
-): Record<string, string> {
+): ID | undefined {
   const target = placementTarget(item);
   if (target !== undefined) {
-    return positionAttrs(target);
+    return target;
   }
-  if (item.extraAttrs?.after !== undefined) {
-    return positionAttrs(item.extraAttrs.after);
+  const names = positionNames(item);
+  if (names.length > 0) {
+    return names[0].id;
   }
-  if (item.extraAttrs?.front === "true") {
-    return positionAttrs(undefined);
-  }
-  const predecessor =
-    index > 0 ? parentNode.children.get(index - 1) : undefined;
-  return positionAttrs(predecessor);
+  return index > 0 ? parentNode.children.get(index - 1) : undefined;
 }
 
 function repairDependentAnchors<T extends GraphPlan>(
@@ -61,15 +61,27 @@ function repairDependentAnchors<T extends GraphPlan>(
   item: GraphNode,
   index: number
 ): T {
-  const position = reAnchorForRemoved(parentNode, item, index);
+  const reAnchor = reAnchorForRemoved(parentNode, item, index);
   return parentNode.children.reduce((current, siblingId) => {
     const sibling = getWritableNode(current, siblingId);
-    if (!sibling || sibling.extraAttrs?.after !== item.id) {
+    if (
+      !sibling ||
+      !positionNames(sibling).some((name) => name.id === item.id)
+    ) {
       return current;
     }
+    const names = positionNames(sibling).flatMap((name) => {
+      if (name.id !== item.id) {
+        return [name];
+      }
+      return reAnchor !== undefined ? [{ ...name, id: reAnchor }] : [];
+    });
     return planUpsertNodes(current, {
       ...sibling,
-      extraAttrs: { ...clearPosition(sibling.extraAttrs), ...position },
+      extraAttrs: {
+        ...clearPosition(sibling.extraAttrs),
+        ...positionAttrs(names),
+      },
       updated: nextUpdated(sibling),
     });
   }, plan);

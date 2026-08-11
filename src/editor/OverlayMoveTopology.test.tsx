@@ -249,7 +249,7 @@ Note
     await expectTree(expected, { showGutter: true });
     await waitFor(() => {
       expect(readOverlayFile(workspacePath, "note.md")).toMatch(
-        /\[A one\]\(#a1\) <!-- id:\S+ embed="true" from="embed-a" after="b1" -->/u
+        /\[A one\]\(#a1\) <!-- id:\S+ embed="true" from="embed-a" after="b1" before="b2" parent="beta" -->/u
       );
       expect(readOverlayFile(workspacePath, "alpha.md")).toContain(alphaBefore);
       expect(readOverlayFile(workspacePath, "beta.md")).toContain(betaBefore);

@@ -1,6 +1,6 @@
 # [Standortwahl Kroatien](#root) <!-- id:o0 embed="true" -->
 
-- [Offene Frage: Bankkonto](#t6) <!-- id:o1 embed="true" front="true" -->
+- [Offene Frage: Bankkonto](#t6) <!-- id:o1 embed="true" before="t4" -->
 - Meine Aufgabe: Notar kontaktieren <!-- id:o2 after="t6" -->
 - (!) [These: Rijeka ist der beste Standort](#t1) <!-- id:o3 embed="true" -->
   - Deckt sich mit meiner Erfahrung vor Ort <!-- id:o4 -->

@@ -89,7 +89,7 @@ Note
     );
     await waitFor(() => {
       expect(readOverlayFile(workspacePath, "note.md")).toMatch(
-        /front="true"/u
+        /parent="basket"/u
       );
     });
     dragOverlayRow("B", "A");

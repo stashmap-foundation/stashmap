@@ -1,6 +1,6 @@
 # [Standortwahl Kroatien](#root) <!-- id:o0 embed="true" -->
 
-- [Offene Frage: Bankkonto](#t6) <!-- id:o1 embed="true" front="true" -->
+- [Offene Frage: Bankkonto](#t6) <!-- id:o1 embed="true" before="t4" -->
 - (!) [These: Rijeka ist der beste Standort](#t1) <!-- id:o2 embed="true" -->
   - Deckt sich mit meiner Erfahrung vor Ort <!-- id:o3 -->
 - [Beleg: Hafeninfrastruktur](#t2) <!-- id:o4 embed="true" -->

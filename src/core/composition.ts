@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-use-before-define */
 import { List } from "immutable";
 import { formatPrefixMarkers } from "../documentFormat";
 import { EMPTY_NODE_ID } from "./connections";
@@ -693,13 +694,7 @@ export function composeNote(
     start: ResolvedNode,
     active: ID[],
     scope: ID,
-    writtenParent: ID | undefined,
-    composeLayerFn: (
-      inner: ComposedRow[],
-      owner: ResolvedNode,
-      active: ID[],
-      scope: ID
-    ) => [ComposedRow[], Pending[]]
+    writtenParent: ID | undefined
   ): [ComposedRow, Pending[]] {
     const walkChain = (
       current: ResolvedNode,
@@ -809,8 +804,7 @@ export function composeNote(
             bondSource,
             activeForBond,
             childScope,
-            writtenParent,
-            composeLayerFn
+            writtenParent
           );
           return {
             chain: bond.chain,
@@ -833,7 +827,7 @@ export function composeNote(
       [...delegated]
         .reverse()
         .reduce<[ComposedRow[], Pending[]]>(([acc, accPending], layer) => {
-          const [next, layerPending] = composeLayerFn(
+          const [next, layerPending] = composeLayer(
             acc,
             layer,
             activeChain,
@@ -876,8 +870,7 @@ export function composeNote(
               child,
               activeChain,
               childScope,
-              isReaderRow(child, rootRef) ? terminal.node.id : undefined,
-              composeLayerFn
+              isReaderRow(child, rootRef) ? terminal.node.id : undefined
             ),
           ];
         });
@@ -948,13 +941,7 @@ export function composeNote(
     source: ComposedRow,
     active: ID[],
     scope: ID,
-    writtenParent: ID,
-    composeLayerFn: (
-      inner: ComposedRow[],
-      owner: ResolvedNode,
-      active: ID[],
-      scope: ID
-    ) => [ComposedRow[], Pending[]]
+    writtenParent: ID
   ): [ComposedRow, Pending[]] {
     const kind = rowKind(claim.node);
     const target = targetOf(claim.node);
@@ -973,7 +960,7 @@ export function composeNote(
       ...source.judgments,
     ];
     const effective = judgments[0];
-    const [children, pending] = composeLayerFn(
+    const [children, pending] = composeLayer(
       source.children,
       claim,
       [...active, claim.node.id],
@@ -1129,8 +1116,7 @@ export function composeNote(
               claimSource,
               active,
               scope,
-              contextId,
-              composeLayer
+              contextId
             );
             views.set(claim.node.id, view);
             const inline = !anchored(claim.node) || path.length === 1;
@@ -1186,13 +1172,7 @@ export function composeNote(
             : state;
         }
         if (match === "edge-lapsed") {
-          const [view, nested] = resolveRow(
-            claim,
-            active,
-            scope,
-            contextId,
-            composeLayer
-          );
+          const [view, nested] = resolveRow(claim, active, scope, contextId);
           const flagged = withFlag(view, "lapsed");
           views.set(claim.node.id, flagged);
           return {
@@ -1221,13 +1201,7 @@ export function composeNote(
             ],
           };
         }
-        const [view, nested] = resolveRow(
-          claim,
-          active,
-          scope,
-          contextId,
-          composeLayer
-        );
+        const [view, nested] = resolveRow(claim, active, scope, contextId);
         views.set(claim.node.id, view);
         return anchored(claim.node)
           ? {
@@ -1284,8 +1258,7 @@ export function composeNote(
     rootResolved,
     [],
     rootResolved.node.id,
-    undefined,
-    composeLayer
+    undefined
   );
 
   const activeAt = (tree: ComposedRow, path: number[]): ID[] => {
@@ -1382,8 +1355,7 @@ export function composeNote(
         source,
         activeAt(tree, match),
         scopeAt(tree, match),
-        item.parentId,
-        composeLayer
+        item.parentId
       );
       return drainQueue(
         { ...tree, children: replace(tree.children, match, [view]) },
@@ -1398,8 +1370,7 @@ export function composeNote(
       claim,
       tree.chain,
       parentResolved && projects(parentResolved.node) ? item.parentId : tree.id,
-      item.parentId,
-      composeLayer
+      item.parentId
     );
     return drainQueue(insertPending(tree, item, view), [...rest, ...nested]);
   };

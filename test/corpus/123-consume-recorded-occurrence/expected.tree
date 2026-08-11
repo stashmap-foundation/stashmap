@@ -1,0 +1,10 @@
+My note <!-- id:note -->
+  Source <!-- id:e1 -->
+    B <!-- base:b -->
+    C <!-- base:c -->
+  Source <!-- id:e2 -->
+    A <!-- base:a -->
+    B <!-- base:b -->
+    C <!-- base:c -->
+  Basket <!-- id:basket -->
+    A <!-- id:o3 -->

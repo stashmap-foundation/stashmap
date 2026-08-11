@@ -1,10 +1,12 @@
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
+  dragOverlayRow,
   expectOverlayTreeAfterReload,
   expandOverlayWorkspace,
   markerForVariant,
   materializeOverlayRow,
+  readOverlayFile,
   reparentOverlayRow,
   writeOverlayWorkspace,
 } from "./OverlayScenario.test";
@@ -203,6 +205,55 @@ Note
       ${markerForVariant(variant)}A
   `;
     await expectTree(expected, { showGutter: true });
+    await expectOverlayTreeAfterReload(workspacePath, expected, true);
+  }
+);
+
+test.each(variants)(
+  "moving a projected row from one embed into another [%s]",
+  async (variant) => {
+    const workspacePath = writeOverlayWorkspace({
+      "note.md": [
+        "# Note <!-- id:note -->",
+        "",
+        '- [Alpha](#alpha) <!-- id:embed-a embed="true" -->',
+        '- [Beta](#beta) <!-- id:embed-b embed="true" -->',
+      ].join("\n"),
+      "alpha.md": [
+        "# Alpha <!-- id:alpha -->",
+        "",
+        "- A one <!-- id:a1 -->",
+        "- A two <!-- id:a2 -->",
+      ].join("\n"),
+      "beta.md": [
+        "# Beta <!-- id:beta -->",
+        "",
+        "- B one <!-- id:b1 -->",
+        "- B two <!-- id:b2 -->",
+      ].join("\n"),
+    });
+    const alphaBefore = readOverlayFile(workspacePath, "alpha.md");
+    const betaBefore = readOverlayFile(workspacePath, "beta.md");
+    await expandOverlayWorkspace(workspacePath, "note.md");
+    await materializeOverlayRow(variant, "A one");
+    dragOverlayRow("A one", "B one");
+    const expected = `
+Note
+  Alpha
+    A two
+  Beta
+    B one
+    ${markerForVariant(variant)}A one
+    B two
+  `;
+    await expectTree(expected, { showGutter: true });
+    await waitFor(() => {
+      expect(readOverlayFile(workspacePath, "note.md")).toMatch(
+        /\[A one\]\(#a1\) <!-- id:\S+ embed="true" from="embed-a" after="b1" -->/u
+      );
+      expect(readOverlayFile(workspacePath, "alpha.md")).toContain(alphaBefore);
+      expect(readOverlayFile(workspacePath, "beta.md")).toContain(betaBefore);
+    });
     await expectOverlayTreeAfterReload(workspacePath, expected, true);
   }
 );

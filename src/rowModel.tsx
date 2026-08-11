@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-use-before-define, functional/no-let, functional/immutable-data */
 import React from "react";
+import { List } from "immutable";
 import { LOCAL } from "./core/nodeRef";
 import { useBackend } from "./BackendContext";
 import { useData } from "./DataContext";
@@ -48,6 +49,56 @@ export function getIndependentRows(rows: Row[]): Row[] {
           row.viewKey.startsWith(`${other.viewKey}:`)
       )
   );
+}
+
+function rowRefsEqual(
+  left: NodeRef | undefined,
+  right: NodeRef | undefined
+): boolean {
+  return (
+    left !== undefined &&
+    right !== undefined &&
+    left.sourceId === right.sourceId &&
+    left.id === right.id
+  );
+}
+
+export function getVisibleParentRow(
+  rows: List<Row>,
+  row: Row
+): Row | undefined {
+  if (!row.parentRef) {
+    return undefined;
+  }
+  return rows
+    .slice(0, row.index)
+    .reverse()
+    .find(
+      (candidate) =>
+        candidate.depth < row.depth &&
+        (rowRefsEqual(candidate.ref, row.parentRef) ||
+          candidate.standsFor?.id === row.parentRef?.id)
+    );
+}
+
+export function getPreviousSiblingFromRows(
+  rows: List<Row>,
+  row: Row
+): Row | undefined {
+  const { childIndex } = row;
+  if (childIndex === undefined || childIndex === 0) {
+    return undefined;
+  }
+  return rows
+    .slice(0, row.index)
+    .reverse()
+    .find(
+      (candidate) =>
+        candidate.childIndex !== undefined &&
+        candidate.parentRef?.sourceId === row.parentRef?.sourceId &&
+        candidate.parentRef?.id === row.parentRef?.id &&
+        candidate.childIndex < childIndex
+    );
 }
 
 const EMPTY_VIEW_PATH_PREFIX = "empty-row:";

@@ -7,7 +7,7 @@ import { LOCAL } from "./core/nodeRef";
 import { moveNodes, createRefTarget, getNode } from "./core/connections";
 import { nodeText } from "./core/nodeSpans";
 import { calendarEntryTarget } from "./core/ical";
-import { getIndependentRows } from "./rowModel";
+import { getIndependentRows, getVisibleParentRow } from "./rowModel";
 import { getDocumentForNode } from "./core/Document";
 import {
   Plan,
@@ -109,21 +109,6 @@ export function isDraggedOccurrence(row: Row, sources: Row[]): boolean {
       row.viewKey === source.viewKey ||
       row.viewKey.startsWith(`${source.viewKey}:`)
   );
-}
-
-function getVisibleParentRow(rows: List<Row>, row: Row): Row | undefined {
-  if (!row.parentRef) {
-    return undefined;
-  }
-  return rows
-    .slice(0, row.index)
-    .reverse()
-    .find(
-      (candidate) =>
-        candidate.depth < row.depth &&
-        (refsEqual(candidate.ref, row.parentRef) ||
-          candidate.standsFor?.id === row.parentRef?.id)
-    );
 }
 
 function getVisibleRootRow(rows: List<Row>): Row | undefined {

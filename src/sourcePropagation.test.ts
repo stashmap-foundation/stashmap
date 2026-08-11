@@ -3,7 +3,7 @@ import { addNodesToGraphIndex, createEmptyGraphIndex } from "./graphIndex";
 import { buildReferenceItem } from "./buildReferenceRow";
 import { graphLookupFromData } from "./core/graphLookup";
 import { buildPaneTarget, ViewPath } from "./rowModel";
-import { getTreeChildren } from "./treeTraversal";
+import { getNodesInTree } from "./treeTraversal";
 import { linkSpan, plainSpans } from "./core/nodeSpans";
 
 const LOCAL = "local" as PublicKey;
@@ -124,7 +124,16 @@ test("tree rows and fullscreen targets stay in the pane source for duplicate ids
   const data = duplicateSourceData();
   const rootPath: ViewPath = [0, "root"];
 
-  const children = getTreeChildren(data, rootPath, "root", SOURCE_B, undefined);
+  const children = {
+    rows: getNodesInTree(
+      data,
+      List<ViewPath>([rootPath]),
+      List<ViewPath>(),
+      "root",
+      SOURCE_B,
+      undefined
+    ).rows.filter((row) => row.depth > 1),
+  };
   const childRow = children.rows.first();
 
   expect(childRow?.viewPath).toEqual([0, "root", "child"]);
@@ -192,13 +201,16 @@ test("incoming refs for duplicate ids stay scoped to the target source", () => {
     ...baseData,
     panes: [{ ...baseData.panes[0], rootNodeId: "target" }],
   };
-  const incomingRows = getTreeChildren(
-    data,
-    [0, "target"],
-    "target",
-    SOURCE_B,
-    undefined
-  );
+  const incomingRows = {
+    rows: getNodesInTree(
+      data,
+      List<ViewPath>([[0, "target"]]),
+      List<ViewPath>(),
+      "target",
+      SOURCE_B,
+      undefined
+    ).rows.filter((row) => row.depth > 1),
+  };
 
   expect(incomingRows.rows.map((row) => row.viewPath).toArray()).toEqual([
     [0, "target", "incoming:source-b:root-b"],
@@ -238,13 +250,16 @@ test("incoming ref owner rows keep source identity when owner ids also collide",
     ...baseData,
     panes: [{ ...baseData.panes[0], rootNodeId: "target" }],
   };
-  const incomingRows = getTreeChildren(
-    data,
-    [0, "target"],
-    "target",
-    SOURCE_B,
-    undefined
-  );
+  const incomingRows = {
+    rows: getNodesInTree(
+      data,
+      List<ViewPath>([[0, "target"]]),
+      List<ViewPath>(),
+      "target",
+      SOURCE_B,
+      undefined
+    ).rows.filter((row) => row.depth > 1),
+  };
 
   expect(incomingRows.rows.map((row) => row.sourceId).toArray()).toEqual([
     SOURCE_B,

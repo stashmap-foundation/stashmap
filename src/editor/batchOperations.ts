@@ -1,5 +1,10 @@
 import { List, OrderedSet } from "immutable";
-import { appendToPath, viewPathToString } from "../rowModel";
+import {
+  appendToPath,
+  getPreviousSiblingFromRows,
+  getVisibleParentRow,
+  viewPathToString,
+} from "../rowModel";
 import {
   Plan,
   applyGesture,
@@ -227,42 +232,6 @@ function remapSelectionForMovedKeys(
 
 function sortByNodeIndex(rows: Row[]): Row[] {
   return [...rows].sort((a, b) => (a.childIndex ?? 0) - (b.childIndex ?? 0));
-}
-
-export function getVisibleParentRow(
-  rows: List<Row>,
-  row: Row
-): Row | undefined {
-  if (!row.parentRef) {
-    return undefined;
-  }
-  return rows
-    .slice(0, row.index)
-    .reverse()
-    .find(
-      (candidate) =>
-        candidate.depth < row.depth && refsEqual(candidate.ref, row.parentRef)
-    );
-}
-
-function getPreviousSiblingFromRows(
-  rows: List<Row>,
-  row: Row
-): Row | undefined {
-  const { childIndex } = row;
-  if (childIndex === undefined || childIndex === 0) {
-    return undefined;
-  }
-  return rows
-    .slice(0, row.index)
-    .reverse()
-    .find(
-      (candidate) =>
-        candidate.childIndex !== undefined &&
-        candidate.parentRef?.sourceId === row.parentRef?.sourceId &&
-        candidate.parentRef?.id === row.parentRef?.id &&
-        candidate.childIndex < childIndex
-    );
 }
 
 function planBatchMove(

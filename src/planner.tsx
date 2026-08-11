@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-use-before-define, functional/no-let, functional/immutable-data, no-continue, no-nested-ternary */
+/* eslint-disable @typescript-eslint/no-use-before-define, functional/immutable-data, no-nested-ternary */
 import React, { Dispatch, SetStateAction, useRef } from "react";
 import { List, OrderedSet } from "immutable";
 import { UnsignedEvent } from "nostr-tools";
@@ -39,7 +39,6 @@ import {
   newGraphNode,
   ViewPath,
   updateView,
-  getParentView,
   addNodeToPathWithNodes,
   addNodesToLastElement,
   copyViewsWithNewPrefix,
@@ -1340,23 +1339,6 @@ export function planSaveNodeAndEnsureNodes(
     viewPath,
     node: currentNode,
   };
-}
-
-export function getNextInsertPosition(
-  plan: Plan,
-  viewPath: ViewPath,
-  nodeIsRoot: boolean,
-  nodeIsExpanded: boolean,
-  nodeIndex: number | undefined
-): { parentPath: ViewPath; insertAt: number } | null {
-  if (nodeIsRoot || nodeIsExpanded) {
-    return { parentPath: viewPath, insertAt: 0 };
-  }
-
-  const parentPath = getParentView(viewPath);
-  if (!parentPath) return null;
-
-  return { parentPath, insertAt: (nodeIndex ?? 0) + 1 };
 }
 
 type ExecutePlan = (plan: Plan) => Promise<void>;

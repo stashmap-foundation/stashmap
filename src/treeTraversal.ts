@@ -57,7 +57,6 @@ type TreeTraversalOptions = {
   projectedRoot?: GraphNode;
 };
 
-const EMPTY_TREE_RESULT: TreeResult = { rows: List<Row>() };
 const INCOMING_GROUP_THRESHOLD = 3;
 
 function emptyTreeResult(rows: List<Row> = List<Row>()): TreeResult {
@@ -1106,33 +1105,38 @@ function getChildrenForRegularNode(
     .filter((node): node is GraphNode => node !== undefined)
     .toList();
 
-  const childRowPairs = nodes.children
-    .map((childID, index) => ({
-      childID,
-      row: createChildRow(
-        data,
-        graph,
-        parentRow,
-        nodes,
-        directNode.ref,
+  const rawChildRows = (): List<{ childID: ID; row: Row }> =>
+    nodes.children
+      .map((childID, index) => ({
         childID,
-        index
-      ),
-    }))
-    .filter(({ childID, row }) =>
-      options?.isMarkdownExport
-        ? row !== undefined && childID !== EMPTY_NODE_ID
-        : childID === EMPTY_NODE_ID ||
-          (row !== undefined && itemPassesFilters(row.node, activeFilters))
-    )
-    .filter((pair): pair is { childID: ID; row: Row } => pair.row !== undefined)
-    .toList();
-  const childRows = childRowPairs.map(({ row }) => row);
+        row: createChildRow(
+          data,
+          graph,
+          parentRow,
+          nodes,
+          directNode.ref,
+          childID,
+          index
+        ),
+      }))
+      .filter(({ childID, row }) =>
+        options?.isMarkdownExport
+          ? row !== undefined && childID !== EMPTY_NODE_ID
+          : childID === EMPTY_NODE_ID ||
+            (row !== undefined && itemPassesFilters(row.node, activeFilters))
+      )
+      .filter(
+        (pair): pair is { childID: ID; row: Row } => pair.row !== undefined
+      )
+      .toList();
 
   if (options?.isMarkdownExport) {
-    return { rows: childRows };
+    return { rows: rawChildRows().map(({ row }) => row) };
   }
 
+  const childRowPairs = parentRow.composed
+    ? List<{ childID: ID; row: Row }>()
+    : rawChildRows();
   const combinedRows = parentRow.composed
     ? spliceEmptyRows(
         data,
@@ -1153,7 +1157,7 @@ function getChildrenForRegularNode(
             .map((child) => rowFromComposed(data, graph, parentRow, child))
         )
       )
-    : childRows;
+    : childRowPairs.map(({ row }) => row);
 
   if (!isFileRow(parentRow)) {
     return { rows: combinedRows };
@@ -1251,33 +1255,20 @@ function getTreeChildrenForResolvedRow(
 
 export function getTreeChildren(
   data: Data,
-  parentPath: ViewPath,
+  parentRow: Row,
   rootNode: ID | undefined,
   author: SourceId,
-  typeFilters: Pane["typeFilters"],
-  options?: TreeTraversalOptions
+  typeFilters: Pane["typeFilters"]
 ): TreeResult {
-  const graph = graphLookupFromData(data);
-  const parentRow = resolveRowForPath(
-    data,
-    graph,
-    parentPath,
-    undefined,
-    options
-  );
-  if (!parentRow) {
-    return EMPTY_TREE_RESULT;
-  }
   return {
     rows: reindexRows(
       getTreeChildrenForResolvedRow(
         data,
-        graph,
+        graphLookupFromData(data),
         parentRow,
         rootNode,
         author,
-        typeFilters,
-        options
+        typeFilters
       ).rows
     ),
   };

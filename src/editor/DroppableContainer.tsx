@@ -2,7 +2,7 @@ import React, { RefObject, useRef } from "react";
 import { List, OrderedSet } from "immutable";
 import { ConnectDropTarget, DropTargetMonitor, useDrop } from "react-dnd";
 import { NativeTypes } from "react-dnd-html5-backend";
-import { dnd, getDropDestinationFromRows } from "../dnd";
+import { dnd, getDropDestinationFromRows, isDraggedOccurrence } from "../dnd";
 import { planMaterializeComputedRow } from "../core/plan";
 import { calendarFeedUrl } from "../core/ical";
 import { getWorkspaceNode } from "../core/knowledge";
@@ -102,7 +102,7 @@ function calcDragDirection(
   if (isDragItem(item)) {
     const sourceStr = item.row.viewKey;
     const targetStr = row.viewKey;
-    if (targetStr === sourceStr || targetStr.startsWith(`${sourceStr}:`)) {
+    if (targetStr.startsWith(`${sourceStr}:`)) {
       return undefined;
     }
   }
@@ -396,11 +396,32 @@ export function useDroppable({
         return item;
       }
       const dragItem = item;
+      const dragRows = dragItem.draggedRows.length
+        ? dragItem.draggedRows
+        : [dragItem.row];
+      // Dropping on yourself is a depth gesture: with a changed indent it
+      // re-parents relative to the row above; without one it is a no-op.
+      const selfDrop = isDraggedOccurrence(row, dragRows);
+      if (
+        selfDrop &&
+        (targetDepth === undefined || targetDepth === row.depth)
+      ) {
+        return item;
+      }
+      const effectiveTarget = selfDrop
+        ? rows
+            .slice(0, row.index)
+            .reverse()
+            .find((candidate) => !isDraggedOccurrence(candidate, dragRows))
+        : row;
+      if (!effectiveTarget) {
+        return item;
+      }
       const dropDestination = getDropDestinationFromRows(
         rows,
-        row,
+        effectiveTarget,
         targetDepth,
-        dragItem.draggedRows.length ? dragItem.draggedRows : [dragItem.row]
+        dragRows
       );
       if (!dropDestination) {
         return item;
@@ -410,9 +431,6 @@ export function useDroppable({
       // entire displayed sequence first (document order becomes
       // authoritative — idea.md, Ordered projections); otherwise only
       // the anchor row the drop lands after materializes.
-      const dragRows = dragItem.draggedRows.length
-        ? dragItem.draggedRows
-        : [dragItem.row];
       const parentId = dropDestination.parentRow.node.id;
       const isProjectionReorder =
         calendarFeedUrl(dropDestination.parentRow.node) !== undefined &&

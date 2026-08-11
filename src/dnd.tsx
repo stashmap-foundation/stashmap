@@ -103,7 +103,7 @@ function planRecordForeignSource(
   });
 }
 
-function isDraggedOccurrence(row: Row, sources: Row[]): boolean {
+export function isDraggedOccurrence(row: Row, sources: Row[]): boolean {
   return sources.some(
     (source) =>
       row.viewKey === source.viewKey ||

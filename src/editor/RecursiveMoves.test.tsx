@@ -5,10 +5,14 @@ import {
   markerForVariant,
   materializeOverlayRow,
   reparentOverlayRow,
+  writeOverlayWorkspace,
 } from "./OverlayScenario.test";
 import {
   awaitRecursivePlacement,
   expandRecursiveWorkspace,
+  recursiveMiddle,
+  recursiveSource,
+  recursiveTerminal,
   writeRecursiveWorkspace,
 } from "./RecursiveScenario.test";
 import { clickRow, modClick } from "./Multiselect.testUtils";
@@ -24,6 +28,49 @@ async function workspace(variant: string, name: string): Promise<string> {
 }
 
 afterEach(cleanup);
+
+test.each(variants)(
+  "moving a terminal row under an own row at the note level [%s]",
+  async (variant) => {
+    const workspacePath = writeOverlayWorkspace({
+      "note.md": [
+        "# Note <!-- id:note -->",
+        "",
+        '- [Outer](#outer) <!-- id:note-outer embed="true" -->',
+        "- Basket <!-- id:basket -->",
+      ].join("\n"),
+      "outer.md": recursiveSource,
+      "middle.md": recursiveMiddle,
+      "terminal.md": recursiveTerminal,
+    });
+    await expandRecursiveWorkspace(workspacePath);
+    await materializeOverlayRow(variant, "Beta");
+    reparentOverlayRow("Beta", "Basket", 3);
+    const expected = `
+Note
+  Outer
+    Outer Parent
+      Outer Before
+      Middle
+        Middle Parent
+          Middle Before
+          Terminal
+            Terminal Parent
+              Alpha
+              Gamma
+            Terminal Destination
+          Middle After
+        Middle Destination
+      Outer After
+    Outer Destination
+  Basket
+    ${markerForVariant(variant)}Beta
+    `;
+    await expectTree(expected, { showGutter: true });
+    await awaitRecursivePlacement(workspacePath, "beta");
+    await expectOverlayTreeAfterReload(workspacePath, expected, true);
+  }
+);
 
 test.each(variants)(
   "moving a terminal child to the front through two embeds [%s]",

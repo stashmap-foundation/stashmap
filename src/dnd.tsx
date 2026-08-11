@@ -347,7 +347,11 @@ export function dnd(
           row.projected === true ||
           row.composed?.kind === "placement" ||
           row.composed?.kind === "speaking"
-      ));
+      ) ||
+      (composedRows.every((row) => row.reader) &&
+        independentRows.every(
+          (row) => row.viewPath[1] === targetParentRow.viewPath[1]
+        )));
   if (composedMove && targetParentRow.composed) {
     const moved = new globalThis.Set(composedRows);
     const rows = independentRows.flatMap((row) => {

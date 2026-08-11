@@ -145,6 +145,159 @@ Note
 );
 
 test.each(variants)(
+  "moving selected projected rows under an own row outside the embed [%s]",
+  async (variant) => {
+    const workspacePath = writeOverlayWorkspace({
+      "note.md": [
+        "# Note <!-- id:note -->",
+        "",
+        '- [Source](#source) <!-- id:embed embed="true" -->',
+        "- Basket <!-- id:basket -->",
+      ].join("\n"),
+      "source.md": [
+        "# Source <!-- id:source -->",
+        "",
+        "- A <!-- id:a -->",
+        "- B <!-- id:b -->",
+        "- C <!-- id:c -->",
+      ].join("\n"),
+    });
+    const sourceBefore = readOverlayFile(workspacePath, "source.md");
+    await expandOverlayWorkspace(workspacePath, "note.md");
+    await materializeOverlayRow(variant, "A");
+    await selectWith("A", "C");
+    fireEvent.dragStart(screen.getByText("A"));
+    setDropIndentLevel("A", "Basket", 3);
+    fireEvent.drop(screen.getByRole("treeitem", { name: "Basket" }));
+    const expected = `
+Note
+  Source
+    B
+  Basket
+    ${markerForVariant(variant)}A
+    C
+  `;
+    await expectTree(expected, { showGutter: true });
+    await expectSourceUnchanged(workspacePath, sourceBefore);
+    await expectOverlayTreeAfterReload(workspacePath, expected, true);
+  }
+);
+
+test("moving a positioned comment out of the embed releases its anchor", async () => {
+  const workspacePath = writeOverlayWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [Source](#source) <!-- id:embed embed="true" -->',
+      '  - C one <!-- id:c1 after="a" -->',
+      '  - [B](#b) <!-- id:bv embed="true" -->',
+      "    - C two <!-- id:c2 -->",
+      "- Basket <!-- id:basket -->",
+    ].join("\n"),
+    "source.md": [
+      "# Source <!-- id:source -->",
+      "",
+      "- A <!-- id:a -->",
+      "- B <!-- id:b -->",
+    ].join("\n"),
+  });
+  await expandOverlayWorkspace(workspacePath, "note.md");
+  await expectTree(
+    `
+Note
+  Source
+    A
+    C one
+    B
+      C two
+  Basket
+  `,
+    { showGutter: true }
+  );
+  await selectWith("C one", "C two");
+  fireEvent.dragStart(screen.getByText("C one"));
+  setDropIndentLevel("C one", "Basket", 3);
+  fireEvent.drop(screen.getByRole("treeitem", { name: "Basket" }));
+  const expected = `
+Note
+  Source
+    A
+    B
+  Basket
+    C one
+    C two
+  `;
+  await expectTree(expected, { showGutter: true });
+  await expectOverlayTreeAfterReload(workspacePath, expected, true);
+});
+
+test("moving a selected comment and projected row together under an own row", async () => {
+  const workspacePath = writeOverlayWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [Source](#source) <!-- id:embed embed="true" -->',
+      "  - C one <!-- id:c1 -->",
+      "- Basket <!-- id:basket -->",
+    ].join("\n"),
+    "source.md": [
+      "# Source <!-- id:source -->",
+      "",
+      "- A <!-- id:a -->",
+      "- B <!-- id:b -->",
+    ].join("\n"),
+  });
+  await expandOverlayWorkspace(workspacePath, "note.md");
+  await selectWith("C one", "A");
+  fireEvent.dragStart(screen.getByText("C one"));
+  setDropIndentLevel("C one", "Basket", 3);
+  fireEvent.drop(screen.getByRole("treeitem", { name: "Basket" }));
+  const expected = `
+Note
+  Source
+    B
+  Basket
+    A
+    C one
+  `;
+  await expectTree(expected, { showGutter: true });
+  await expectOverlayTreeAfterReload(workspacePath, expected, true);
+});
+
+test("moving a comment from one placement onto a projected row files it there", async () => {
+  const workspacePath = writeOverlayWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [Source](#source) <!-- id:embed embed="true" -->',
+      '  - [B](#b) <!-- id:bv embed="true" -->',
+      "    - C two <!-- id:c2 -->",
+    ].join("\n"),
+    "source.md": [
+      "# Source <!-- id:source -->",
+      "",
+      "- A <!-- id:a -->",
+      "- B <!-- id:b -->",
+    ].join("\n"),
+  });
+  await expandOverlayWorkspace(workspacePath, "note.md");
+  const sourceRow = screen.getByText("C two");
+  const targetRow = screen.getByRole("treeitem", { name: "A" });
+  fireEvent.dragStart(sourceRow);
+  setDropIndentLevelForRows(sourceRow, targetRow, 4);
+  fireEvent.drop(targetRow);
+  const expected = `
+Note
+  Source
+    A
+      C two
+    B
+  `;
+  await expectTree(expected, { showGutter: true });
+  await expectOverlayTreeAfterReload(workspacePath, expected, true);
+});
+
+test.each(variants)(
   "moving mixed projected, relevance, evidence, and rewording rows across repeated scopes [%s]",
   async (variant) => {
     const workspacePath = writeOverlayWorkspace({

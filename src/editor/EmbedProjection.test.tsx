@@ -878,7 +878,7 @@ Note
       encoding: "utf8",
     });
     expect(note).toMatch(
-      /- My own row <!-- id:own -->\n- \[Casa Mila\]\(#cm\) <!-- id:\S+ embed="true" -->/u
+      /- My own row <!-- id:own -->\n- \[Casa Mila\]\(#cm\) <!-- id:\S+ embed="true" from="emb" after="own" -->/u
     );
   });
 });
@@ -952,7 +952,7 @@ Note
       encoding: "utf8",
     });
     expect(note).toMatch(
-      /- \[A\]\(#art\) <!-- id:emb embed="true" -->\n- My own row <!-- id:own -->\n- \(!\) \[Sagrada Familia\]\(#sf\) <!-- id:\S+ embed="true" -->/u
+      /- \[A\]\(#art\) <!-- id:emb embed="true" -->\n- My own row <!-- id:own -->\n- \(!\) \[Sagrada Familia\]\(#sf\) <!-- id:\S+ embed="true" from="emb" after="own" -->/u
     );
   });
 });

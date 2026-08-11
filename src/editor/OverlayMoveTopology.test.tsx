@@ -8,11 +8,13 @@ import {
   reparentOverlayRow,
   writeOverlayWorkspace,
 } from "./OverlayScenario.test";
+import { clickRow, modClick } from "./Multiselect.testUtils";
 import {
   expectTree,
   getPane,
   navigateToNodeViaSearch,
   openNodeInFullscreen,
+  setDropIndentLevel,
 } from "../utils.test";
 
 const variants = ["projected", "materialized-first"];
@@ -140,6 +142,159 @@ Note
     await expectOverlayTreeAfterReload(workspacePath, expected, true);
   }
 );
+
+test.each(variants)(
+  "moving a projected row under an own row outside the embed [%s]",
+  async (variant) => {
+    const workspacePath = writeOverlayWorkspace({
+      "note.md": [
+        "# Note <!-- id:note -->",
+        "",
+        '- [Source](#source) <!-- id:embed embed="true" -->',
+        "- My own row <!-- id:own -->",
+      ].join("\n"),
+      "source.md": [
+        "# Source <!-- id:source -->",
+        "",
+        "- A <!-- id:a -->",
+        "- B <!-- id:b -->",
+      ].join("\n"),
+    });
+    await expandOverlayWorkspace(workspacePath, "note.md");
+    await materializeOverlayRow(variant, "A");
+    reparentOverlayRow("A", "My own row", 3);
+    const expected = `
+Note
+  Source
+    B
+  My own row
+    ${markerForVariant(variant)}A
+  `;
+    await expectTree(expected, { showGutter: true });
+    await expectOverlayTreeAfterReload(workspacePath, expected, true);
+  }
+);
+
+test.each(variants)(
+  "moving a projected row onto an own comment inside the embed [%s]",
+  async (variant) => {
+    const workspacePath = writeOverlayWorkspace({
+      "note.md": [
+        "# Note <!-- id:note -->",
+        "",
+        '- [Source](#source) <!-- id:embed embed="true" -->',
+        "  - My comment <!-- id:comment -->",
+      ].join("\n"),
+      "source.md": [
+        "# Source <!-- id:source -->",
+        "",
+        "- A <!-- id:a -->",
+        "- B <!-- id:b -->",
+      ].join("\n"),
+    });
+    await expandOverlayWorkspace(workspacePath, "note.md");
+    await materializeOverlayRow(variant, "A");
+    reparentOverlayRow("A", "My comment", 4);
+    const expected = `
+Note
+  Source
+    B
+    My comment
+      ${markerForVariant(variant)}A
+  `;
+    await expectTree(expected, { showGutter: true });
+    await expectOverlayTreeAfterReload(workspacePath, expected, true);
+  }
+);
+
+test("dragging the embed row under an own row moves the whole projection", async () => {
+  const workspacePath = writeOverlayWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [Source](#source) <!-- id:embed embed="true" -->',
+      "- Basket <!-- id:basket -->",
+    ].join("\n"),
+    "source.md": [
+      "# Source <!-- id:source -->",
+      "",
+      "- A <!-- id:a -->",
+      "- B <!-- id:b -->",
+    ].join("\n"),
+  });
+  await expandOverlayWorkspace(workspacePath, "note.md");
+  reparentOverlayRow("Source", "Basket", 3);
+  const expected = `
+Note
+  Basket
+    Source
+      A
+      B
+  `;
+  await expectTree(expected, { showGutter: true });
+  await expectOverlayTreeAfterReload(workspacePath, expected, true);
+});
+
+test("multiselecting an embed row and its projected child moves only the embed", async () => {
+  const workspacePath = writeOverlayWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [Source](#source) <!-- id:embed embed="true" -->',
+      "- Basket <!-- id:basket -->",
+    ].join("\n"),
+    "source.md": [
+      "# Source <!-- id:source -->",
+      "",
+      "- A <!-- id:a -->",
+      "- B <!-- id:b -->",
+    ].join("\n"),
+  });
+  await expandOverlayWorkspace(workspacePath, "note.md");
+  await clickRow("Source");
+  modClick(screen.getByLabelText("A"), { metaKey: true });
+  fireEvent.dragStart(screen.getByText("Source"));
+  setDropIndentLevel("Source", "Basket", 3);
+  fireEvent.drop(screen.getByRole("treeitem", { name: "Basket" }));
+  const expected = `
+Note
+  Basket
+    Source
+      A
+      B
+  `;
+  await expectTree(expected, { showGutter: true });
+  await expectOverlayTreeAfterReload(workspacePath, expected, true);
+});
+
+test("dragging a rewording out of the embed keeps one showing", async () => {
+  const workspacePath = writeOverlayWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [Source](#source) <!-- id:embed embed="true" -->',
+      '  - Reader words ~~[A](#a)~~ <!-- id:reword embed="true" -->',
+      "- Basket <!-- id:basket -->",
+    ].join("\n"),
+    "source.md": [
+      "# Source <!-- id:source -->",
+      "",
+      "- A <!-- id:a -->",
+      "- B <!-- id:b -->",
+    ].join("\n"),
+  });
+  await expandOverlayWorkspace(workspacePath, "note.md");
+  reparentOverlayRow("Reader words", "Basket", 3);
+  const expected = `
+Note
+  Source
+    B
+  Basket
+    Reader words
+  `;
+  await expectTree(expected, { showGutter: true });
+  await expectOverlayTreeAfterReload(workspacePath, expected, true);
+});
 
 test.each(variants)(
   "moving a projected parent with an untouched subtree [%s]",

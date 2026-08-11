@@ -149,7 +149,7 @@ function localParentFor(
     : [plan, undefined];
 }
 
-function nextUpdated(node: GraphNode): number {
+export function nextUpdated(node: GraphNode): number {
   return Math.max(Date.now(), node.updated + 1);
 }
 
@@ -192,14 +192,19 @@ function moveLocalNode(
   });
 }
 
-function clearPosition(
-  attrs: Record<string, string> | undefined
+function withoutAttrs(
+  attrs: Record<string, string> | undefined,
+  keys: string[]
 ): Record<string, string> {
   return Object.fromEntries(
-    Object.entries(attrs ?? {}).filter(
-      ([key]) => key !== "front" && key !== "after"
-    )
+    Object.entries(attrs ?? {}).filter(([key]) => !keys.includes(key))
   );
+}
+
+export function clearPosition(
+  attrs: Record<string, string> | undefined
+): Record<string, string> {
+  return withoutAttrs(attrs, ["front", "after"]);
 }
 
 function migrateViewPath(
@@ -241,18 +246,6 @@ function positionRows(
   after: ComposedRow | undefined
 ): Plan {
   const scope = getWorkspaceNode(plan.knowledgeDBs, parent.scope);
-  if (!scope || placementTarget(scope) === undefined) {
-    return [...moved.values()].reduce((current, id) => {
-      const node = getWorkspaceNode(current.knowledgeDBs, id);
-      return node
-        ? planUpsertNodes(current, {
-            ...node,
-            extraAttrs: clearPosition(node.extraAttrs),
-            updated: nextUpdated(node),
-          })
-        : current;
-    }, plan);
-  }
   const stationary = parent.children.filter((row) => !moved.has(row.id));
   const anchorIndex =
     after === undefined
@@ -276,6 +269,44 @@ function positionRows(
       : node.extraAttrs?.after === undefined
       ? undefined
       : `after:${node.extraAttrs.after}`;
+  // Outside a placement scope the file order carries sibling order, but a
+  // moved placement still needs its anchor: only an anchored placement
+  // consumes its projected occurrence from here (rule 6/11).
+  if (!scope || placementTarget(scope) === undefined) {
+    return desired.reduce((current, row, index) => {
+      const localID = moved.get(row.id);
+      if (localID === undefined) {
+        return current;
+      }
+      const node = getWorkspaceNode(current.knowledgeDBs, localID);
+      if (!node) {
+        return current;
+      }
+      if (placementTarget(node) === undefined) {
+        return currentSignature(node) === undefined
+          ? current
+          : planUpsertNodes(current, {
+              ...node,
+              extraAttrs: clearPosition(node.extraAttrs),
+              updated: nextUpdated(node),
+            });
+      }
+      const predecessor = desired[index - 1];
+      const extraAttrs = predecessor
+        ? {
+            ...clearPosition(node.extraAttrs),
+            after: anchorIDFor(predecessor),
+          }
+        : { ...clearPosition(node.extraAttrs), front: "true" };
+      return currentSignature(node) === signatureAt(index)
+        ? current
+        : planUpsertNodes(current, {
+            ...node,
+            extraAttrs,
+            updated: nextUpdated(node),
+          });
+    }, plan);
+  }
   const movedSeats = new globalThis.Set(
     movedRows.flatMap((row) => [row.id, ...(row.target ? [row.target] : [])])
   );
@@ -566,6 +597,59 @@ function repairSourceDependents(
   }, plan);
 }
 
+// The consumption record must name a row on the projection walk: a
+// placement written under a non-projecting parent. A placement written
+// inside another placement's scope is a layer claim and never appears
+// on the walk chain of the content it overlays.
+function nearestWalkScope(plan: Plan, nodeId: ID): ID | undefined {
+  const node = getWorkspaceNode(plan.knowledgeDBs, nodeId);
+  const parentId = node?.parent;
+  if (parentId === undefined) {
+    return undefined;
+  }
+  const parent = getWorkspaceNode(plan.knowledgeDBs, parentId);
+  if (!parent) {
+    return undefined;
+  }
+  const grandparent =
+    parent.parent === undefined
+      ? undefined
+      : getWorkspaceNode(plan.knowledgeDBs, parent.parent);
+  if (
+    placementTarget(parent) !== undefined &&
+    placementTarget(grandparent) === undefined
+  ) {
+    return parentId;
+  }
+  return nearestWalkScope(plan, parentId);
+}
+
+function scopeCoversTarget(
+  plan: Plan,
+  scopeId: ID,
+  target: ID,
+  sourceId: SourceId
+): boolean {
+  const scopeNode = getWorkspaceNode(plan.knowledgeDBs, scopeId);
+  const scopeTarget = placementTarget(scopeNode);
+  if (scopeTarget === undefined) {
+    return false;
+  }
+  const reaches = (id: ID, seen: ID[]): boolean => {
+    if (id === scopeTarget) {
+      return true;
+    }
+    if (seen.includes(id)) {
+      return false;
+    }
+    const resolved = getNode(plan.knowledgeDBs, id, sourceId);
+    return (
+      resolved?.parent !== undefined && reaches(resolved.parent, [...seen, id])
+    );
+  };
+  return reaches(target, []);
+}
+
 function move(plan: Plan, gesture: Extract<Gesture, { kind: "move" }>): Plan {
   const repaired = repairSourceDependents(plan, gesture.rows);
   const [withParent, parent] = localParentFor(repaired, gesture.parent);
@@ -597,7 +681,39 @@ function move(plan: Plan, gesture: Extract<Gesture, { kind: "move" }>): Plan {
       if (!node) {
         return current;
       }
-      const moved = moveLocalNode(withRow, node, parent, current.afterID);
+      // A drag out of a projection that no longer shows at the written
+      // place records which occurrence it grabbed: the nearest reader
+      // scope of the taken row. Consumption follows the record, so the
+      // untouched showing in a sibling embed stays whole. A destination
+      // whose scope still projects the target needs no record.
+      const priorScope = (): ID | undefined => {
+        if (!entry.row.reader) {
+          return entry.row.scope;
+        }
+        if (node.extraAttrs?.from !== undefined) {
+          return node.extraAttrs.from;
+        }
+        return nearestWalkScope(current.plan, node.id);
+      };
+      const from =
+        placementTarget(node) === undefined ||
+        scopeCoversTarget(
+          current.plan,
+          gesture.parent.scope,
+          writeTarget(entry.row),
+          entry.row.ref.sourceId
+        )
+          ? undefined
+          : priorScope();
+      const recorded =
+        from === undefined
+          ? node.extraAttrs?.from === undefined
+            ? node
+            : { ...node, extraAttrs: withoutAttrs(node.extraAttrs, ["from"]) }
+          : node.extraAttrs?.from === from
+          ? node
+          : { ...node, extraAttrs: { ...node.extraAttrs, from } };
+      const moved = moveLocalNode(withRow, recorded, parent, current.afterID);
       const currentParent = getWorkspaceNode(moved.knowledgeDBs, parent.id);
       const index = currentParent?.children.indexOf(node.id) ?? -1;
       const withViews =

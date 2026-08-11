@@ -1,4 +1,4 @@
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   dragOverlayRow,
@@ -6,6 +6,7 @@ import {
   expandOverlayWorkspace,
   markerForVariant,
   materializeOverlayRow,
+  readOverlayFile,
   reparentOverlayRow,
   writeOverlayWorkspace,
 } from "./OverlayScenario.test";
@@ -53,6 +54,79 @@ Note
   );
   return workspacePath;
 }
+
+test.each(variants)(
+  "moving out of the embed, back in, and to the front [%s]",
+  async (variant) => {
+    const workspacePath = writeOverlayWorkspace({
+      "note.md": [
+        "# Note <!-- id:note -->",
+        "",
+        '- [Source](#source) <!-- id:embed embed="true" -->',
+        "- Basket <!-- id:basket -->",
+      ].join("\n"),
+      "source.md": [
+        "# Source <!-- id:source -->",
+        "",
+        "- A <!-- id:a -->",
+        "- B <!-- id:b -->",
+        "- C <!-- id:c -->",
+      ].join("\n"),
+    });
+    await expandOverlayWorkspace(workspacePath, "note.md");
+    await materializeOverlayRow(variant, "B");
+    reparentOverlayRow("B", "Basket", 3);
+    await expectTree(
+      `
+Note
+  Source
+    A
+    C
+  Basket
+    ${markerForVariant(variant)}B
+  `,
+      { showGutter: true }
+    );
+    await waitFor(() => {
+      expect(readOverlayFile(workspacePath, "note.md")).toMatch(
+        /front="true"/u
+      );
+    });
+    dragOverlayRow("B", "A");
+    await expectTree(
+      `
+Note
+  Source
+    A
+    ${markerForVariant(variant)}B
+    C
+  Basket
+  `,
+      { showGutter: true }
+    );
+    await waitFor(() => {
+      const note = readOverlayFile(workspacePath, "note.md");
+      expect(note).toMatch(/after="a"/u);
+      expect(note).not.toMatch(/from="/u);
+    });
+    reparentOverlayRow("B", "Source", 3);
+    const expected = `
+Note
+  Source
+    ${markerForVariant(variant)}B
+    A
+    C
+  Basket
+  `;
+    await expectTree(expected, { showGutter: true });
+    await waitFor(() => {
+      expect(
+        readOverlayFile(workspacePath, "note.md").match(/\(#b\)/gu)
+      ).toHaveLength(1);
+    });
+    await expectOverlayTreeAfterReload(workspacePath, expected, true);
+  }
+);
 
 test.each(variants)("moving then adding evidence [%s]", async (variant) => {
   const workspacePath = await moveB(variant);

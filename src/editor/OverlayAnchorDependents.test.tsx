@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
+  dragOverlayRow,
   expectOverlayTreeAfterReload,
   expandOverlayWorkspace,
   markerForVariant,
@@ -237,6 +238,98 @@ test.each(dependentRuns)(
     await expectOverlayTreeAfterReload(workspacePath, tree, true);
   }
 );
+
+test.each(variants)(
+  "dismissing the anchor of a moved row keeps the row in place [%s]",
+  async (variant) => {
+    const workspacePath = writeOverlayWorkspace({
+      "note.md": [
+        "# Note <!-- id:note -->",
+        "",
+        '- [Source](#source) <!-- id:embed embed="true" -->',
+      ].join("\n"),
+      "source.md": [
+        "# Source <!-- id:source -->",
+        "",
+        "- Alpha <!-- id:alpha -->",
+        "- Beta <!-- id:beta -->",
+        "- Gamma <!-- id:gamma -->",
+      ].join("\n"),
+    });
+    await expandOverlayWorkspace(workspacePath, "note.md");
+    await materializeOverlayRow(variant, "Gamma");
+    dragOverlayRow("Gamma", "Alpha");
+    await expectTree(
+      `
+Note
+  Source
+    Alpha
+    ${markerForVariant(variant)}Gamma
+    Beta
+  `,
+      { showGutter: true }
+    );
+    await waitFor(() => {
+      expect(readOverlayFile(workspacePath, "note.md")).toMatch(
+        /after="alpha"/u
+      );
+    });
+    await userEvent.click(screen.getByRole("treeitem", { name: "Alpha" }));
+    await userEvent.keyboard("x");
+    const expected = `
+Note
+  Source
+    ${markerForVariant(variant)}Gamma
+    Beta
+  `;
+    await expectTree(expected, { showGutter: true });
+    await expectOverlayTreeAfterReload(workspacePath, expected, true);
+  }
+);
+
+test("deleting the claim a moved row is anchored on keeps the row in place", async () => {
+  const workspacePath = writeOverlayWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [Source](#source) <!-- id:embed embed="true" -->',
+    ].join("\n"),
+    "source.md": [
+      "# Source <!-- id:source -->",
+      "",
+      "- Alpha <!-- id:alpha -->",
+      "- Beta <!-- id:beta -->",
+      "- Gamma <!-- id:gamma -->",
+    ].join("\n"),
+  });
+  await expandOverlayWorkspace(workspacePath, "note.md");
+  await materializeOverlayRow("materialized-first", "Alpha");
+  dragOverlayRow("Gamma", "Alpha");
+  await expectTree(
+    `
+Note
+  Source
+    {!} Alpha
+    Gamma
+    Beta
+  `,
+    { showGutter: true }
+  );
+  await waitFor(() => {
+    expect(readOverlayFile(workspacePath, "note.md")).toMatch(/after="/u);
+  });
+  await userEvent.click(screen.getByRole("treeitem", { name: "Alpha" }));
+  await userEvent.keyboard("{Delete}");
+  const expected = `
+Note
+  Source
+    Alpha
+    Gamma
+    Beta
+  `;
+  await expectTree(expected, { showGutter: true });
+  await expectOverlayTreeAfterReload(workspacePath, expected, true);
+});
 
 function selectionWorkspace(): string {
   return writeOverlayWorkspace({

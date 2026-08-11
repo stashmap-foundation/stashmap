@@ -405,7 +405,10 @@ function followAnchors(root: ComposedRow): ComposedRow {
 }
 
 function pruneConsumed(root: ComposedRow): ComposedRow {
-  const represented = new globalThis.Map<ID, ID[][]>();
+  const represented = new globalThis.Map<
+    ID,
+    { chain: ID[]; from: ID | undefined }[]
+  >();
   const collectRepresented = (row: ComposedRow, chain: ID[]): void => {
     if (
       row.reader &&
@@ -414,7 +417,7 @@ function pruneConsumed(root: ComposedRow): ComposedRow {
     ) {
       represented.set(row.target, [
         ...(represented.get(row.target) ?? []),
-        chain,
+        { chain, from: row.node.extraAttrs?.from },
       ]);
     }
     const next = row.reader ? [...chain, row.id] : chain;
@@ -430,8 +433,10 @@ function pruneConsumed(root: ComposedRow): ComposedRow {
         .filter(
           (child) =>
             child.reader ||
-            !(represented.get(child.id) ?? []).some((claimChain) =>
-              claimChain.every((value, index) => next[index] === value)
+            !(represented.get(child.id) ?? []).some(
+              (claim) =>
+                claim.chain.every((value, index) => next[index] === value) &&
+                (claim.from === undefined || next.includes(claim.from))
             )
         )
         .map((child) => prune(child, next)),
@@ -636,11 +641,11 @@ export function composeNote(
         target !== undefined &&
         resolvable(target, child.ref.sourceId)
       ) {
-        const claimReaderPath = readerScope(
-          readerPath,
-          target,
-          child.ref.sourceId
-        );
+        const fromScope = child.node.extraAttrs?.from;
+        const claimReaderPath = dedupe([
+          ...readerScope(readerPath, target, child.ref.sourceId),
+          ...(fromScope !== undefined ? [fromScope] : []),
+        ]);
         const existing = claimedParent.get(target) ?? [];
         if (
           !existing.some(

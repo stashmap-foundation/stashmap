@@ -1,4 +1,4 @@
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   dragOverlayOccurrence,
@@ -10,7 +10,7 @@ import {
   readOverlayFile,
   writeOverlayWorkspace,
 } from "./OverlayScenario.test";
-import { expectTree } from "../utils.test";
+import { expectTree, setDropIndentLevelForRows } from "../utils.test";
 
 const variants = ["projected", "materialized-first"];
 
@@ -313,6 +313,91 @@ Note
     await expectOverlayTreeAfterReload(workspacePath, expected, true);
   }
 );
+
+test.each(variants)(
+  "moving one occurrence out of duplicate embeds leaves the sibling embed whole [%s]",
+  async (variant) => {
+    const workspacePath = writeOverlayWorkspace({
+      "note.md": [
+        "# Note <!-- id:note -->",
+        "",
+        '- [Source](#source) <!-- id:embed-one embed="true" -->',
+        '- [Source](#source) <!-- id:embed-two embed="true" -->',
+        "- Basket <!-- id:basket -->",
+      ].join("\n"),
+      "source.md": [
+        "# Source <!-- id:source -->",
+        "",
+        "- A <!-- id:a -->",
+        "- B <!-- id:b -->",
+        "- C <!-- id:c -->",
+      ].join("\n"),
+    });
+    await expandOverlayWorkspace(workspacePath, "note.md");
+    await materializeOccurrence(variant, 0);
+    const sourceRow = screen.getAllByRole("treeitem", { name: "A" })[0];
+    const targetRow = screen.getByRole("treeitem", { name: "Basket" });
+    fireEvent.dragStart(sourceRow);
+    setDropIndentLevelForRows(sourceRow, targetRow, 3);
+    fireEvent.drop(targetRow);
+    const expected = `
+Note
+  Source
+    B
+    C
+    [I] Note ↩
+  Source
+    A
+    B
+    C
+    [I] Note ↩
+  Basket
+    ${markerForVariant(variant)}A
+  `;
+    await expectTree(expected, { showGutter: true });
+    await waitFor(() => {
+      expect(readOverlayFile(workspacePath, "note.md")).toMatch(
+        /from="embed-one"/u
+      );
+    });
+    await expectOverlayTreeAfterReload(workspacePath, expected, true);
+  }
+);
+
+test("a hand-written occurrence record consumes only its recorded embed", async () => {
+  const workspacePath = writeOverlayWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [Source](#source) <!-- id:embed-one embed="true" -->',
+      '- [Source](#source) <!-- id:embed-two embed="true" -->',
+      '- [A](#a) <!-- id:o3 embed="true" from="embed-one" -->',
+    ].join("\n"),
+    "source.md": [
+      "# Source <!-- id:source -->",
+      "",
+      "- A <!-- id:a -->",
+      "- B <!-- id:b -->",
+      "- C <!-- id:c -->",
+    ].join("\n"),
+  });
+  await expandOverlayWorkspace(workspacePath, "note.md");
+  const expected = `
+Note
+  Source
+    B
+    C
+    [I] Note ↩
+  Source
+    A
+    B
+    C
+    [I] Note ↩
+  A
+  `;
+  await expectTree(expected, { showGutter: true });
+  await expectOverlayTreeAfterReload(workspacePath, expected, true);
+});
 
 test.each(variants)(
   "moving a cycle-boundary row without consuming another occurrence [%s]",

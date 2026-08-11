@@ -1,8 +1,11 @@
 import { Set } from "immutable";
 import { getWorkspaceNode } from "./core/knowledge";
 import { deleteNodes } from "./core/connections";
+import { placementTarget } from "./core/nodeSpans";
 import {
   GraphPlan,
+  clearPosition,
+  nextUpdated,
   planDeleteDescendantNodes,
   planDeleteNodes,
   planMoveDescendantNodes,
@@ -49,6 +52,50 @@ export function planUpdateNodeItemMetadataById<T extends GraphPlan>(
     : plan;
 }
 
+// A deleted row takes its anchor seat with it. Dependents re-aim to the
+// row the seat stands for — the claim's target that resurfaces as a base
+// row, the deleted row's own anchor, or its file predecessor — so a
+// deletion never moves the rows anchored behind it.
+function reAnchorForRemoved(
+  parentNode: GraphNode,
+  item: GraphNode,
+  index: number
+): Record<string, string> {
+  const target = placementTarget(item);
+  if (target !== undefined) {
+    return { after: target };
+  }
+  if (item.extraAttrs?.after !== undefined) {
+    return { after: item.extraAttrs.after };
+  }
+  if (item.extraAttrs?.front === "true") {
+    return { front: "true" };
+  }
+  const predecessor =
+    index > 0 ? parentNode.children.get(index - 1) : undefined;
+  return predecessor !== undefined ? { after: predecessor } : { front: "true" };
+}
+
+function repairDependentAnchors<T extends GraphPlan>(
+  plan: T,
+  parentNode: GraphNode,
+  item: GraphNode,
+  index: number
+): T {
+  const position = reAnchorForRemoved(parentNode, item, index);
+  return parentNode.children.reduce((current, siblingId) => {
+    const sibling = getWritableNode(current, siblingId);
+    if (!sibling || sibling.extraAttrs?.after !== item.id) {
+      return current;
+    }
+    return planUpsertNodes(current, {
+      ...sibling,
+      extraAttrs: { ...clearPosition(sibling.extraAttrs), ...position },
+      updated: nextUpdated(sibling),
+    });
+  }, plan);
+}
+
 export function planRemoveNodeItemById<T extends GraphPlan>(
   plan: T,
   parentNodeId: ID,
@@ -64,8 +111,12 @@ export function planRemoveNodeItemById<T extends GraphPlan>(
     return plan;
   }
   const item = requireNodeItem(plan, parentNode, itemId);
+  const repaired =
+    item && !preserveDescendants
+      ? repairDependentAnchors(plan, parentNode, item, nodeIndex)
+      : plan;
   const withoutItem = planUpsertNodes(
-    plan,
+    repaired,
     deleteNodes(parentNode, Set([nodeIndex]))
   );
   if (!item) {

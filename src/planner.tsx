@@ -57,7 +57,7 @@ import { classifyLinkHref } from "./core/linkPath";
 import { LOCAL } from "./core/nodeRef";
 import { entityIdForText } from "./core/entityRecognition";
 import { getWorkspaceNode } from "./core/knowledge";
-import { planRemoveNodeItemById } from "./dataPlanner";
+import { planRepairDependentAnchors } from "./dataPlanner";
 import { Gesture, ComposedRow } from "./core/composition";
 import {
   MultiSelectionState,
@@ -488,12 +488,8 @@ function judge(plan: Plan, gesture: Extract<Gesture, { kind: "judge" }>): Plan {
     if (boundAlready) {
       return stamp(plan, existing);
     }
-    const withoutFlat =
-      existing.parent !== undefined
-        ? planRemoveNodeItemById(plan, existing.parent, existing.id)
-        : plan;
     const [withParent, parentLine] = ensurePlacement(
-      withoutFlat,
+      plan,
       scope.id,
       evidenceParent.id,
       nodeText(evidenceParent),
@@ -503,15 +499,14 @@ function judge(plan: Plan, gesture: Extract<Gesture, { kind: "judge" }>): Plan {
     if (!parentLine) {
       return stamp(plan, existing);
     }
-    const [rebound, reboundRow] = ensurePlacement(
-      withParent,
-      parentLine.id,
-      writeTarget(gesture.row),
-      gesture.row.text,
-      gesture.relevance,
-      gesture.argument
+    const moved = moveLocalNode(
+      planRepairDependentAnchors(withParent, existing.id),
+      { ...existing, extraAttrs: clearPosition(existing.extraAttrs) },
+      parentLine,
+      undefined
     );
-    return reboundRow ? rebound : stamp(plan, existing);
+    const movedNode = getWorkspaceNode(moved.knowledgeDBs, existing.id);
+    return movedNode ? stamp(moved, movedNode) : stamp(plan, existing);
   }
   const evidenceParent = evidenceParentFor(plan, gesture);
   const scope = getWorkspaceNode(
@@ -870,8 +865,8 @@ export function applyGesture(plan: Plan, gesture: Gesture): Plan {
         scope.id,
         writeTarget(gesture.row),
         gesture.row.text,
-        gesture.row.relevance,
-        gesture.row.argument
+        gesture.row.reader ? gesture.row.node.relevance : undefined,
+        gesture.row.reader ? gesture.row.node.argument : undefined
       );
   if (!node) {
     return plan;

@@ -336,6 +336,107 @@ Note
   });
 });
 
+test("evidence on a written line keeps the reader's subtree and its id", async () => {
+  const workspacePath = await openExpandedWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [S](#src) <!-- id:emb embed="true" -->',
+      '  - (!) [Beleg B1](#b1) <!-- id:m1 embed="true" -->',
+      "    - Meine Notiz <!-- id:own -->",
+    ].join("\n"),
+    "source.md": [
+      "# Source <!-- id:src -->",
+      "",
+      "- Argument B <!-- id:b -->",
+      "  - Beleg B1 <!-- id:b1 -->",
+    ].join("\n"),
+  });
+
+  await userEvent.click(screen.getByRole("treeitem", { name: "Beleg B1" }));
+  await userEvent.keyboard("+");
+
+  await expectTree(
+    `
+Note
+  Source
+    Argument B
+      {!+} Beleg B1
+        Meine Notiz
+  `,
+    { showGutter: true }
+  );
+
+  await waitFor(() => {
+    const note = fs.readFileSync(pathModule.join(workspacePath, "note.md"), {
+      encoding: "utf8",
+    });
+    expect(note).toMatch(
+      /- \[Argument B\]\(#b\) <!-- id:\S+ embed="true" -->\n {4}- \(\+!\) \[Beleg B1\]\(#b1\) <!-- id:m1 embed="true" -->\n {6}- Meine Notiz <!-- id:own -->/u
+    );
+    expect(note.match(/\(#b1\)/gu)).toHaveLength(1);
+  });
+
+  cleanup();
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+  await expectTree(
+    `
+Note
+  Source
+    Argument B
+      {!+} Beleg B1
+        Meine Notiz
+  `,
+    { showGutter: true }
+  );
+});
+
+test("renaming a source-judged row writes no marker of its own", async () => {
+  const workspacePath = await openExpandedWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [S](#src) <!-- id:emb embed="true" -->',
+    ].join("\n"),
+    "source.md": [
+      "# Source <!-- id:src -->",
+      "",
+      "- (!) Argument C <!-- id:c -->",
+    ].join("\n"),
+  });
+
+  const editor = await screen.findByRole("textbox", {
+    name: "edit Argument C",
+  });
+  await userEvent.clear(editor);
+  await userEvent.type(editor, "Meine Worte{Escape}");
+
+  await expectTree(
+    `
+Note
+  Source
+    {!} Meine Worte
+  `,
+    { showGutter: true }
+  );
+
+  await waitFor(() => {
+    const note = fs.readFileSync(pathModule.join(workspacePath, "note.md"), {
+      encoding: "utf8",
+    });
+    expect(note).toMatch(
+      /- Meine Worte ~~\[Argument C\]\(#c\)~~ <!-- id:\S+ embed="true" -->/u
+    );
+    expect(note).not.toContain("(!) Meine Worte");
+  });
+});
+
 test("rewording twice keeps the original source bond", async () => {
   const workspacePath = writeWorkspace({
     "note.md": [

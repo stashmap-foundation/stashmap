@@ -75,6 +75,19 @@ function repairDependentAnchors<T extends GraphPlan>(
   }, plan);
 }
 
+export function planRepairDependentAnchors<T extends GraphPlan>(
+  plan: T,
+  itemId: ID
+): T {
+  const item = getWritableNode(plan, itemId);
+  const parentNode =
+    item?.parent === undefined ? undefined : getWritableNode(plan, item.parent);
+  const index = parentNode ? getNodeItemIndex(parentNode, itemId) : undefined;
+  return item && parentNode && index !== undefined
+    ? repairDependentAnchors(plan, parentNode, item, index)
+    : plan;
+}
+
 export function planRemoveNodeItemById<T extends GraphPlan>(
   plan: T,
   parentNodeId: ID,

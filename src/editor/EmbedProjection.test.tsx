@@ -2378,6 +2378,111 @@ Note
   });
 });
 
+test("dragging Sagrada to the displayed front anchors it before Casa Battlo", async () => {
+  const workspacePath = await openExpandedWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [Art Noveau](#art) <!-- id:art-placement embed="true" -->',
+      '  - [Sagrada Familia](#sf) <!-- id:sagrada-placement embed="true" after="secession-placement" before="otto-placement" -->',
+      '  - [Otto Wagner Pavillion](#otto) <!-- id:otto-placement embed="true" from="art-placement" before="spain" parent="art" -->',
+      '  - [Casa Mila](#mila) <!-- id:mila-placement embed="true" after="otto-placement" before="spain" parent="art" -->',
+      '  - [Casa Battlo](#battlo) <!-- id:battlo-placement embed="true" parent="art" -->',
+      '  - [Secession](#secession) <!-- id:secession-placement embed="true" from="art-placement" after="battlo-placement" before="sagrada-placement" parent="art" -->',
+      '  - [Barcelona](#barcelona) <!-- id:barcelona-placement embed="true" -->',
+    ].join("\n"),
+    "art.md": [
+      "# Art Noveau <!-- id:art -->",
+      "",
+      "- Spain <!-- id:spain -->",
+      "  - Barcelona <!-- id:barcelona -->",
+      "    - Sagrada Familia <!-- id:sf -->",
+      "    - Casa Battlo <!-- id:battlo -->",
+      "    - Casa Mila <!-- id:mila -->",
+      "- Austria <!-- id:austria -->",
+      "  - Vienna <!-- id:vienna -->",
+      '    - [Architectural Buildings in Austria](#architecture) <!-- id:architecture-placement embed="true" -->',
+    ].join("\n"),
+    "architecture.md": [
+      "# Architectural Buildings in Austria <!-- id:architecture -->",
+      "",
+      "- Secession <!-- id:secession -->",
+      "- Otto Wagner Pavillion <!-- id:otto -->",
+    ].join("\n"),
+  });
+
+  await expectTree(`
+Note
+  Art Noveau
+    Casa Battlo
+    Secession
+    Sagrada Familia
+    Otto Wagner Pavillion
+    Casa Mila
+    Spain
+      Barcelona
+    Austria
+      Vienna
+        Architectural Buildings in Austria
+  `);
+
+  fireEvent.dragStart(
+    screen.getByRole("treeitem", { name: "Sagrada Familia" })
+  );
+  fireEvent.drop(screen.getByRole("treeitem", { name: "Art Noveau" }));
+
+  await expectTree(`
+Note
+  Art Noveau
+    Sagrada Familia
+    Casa Battlo
+    Secession
+    Otto Wagner Pavillion
+    Casa Mila
+    Spain
+      Barcelona
+    Austria
+      Vienna
+        Architectural Buildings in Austria
+  `);
+
+  await waitFor(() => {
+    const note = fs.readFileSync(pathModule.join(workspacePath, "note.md"), {
+      encoding: "utf8",
+    });
+    expect(note).toMatch(
+      /- \[Sagrada Familia\]\(#sf\) <!-- id:sagrada-placement embed="true" before="battlo-placement" -->/u
+    );
+    expect(note).not.toMatch(
+      /\[Sagrada Familia\]\(#sf\)[^\n]*before="otto-placement"/u
+    );
+  });
+
+  cleanup();
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await expectTree(`
+Note
+  Art Noveau
+    Sagrada Familia
+    Casa Battlo
+    Secession
+    Otto Wagner Pavillion
+    Casa Mila
+    Spain
+      Barcelona
+    Austria
+      Vienna
+        Architectural Buildings in Austria
+  `);
+});
+
 test("position chains longer than ten links resolve completely", async () => {
   const sourceRows = Array.from(
     { length: 15 },

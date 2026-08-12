@@ -355,10 +355,59 @@ function followAnchors(root: ComposedRow): ComposedRow {
     return descend(forest, 0);
   };
 
-  const moveEntry = (
+  const candidatesFor = (
+    tree: ComposedRow,
+    entries: { path: number[]; row: ComposedRow; hidden: boolean }[],
+    entry: { path: number[]; row: ComposedRow; hidden: boolean },
+    name: PositionName
+  ): { path: number[]; row: ComposedRow; hidden: boolean }[] => {
+    const scope = scopePrefix(tree.children, entry.path);
+    const candidates = entries.filter(
+      (candidate) =>
+        !candidate.hidden &&
+        isPathPrefix(scope, candidate.path) &&
+        candidate.path.join(",") !== entry.path.join(",") &&
+        !isPathPrefix(entry.path, candidate.path) &&
+        !candidate.row.flags.some((flag) => BROKEN_FLAGS.includes(flag)) &&
+        (candidate.row.id === name.id || candidate.row.chain.includes(name.id))
+    );
+    const exact = candidates.filter(
+      (candidate) => candidate.row.id === name.id
+    );
+    return exact.length > 0 ? exact : candidates;
+  };
+
+  const decisionFor = (
     tree: ComposedRow,
     entries: { path: number[]; row: ComposedRow; hidden: boolean }[],
     entry: { path: number[]; row: ComposedRow; hidden: boolean }
+  ):
+    | {
+        name: PositionName;
+        chosen: { path: number[]; row: ComposedRow; hidden: boolean }[];
+      }
+    | undefined => {
+    const names = positionNames(entry.row.node);
+    return names.reduce<
+      | {
+          name: PositionName;
+          chosen: { path: number[]; row: ComposedRow; hidden: boolean }[];
+        }
+      | undefined
+    >((done, name) => {
+      if (done !== undefined) {
+        return done;
+      }
+      const chosen = candidatesFor(tree, entries, entry, name);
+      return chosen.length > 0 ? { name, chosen } : undefined;
+    }, undefined);
+  };
+
+  const moveEntry = (
+    tree: ComposedRow,
+    entries: { path: number[]; row: ComposedRow; hidden: boolean }[],
+    entry: { path: number[]; row: ComposedRow; hidden: boolean },
+    decided: ReturnType<typeof decisionFor>
   ): ComposedRow | undefined => {
     if (entry.hidden || !entry.row.reader) {
       return undefined;
@@ -367,33 +416,6 @@ function followAnchors(root: ComposedRow): ComposedRow {
     if (names.length === 0) {
       return undefined;
     }
-    const scope = scopePrefix(tree.children, entry.path);
-    const candidatesFor = (
-      name: PositionName
-    ): { path: number[]; row: ComposedRow; hidden: boolean }[] =>
-      entries.filter(
-        (candidate) =>
-          !candidate.hidden &&
-          isPathPrefix(scope, candidate.path) &&
-          candidate.path.join(",") !== entry.path.join(",") &&
-          !isPathPrefix(entry.path, candidate.path) &&
-          !candidate.row.flags.some((flag) => BROKEN_FLAGS.includes(flag)) &&
-          (candidate.row.id === name.id ||
-            candidate.row.chain.includes(name.id))
-      );
-    const decided = names.reduce<
-      { name: PositionName; chosen: { path: number[] }[] } | undefined
-    >((done, name) => {
-      if (done !== undefined) {
-        return done;
-      }
-      const candidates = candidatesFor(name);
-      const exact = candidates.filter(
-        (candidate) => candidate.row.id === name.id
-      );
-      const chosen = exact.length > 0 ? exact : candidates;
-      return chosen.length > 0 ? { name, chosen } : undefined;
-    }, undefined);
     if (decided === undefined || decided.chosen.length !== 1) {
       return undefined;
     }
@@ -476,23 +498,187 @@ function followAnchors(root: ComposedRow): ComposedRow {
     };
   };
 
-  const anchoredCount = entriesOf(root, [], false).filter(
+  const initial = entriesOf(root, [], false);
+  const movable = initial.filter(
     (entry) => entry.row.reader && anchored(entry.row.node)
-  ).length;
-  const bound = globalThis.Math.max(10, 2 * anchoredCount * anchoredCount);
-
-  const rounds = (tree: ComposedRow, round: number): ComposedRow => {
-    if (round >= bound) {
+  );
+  const movableIds = new globalThis.Set(movable.map((entry) => entry.row.id));
+  const adjacent = new globalThis.Map<ID, globalThis.Set<ID>>(
+    movable.map((entry) => [entry.row.id, new globalThis.Set<ID>()])
+  );
+  const prerequisites = new globalThis.Map<ID, globalThis.Set<ID>>(
+    movable.map((entry) => [entry.row.id, new globalThis.Set<ID>()])
+  );
+  const slots = new globalThis.Map<string, ID[]>();
+  movable.forEach((entry) => {
+    positionNames(entry.row.node).some((name) => {
+      const candidates = candidatesFor(root, initial, entry, name);
+      if (name.kind === "parent" || candidates.length !== 1) {
+        return candidates.length > 0;
+      }
+      const anchor = candidates[0].row.id;
+      const slot = `${name.kind}:${candidates[0].path.join(",")}`;
+      slots.set(slot, [...(slots.get(slot) ?? []), entry.row.id]);
+      if (!movableIds.has(anchor)) {
+        return true;
+      }
+      adjacent.get(entry.row.id)?.add(anchor);
+      adjacent.get(anchor)?.add(entry.row.id);
+      if (name.kind === "after") {
+        prerequisites.get(entry.row.id)?.add(anchor);
+      } else {
+        prerequisites.get(anchor)?.add(entry.row.id);
+      }
+      return false;
+    });
+  });
+  const writtenIndex = (id: ID): number => {
+    const entry = movable.find((candidate) => candidate.row.id === id);
+    const parentId = entry?.row.node.parent;
+    const parent =
+      parentId === root.id
+        ? root
+        : initial.find(
+            (candidate) => candidate.row.reader && candidate.row.id === parentId
+          )?.row;
+    const index = parent?.node.children.indexOf(id) ?? -1;
+    return index < 0
+      ? movable.findIndex((candidate) => candidate.row.id === id)
+      : index;
+  };
+  slots.forEach((ids, slot) => {
+    const fileOrder = [...ids].sort(
+      (left, right) => writtenIndex(left) - writtenIndex(right)
+    );
+    const order = slot.startsWith("after:")
+      ? fileOrder.map((_, index) => fileOrder[fileOrder.length - index - 1])
+      : fileOrder;
+    order.slice(1).forEach((id, index) => {
+      const prior = order[index];
+      adjacent.get(id)?.add(prior);
+      adjacent.get(prior)?.add(id);
+      prerequisites.get(id)?.add(prior);
+    });
+  });
+  const seen = new globalThis.Set<ID>();
+  const components = movable.flatMap((entry) => {
+    if (seen.has(entry.row.id)) {
+      return [];
+    }
+    const collect = (pending: ID[], component: ID[]): ID[] => {
+      const [id, ...rest] = pending;
+      if (id === undefined) {
+        return component;
+      }
+      if (seen.has(id)) {
+        return collect(rest, component);
+      }
+      seen.add(id);
+      return collect(
+        [...rest, ...(adjacent.get(id) ?? [])],
+        [...component, id]
+      );
+    };
+    return [collect([entry.row.id], [])];
+  });
+  const place = (
+    tree: ComposedRow,
+    id: ID,
+    name: PositionName,
+    anchorId: ID
+  ): ComposedRow => {
+    const entries = entriesOf(tree, [], false);
+    const entry = entries.find(
+      (candidate) => candidate.row.reader && candidate.row.id === id
+    );
+    if (!entry) {
       return tree;
     }
-    const entries = entriesOf(tree, [], false);
-    const moved = entries.reduce<ComposedRow | undefined>(
-      (done, entry) => done ?? moveEntry(tree, entries, entry),
-      undefined
+    const chosen = candidatesFor(tree, entries, entry, name).filter(
+      (candidate) => candidate.row.id === anchorId
     );
-    return moved ? rounds(moved, round + 1) : tree;
+    return chosen.length === 1
+      ? moveEntry(tree, entries, entry, { name, chosen }) ?? tree
+      : tree;
   };
-  return rounds(root, 0);
+  return components.reduce((tree, component) => {
+    const componentIds = new globalThis.Set(component);
+    const ordered = component.reduce<ID[]>((order) => {
+      const next = component.find(
+        (id) =>
+          !order.includes(id) &&
+          [...(prerequisites.get(id) ?? [])].every(
+            (required) =>
+              !componentIds.has(required) || order.includes(required)
+          )
+      );
+      return next === undefined ? order : [...order, next];
+    }, []);
+    if (ordered.length !== component.length) {
+      return tree;
+    }
+    if (ordered.length === 1) {
+      const entries = entriesOf(tree, [], false);
+      const entry = entries.find(
+        (candidate) => candidate.row.reader && candidate.row.id === ordered[0]
+      );
+      return entry
+        ? moveEntry(tree, entries, entry, decisionFor(tree, entries, entry)) ??
+            tree
+        : tree;
+    }
+    const entries = entriesOf(tree, [], false);
+    const external = ordered
+      .flatMap((id) => {
+        const entry = entries.find(
+          (candidate) => candidate.row.reader && candidate.row.id === id
+        );
+        return entry
+          ? positionNames(entry.row.node).flatMap((name) => {
+              const candidates = candidatesFor(
+                tree,
+                entries,
+                entry,
+                name
+              ).filter((candidate) => !componentIds.has(candidate.row.id));
+              return candidates.length === 1
+                ? [{ id, name, anchorId: candidates[0].row.id }]
+                : [];
+            })
+          : [];
+      })
+      .at(0);
+    if (!external) {
+      return tree;
+    }
+    const pivot = ordered.indexOf(external.id);
+    const located = place(tree, external.id, external.name, external.anchorId);
+    const prepended = ordered
+      .slice(0, pivot)
+      .reverse()
+      .reduce(
+        (current, id, index) =>
+          place(
+            current,
+            id,
+            { kind: "before", id: ordered[pivot - index] },
+            ordered[pivot - index]
+          ),
+        located
+      );
+    return ordered
+      .slice(pivot + 1)
+      .reduce(
+        (current, id, index) =>
+          place(
+            current,
+            id,
+            { kind: "after", id: ordered[pivot + index] },
+            ordered[pivot + index]
+          ),
+        prepended
+      );
+  }, root);
 }
 
 function pruneConsumed(root: ComposedRow): ComposedRow {

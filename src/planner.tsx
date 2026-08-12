@@ -32,6 +32,7 @@ import {
   GraphPlan,
   createGraphPlan,
   planAddTargetsToNode,
+  planTakeComposedRow,
   planUpsertNodes,
   withDocumentRoot,
 } from "./core/plan";
@@ -135,24 +136,7 @@ function localParentFor(
   plan: Plan,
   row: ComposedRow
 ): [Plan, GraphNode | undefined] {
-  const direct =
-    row.ref.sourceId === LOCAL
-      ? getWorkspaceNode(plan.knowledgeDBs, row.id)
-      : undefined;
-  if (row.reader && direct) {
-    return [plan, direct];
-  }
-  const parent = getWorkspaceNode(plan.knowledgeDBs, row.writeParent);
-  return parent
-    ? ensurePlacement(
-        plan,
-        parent.id,
-        writeTarget(row),
-        row.text,
-        undefined,
-        undefined
-      )
-    : [plan, undefined];
+  return planTakeComposedRow(plan, row);
 }
 
 export function nextUpdated(node: GraphNode): number {

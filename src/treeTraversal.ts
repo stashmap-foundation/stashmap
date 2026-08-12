@@ -25,13 +25,11 @@ import {
   plainSpans,
 } from "./core/nodeSpans";
 import {
-  IcalEntry,
   calendarEntryTarget,
   embeddedFeedUrl,
   hiddenPastEntryCount,
   isCalendarEntryId,
-  icalEntryDisplayText,
-  mergeProjectedEntries,
+  isPastCalendarRowText,
 } from "./core/ical";
 import { getDocumentByIdOrFilePath, type Document } from "./core/Document";
 import { DEFAULT_TYPE_FILTERS } from "./core/constants";
@@ -668,60 +666,10 @@ function createVirtualRow(
         relevance: inherited?.relevance,
         argument: inherited?.argument,
       },
-      ...(input.parentRow?.materialize
-        ? {
-            host: {
-              node: input.parentRow.node,
-              parentRef: input.parentRow.parentRef,
-              materialize: input.parentRow.materialize,
-            },
-          }
+      ...(input.parentRow?.materialize ||
+      input.parentRow?.composed?.reader === false
+        ? { host: input.parentRow }
         : {}),
-    },
-  };
-}
-
-// A projected calendar entry as a behaviorally first-class row (idea.md,
-// Computed rows are first-class in behavior): synthetic node, no
-// virtualType, never stored — write gestures materialize it (M8.4).
-function createProjectionRow(
-  data: Data,
-  graph: GraphLookup,
-  parentRow: Row,
-  parentNode: GraphNode,
-  parentSourceId: SourceId,
-  entry: IcalEntry,
-  precededBy: ID[]
-): Row {
-  const node: GraphNode = {
-    children: List<ID>(),
-    id: entry.id as ID,
-    spans: plainSpans(icalEntryDisplayText(entry)),
-    parent: parentNode.id,
-    updated: parentNode.updated ?? Date.now(),
-    root: parentNode.root ?? parentNode.id,
-    relevance: undefined,
-  };
-  const parentPath = addNodesToLastElement(parentRow.viewPath, parentNode.id);
-  const viewPath = appendNodeToPath(parentPath, node.id);
-  const row = createRow(
-    data,
-    graph,
-    viewPath,
-    node,
-    graph.localSourceId,
-    parentRow,
-    parentNode,
-    { sourceId: parentSourceId, id: parentNode.id },
-    undefined,
-    false,
-    undefined
-  );
-  return {
-    ...row,
-    materialize: {
-      precededBy,
-      take: createRefTarget(entry.id as ID, icalEntryDisplayText(entry)),
     },
   };
 }
@@ -785,121 +733,6 @@ function createPastDatesActionRow(
     "past dates",
     "toggle-past-entries"
   );
-}
-
-// The machine-feeds merge at row level: children keep document order,
-// untouched projections slot in per mergeProjectedEntries. Projections
-// derive from data.calendarFeeds and never touch knowledgeDBs.
-function interleaveProjectionRows(
-  data: Data,
-  graph: GraphLookup,
-  parentRow: Row,
-  parentNode: GraphNode,
-  parentSourceId: SourceId,
-  rowsByChildId: Map<ID, Row>,
-  childRows: List<Row>,
-  typeFilters: Pane["typeFilters"]
-): { rows: List<Row>; actionRow?: Row } {
-  const feedUrl = embeddedFeedUrl(parentNode);
-  const entries = feedUrl ? data.calendarFeeds?.get(feedUrl) : undefined;
-  if (!entries || entries.length === 0) {
-    return { rows: childRows };
-  }
-  const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
-  const childKeys = parentNode.children.toArray().reduce<{
-    keys: ID[];
-    childIdByKey: globalThis.Map<ID, ID>;
-  }>(
-    (acc, childId) => {
-      const childNode = getNodeInSource(graph, {
-        sourceId: parentSourceId,
-        id: childId,
-      })?.node;
-      const entryId =
-        calendarEntryTarget(childNode) ??
-        (childNode && isCalendarEntryId(childNode.id)
-          ? childNode.id
-          : undefined);
-      const key =
-        entryId !== undefined && !acc.childIdByKey.has(entryId)
-          ? entryId
-          : childId;
-      acc.childIdByKey.set(key, childId);
-      return { keys: [...acc.keys, key], childIdByKey: acc.childIdByKey };
-    },
-    { keys: [], childIdByKey: new globalThis.Map<ID, ID>() }
-  );
-  const entriesById = new globalThis.Map(
-    entries.map((entry) => [entry.id as ID, entry])
-  );
-  // Bare past entries don't project by default; the action row reveals
-  // them. File content always shows. Pastness is node-type rendering,
-  // never a judgment.
-  const pastCount = hiddenPastEntryCount(childKeys.keys, entries, Date.now());
-  const actionRow =
-    pastCount > 0
-      ? createPastDatesActionRow(
-          data,
-          graph,
-          parentRow,
-          parentNode,
-          parentSourceId
-        )
-      : undefined;
-  const showPast = actionRow?.view.showPastEntries === true;
-  const merged = mergeProjectedEntries(
-    childKeys.keys,
-    entries,
-    showPast ? undefined : Date.now()
-  );
-  // Nearest-first anchors of everything displayed above, materialized or
-  // not — ids are deterministic, so an anchor may reference a row that
-  // doesn't exist yet. Projections obey the marker filters like every row.
-  const { rows } = merged.reduce<{ rows: Row[]; precededBy: ID[] }>(
-    (acc, item) => {
-      if (item.kind === "projection") {
-        const row = createProjectionRow(
-          data,
-          graph,
-          parentRow,
-          parentNode,
-          parentSourceId,
-          item.entry,
-          acc.precededBy
-        );
-        return {
-          rows: itemPassesFilters(row.node, activeFilters)
-            ? [...acc.rows, row]
-            : acc.rows,
-          precededBy: [item.entry.id as ID, ...acc.precededBy],
-        };
-      }
-      const childId = childKeys.childIdByKey.get(item.childId as ID);
-      const row =
-        childId !== undefined ? rowsByChildId.get(childId) : undefined;
-      const entry = entriesById.get(item.childId as ID);
-      const placementRow =
-        row && item.childId !== childId
-          ? {
-              ...row,
-              reference: undefined,
-              standsFor: {
-                id: item.childId as ID,
-                liveText: entry ? icalEntryDisplayText(entry) : undefined,
-              },
-            }
-          : row;
-      return {
-        rows: placementRow ? [...acc.rows, placementRow] : acc.rows,
-        precededBy: [item.childId as ID, ...acc.precededBy],
-      };
-    },
-    { rows: [], precededBy: [] }
-  );
-  // The action row is footer territory — the caller places it below the
-  // dotted line, ahead of the other virtual rows. Never an anchor: its
-  // id is view furniture, not content.
-  return { rows: List(rows), actionRow };
 }
 
 function appendVirtualFooterRows(
@@ -1163,23 +996,20 @@ function getChildrenForRegularNode(
     return { rows: combinedRows };
   }
 
-  const rowsByChildId = Map<ID, Row>(
-    parentRow.composed
-      ? combinedRows
-          .toArray()
-          .map((row): [ID, Row] => [row.composed?.id ?? row.node.id, row])
-      : childRowPairs.map(({ childID, row }) => [childID, row])
-  );
-  const { rows: rowsWithProjections, actionRow } = interleaveProjectionRows(
-    data,
-    graph,
-    parentRow,
-    nodes,
-    nodeSourceId,
-    rowsByChildId,
-    combinedRows,
-    typeFilters
-  );
+  const feedUrl = embeddedFeedUrl(nodes);
+  const isBarePastRow = (row: Row): boolean =>
+    row.composed?.reader === false &&
+    isPastCalendarRowText(nodeText(row.node), Date.now());
+  const hiddenPastCount =
+    feedUrl === undefined ? 0 : combinedRows.filter(isBarePastRow).size;
+  const actionRow =
+    hiddenPastCount > 0
+      ? createPastDatesActionRow(data, graph, parentRow, nodes, nodeSourceId)
+      : undefined;
+  const rowsWithProjections =
+    actionRow && actionRow.view.showPastEntries !== true
+      ? combinedRows.filter((row) => !isBarePastRow(row))
+      : combinedRows;
 
   const visibleAuthors = footerVisibleSources(data, parentRow.viewPath[0], [
     LOCAL,

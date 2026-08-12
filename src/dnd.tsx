@@ -4,9 +4,13 @@ import { DndProvider, useDragLayer, XYCoord } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { nip19 } from "nostr-tools";
 import { LOCAL } from "./core/nodeRef";
-import { moveNodes, createRefTarget, getNode } from "./core/connections";
+import {
+  createRefTarget,
+  createReferenceTarget,
+  getNode,
+} from "./core/connections";
 import { nodeText } from "./core/nodeSpans";
-import { calendarEntryTarget } from "./core/ical";
+import { calendarEntryTarget, isCalendarEntryId } from "./core/ical";
 import { getIndependentRows, getVisibleParentRow } from "./rowModel";
 import { getDocumentForNode } from "./core/Document";
 import {
@@ -14,15 +18,9 @@ import {
   applyGesture,
   moveGestureRows,
   planExpandNode,
-  planAddToParent,
-  planUpsertNodes,
   AddToParentTarget,
 } from "./planner";
-import { planMoveNode } from "./treeMutations";
-import {
-  planMaterializeComputedRow,
-  planRecordKnowstrSource,
-} from "./core/plan";
+import { planRecordKnowstrSource } from "./core/plan";
 import { sourceCoordinate } from "./navigationUrl";
 import { decodePublicKeyInputSync } from "./infra/nostr/publicKeys";
 
@@ -33,26 +31,11 @@ type DragSource = {
   sourcePaneIndex: number;
   text?: string;
   isCopyDrag?: boolean;
+  altCopy?: boolean;
   nodeId?: ID;
   targetId?: ID;
   insertTarget?: AddToParentTarget;
 };
-
-function refsEqual(
-  left: NodeRef | undefined,
-  right: NodeRef | undefined
-): boolean {
-  return (
-    left !== undefined &&
-    right !== undefined &&
-    left.sourceId === right.sourceId &&
-    left.id === right.id
-  );
-}
-
-function getCurrentPlanNode(plan: Plan, node: GraphNode): GraphNode {
-  return getNode(plan.knowledgeDBs, node.id, LOCAL) ?? node;
-}
 
 function addFallbackLinkText(
   target: AddToParentTarget,
@@ -304,7 +287,6 @@ export function getDropDestinationFromRows(
 export function dnd(
   basePlan: Plan,
   sourceDrag: DragSource,
-  targetPaneIndex: number,
   targetParentRow: Row,
   dropIndex: number,
   dropAnchor: Row | undefined
@@ -347,43 +329,48 @@ export function dnd(
           plan
         )
       : plan;
+  const sourceDocument = getDocumentForNode(
+    basePlan.knowledgeDBs,
+    basePlan.documents,
+    sourceDrag.row.node,
+    sourceDrag.row.sourceId
+  );
+  const targetDocument = getDocumentForNode(
+    basePlan.knowledgeDBs,
+    basePlan.documents,
+    targetParentRow.node,
+    targetParentRow.sourceId
+  );
+  const sameDocument =
+    sourceDocument !== undefined &&
+    targetDocument !== undefined &&
+    sourceDocument.sourceId === targetDocument.sourceId &&
+    sourceDocument.docId === targetDocument.docId;
+  const rowTargetID = (row: Row): ID =>
+    (row.viewKey === source
+      ? sourceDrag.targetId || sourceDrag.nodeId
+      : undefined) ??
+    calendarEntryTarget(row.node) ??
+    row.node.id;
+  const rowCopies = (row: Row): boolean =>
+    sourceDrag.isCopyDrag === true ||
+    (sourceDrag.altCopy === true &&
+      (!sameDocument || isCalendarEntryId(rowTargetID(row))));
   if (
     sourceDrag.isCopyDrag !== true &&
-    independentRows.some((row) => !row.parentRef)
+    independentRows.some((row) => !row.parentRef) &&
+    sameDocument
   ) {
-    const sourceDocument = getDocumentForNode(
-      basePlan.knowledgeDBs,
-      basePlan.documents,
-      sourceDrag.row.node,
-      sourceDrag.row.sourceId
-    );
-    const targetDocument = getDocumentForNode(
-      basePlan.knowledgeDBs,
-      basePlan.documents,
-      targetParentRow.node,
-      targetParentRow.sourceId
-    );
-    if (
-      sourceDocument !== undefined &&
-      targetDocument !== undefined &&
-      sourceDocument.sourceId === targetDocument.sourceId &&
-      sourceDocument.docId === targetDocument.docId
-    ) {
-      return basePlan;
-    }
+    return basePlan;
   }
-  const composedAnchor =
-    dropAnchor === undefined || dropAnchor.composed !== undefined;
-  const doorTarget =
-    composedAnchor && targetParentRow.composed !== undefined
-      ? targetParentRow.composed
-      : undefined;
+  const doorTarget = targetParentRow.composed;
   const moveRows =
-    doorTarget !== undefined &&
-    sourceDrag.isCopyDrag !== true &&
-    targetRoot !== undefined
+    doorTarget !== undefined && targetRoot !== undefined
       ? independentRows.filter(
-          (row) => row.composed !== undefined && rootOf(row) === targetRoot
+          (row) =>
+            row.composed !== undefined &&
+            rootOf(row) === targetRoot &&
+            !rowCopies(row)
         )
       : [];
   const rest = independentRows.filter((row) => !moveRows.includes(row));
@@ -405,269 +392,41 @@ export function dnd(
       }
     );
   })();
-  if (rest.length === 0) {
+  if (rest.length === 0 || doorTarget === undefined) {
     return movedPlan;
   }
-  const projectionReorder = rest.some(
-    (row) =>
-      row.materialize !== undefined &&
-      row.parentRef?.id === targetParentRow.node.id
-  );
-  if (doorTarget !== undefined && !projectionReorder) {
-    const targets = rest.map((row) => {
-      const isPrimarySource = row.viewKey === source;
-      const insertTarget =
-        (isPrimarySource ? sourceDrag.insertTarget : undefined) ??
-        row.materialize?.take;
-      const dragTargetID = isPrimarySource
-        ? sourceDrag.targetId || sourceDrag.nodeId
-        : undefined;
-      const target = insertTarget
-        ? addFallbackLinkText(insertTarget, sourceDrag.text)
-        : createRefTarget(
-            dragTargetID ?? calendarEntryTarget(row.node) ?? row.node.id,
-            nodeText(row.node)
-          );
-      const edge = row.composed ? row.composed.node : row.node;
-      return { target, relevance: edge.relevance, argument: edge.argument };
-    });
-    return applyGesture(
-      recordForeignSources(
-        planExpandNode(
-          movedPlan,
-          targetParentRow.view,
-          targetParentRow.viewPath
-        )
-      ),
-      {
-        kind: "place",
-        targets,
-        parent: doorTarget,
-        at: dropIndex + moveRows.length,
-        after: dropAnchor?.composed,
-      }
-    );
-  }
-  if (targetParentRow.projected || rest.some((row) => row.projected)) {
-    return movedPlan;
-  }
-  const [plan, targetParentNode] = planMaterializeComputedRow(
-    movedPlan,
-    targetParentRow
-  );
-
-  const targetPane = plan.panes[targetPaneIndex];
-  if (!sourcePane || !targetPane) {
-    return plan;
-  }
-  const sourceDocumentNode = sourceDrag.row.node;
-  const sourceDocument = getDocumentForNode(
-    plan.knowledgeDBs,
-    plan.documents,
-    sourceDocumentNode,
-    sourceDrag.row.sourceId
-  );
-  const targetSourceId = targetParentRow.materialize
-    ? LOCAL
-    : targetParentRow.sourceId;
-  const targetDocument = getDocumentForNode(
-    plan.knowledgeDBs,
-    plan.documents,
-    targetParentNode,
-    targetSourceId
-  );
-  const isSameDocument =
-    sourceDocument !== undefined &&
-    targetDocument !== undefined &&
-    sourceDocument.sourceId === targetDocument.sourceId &&
-    sourceDocument.docId === targetDocument.docId;
-  const isDocumentTopLevelSource =
-    sourceDocument !== undefined &&
-    sourceDocument.sourceId === sourceDrag.row.sourceId &&
-    sourceDocument.topNodeShortIds.includes(sourceDocumentNode.id);
-
-  if (isDocumentTopLevelSource && isSameDocument && !sourceDrag.isCopyDrag) {
-    return plan;
-  }
-
-  const sourceParentRef = sourceDrag.row.parentRef;
-  const allSourcesSameParent =
-    sourceParentRef !== undefined &&
-    rest.every((row) => refsEqual(row.parentRef, sourceParentRef));
-  const targetParentRef = { sourceId: targetSourceId, id: targetParentNode.id };
-  const sameNode =
-    allSourcesSameParent && refsEqual(sourceParentRef, targetParentRef);
-
-  const skipMoveLogic = sourceDrag.isCopyDrag;
-  const reorder = isSameDocument && !skipMoveLogic && sameNode;
-
-  const addProjectedSourceAsReference = (
-    accPlan: Plan,
-    sourceRow: Row,
-    insertAt: number
-  ): Plan => {
-    // A computed row with a materialization recipe drags as itself: it
-    // materializes at the drop position (mint-or-link decides whether
-    // that means the node or a link row to its home elsewhere). Already
-    // materialized (a projection-reorder pre-step ran): ordinary move.
-    if (sourceRow.materialize) {
-      const [materializedPlan, materializedNode, materializedNow] =
-        planMaterializeComputedRow(accPlan, sourceRow, undefined, {
-          parentID: targetParentNode.id,
-          insertIndex: insertAt,
-        });
-      if (materializedNow || !sourceRow.parentRef) {
-        return materializedPlan;
-      }
-      // Same-parent: an in-place reorder (planMoveNode is add-then-
-      // disconnect and not same-parent-safe). Cross-parent: a move.
-      if (sourceRow.parentRef.id === targetParentNode.id) {
-        const parentNode = getCurrentPlanNode(
-          materializedPlan,
-          targetParentNode
-        );
-        const fromIndex = parentNode.children.indexOf(materializedNode.id);
-        if (fromIndex < 0) {
-          return materializedPlan;
-        }
-        return planUpsertNodes(
-          materializedPlan,
-          moveNodes(parentNode, [fromIndex], insertAt)
-        );
-      }
-      return planMoveNode(
-        materializedPlan,
-        materializedNode.id,
-        materializedNode.id,
-        sourceRow.parentRef.id,
-        sourceRow.viewPath,
-        targetParentNode.id,
-        targetParentRow.viewPath,
-        insertAt
-      );
-    }
-    return planAddToParent(
-      accPlan,
-      createRefTarget(
-        calendarEntryTarget(sourceRow.node) ?? sourceRow.node.id,
-        nodeText(sourceRow.node)
-      ),
-      targetParentNode.id,
-      insertAt
-    )[0];
-  };
-
-  if (reorder) {
-    const realRows = rest.filter((row) => row.childIndex !== undefined);
-    const virtualRows = rest.filter((row) => row.childIndex === undefined);
-    const sourceIndices = realRows.flatMap((row) =>
-      row.childIndex === undefined ? [] : [row.childIndex]
-    );
-    const targetNode = getCurrentPlanNode(plan, targetParentNode);
-    const reorderedPlan = planUpsertNodes(
-      plan,
-      moveNodes(targetNode, sourceIndices, dropIndex)
-    );
-    return virtualRows.reduce((accPlan: Plan, sourceRow, idx) => {
-      const insertAt = dropIndex + sourceIndices.length + idx;
-      return addProjectedSourceAsReference(accPlan, sourceRow, insertAt);
-    }, reorderedPlan);
-  }
-
-  const sameDocumentMove = isSameDocument && !skipMoveLogic && !sameNode;
-
-  if (sameDocumentMove) {
-    const isDropIntoOwnDescendant = rest.some(
-      (row) =>
-        targetParentRow.viewKey === row.viewKey ||
-        targetParentRow.viewKey.startsWith(`${row.viewKey}:`)
-    );
-    if (isDropIntoOwnDescendant) {
-      return plan;
-    }
-    const realRows = rest.filter((row) => row.childIndex !== undefined);
-    const virtualRows = rest.filter((row) => row.childIndex === undefined);
-    const moveBasePlan = targetParentRow.view.expanded
-      ? plan
-      : planExpandNode(plan, targetParentRow.view, targetParentRow.viewPath);
-    const rawMovedPlan = realRows.reduce((accPlan: Plan, sourceRow, idx) => {
-      if (!sourceRow.parentNode) {
-        return accPlan;
-      }
-      const insertAt = dropIndex + idx;
-      return planMoveNode(
-        accPlan,
-        sourceRow.node.id,
-        sourceRow.node.id,
-        sourceRow.parentNode.id,
-        sourceRow.viewPath,
-        targetParentNode.id,
-        targetParentRow.viewPath,
-        insertAt
-      );
-    }, moveBasePlan);
-    return virtualRows.reduce((accPlan: Plan, sourceRow, idx) => {
-      const insertAt = dropIndex + realRows.length + idx;
-      return addProjectedSourceAsReference(accPlan, sourceRow, insertAt);
-    }, rawMovedPlan);
-  }
-
-  const expandedPlan = targetParentRow.view.expanded
-    ? plan
-    : planExpandNode(plan, targetParentRow.view, targetParentRow.viewPath);
-
-  const toReferenceTarget = (sourceRow: Row): AddToParentTarget =>
-    createRefTarget(
-      calendarEntryTarget(sourceRow.node) ?? sourceRow.node.id,
-      nodeText(sourceRow.node)
-    );
-
-  return rest.reduce((accPlan: Plan, sourceRow, idx) => {
-    const sourceNode = sourceRow.node;
-    const sourceEdgeRelevance = sourceNode.relevance;
-    const sourceEdgeArgument = sourceNode.argument;
-    const insertAt = dropIndex + idx;
-    const isPrimarySource = sourceRow.viewKey === source;
-    const targetNode = getCurrentPlanNode(accPlan, targetParentNode);
-    const planWithSource =
-      targetSourceId === LOCAL
-        ? planRecordForeignSource(accPlan, sourcePane, sourceRow, targetNode)
-        : accPlan;
+  const targets = rest.map((row) => {
+    const isPrimarySource = row.viewKey === source;
     const insertTarget =
-      sourceRow.materialize?.take ??
-      (isPrimarySource ? sourceDrag.insertTarget : undefined);
+      (isPrimarySource ? sourceDrag.insertTarget : undefined) ??
+      row.materialize?.take;
     const dragTargetID = isPrimarySource
       ? sourceDrag.targetId || sourceDrag.nodeId
       : undefined;
-    if (insertTarget) {
-      return planAddToParent(
-        planWithSource,
-        addFallbackLinkText(insertTarget, sourceDrag.text),
-        targetNode.id,
-        insertAt,
-        sourceEdgeRelevance,
-        sourceEdgeArgument
-      )[0];
+    const targetID =
+      dragTargetID ?? calendarEntryTarget(row.node) ?? row.node.id;
+    const makeTarget =
+      sourceDrag.altCopy === true && isCalendarEntryId(targetID)
+        ? createReferenceTarget
+        : createRefTarget;
+    const target = insertTarget
+      ? addFallbackLinkText(insertTarget, sourceDrag.text)
+      : makeTarget(targetID, nodeText(row.node));
+    const edge = row.composed ? row.composed.node : row.node;
+    return { target, relevance: edge.relevance, argument: edge.argument };
+  });
+  return applyGesture(
+    recordForeignSources(
+      planExpandNode(movedPlan, targetParentRow.view, targetParentRow.viewPath)
+    ),
+    {
+      kind: "place",
+      targets,
+      parent: doorTarget,
+      at: dropIndex + moveRows.length,
+      after: dropAnchor?.composed,
     }
-    if (dragTargetID) {
-      return planAddToParent(
-        planWithSource,
-        createRefTarget(dragTargetID, nodeText(sourceNode)),
-        targetNode.id,
-        insertAt,
-        sourceEdgeRelevance,
-        sourceEdgeArgument
-      )[0];
-    }
-    return planAddToParent(
-      planWithSource,
-      toReferenceTarget(sourceRow),
-      targetNode.id,
-      insertAt,
-      sourceEdgeRelevance,
-      sourceEdgeArgument
-    )[0];
-  }, expandedPlan);
+  );
 }
 
 function CustomDragLayer(): JSX.Element | null {
@@ -702,7 +461,45 @@ function CustomDragLayer(): JSX.Element | null {
   );
 }
 
+/* eslint-disable functional/immutable-data */
+const dragModifier = { alt: false, altKeyHeld: false };
+
+export function takeAltDrag(): boolean {
+  const pressed = dragModifier.alt || dragModifier.altKeyHeld;
+  dragModifier.alt = false;
+  dragModifier.altKeyHeld = false;
+  return pressed;
+}
+
 export function DND({ children }: { children: React.ReactNode }): JSX.Element {
+  React.useEffect(() => {
+    const recordDrag = (event: DragEvent): void => {
+      if (typeof event.altKey === "boolean") {
+        dragModifier.alt = event.altKey;
+      }
+    };
+    const recordKey = (event: KeyboardEvent): void => {
+      if (event.key === "Alt") {
+        dragModifier.altKeyHeld = event.type === "keydown";
+      }
+    };
+    const clear = (): void => {
+      dragModifier.alt = false;
+      dragModifier.altKeyHeld = false;
+    };
+    window.addEventListener("dragover", recordDrag, true);
+    window.addEventListener("drop", recordDrag, true);
+    window.addEventListener("keydown", recordKey, true);
+    window.addEventListener("keyup", recordKey, true);
+    window.addEventListener("blur", clear);
+    return () => {
+      window.removeEventListener("dragover", recordDrag, true);
+      window.removeEventListener("drop", recordDrag, true);
+      window.removeEventListener("keydown", recordKey, true);
+      window.removeEventListener("keyup", recordKey, true);
+      window.removeEventListener("blur", clear);
+    };
+  }, []);
   return (
     <DndProvider backend={HTML5Backend}>
       <CustomDragLayer />
@@ -710,3 +507,4 @@ export function DND({ children }: { children: React.ReactNode }): JSX.Element {
     </DndProvider>
   );
 }
+/* eslint-enable functional/immutable-data */

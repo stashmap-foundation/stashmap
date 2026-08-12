@@ -53,7 +53,7 @@ import { linkStyleForHref } from "./editorDom";
 import { useOnToggleExpanded } from "./SelectNodes";
 import { useApis } from "../Apis";
 import { useData } from "../DataContext";
-import { planMaterializeComputedRow } from "../core/plan";
+import { planMaterializeComputedRow, planTakeComposedRow } from "../core/plan";
 import { getWorkspaceNode } from "../core/knowledge";
 import {
   Plan,
@@ -623,15 +623,52 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
     if (rewordEditing && row.composed) {
       const unchanged =
         spansText(nextSpans).trim() === row.composed.text.trim();
-      if (unchanged) {
+      if (!unchanged) {
+        await executePlan(
+          applyGesture(createPlan(), {
+            kind: "reword",
+            row: row.composed,
+            spans: nextSpans,
+          })
+        );
+        return;
+      }
+      const visibleParent = getVisibleParentRow(rows, row);
+      if (
+        !submitted ||
+        !isCalendarEntryId(row.composed.id) ||
+        !parentNode ||
+        !parentPath ||
+        !visibleParent
+      ) {
+        return;
+      }
+      const [takenPlan, takenNode] = planTakeComposedRow(
+        createPlan(),
+        row.composed
+      );
+      if (!takenNode) {
+        return;
+      }
+      const takenParent = getWorkspaceNode(
+        takenPlan.knowledgeDBs,
+        parentNode.id
+      );
+      const takenIndex = takenParent
+        ? takenParent.children.indexOf(takenNode.id)
+        : -1;
+      if (takenIndex < 0) {
         return;
       }
       await executePlan(
-        applyGesture(createPlan(), {
-          kind: "reword",
-          row: row.composed,
-          spans: nextSpans,
-        })
+        planSetEmptyNodePosition(
+          takenPlan,
+          parentNode.id,
+          visibleParent.view,
+          parentPath,
+          paneIndex,
+          takenIndex + 1
+        )
       );
       return;
     }

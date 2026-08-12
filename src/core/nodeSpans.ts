@@ -43,12 +43,15 @@ export const embeddedTarget = (node: GraphNode | undefined): ID | undefined => {
     node?.extraAttrs?.embed !== "true" ||
     node.spans.length !== 1 ||
     node.spans[0]?.kind !== "link" ||
-    node.spans[0].struck === true ||
-    !node.spans[0].href.startsWith("#")
+    node.spans[0].struck === true
   ) {
     return undefined;
   }
-  return node.spans[0].href.slice(1);
+  const { href } = node.spans[0];
+  if (href.startsWith("#")) {
+    return href.slice(1);
+  }
+  return classifyLinkHref(href) === "feed" ? href : undefined;
 };
 
 export const rewordingTargets = (node: GraphNode | undefined): ID[] =>

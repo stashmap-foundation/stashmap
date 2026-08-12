@@ -2,6 +2,7 @@
 import { List } from "immutable";
 import { formatPrefixMarkers } from "../documentFormat";
 import { EMPTY_NODE_ID } from "./connections";
+import { isCalendarEntryId } from "./ical";
 import type { AddToParentTarget } from "./plan";
 import {
   GraphLookup,
@@ -130,6 +131,10 @@ function rowTargets(node: GraphNode): ID[] {
   if (rewording.length > 0) {
     return rewording;
   }
+  const embedded = embeddedTarget(node);
+  if (embedded !== undefined) {
+    return [embedded];
+  }
   const span = node.spans.length === 1 ? node.spans[0] : undefined;
   return span?.kind === "link" &&
     span.struck !== true &&
@@ -140,6 +145,11 @@ function rowTargets(node: GraphNode): ID[] {
 
 function targetOf(node: GraphNode): ID | undefined {
   return rowTargets(node)[0];
+}
+
+function isFeedRoot(node: GraphNode): boolean {
+  const span = node.spans.length === 1 ? node.spans[0] : undefined;
+  return span?.kind === "link" && span.href === node.id;
 }
 
 function projects(node: GraphNode): boolean {
@@ -690,6 +700,7 @@ function pruneConsumed(root: ComposedRow): ComposedRow {
     if (
       row.reader &&
       row.target !== undefined &&
+      !(row.kind === "link" && isCalendarEntryId(row.target)) &&
       !row.flags.includes("lapsed")
     ) {
       represented.set(row.target, [
@@ -1194,6 +1205,9 @@ export function composeNote(
     const text = (() => {
       if (speaking) {
         return effectiveText(speaking.node);
+      }
+      if (terminal && isFeedRoot(terminal.node) && layers.length > 1) {
+        return frozenText(layers[0].node);
       }
       if (terminal) {
         return nodeText(terminal.node);

@@ -69,12 +69,13 @@ function localTargetToHref(data: Data, targetID: ID): string | undefined {
   if (!target) {
     return undefined;
   }
-  const parent = target.node.parent
-    ? getNodeInSource(graph, {
-        sourceId: LOCAL,
-        id: target.node.parent,
-      })
-    : undefined;
+  const parent =
+    target.node.parent && !graph.feeds.has(target.node.id)
+      ? getNodeInSource(graph, {
+          sourceId: LOCAL,
+          id: target.node.parent,
+        })
+      : undefined;
   const targetRoot = parent ?? target;
   return buildNodeRouteUrl(targetRoot.node.id, LOCAL, {
     scrollToId:

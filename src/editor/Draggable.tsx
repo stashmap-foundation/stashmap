@@ -194,7 +194,6 @@ export function ListItem({
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
   const selected = useIsSelected();
   const rowDepth = row.depth;
-  const paneIndex = usePaneIndex();
   const isActiveRow = activeRowKey === viewKey;
   const isEmptyNode = isEmptyNodeID(row.node.id);
 
@@ -205,7 +204,6 @@ export function ListItem({
     ref,
     nextRow,
     rows,
-    paneIndex,
   });
 
   // Action rows are buttons in row position: one interaction (click) —

@@ -7,6 +7,7 @@ import {
   useRow,
 } from "../rowModel";
 import { isEmptyNodeID } from "../core/connections";
+import { LOCAL } from "../core/nodeRef";
 import { useCurrentPane } from "../SplitPanesContext";
 import { RelevanceSelector } from "./RelevanceSelector";
 import { EvidenceSelector } from "./EvidenceSelector";
@@ -14,7 +15,7 @@ import { FullscreenButton } from "./FullscreenButton";
 import { OpenInSplitPaneButton } from "./OpenInSplitPaneButton";
 
 export function RightMenu(): JSX.Element {
-  const { virtualType, projected, composed } = useRow();
+  const { virtualType, sourceId, occurrence } = useRow();
   const isVirtualItem = virtualType === "incoming";
   const isRoot = useIsRoot();
   const pane = useCurrentPane();
@@ -27,7 +28,7 @@ export function RightMenu(): JSX.Element {
   const isReadonly =
     (isRoot && !isDocumentTopLevel) ||
     isInSearchView ||
-    (projected === true && composed === undefined) ||
+    (sourceId !== LOCAL && occurrence === undefined && !isVirtualItem) ||
     (isViewingOtherUserContent && !isVirtualItem);
 
   return (

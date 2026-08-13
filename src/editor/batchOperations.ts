@@ -19,10 +19,11 @@ import { isEmptyNodeID } from "../core/connections";
 import {
   planAddTopTargetsToDocument,
   planMaterializeComputedRow,
+  planTakeOccurrence,
 } from "../core/plan";
 import { getDocumentByIdOrFilePath } from "../core/Document";
 import { spansText, spansToMarkdown, plainSpans } from "../core/nodeSpans";
-import type { ComposedRow } from "../core/composition";
+import type { Occurrence } from "../core/composition";
 
 export type EditorInfo = {
   spans: InlineSpan[];
@@ -48,27 +49,31 @@ function getEditorSpansForRow(
   return editorInfo.spans;
 }
 
-export function planJudgeComposedRow(
+export function planJudgeOccurrence(
   plan: Plan,
-  composed: ComposedRow,
+  occurrence: Occurrence,
   metadata: NodeItemMetadata,
   editorSpans: InlineSpan[] | undefined
 ): Plan {
-  const spans = editorSpans ?? plainSpans(composed.text);
+  const spans = editorSpans ?? plainSpans(occurrence.text);
   if (metadata.relevance === "not_relevant") {
     return applyGesture(plan, {
       kind: "dismiss",
-      row: composed,
+      row: occurrence,
       spans,
     });
   }
   return applyGesture(plan, {
     kind: "judge",
-    row: composed,
+    row: occurrence,
     relevance:
-      "relevance" in metadata ? metadata.relevance : composed.node.relevance,
+      "relevance" in metadata
+        ? metadata.relevance
+        : occurrence.line.node.relevance,
     argument:
-      "argument" in metadata ? metadata.argument : composed.node.argument,
+      "argument" in metadata
+        ? metadata.argument
+        : occurrence.line.node.argument,
     spans,
   });
 }
@@ -79,8 +84,8 @@ export function planUpdateOneMetadata(
   metadata: NodeItemMetadata,
   editorSpans: InlineSpan[] | undefined
 ): Plan {
-  if (row.composed) {
-    return planJudgeComposedRow(acc, row.composed, metadata, editorSpans);
+  if (row.occurrence) {
+    return planJudgeOccurrence(acc, row.occurrence, metadata, editorSpans);
   }
   if (isEmptyNodeID(row.node.id)) {
     if (!row.parentViewPath) {
@@ -104,9 +109,23 @@ export function planUpdateOneMetadata(
       ? planUpdateEmptyNodeMetadata(acc, row.parentNode.id, metadata)
       : acc;
   }
+  const host = row.materialize?.host;
+  const takenHost = host?.occurrence
+    ? planTakeOccurrence(acc, host.occurrence)
+    : undefined;
+  const hostPlan = takenHost?.[0] ?? acc;
+  const hostRow = takenHost?.[1]
+    ? {
+        ...row,
+        parentRef: {
+          sourceId: host?.occurrence?.line.ref.sourceId ?? row.sourceId,
+          id: takenHost[1].id,
+        },
+      }
+    : row;
   const [materializedPlan, , materializedNow] = planMaterializeComputedRow(
-    acc,
-    row,
+    hostPlan,
+    hostRow,
     { relevance: metadata.relevance, argument: metadata.argument }
   );
   if (materializedNow) {
@@ -244,13 +263,13 @@ function planBatchMove(
   const withEdits = sortedRows.reduce((acc, row) => {
     const editorSpans = getEditorSpansForRow(editorInfo, row);
     return !editorSpans ||
-      row.composed?.reader !== true ||
+      row.occurrence?.persisted === undefined ||
       spansToMarkdown(editorSpans) === spansToMarkdown(row.node.spans)
       ? acc
       : planUpdateNodeSpans(acc, row.node.id, editorSpans);
   }, moved);
   const remappedKeys = sortedRows.flatMap((row) =>
-    row.composed?.reader === true
+    row.occurrence?.persisted !== undefined
       ? [
           {
             fromKey: row.viewKey,
@@ -272,7 +291,7 @@ export function planBatchIndent(
   const sortedRows = sortByNodeIndex(rows);
   const firstRow = sortedRows[0];
   const prevSibling = getPreviousSiblingFromRows(orderedRows, firstRow);
-  const parent = prevSibling?.composed;
+  const parent = prevSibling?.occurrence;
   if (!prevSibling || !parent) return undefined;
   const gestureRows = moveGestureRows(sortedRows, orderedRows);
   if (gestureRows.length !== sortedRows.length) return undefined;
@@ -305,9 +324,9 @@ export function planBatchOutdent(
   const sortedRows = sortByNodeIndex(rows);
   const firstRow = sortedRows[0];
   const parentRow = getVisibleParentRow(orderedRows, firstRow);
-  if (!parentRow?.composed) return undefined;
+  if (!parentRow?.occurrence) return undefined;
   const grandParentRow = getVisibleParentRow(orderedRows, parentRow);
-  const parent = grandParentRow?.composed;
+  const parent = grandParentRow?.occurrence;
   if (!grandParentRow || !parent) return undefined;
   const gestureRows = moveGestureRows(sortedRows, orderedRows);
   if (gestureRows.length !== sortedRows.length) return undefined;
@@ -316,7 +335,7 @@ export function planBatchOutdent(
     rows: gestureRows,
     parent,
     parentPath: grandParentRow.viewPath,
-    after: parentRow.composed,
+    after: parentRow.occurrence,
   });
   return planBatchMove(
     plan,

@@ -54,10 +54,10 @@ export function useItemStyle(): ItemStyle {
   // un-dims: deliberate emphasis beats default de-emphasis.
   const isPastCalendarRow =
     !!currentRow &&
-    isCalendarEntryId(row.standsFor?.id ?? currentRow.id) &&
+    isCalendarEntryId(row.occurrence?.target ?? currentRow.id) &&
     currentRow.relevance === undefined &&
     isPastCalendarRowText(
-      row.standsFor?.liveText ?? nodeText(currentRow),
+      row.occurrence?.text ?? nodeText(currentRow),
       Date.now()
     );
 

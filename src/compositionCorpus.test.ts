@@ -2,7 +2,7 @@ import fs from "fs";
 import pathModule from "path";
 import { Map as ImmutableMap } from "immutable";
 import { parseToDocumentPreservingExplicitIds } from "./core/Document";
-import { composeNote, treeFromComposition } from "./core/composition";
+import { buildOccurrences, treeFromOccurrences } from "./core/composition";
 import { graphLookupFromData } from "./core/graphLookup";
 import { createEmptyGraphIndex } from "./graphIndex";
 import { LOCAL } from "./core/nodeRef";
@@ -84,7 +84,7 @@ test.each(compositionFixtures)(
       graphIndex: createEmptyGraphIndex(),
     });
 
-    const result = composeNote(graph, {
+    const result = buildOccurrences(graph, {
       sourceId: LOCAL,
       id: document.topNodeShortIds[0],
     });
@@ -93,6 +93,6 @@ test.each(compositionFixtures)(
       pathModule.join(fixturePath, "expected.tree"),
       "utf8"
     );
-    expect(treeFromComposition(result)).toEqual(expected);
+    expect(treeFromOccurrences(result)).toEqual(expected);
   }
 );

@@ -4,7 +4,7 @@ import { QueueStatus } from "./infra/nostr/cache/PublishQueue";
 import { Document as DocumentType } from "./core/Document";
 import { IcalEntry } from "./core/ical";
 import type { AddToParentTarget } from "./core/plan";
-import type { ComposedRow } from "./core/composition";
+import type { Occurrence } from "./core/composition";
 
 declare global {
   type Children = {
@@ -215,12 +215,10 @@ declare global {
       precededBy: ID[];
       take?: AddToParentTarget;
       defaults?: { relevance?: Relevance; argument?: Argument };
-      host?: Pick<Row, "node" | "parentRef" | "materialize">;
+      host?: Pick<Row, "node" | "occurrence" | "parentRef" | "materialize">;
       root?: true;
     };
-    standsFor?: { id: ID; liveText?: string };
-    composed?: ComposedRow;
-    projected?: true;
+    occurrence?: Occurrence;
     isFirstVirtual: boolean;
     virtualType: "search" | "incoming" | undefined;
     // The action row: a button in row position, obviously not content.

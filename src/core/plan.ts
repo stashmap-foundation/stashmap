@@ -11,7 +11,7 @@ import type {
   RefTargetSeed,
   TextSeed,
 } from "./connections";
-import type { ComposedRow } from "./composition";
+import type { Occurrence } from "./composition";
 import {
   createDocumentFromRootNode,
   Document,
@@ -414,9 +414,9 @@ export function createGraphPlan(props: CreateGraphPlanProps): GraphPlan {
 // interpreter never learns what produced the row.
 export type MaterializableRow = {
   node: GraphNode;
+  occurrence?: Occurrence;
   parentRef?: NodeRef;
   sourceId?: SourceId;
-  composed?: ComposedRow;
   materialize?: {
     precededBy: ID[];
     // A prepared take: materialize by adding THIS target (a link row or
@@ -453,22 +453,22 @@ function materializeInsertIndex(
   return found !== undefined ? found + 1 : 0;
 }
 
-export function planTakeComposedRow<T extends GraphPlan>(
+export function planTakeOccurrence<T extends GraphPlan>(
   plan: T,
-  row: ComposedRow
+  row: Occurrence
 ): [T, GraphNode | undefined] {
   const direct =
-    row.ref.sourceId === LOCAL
+    row.line.ref.sourceId === LOCAL
       ? getWorkspaceNode(plan.knowledgeDBs, row.id)
       : undefined;
-  if (row.reader && direct) {
+  if (row.persisted && direct) {
     return [plan, direct];
   }
   const parent = getWorkspaceNode(plan.knowledgeDBs, row.writeParent);
   if (!parent) {
     return [plan, undefined];
   }
-  const target = row.reader ? row.target ?? row.id : row.id;
+  const target = row.persisted ? row.target ?? row.id : row.id;
   const existing = parent.children
     .map((id) => getWorkspaceNode(plan.knowledgeDBs, id))
     .find((node) => placementTarget(node) === target);
@@ -490,13 +490,6 @@ export function planMaterializeComputedRow<T extends GraphPlan>(
   placement?: { parentID?: ID; insertIndex?: number }
 ): [T, GraphNode, boolean] {
   if (!row.materialize) {
-    if (
-      row.composed &&
-      !(row.composed.reader && row.composed.ref.sourceId === LOCAL)
-    ) {
-      const [taken, node] = planTakeComposedRow(plan, row.composed);
-      return node ? [taken, node, true] : [plan, row.node, false];
-    }
     return [plan, row.node, false];
   }
   if (row.materialize.root) {

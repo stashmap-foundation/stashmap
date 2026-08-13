@@ -53,7 +53,7 @@ import { linkStyleForHref } from "./editorDom";
 import { useOnToggleExpanded } from "./SelectNodes";
 import { useApis } from "../Apis";
 import { useData } from "../DataContext";
-import { planMaterializeComputedRow, planTakeComposedRow } from "../core/plan";
+import { planMaterializeComputedRow, planTakeOccurrence } from "../core/plan";
 import { getWorkspaceNode } from "../core/knowledge";
 import {
   Plan,
@@ -297,12 +297,13 @@ function reciprocalLinks(
 }
 
 function hasBrokenTarget(row: Row): boolean {
-  const terminal = row.composed?.chain[row.composed.chain.length - 1];
+  const terminal = row.occurrence?.chain[row.occurrence.chain.length - 1];
   return (
-    (row.composed?.kind === "placement" || row.composed?.kind === "speaking") &&
+    (row.occurrence?.kind === "placement" ||
+      row.occurrence?.kind === "speaking") &&
     terminal !== undefined &&
     !isCanonicalId(terminal) &&
-    row.composed.flags.some(
+    row.occurrence.flags.some(
       (flag) => flag === "dangling" || flag === "orphan-source"
     )
   );
@@ -326,14 +327,15 @@ function InlineLinkSpan({
   // An embed shows the target's live text: the row's own label is the
   // frozen file record, the display follows the source.
   const displayedText =
-    row.standsFor?.liveText !== undefined &&
-    span.href === `#${row.standsFor.id}`
-      ? row.standsFor.liveText
+    row.occurrence?.target !== undefined &&
+    span.href === `#${row.occurrence.target}`
+      ? row.occurrence.text
       : span.text;
   const calendarContent =
     !isSearchResult &&
     (calendarFeedUrl(node) !== undefined ||
-      (row.standsFor !== undefined && isCalendarEntryId(row.standsFor.id)));
+      (row.occurrence?.target !== undefined &&
+        isCalendarEntryId(row.occurrence.target)));
   const externalUrl = calendarContent ? undefined : externalLinkUrl(span.href);
   const dead =
     hasBrokenTarget(row) || isDeadLinkTarget(data, span.href, node, sourceId);
@@ -570,22 +572,22 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
     isCalendarEntryPlacement(currentNode, parentNode ?? undefined);
   const rewordEditing =
     !calendarContent &&
-    row.composed !== undefined &&
-    (row.projected === true ||
-      ((row.composed.kind === "placement" ||
-        row.composed.kind === "speaking") &&
-        row.composed.target !== undefined &&
-        classifyLinkHref(`#${row.composed.target}`) === "node"));
-  const bondHref = `#${row.composed?.target ?? row.node.id}`;
+    row.occurrence !== undefined &&
+    (row.occurrence.persisted === undefined ||
+      ((row.occurrence.kind === "placement" ||
+        row.occurrence.kind === "speaking") &&
+        row.occurrence.target !== undefined &&
+        classifyLinkHref(`#${row.occurrence.target}`) === "node"));
+  const bondHref = `#${row.occurrence?.target ?? row.node.id}`;
   const editorSpans: InlineSpan[] = (() => {
     if (!rewordEditing) {
       return currentNode.spans;
     }
     if (
       embeddedTarget(currentNode) !== undefined &&
-      row.standsFor?.liveText !== undefined
+      row.occurrence !== undefined
     ) {
-      return [{ kind: "link", href: bondHref, text: row.standsFor.liveText }];
+      return [{ kind: "link", href: bondHref, text: row.occurrence.text }];
     }
     return currentNode.spans.filter(
       (span) => !(span.kind === "link" && span.struck === true)
@@ -620,14 +622,14 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
     submitted?: boolean
   ): Promise<void> => {
     const nextSpans = persistedSpans(spans);
-    if (rewordEditing && row.composed) {
+    if (rewordEditing && row.occurrence) {
       const unchanged =
-        spansText(nextSpans).trim() === row.composed.text.trim();
+        spansText(nextSpans).trim() === row.occurrence.text.trim();
       if (!unchanged) {
         await executePlan(
           applyGesture(createPlan(), {
             kind: "reword",
-            row: row.composed,
+            row: row.occurrence,
             spans: nextSpans,
           })
         );
@@ -636,16 +638,16 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       const visibleParent = getVisibleParentRow(rows, row);
       if (
         !submitted ||
-        !isCalendarEntryId(row.composed.id) ||
+        !isCalendarEntryId(row.occurrence.id) ||
         !parentNode ||
         !parentPath ||
         !visibleParent
       ) {
         return;
       }
-      const [takenPlan, takenNode] = planTakeComposedRow(
+      const [takenPlan, takenNode] = planTakeOccurrence(
         createPlan(),
-        row.composed
+        row.occurrence
       );
       if (!takenNode) {
         return;
@@ -1040,7 +1042,7 @@ function InteractiveNodeContent({ rows }: { rows: List<Row> }): JSX.Element {
     isInSearchView ||
     isViewingOtherUserContent ||
     virtualType !== undefined ||
-    (row.projected === true && row.composed === undefined);
+    (row.sourceId !== LOCAL && row.occurrence === undefined);
 
   if (isLoading) {
     return <LoadingNode />;
@@ -1133,7 +1135,7 @@ export function Node({
   const calendarType = (() => {
     if (virtualType !== undefined) return undefined;
     if (calendarFeedUrl(currentNode) !== undefined) return "Calendar";
-    return isCalendarEntryId(row.standsFor?.id ?? currentNode.id)
+    return isCalendarEntryId(row.occurrence?.target ?? currentNode.id)
       ? "Date"
       : undefined;
   })();

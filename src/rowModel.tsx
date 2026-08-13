@@ -77,7 +77,7 @@ export function getVisibleParentRow(
       (candidate) =>
         candidate.depth < row.depth &&
         (rowRefsEqual(candidate.ref, row.parentRef) ||
-          candidate.standsFor?.id === row.parentRef?.id)
+          candidate.occurrence?.target === row.parentRef?.id)
     );
 }
 
@@ -228,14 +228,14 @@ export function resolveRowView(
 
 export function buildPaneTarget(data: Data, row: Row): EditorNavigationTarget {
   const composedPlacement =
-    row.composed?.kind === "placement" || row.composed?.kind === "speaking";
+    row.occurrence?.kind === "placement" || row.occurrence?.kind === "speaking";
   const terminalTarget =
     composedPlacement &&
-    row.composed?.flags.some(
+    row.occurrence?.flags.some(
       (flag) =>
         flag === "cycle" || flag === "dangling" || flag === "orphan-source"
     )
-      ? row.composed.chain[row.composed.chain.length - 1]
+      ? row.occurrence.chain[row.occurrence.chain.length - 1]
       : undefined;
   const targetID =
     row.virtualType === "search"
@@ -244,7 +244,7 @@ export function buildPaneTarget(data: Data, row: Row): EditorNavigationTarget {
   const targetSourceId =
     terminalTarget === undefined
       ? row.sourceId
-      : row.composed?.sourceParent?.sourceId ?? row.sourceId;
+      : row.occurrence?.sourceParent?.sourceId ?? row.sourceId;
   const resolvedTarget = terminalTarget
     ? lookupNode(graphLookupFromData(data), terminalTarget, targetSourceId)
     : undefined;
@@ -349,8 +349,11 @@ export function useCurrentEdge(): GraphNode {
 
 export function getDisplayTextForRow(row: Row): string {
   const { reference } = row;
-  if (row.standsFor?.liveText !== undefined) {
-    return row.standsFor.liveText;
+  if (
+    row.occurrence?.kind === "placement" ||
+    row.occurrence?.kind === "speaking"
+  ) {
+    return row.occurrence.text;
   }
   if (
     row.virtualType === undefined &&

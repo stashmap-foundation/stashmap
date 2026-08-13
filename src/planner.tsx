@@ -32,7 +32,7 @@ import {
   GraphPlan,
   createGraphPlan,
   planAddTargetsToNode,
-  planTakeComposedRow,
+  planTakeOccurrence,
   planUpsertNodes,
   withDocumentRoot,
 } from "./core/plan";
@@ -60,7 +60,7 @@ import { getWorkspaceNode } from "./core/knowledge";
 import { planRepairDependentAnchors } from "./dataPlanner";
 import {
   Gesture,
-  ComposedRow,
+  Occurrence,
   PositionName,
   clearPosition,
   positionAttrs,
@@ -94,8 +94,8 @@ type WorkspacePlan = GraphPlan &
 
 export type Plan = WorkspacePlan;
 
-function writeTarget(row: ComposedRow): ID {
-  return row.reader ? row.target ?? row.id : row.id;
+function writeTarget(row: Occurrence): ID {
+  return row.persisted ? row.target ?? row.id : row.id;
 }
 
 function localPlacement(
@@ -134,9 +134,9 @@ function ensurePlacement(
 
 function localParentFor(
   plan: Plan,
-  row: ComposedRow
+  row: Occurrence
 ): [Plan, GraphNode | undefined] {
-  return planTakeComposedRow(plan, row);
+  return planTakeOccurrence(plan, row);
 }
 
 export function nextUpdated(node: GraphNode): number {
@@ -206,9 +206,9 @@ function migrateViewPath(
   );
 }
 
-function migrateComposedViewPath(
+function migrateOccurrenceViewPath(
   plan: Plan,
-  row: ComposedRow,
+  row: Occurrence,
   source: ViewPath,
   destination: ViewPath
 ): Plan {
@@ -231,13 +231,13 @@ type Seat = {
 };
 
 function rowSeat(
-  row: ComposedRow,
+  row: Occurrence,
   localID: ID | undefined,
   reparented: boolean
 ): Seat {
   return {
     id: row.id,
-    localID: localID ?? (row.reader ? row.id : undefined),
+    localID: localID ?? (row.persisted ? row.id : undefined),
     target: row.target,
     chain: row.chain,
     reparented,
@@ -246,12 +246,15 @@ function rowSeat(
 
 function positionRows(
   plan: Plan,
-  parent: ComposedRow,
+  parent: Occurrence,
   moved: Seat[],
-  after: ComposedRow | undefined,
+  after: Occurrence | undefined,
   anchorMoved: boolean
 ): Plan {
-  const scope = getWorkspaceNode(plan.knowledgeDBs, parent.scope);
+  const scope = getWorkspaceNode(
+    plan.knowledgeDBs,
+    parent.persisted ? parent.id : parent.writeParent
+  );
   const placementScope =
     scope !== undefined && placementTarget(scope) !== undefined;
   const movedIds = new globalThis.Set(moved.map((seat) => seat.id));
@@ -387,7 +390,7 @@ function positionRows(
   }, plan);
 }
 
-function rewordingSpans(row: ComposedRow, spans: InlineSpan[]): InlineSpan[] {
+function rewordingSpans(row: Occurrence, spans: InlineSpan[]): InlineSpan[] {
   const spoken = spans.map(
     (span): InlineSpan =>
       span.kind === "link" ? { kind: "text", text: span.text } : span
@@ -401,8 +404,8 @@ function rewordingSpans(row: ComposedRow, spans: InlineSpan[]): InlineSpan[] {
         ]
       : [...spoken, { kind: "text", text: " " }];
   const existingBonds =
-    row.reader && row.kind === "speaking"
-      ? row.node.spans.filter(
+    row.persisted && row.kind === "speaking"
+      ? row.line.node.spans.filter(
           (span) => span.kind === "link" && span.struck === true
         )
       : [];
@@ -420,10 +423,10 @@ function rewordingSpans(row: ComposedRow, spans: InlineSpan[]): InlineSpan[] {
   return [...words, ...bonds];
 }
 
-function isRewording(row: ComposedRow, spans: InlineSpan[]): boolean {
+function isRewording(row: Occurrence, spans: InlineSpan[]): boolean {
   return (
     spansText(spans).trim() !== "" &&
-    (!row.reader || row.kind === "placement" || row.kind === "speaking") &&
+    (!row.persisted || row.kind === "placement" || row.kind === "speaking") &&
     spansText(spans).trim() !== row.text.trim()
   );
 }
@@ -433,22 +436,23 @@ function evidenceParentFor(
   gesture: Extract<Gesture, { kind: "judge" }>
 ): GraphNode | undefined {
   return gesture.argument === undefined ||
-    gesture.row.sourceParent === undefined
+    gesture.row.sourceParent === undefined ||
+    gesture.row.parent === undefined
     ? undefined
     : getNode(
         plan.knowledgeDBs,
-        gesture.row.sourceParent.id,
-        gesture.row.sourceParent.sourceId
+        gesture.row.parent.id,
+        gesture.row.parent.sourceId
       );
 }
 
-function containingScope(row: ComposedRow): ID {
-  return row.scope === row.id ? row.writeParent : row.scope;
+function containingScope(row: Occurrence): ID {
+  return row.writeParent === row.id ? row.writeParent : row.writeParent;
 }
 
 function judge(plan: Plan, gesture: Extract<Gesture, { kind: "judge" }>): Plan {
   const existing =
-    gesture.row.reader && gesture.row.ref.sourceId === LOCAL
+    gesture.row.persisted && gesture.row.line.ref.sourceId === LOCAL
       ? getWorkspaceNode(plan.knowledgeDBs, gesture.row.id)
       : undefined;
   const rewording = isRewording(gesture.row, gesture.spans);
@@ -576,7 +580,7 @@ function repairSourceDependents(
     const remaining = sourceParent.children.filter((row) => !moved.has(row));
     return remaining.reduce((acc, row, index) => {
       const node =
-        row.reader && row.ref.sourceId === LOCAL
+        row.persisted && row.line.ref.sourceId === LOCAL
           ? getWorkspaceNode(acc.knowledgeDBs, row.id)
           : undefined;
       if (
@@ -669,7 +673,7 @@ function move(plan: Plan, gesture: Extract<Gesture, { kind: "move" }>): Plan {
   if (!parent) {
     return plan;
   }
-  const withParentView = migrateComposedViewPath(
+  const withParentView = migrateOccurrenceViewPath(
     withParent,
     gesture.parent,
     gesture.parentPath,
@@ -678,7 +682,7 @@ function move(plan: Plan, gesture: Extract<Gesture, { kind: "move" }>): Plan {
   const materialized = gesture.rows.reduce(
     (current, entry) => {
       const existing =
-        entry.row.reader && entry.row.ref.sourceId === LOCAL
+        entry.row.persisted && entry.row.line.ref.sourceId === LOCAL
           ? getWorkspaceNode(current.plan.knowledgeDBs, entry.row.id)
           : undefined;
       const [withRow, node] = existing
@@ -688,8 +692,8 @@ function move(plan: Plan, gesture: Extract<Gesture, { kind: "move" }>): Plan {
             parent.id,
             writeTarget(entry.row),
             entry.row.text,
-            entry.row.reader ? entry.row.node.relevance : undefined,
-            entry.row.reader ? entry.row.node.argument : undefined
+            entry.row.persisted ? entry.row.line.node.relevance : undefined,
+            entry.row.persisted ? entry.row.line.node.argument : undefined
           );
       if (!node) {
         return current;
@@ -700,8 +704,8 @@ function move(plan: Plan, gesture: Extract<Gesture, { kind: "move" }>): Plan {
       // untouched showing in a sibling embed stays whole. A destination
       // whose scope still projects the target needs no record.
       const priorScope = (): ID | undefined => {
-        if (!entry.row.reader) {
-          return entry.row.scope;
+        if (!entry.row.persisted) {
+          return entry.row.writeParent;
         }
         if (node.extraAttrs?.from !== undefined) {
           return node.extraAttrs.from;
@@ -712,9 +716,11 @@ function move(plan: Plan, gesture: Extract<Gesture, { kind: "move" }>): Plan {
         placementTarget(node) === undefined ||
         scopeCoversTarget(
           current.plan,
-          gesture.parent.scope,
+          gesture.parent.persisted
+            ? gesture.parent.id
+            : gesture.parent.writeParent,
           writeTarget(entry.row),
-          entry.row.ref.sourceId
+          entry.row.line.ref.sourceId
         )
           ? undefined
           : priorScope();
@@ -731,7 +737,7 @@ function move(plan: Plan, gesture: Extract<Gesture, { kind: "move" }>): Plan {
       const index = currentParent?.children.indexOf(node.id) ?? -1;
       const withViews =
         currentParent && index >= 0
-          ? migrateComposedViewPath(
+          ? migrateOccurrenceViewPath(
               moved,
               entry.row,
               entry.path,
@@ -747,7 +753,7 @@ function move(plan: Plan, gesture: Extract<Gesture, { kind: "move" }>): Plan {
     {
       plan: withParentView,
       ids: new globalThis.Map<ID, ID>(),
-      afterID: gesture.after?.reader ? gesture.after.id : undefined,
+      afterID: gesture.after?.persisted ? gesture.after.id : undefined,
     }
   );
   return positionRows(
@@ -770,25 +776,25 @@ export function moveGestureRows(
   orderedRows: List<Row>
 ): Extract<Gesture, { kind: "move" }>["rows"] {
   const moved = new globalThis.Set(
-    rows.flatMap((row) => (row.composed ? [row.composed] : []))
+    rows.flatMap((row) => (row.occurrence ? [row.occurrence] : []))
   );
   return rows.flatMap((row) => {
-    if (!row.composed) {
+    if (!row.occurrence) {
       return [];
     }
     const sourceParent = orderedRows
       .slice(0, row.index)
       .reverse()
-      .find((candidate) => candidate.depth === row.depth - 1)?.composed;
+      .find((candidate) => candidate.depth === row.depth - 1)?.occurrence;
     const siblings = sourceParent?.children ?? [];
-    const index = siblings.indexOf(row.composed);
+    const index = siblings.indexOf(row.occurrence);
     const predecessor = siblings
       .slice(0, index)
       .reverse()
       .find((candidate) => !moved.has(candidate));
     return [
       {
-        row: row.composed,
+        row: row.occurrence,
         sourceParent,
         predecessor,
         path: row.viewPath,
@@ -865,7 +871,7 @@ export function applyGesture(plan: Plan, gesture: Gesture): Plan {
     return place(plan, gesture);
   }
   const existing =
-    gesture.row.reader && gesture.row.ref.sourceId === LOCAL
+    gesture.row.persisted && gesture.row.line.ref.sourceId === LOCAL
       ? getWorkspaceNode(plan.knowledgeDBs, gesture.row.id)
       : undefined;
   const scope = getWorkspaceNode(
@@ -882,8 +888,8 @@ export function applyGesture(plan: Plan, gesture: Gesture): Plan {
         scope.id,
         writeTarget(gesture.row),
         gesture.row.text,
-        gesture.row.reader ? gesture.row.node.relevance : undefined,
-        gesture.row.reader ? gesture.row.node.argument : undefined
+        gesture.row.persisted ? gesture.row.line.node.relevance : undefined,
+        gesture.row.persisted ? gesture.row.line.node.argument : undefined
       );
   if (!node) {
     return plan;

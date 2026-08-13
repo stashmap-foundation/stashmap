@@ -68,7 +68,7 @@ export function useNodeItemContext(): NodeItemContext {
     !isInSearchView &&
     (isDocumentTopLevel ||
       (nodeIndex !== undefined && parentView !== undefined) ||
-      (row.composed !== undefined &&
+      (row.occurrence !== undefined &&
         parentView !== undefined &&
         !isViewingOtherUserContent) ||
       // Computed rows are first-class in behavior: a row carrying a

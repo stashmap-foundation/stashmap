@@ -306,13 +306,14 @@ export function dnd(
   }
   const sourcePane = basePlan.panes[sourceDrag.sourcePaneIndex];
   const rootOf = (row: Row): ID | undefined => {
-    if (!row.composed) {
+    if (!row.occurrence) {
       return undefined;
     }
-    if (row.composed.reader) {
+    if (row.occurrence.persisted) {
       return row.node.root;
     }
-    return getNode(basePlan.knowledgeDBs, row.composed.scope, LOCAL)?.root;
+    return getNode(basePlan.knowledgeDBs, row.occurrence.writeParent, LOCAL)
+      ?.root;
   };
   const targetRoot = rootOf(targetParentRow);
   const localRoot =
@@ -363,12 +364,12 @@ export function dnd(
   ) {
     return basePlan;
   }
-  const doorTarget = targetParentRow.composed;
+  const doorTarget = targetParentRow.occurrence;
   const moveRows =
     doorTarget !== undefined && targetRoot !== undefined
       ? independentRows.filter(
           (row) =>
-            row.composed !== undefined &&
+            row.occurrence !== undefined &&
             rootOf(row) === targetRoot &&
             !rowCopies(row)
         )
@@ -388,7 +389,7 @@ export function dnd(
         rows,
         parent: doorTarget,
         parentPath: targetParentRow.viewPath,
-        after: dropAnchor?.composed,
+        after: dropAnchor?.occurrence,
       }
     );
   })();
@@ -412,7 +413,7 @@ export function dnd(
     const target = insertTarget
       ? addFallbackLinkText(insertTarget, sourceDrag.text)
       : makeTarget(targetID, nodeText(row.node));
-    const edge = row.composed ? row.composed.node : row.node;
+    const edge = row.occurrence ? row.occurrence.line.node : row.node;
     return { target, relevance: edge.relevance, argument: edge.argument };
   });
   return applyGesture(
@@ -424,7 +425,7 @@ export function dnd(
       targets,
       parent: doorTarget,
       at: dropIndex + moveRows.length,
-      after: dropAnchor?.composed,
+      after: dropAnchor?.occurrence,
     }
   );
 }

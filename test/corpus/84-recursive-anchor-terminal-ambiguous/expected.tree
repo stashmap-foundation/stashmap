@@ -1,0 +1,7 @@
+Alice questions <!-- id:bob -->
+  Spain <!-- base:alice-office -->
+    Spain evidence <!-- base:spain-evidence -->
+  Spain <!-- base:alice-seminar -->
+    Spain evidence <!-- base:spain-evidence -->
+  Closing row <!-- base:closing -->
+  Ambiguous after Spain <!-- id:bob-note flag:ambiguous-anchor -->

@@ -1,0 +1,11 @@
+My note <!-- id:note -->
+  Art Noveau <!-- id:o1 -->
+    Spain <!-- base:sp -->
+      Barcelona <!-- base:bc -->
+        Gaudi <!-- base:g -->
+          Sagrada Familia <!-- base:sf -->
+            Bauzeit 1882 bis heute <!-- id:o2 -->
+            Baubeginn 1882 <!-- base:s1 -->
+            Architekt bis 1926 <!-- base:s2 -->
+          Casa Mila <!-- base:cm -->
+          Casa Battlo <!-- base:cb -->

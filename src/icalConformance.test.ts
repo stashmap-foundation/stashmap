@@ -8,12 +8,10 @@ import * as fs from "fs";
 import * as path from "path";
 import { icalEntryId } from "./core/icalId";
 import {
-  IcalEntry,
   icalFeedLinkPartsOf,
   icalFeedLinkText,
   icalFeedUrlOf,
   isBareIcalFeedUrl,
-  mergeProjectedEntries,
   parseIcalFeed,
 } from "./core/ical";
 
@@ -108,63 +106,6 @@ describe("icalFeedUrlOf", () => {
     expect(icalFeedUrlOf("https://x.org/salon.ics")).toBeUndefined();
     expect(icalFeedUrlOf("webcal://x.org/feed")).toBeUndefined();
     expect(icalFeedUrlOf("just text")).toBeUndefined();
-  });
-});
-
-describe("mergeProjectedEntries", () => {
-  const entry = (id: string): IcalEntry => ({
-    id,
-    uid: id,
-    summary: id,
-    allDay: false,
-  });
-
-  test("nothing materialized: pure feed order", () => {
-    expect(mergeProjectedEntries([], [entry("a"), entry("b")])).toEqual([
-      { kind: "projection", entry: entry("a") },
-      { kind: "projection", entry: entry("b") },
-    ]);
-  });
-
-  test("materialized rows keep document order, projections ride anchors", () => {
-    // Feed order a,b,c — the user materialized b and moved a plain note in.
-    const items = mergeProjectedEntries(
-      ["note", "b"],
-      [entry("a"), entry("b"), entry("c")]
-    );
-    expect(items).toEqual([
-      { kind: "projection", entry: entry("a") },
-      { kind: "child", childId: "note" },
-      { kind: "child", childId: "b" },
-      { kind: "projection", entry: entry("c") },
-    ]);
-  });
-
-  test("a note after an entry keeps its slot; projections follow the segment", () => {
-    // children: [a, note]; feed: a, b — b anchors to a but emits after
-    // a's segment (the note), not between them.
-    const items = mergeProjectedEntries(
-      ["a", "note"],
-      [entry("a"), entry("b")]
-    );
-    expect(items).toEqual([
-      { kind: "child", childId: "a" },
-      { kind: "child", childId: "note" },
-      { kind: "projection", entry: entry("b") },
-    ]);
-  });
-
-  test("reordered materialized entries win over feed order", () => {
-    // Feed a,b — user materialized both and swapped them.
-    const items = mergeProjectedEntries(
-      ["b", "a"],
-      [entry("a"), entry("b"), entry("c")]
-    );
-    expect(items).toEqual([
-      { kind: "child", childId: "b" },
-      { kind: "projection", entry: entry("c") },
-      { kind: "child", childId: "a" },
-    ]);
   });
 });
 

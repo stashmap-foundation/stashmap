@@ -1,0 +1,4 @@
+Alice note <!-- id:bob -->
+  Spain <!-- base:alice-spain -->
+    Spain evidence <!-- base:spain-evidence -->
+  See Alice Spain here <!-- id:bob-row -->

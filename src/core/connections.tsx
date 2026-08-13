@@ -13,6 +13,7 @@ export type TextSeed = {
 export type RefTargetSeed = {
   targetID: ID;
   linkText?: string;
+  reference?: true;
 };
 
 export type DocumentLinkTargetSeed = {
@@ -27,6 +28,13 @@ export function createRefTarget(
   linkText?: string
 ): RefTargetSeed {
   return { targetID, linkText };
+}
+
+export function createReferenceTarget(
+  targetID: ID,
+  linkText?: string
+): RefTargetSeed {
+  return { targetID, linkText, reference: true };
 }
 
 export function createDocumentLinkTarget(
@@ -246,22 +254,6 @@ export function deleteNodes(nodes: GraphNode, indices: Set<number>): GraphNode {
   return {
     ...nodes,
     children,
-  };
-}
-
-export function moveNodes(
-  nodes: GraphNode,
-  indices: Array<number>,
-  startPosition: number
-): GraphNode {
-  const itemsToMove = nodes.children.filter((_, i) => indices.includes(i));
-  const itemsBeforeStartPos = indices.filter((i) => i < startPosition).length;
-  const updatedItems = nodes.children
-    .filterNot((_, i) => indices.includes(i))
-    .splice(startPosition - itemsBeforeStartPos, 0, ...itemsToMove.toArray());
-  return {
-    ...nodes,
-    children: updatedItems,
   };
 }
 

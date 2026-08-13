@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-use-before-define, functional/no-let, functional/immutable-data */
 import React from "react";
+import { List } from "immutable";
 import { LOCAL } from "./core/nodeRef";
 import { useBackend } from "./BackendContext";
 import { useData } from "./DataContext";
@@ -12,6 +13,7 @@ import {
 } from "./core/connections";
 import { isCanonicalId } from "./core/entityRecognition";
 import { nodeText } from "./core/nodeSpans";
+import { graphLookupFromData, lookupNode } from "./core/graphLookup";
 import { EditorNavigationTarget } from "./editor/linkOperations";
 import { searchTargetID } from "./localSearch";
 
@@ -47,6 +49,56 @@ export function getIndependentRows(rows: Row[]): Row[] {
           row.viewKey.startsWith(`${other.viewKey}:`)
       )
   );
+}
+
+function rowRefsEqual(
+  left: NodeRef | undefined,
+  right: NodeRef | undefined
+): boolean {
+  return (
+    left !== undefined &&
+    right !== undefined &&
+    left.sourceId === right.sourceId &&
+    left.id === right.id
+  );
+}
+
+export function getVisibleParentRow(
+  rows: List<Row>,
+  row: Row
+): Row | undefined {
+  if (!row.parentRef) {
+    return undefined;
+  }
+  return rows
+    .slice(0, row.index)
+    .reverse()
+    .find(
+      (candidate) =>
+        candidate.depth < row.depth &&
+        (rowRefsEqual(candidate.ref, row.parentRef) ||
+          candidate.standsFor?.id === row.parentRef?.id)
+    );
+}
+
+export function getPreviousSiblingFromRows(
+  rows: List<Row>,
+  row: Row
+): Row | undefined {
+  const { childIndex } = row;
+  if (childIndex === undefined || childIndex === 0) {
+    return undefined;
+  }
+  return rows
+    .slice(0, row.index)
+    .reverse()
+    .find(
+      (candidate) =>
+        candidate.childIndex !== undefined &&
+        candidate.parentRef?.sourceId === row.parentRef?.sourceId &&
+        candidate.parentRef?.id === row.parentRef?.id &&
+        candidate.childIndex < childIndex
+    );
 }
 
 const EMPTY_VIEW_PATH_PREFIX = "empty-row:";
@@ -94,16 +146,13 @@ export function parseViewPath(path: string): ViewPath {
   return [paneIndex, ...pathPieces];
 }
 
-function convertViewPathToString(viewContext: ViewPath): string {
+export function viewPathToString(viewContext: ViewPath): string {
   const paneIndex = viewContext[0] as number;
   const pathPart = (viewContext.slice(1) as readonly ViewPathSegment[])
     .map((segment) => encodePathID(segment))
     .join(":");
   return `p${paneIndex}:${pathPart}`;
 }
-
-// TODO: delete this export
-export const viewPathToString = convertViewPathToString;
 
 export function isRoot(viewPath: ViewPath): boolean {
   return viewPath.length === 2;
@@ -118,11 +167,6 @@ export function getParentView(viewContext: ViewPath): ViewPath | undefined {
     return undefined;
   }
   return viewContext.slice(0, -1) as unknown as ViewPath;
-}
-
-function getViewExactMatch(views: Views, path: ViewPath): View | undefined {
-  const viewKey = viewPathToString(path);
-  return views.get(viewKey);
 }
 
 export function getLast(viewContext: ViewPath): ViewPathSegment {
@@ -143,18 +187,83 @@ export function getPaneRootItemID(pane: Pane): ID {
   );
 }
 
-export function getViewForNode(data: Data, path: ViewPath, nodeID: ID): View {
+// A row's view state lives under its full path of stable ids. When a touch
+// swaps a row's id (a judged base row becomes the reader's claim line), the
+// swapped-in row inherits state through its target: each candidate joins the
+// parent's resolved key with the row's id or its target, so the takeover
+// chains to every depth without rewriting stored keys.
+export function resolveRowView(
+  data: Data,
+  path: ViewPath,
+  parentStateKey: string | undefined,
+  candidates: ID[]
+): { view: View; key: string } {
+  const exactParent = getParentView(path);
+  const parentKeys = [
+    ...(exactParent ? [viewPathToString(exactParent)] : []),
+    ...(parentStateKey !== undefined ? [parentStateKey] : []),
+  ].filter((key, index, keys) => keys.indexOf(key) === index);
+  const prefixes =
+    parentKeys.length > 0 ? parentKeys : [`p${getPaneIndex(path)}`];
+  const keys = prefixes.flatMap((prefix) =>
+    candidates.map((candidate) => `${prefix}:${encodePathID(candidate)}`)
+  );
+  const found = keys.reduce<{ view: View; key: string } | undefined>(
+    (hit, key) => {
+      if (hit) {
+        return hit;
+      }
+      const view = data.views.get(key);
+      return view ? { view, key } : undefined;
+    },
+    undefined
+  );
   return (
-    getViewExactMatch(data.views, path) || getDefaultView(nodeID, isRoot(path))
+    found ?? {
+      view: getDefaultView(candidates[0], isRoot(path)),
+      key: keys[0],
+    }
   );
 }
 
 export function buildPaneTarget(data: Data, row: Row): EditorNavigationTarget {
+  const composedPlacement =
+    row.composed?.kind === "placement" || row.composed?.kind === "speaking";
+  const terminalTarget =
+    composedPlacement &&
+    row.composed?.flags.some(
+      (flag) =>
+        flag === "cycle" || flag === "dangling" || flag === "orphan-source"
+    )
+      ? row.composed.chain[row.composed.chain.length - 1]
+      : undefined;
   const targetID =
-    row.virtualType === "search" ? searchTargetID(row.node) : row.reference?.id;
-  const refInfo = targetID
-    ? getRefTargetInfo(targetID, data.knowledgeDBs, row.sourceId)
+    row.virtualType === "search"
+      ? searchTargetID(row.node)
+      : row.reference?.id ?? terminalTarget;
+  const targetSourceId =
+    terminalTarget === undefined
+      ? row.sourceId
+      : row.composed?.sourceParent?.sourceId ?? row.sourceId;
+  const resolvedTarget = terminalTarget
+    ? lookupNode(graphLookupFromData(data), terminalTarget, targetSourceId)
     : undefined;
+  const refInfo = targetID
+    ? getRefTargetInfo(
+        targetID,
+        data.knowledgeDBs,
+        resolvedTarget?.ref.sourceId ?? targetSourceId
+      )
+    : undefined;
+  if (terminalTarget !== undefined && resolvedTarget === undefined) {
+    return isCanonicalId(terminalTarget)
+      ? {
+          sourceId: targetSourceId,
+          rootNodeId: terminalTarget,
+          fallbackLabel: nodeText(row.node),
+        }
+      : { sourceId: targetSourceId };
+  }
   return refInfo
     ? {
         sourceId: refInfo.sourceId,
@@ -183,6 +292,13 @@ export function useSearchDepth(): number | undefined {
 
 export function useIsInSearchView(): boolean {
   return useSearchDepth() !== undefined;
+}
+
+export function appendToPath(
+  [paneIndex, ...segments]: ViewPath,
+  nodeID: ID
+): ViewPath {
+  return [paneIndex, ...segments, nodeID];
 }
 
 export function addNodesToLastElement(path: ViewPath, nodeID: ID): ViewPath {
@@ -303,12 +419,6 @@ function pathContainsSubpath(
   );
 }
 
-export function updateViewPathsAfterMoveNodes(
-  data: Pick<Data, "views">
-): Views {
-  return data.views;
-}
-
 export function updateViewPathsAfterDisconnect(
   views: Views,
   disconnectNode: ID,
@@ -357,8 +467,4 @@ export function updateViewPathsAfterPaneInsert(
     }
     return key;
   });
-}
-
-export function bulkUpdateViewPathsAfterAddNode(data: Data): Views {
-  return data.views;
 }

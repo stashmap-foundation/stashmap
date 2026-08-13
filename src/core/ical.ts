@@ -260,10 +260,6 @@ export function parseIcalFeed(content: string): IcalEntry[] {
     .map(({ entry }) => entry);
 }
 
-export type CalendarMergeItem =
-  | { kind: "child"; childId: string }
-  | { kind: "projection"; entry: IcalEntry };
-
 function startOfDay(nowMs: number): number {
   const now = new Date(nowMs);
   return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
@@ -277,67 +273,6 @@ export function isPastIcalEntry(entry: IcalEntry, nowMs: number): boolean {
     return false;
   }
   return entry.startMs < startOfDay(nowMs);
-}
-
-// Interleaves untouched projections with the calendar node's actual
-// children: your arrangement wins where you arranged (children keep
-// document order), the feed owns what you left alone (each untouched
-// projection rides after its nearest materialized feed predecessor;
-// projections before any materialized entry lead the list). With nothing
-// materialized this is pure feed order.
-// hidePastBefore: bare past entries (past AND not materialized) don't
-// project — the past stays in the feed; the file, when touched, stays
-// visible. Materialized entries always pass; they are file truth and they
-// anchor the projections that follow them.
-export function mergeProjectedEntries(
-  childIds: readonly string[],
-  entries: readonly IcalEntry[],
-  hidePastBefore?: number
-): CalendarMergeItem[] {
-  const childIdSet = new Set(childIds);
-  const projectable =
-    hidePastBefore === undefined
-      ? entries
-      : entries.filter(
-          (entry) =>
-            childIdSet.has(entry.id) || !isPastIcalEntry(entry, hidePastBefore)
-        );
-  const leading: IcalEntry[] = [];
-  const anchored = new Map<string, IcalEntry[]>();
-  let anchor: string | undefined;
-  projectable.forEach((entry) => {
-    if (childIdSet.has(entry.id)) {
-      anchor = entry.id;
-      return;
-    }
-    if (anchor === undefined) {
-      leading.push(entry);
-    } else {
-      anchored.set(anchor, [...(anchored.get(anchor) ?? []), entry]);
-    }
-  });
-  const items: CalendarMergeItem[] = leading.map((entry) => ({
-    kind: "projection",
-    entry,
-  }));
-  const entryIds = new Set(entries.map((entry) => entry.id));
-  // Anchored projections emit after the anchor's SEGMENT — the anchor
-  // child plus its consecutive non-entry children (notes dropped right
-  // after an entry stay right after it; the next projection follows the
-  // segment, still after its feed predecessor).
-  let pending: IcalEntry[] = [];
-  childIds.forEach((childId) => {
-    if (entryIds.has(childId) && pending.length > 0) {
-      pending.forEach((entry) => items.push({ kind: "projection", entry }));
-      pending = [];
-    }
-    items.push({ kind: "child", childId });
-    if (anchored.has(childId)) {
-      pending = [...pending, ...(anchored.get(childId) ?? [])];
-    }
-  });
-  pending.forEach((entry) => items.push({ kind: "projection", entry }));
-  return items;
 }
 
 function pad2(value: number): string {

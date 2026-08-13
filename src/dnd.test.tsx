@@ -322,6 +322,59 @@ Root
   `);
 });
 
+test("Depth drop: dropping on yourself out-dents to the chosen depth", async () => {
+  const [alice] = setup([ALICE]);
+  renderApp(alice());
+
+  await type(
+    "Root{Enter}Spain{Enter}{Tab}Barcelona{Enter}{Tab}Draggable{Escape}"
+  );
+
+  await expectTree(`
+Root
+  Spain
+    Barcelona
+      Draggable
+  `);
+
+  const draggable = screen.getByRole("treeitem", { name: "Draggable" });
+  fireEvent.dragStart(draggable);
+  setDropIndentLevel("Draggable", "Draggable", 3);
+  fireEvent.drop(draggable);
+
+  await expectTree(`
+Root
+  Spain
+    Barcelona
+    Draggable
+  `);
+});
+
+test("Depth drop: dropping on yourself without a depth change is a no-op", async () => {
+  const [alice] = setup([ALICE]);
+  renderApp(alice());
+
+  await type("Root{Enter}Spain{Enter}{Tab}Barcelona{Enter}Draggable{Escape}");
+
+  await expectTree(`
+Root
+  Spain
+    Barcelona
+    Draggable
+  `);
+
+  const draggable = screen.getByRole("treeitem", { name: "Draggable" });
+  fireEvent.dragStart(draggable);
+  fireEvent.drop(draggable);
+
+  await expectTree(`
+Root
+  Spain
+    Barcelona
+    Draggable
+  `);
+});
+
 test("Depth drop: depth 2 on last item outdents to root level", async () => {
   const [alice] = setup([ALICE]);
   renderApp(alice());

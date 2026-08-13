@@ -1,0 +1,6 @@
+Alice questions <!-- id:bob -->
+  Spain <!-- id:bob-one -->
+    Source evidence <!-- base:evidence -->
+    Bob note for one <!-- id:bob-note -->
+  Spain <!-- base:alice-two -->
+    Source evidence <!-- base:evidence -->

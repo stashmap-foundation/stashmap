@@ -1,0 +1,7 @@
+Alice questions <!-- id:bob -->
+  Spain <!-- base:alice-office -->
+    Spain evidence <!-- base:spain-evidence -->
+  Spain <!-- base:alice-seminar -->
+    Spain evidence <!-- base:spain-evidence -->
+  {!} Spain <!-- id:bob-spain -->
+    Spain evidence <!-- base:spain-evidence -->

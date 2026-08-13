@@ -2,12 +2,13 @@ import React, { RefObject, useRef } from "react";
 import { List, OrderedSet } from "immutable";
 import { ConnectDropTarget, DropTargetMonitor, useDrop } from "react-dnd";
 import { NativeTypes } from "react-dnd-html5-backend";
-import { dnd, getDropDestinationFromRows } from "../dnd";
-import { planMaterializeComputedRow } from "../core/plan";
-import { calendarFeedUrl } from "../core/ical";
-import { getWorkspaceNode } from "../core/knowledge";
 import {
-  Plan,
+  dnd,
+  getDropDestinationFromRows,
+  isDraggedOccurrence,
+  takeAltDrag,
+} from "../dnd";
+import {
   AddToParentTarget,
   planSetTemporarySelectionState,
   planUpdatePanes,
@@ -27,8 +28,10 @@ import {
 type DragItemType = {
   row: Row;
   draggedRows: Row[];
+  orderedRows: List<Row>;
   sourcePaneIndex: number;
   isCopyDrag?: boolean;
+  altCopy?: boolean;
   nodeId?: ID;
   targetId?: ID;
   insertTarget?: AddToParentTarget;
@@ -101,7 +104,7 @@ function calcDragDirection(
   if (isDragItem(item)) {
     const sourceStr = item.row.viewKey;
     const targetStr = row.viewKey;
-    if (targetStr === sourceStr || targetStr.startsWith(`${sourceStr}:`)) {
+    if (targetStr.startsWith(`${sourceStr}:`)) {
       return undefined;
     }
   }
@@ -191,13 +194,11 @@ export function useDroppable({
   ref,
   nextRow,
   rows,
-  paneIndex,
 }: {
   row: Row;
   ref: RefObject<HTMLElement>;
   nextRow: Row | undefined;
   rows: List<Row>;
-  paneIndex: number;
 }): [
   { dragDirection: number | undefined; isOver: boolean },
   ConnectDropTarget
@@ -395,65 +396,42 @@ export function useDroppable({
         return item;
       }
       const dragItem = item;
+      const dragRows = dragItem.draggedRows.length
+        ? dragItem.draggedRows
+        : [dragItem.row];
+      // Dropping on yourself is a depth gesture: with a changed indent it
+      // re-parents relative to the row above; without one it is a no-op.
+      const selfDrop = isDraggedOccurrence(row, dragRows);
+      if (
+        selfDrop &&
+        (targetDepth === undefined || targetDepth === row.depth)
+      ) {
+        return item;
+      }
+      const effectiveTarget = selfDrop
+        ? rows
+            .slice(0, row.index)
+            .reverse()
+            .find((candidate) => !isDraggedOccurrence(candidate, dragRows))
+        : row;
+      if (!effectiveTarget) {
+        return item;
+      }
       const dropDestination = getDropDestinationFromRows(
         rows,
-        row,
+        effectiveTarget,
         targetDepth,
-        dragItem.draggedRows.length ? dragItem.draggedRows : [dragItem.row]
+        dragRows
       );
       if (!dropDestination) {
         return item;
       }
-      // Arranging something relative to a computed row touches it. A
-      // reorder WITHIN a source-ordered projection materializes the
-      // entire displayed sequence first (document order becomes
-      // authoritative — idea.md, Ordered projections); otherwise only
-      // the anchor row the drop lands after materializes.
-      const dragRows = dragItem.draggedRows.length
-        ? dragItem.draggedRows
-        : [dragItem.row];
-      const parentId = dropDestination.parentRow.node.id;
-      const isProjectionReorder =
-        calendarFeedUrl(dropDestination.parentRow.node) !== undefined &&
-        dragRows.some((dragged) => dragged.parentRef?.id === parentId);
-      const [plan, dropIndex] = ((): [Plan, number] => {
-        const base = createPlan();
-        const withSequence = isProjectionReorder
-          ? rows
-              .filter(
-                (displayRow) =>
-                  displayRow.parentRef?.id === parentId &&
-                  displayRow.materialize !== undefined
-              )
-              .reduce(
-                (accPlan: Plan, displayRow) =>
-                  planMaterializeComputedRow(accPlan, displayRow)[0],
-                base
-              )
-          : base;
-        const { anchorRow } = dropDestination;
-        if (!anchorRow?.materialize && !isProjectionReorder) {
-          return [withSequence, dropDestination.insertAtIndex];
-        }
-        const anchored = anchorRow
-          ? planMaterializeComputedRow(withSequence, anchorRow)
-          : undefined;
-        const planWithAnchor = anchored ? anchored[0] : withSequence;
-        const anchorNode = anchored?.[1];
-        const parent = getWorkspaceNode(planWithAnchor.knowledgeDBs, parentId);
-        const anchorIndex =
-          parent && anchorNode ? parent.children.indexOf(anchorNode.id) : -1;
-        return [
-          planWithAnchor,
-          anchorIndex >= 0 ? anchorIndex + 1 : dropDestination.insertAtIndex,
-        ];
-      })();
       const dropped = dnd(
-        plan,
-        dragItem,
-        paneIndex,
+        createPlan(),
+        takeAltDrag() ? { ...dragItem, altCopy: true } : dragItem,
         dropDestination.parentRow,
-        dropIndex
+        dropDestination.insertAtIndex,
+        dropDestination.anchorRow
       );
       executePlan(
         planSetTemporarySelectionState(dropped, {

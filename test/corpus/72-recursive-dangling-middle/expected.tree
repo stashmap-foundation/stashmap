@@ -1,0 +1,3 @@
+Alice question <!-- id:bob -->
+  Missing source <!-- base:alice-missing flag:dangling -->
+    Alice survives <!-- base:alice-note -->

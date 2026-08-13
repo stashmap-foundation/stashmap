@@ -115,6 +115,27 @@ function extractSpans(children: readonly Token[]): InlineSpan[] {
   const extractFrom = (index: number, spans: InlineSpan[]): InlineSpan[] => {
     if (index >= tokens.length) return spans;
     const token = tokens[index];
+    if (token.type === "s_open") {
+      const relativeClose = tokens
+        .slice(index + 1)
+        .findIndex((candidate) => candidate.type === "s_close");
+      const close = index + relativeClose + 1;
+      const inner = tokens.slice(index + 1, close);
+      if (
+        relativeClose >= 0 &&
+        inner[0]?.type === "link_open" &&
+        inner[inner.length - 1]?.type === "link_close"
+      ) {
+        const parsed = extractSpans(inner);
+        const link = parsed[0];
+        if (parsed.length === 1 && link?.kind === "link") {
+          return extractFrom(
+            close + 1,
+            appendSpan(spans, { ...link, struck: true })
+          );
+        }
+      }
+    }
     if (token.type !== "link_open") {
       return extractFrom(
         index + 1,

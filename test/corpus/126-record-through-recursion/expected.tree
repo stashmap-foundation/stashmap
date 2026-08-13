@@ -1,0 +1,12 @@
+My note <!-- id:note -->
+  Outer <!-- id:e1 -->
+    Inner <!-- base:outer-inner -->
+      B <!-- base:b -->
+    Outer own <!-- base:outer-own -->
+  Outer <!-- id:e2 -->
+    Inner <!-- base:outer-inner -->
+      A <!-- base:a -->
+      B <!-- base:b -->
+    Outer own <!-- base:outer-own -->
+  Basket <!-- id:basket -->
+    A <!-- id:o3 -->

@@ -692,6 +692,7 @@ type RowInfo = {
   text: string;
   indentLevel: number;
   gutter?: string;
+  isReference?: true;
 };
 
 function getItemPrefix(innerNode: Element | null, isRef: boolean): string {
@@ -772,6 +773,22 @@ function classifyRow(row: Element): RowInfo | null {
     });
   }
 
+  /* eslint-disable testing-library/no-node-access */
+  const clusterText = (excludeContainer: Element | null): string =>
+    Array.from(
+      innerNode?.querySelectorAll(
+        ".incoming-part:not(.external-link-part):not(.dead-link-part)"
+      ) ?? []
+    )
+      .filter((part) => part.closest('[data-testid="reference-row"]') === null)
+      .filter(
+        (part) => excludeContainer === null || !excludeContainer.contains(part)
+      )
+      .map((part) => part.textContent ?? "")
+      .join("");
+  /* eslint-enable testing-library/no-node-access */
+  const reciprocalCluster = clusterText(null);
+
   if (toggleButton) {
     const getRawText = (): string => {
       const labelText = (toggleButton.getAttribute("aria-label") || "").replace(
@@ -792,22 +809,20 @@ function classifyRow(row: Element): RowInfo | null {
     if (!rawText) {
       return null;
     }
-    // The aria label carries the plain display text; the reciprocal ↩
-    // cluster lives in the row content and must survive an expand toggle.
-    // Reference rows already speak ↩ through their own text.
     /* eslint-disable testing-library/no-node-access */
-    const reciprocalCluster = Array.from(
-      innerNode?.querySelectorAll(
-        ".incoming-part:not(.external-link-part):not(.dead-link-part)"
-      ) ?? []
+    const furniture = Array.from(
+      innerNode?.querySelectorAll(".dead-link-part, .external-link-part") ?? []
     )
       .filter((part) => part.closest('[data-testid="reference-row"]') === null)
       .map((part) => part.textContent ?? "")
       .join("");
     /* eslint-enable testing-library/no-node-access */
+    const withFurniture = rawText.endsWith(furniture)
+      ? rawText
+      : `${rawText}${furniture}`;
     return withGutter({
       element: toggleButton as HTMLElement,
-      text: `${prefix}${rawText}${reciprocalCluster}`,
+      text: `${prefix}${withFurniture}${reciprocalCluster}`,
       indentLevel: getIndentLevel(toggleButton as HTMLElement),
     });
   }
@@ -826,6 +841,7 @@ function classifyRow(row: Element): RowInfo | null {
       element: referenceRow as HTMLElement,
       text: `${prefix}${displayText}`.trimEnd(),
       indentLevel: getIndentLevel(referenceRow as HTMLElement),
+      isReference: true,
     });
   }
 
@@ -849,7 +865,7 @@ function classifyRow(row: Element): RowInfo | null {
     }
     return withGutter({
       element: noteEditor as HTMLElement,
-      text: rawText,
+      text: `${rawText}${clusterText(noteEditor)}`,
       indentLevel: getIndentLevel(noteEditor as HTMLElement),
     });
   }
@@ -874,6 +890,7 @@ function classifyRow(row: Element): RowInfo | null {
 
 type TreeOptions = {
   showGutter?: boolean;
+  withoutReferenceRows?: boolean;
 };
 
 async function getTreeStructure(options?: TreeOptions): Promise<string> {
@@ -887,7 +904,8 @@ async function getTreeStructure(options?: TreeOptions): Promise<string> {
 
   const rowInfos: RowInfo[] = Array.from(allRows)
     .map((row) => classifyRow(row))
-    .filter((info): info is RowInfo => info !== null);
+    .filter((info): info is RowInfo => info !== null)
+    .filter((info) => !(options?.withoutReferenceRows && info.isReference));
 
   const lines = rowInfos.map(({ text, indentLevel, gutter }) => {
     const indent = "  ".repeat(indentLevel);

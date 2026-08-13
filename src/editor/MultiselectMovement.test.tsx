@@ -518,8 +518,8 @@ Root
 Root
   A1
   A2
-  A
   B
+  A
     `);
   });
 

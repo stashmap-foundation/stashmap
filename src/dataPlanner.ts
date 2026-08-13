@@ -1,14 +1,20 @@
 import { Set } from "immutable";
 import { getWorkspaceNode } from "./core/knowledge";
 import { deleteNodes } from "./core/connections";
+import { placementTarget } from "./core/nodeSpans";
 import {
   GraphPlan,
+  nextUpdated,
   planDeleteDescendantNodes,
   planDeleteNodes,
   planMoveDescendantNodes,
   planUpsertNodes,
 } from "./planner";
-import { NodeItemMetadata, updateNodeItemMetadata } from "./nodeItemMetadata";
+import {
+  clearPosition,
+  positionAttrs,
+  positionNames,
+} from "./core/composition";
 
 function getWritableNode(plan: GraphPlan, nodeId: ID): GraphNode | undefined {
   return getWorkspaceNode(plan.knowledgeDBs, nodeId);
@@ -29,23 +35,68 @@ function requireNodeItem(
   return childID ? getWorkspaceNode(plan.knowledgeDBs, childID) : undefined;
 }
 
-export function planUpdateNodeItemMetadataById<T extends GraphPlan>(
+// A deleted row takes its anchor seat with it. Dependents re-aim to the
+// row the seat stands for — the claim's target that resurfaces as a base
+// row, the deleted row's own first name, or its file predecessor — so a
+// deletion never moves the rows anchored behind it.
+function reAnchorForRemoved(
+  parentNode: GraphNode,
+  item: GraphNode,
+  index: number
+): ID | undefined {
+  const target = placementTarget(item);
+  if (target !== undefined) {
+    return target;
+  }
+  const names = positionNames(item);
+  if (names.length > 0) {
+    return names[0].id;
+  }
+  return index > 0 ? parentNode.children.get(index - 1) : undefined;
+}
+
+function repairDependentAnchors<T extends GraphPlan>(
   plan: T,
-  parentNodeId: ID,
-  itemId: ID,
-  metadata: NodeItemMetadata
+  parentNode: GraphNode,
+  item: GraphNode,
+  index: number
 ): T {
-  const parentNode = getWritableNode(plan, parentNodeId);
-  if (!parentNode) {
-    return plan;
-  }
-  const nodeIndex = getNodeItemIndex(parentNode, itemId);
-  if (nodeIndex === undefined) {
-    return plan;
-  }
-  const item = requireNodeItem(plan, parentNode, itemId);
-  return item
-    ? planUpsertNodes(plan, updateNodeItemMetadata(item, metadata))
+  const reAnchor = reAnchorForRemoved(parentNode, item, index);
+  return parentNode.children.reduce((current, siblingId) => {
+    const sibling = getWritableNode(current, siblingId);
+    if (
+      !sibling ||
+      !positionNames(sibling).some((name) => name.id === item.id)
+    ) {
+      return current;
+    }
+    const names = positionNames(sibling).flatMap((name) => {
+      if (name.id !== item.id) {
+        return [name];
+      }
+      return reAnchor !== undefined ? [{ ...name, id: reAnchor }] : [];
+    });
+    return planUpsertNodes(current, {
+      ...sibling,
+      extraAttrs: {
+        ...clearPosition(sibling.extraAttrs),
+        ...positionAttrs(names),
+      },
+      updated: nextUpdated(sibling),
+    });
+  }, plan);
+}
+
+export function planRepairDependentAnchors<T extends GraphPlan>(
+  plan: T,
+  itemId: ID
+): T {
+  const item = getWritableNode(plan, itemId);
+  const parentNode =
+    item?.parent === undefined ? undefined : getWritableNode(plan, item.parent);
+  const index = parentNode ? getNodeItemIndex(parentNode, itemId) : undefined;
+  return item && parentNode && index !== undefined
+    ? repairDependentAnchors(plan, parentNode, item, index)
     : plan;
 }
 
@@ -64,8 +115,12 @@ export function planRemoveNodeItemById<T extends GraphPlan>(
     return plan;
   }
   const item = requireNodeItem(plan, parentNode, itemId);
+  const repaired =
+    item && !preserveDescendants
+      ? repairDependentAnchors(plan, parentNode, item, nodeIndex)
+      : plan;
   const withoutItem = planUpsertNodes(
-    plan,
+    repaired,
     deleteNodes(parentNode, Set([nodeIndex]))
   );
   if (!item) {

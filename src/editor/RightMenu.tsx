@@ -14,7 +14,7 @@ import { FullscreenButton } from "./FullscreenButton";
 import { OpenInSplitPaneButton } from "./OpenInSplitPaneButton";
 
 export function RightMenu(): JSX.Element {
-  const { virtualType, projected } = useRow();
+  const { virtualType, projected, composed } = useRow();
   const isVirtualItem = virtualType === "incoming";
   const isRoot = useIsRoot();
   const pane = useCurrentPane();
@@ -27,7 +27,7 @@ export function RightMenu(): JSX.Element {
   const isReadonly =
     (isRoot && !isDocumentTopLevel) ||
     isInSearchView ||
-    projected === true ||
+    (projected === true && composed === undefined) ||
     (isViewingOtherUserContent && !isVirtualItem);
 
   return (

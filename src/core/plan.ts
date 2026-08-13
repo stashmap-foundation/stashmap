@@ -1,12 +1,17 @@
 /* eslint-disable @typescript-eslint/no-use-before-define, functional/no-let, functional/immutable-data, no-continue, no-nested-ternary */
 import { List, Map, Set as ImmutableSet } from "immutable";
 import { v4 } from "uuid";
-import { ensureNodeNativeFields, isSearchId } from "./connections";
+import {
+  createRefTarget,
+  ensureNodeNativeFields,
+  isSearchId,
+} from "./connections";
 import type {
   DocumentLinkTargetSeed,
   RefTargetSeed,
   TextSeed,
 } from "./connections";
+import type { ComposedRow } from "./composition";
 import {
   createDocumentFromRootNode,
   Document,
@@ -14,6 +19,7 @@ import {
   workspaceDocumentKey,
 } from "./Document";
 import { entityIdForText, isCanonicalId } from "./entityRecognition";
+import { LOCAL } from "./nodeRef";
 import { icalFeedLinkText, isBareIcalFeedUrl } from "./ical";
 import { documentLinkHref } from "./linkPath";
 import { getWorkspaceNode, withWorkspace, workspaceOf } from "./knowledge";
@@ -23,6 +29,7 @@ import {
   getAllLinks,
   linkSpan,
   nodeText,
+  placementTarget,
   plainSpans,
 } from "./nodeSpans";
 import {
@@ -41,7 +48,12 @@ export type CoreOutboundEvent = {
 
 type GraphPlanData = Pick<
   Data,
-  "user" | "knowledgeDBs" | "graphIndex" | "documents" | "documentByFilePath"
+  | "user"
+  | "knowledgeDBs"
+  | "graphIndex"
+  | "documents"
+  | "documentByFilePath"
+  | "calendarFeeds"
 >;
 
 export type GraphPlan = GraphPlanData & {
@@ -403,6 +415,8 @@ export function createGraphPlan(props: CreateGraphPlanProps): GraphPlan {
 export type MaterializableRow = {
   node: GraphNode;
   parentRef?: NodeRef;
+  sourceId?: SourceId;
+  composed?: ComposedRow;
   materialize?: {
     precededBy: ID[];
     // A prepared take: materialize by adding THIS target (a link row or
@@ -439,6 +453,36 @@ function materializeInsertIndex(
   return found !== undefined ? found + 1 : 0;
 }
 
+export function planTakeComposedRow<T extends GraphPlan>(
+  plan: T,
+  row: ComposedRow
+): [T, GraphNode | undefined] {
+  const direct =
+    row.ref.sourceId === LOCAL
+      ? getWorkspaceNode(plan.knowledgeDBs, row.id)
+      : undefined;
+  if (row.reader && direct) {
+    return [plan, direct];
+  }
+  const parent = getWorkspaceNode(plan.knowledgeDBs, row.writeParent);
+  if (!parent) {
+    return [plan, undefined];
+  }
+  const target = row.reader ? row.target ?? row.id : row.id;
+  const existing = parent.children
+    .map((id) => getWorkspaceNode(plan.knowledgeDBs, id))
+    .find((node) => placementTarget(node) === target);
+  if (existing) {
+    return [plan, existing];
+  }
+  const [next, ids] = planAddTargetsToNode(
+    plan,
+    parent.id,
+    createRefTarget(target, row.text)
+  );
+  return [next, getWorkspaceNode(next.knowledgeDBs, ids[0])];
+}
+
 export function planMaterializeComputedRow<T extends GraphPlan>(
   plan: T,
   row: MaterializableRow,
@@ -446,6 +490,13 @@ export function planMaterializeComputedRow<T extends GraphPlan>(
   placement?: { parentID?: ID; insertIndex?: number }
 ): [T, GraphNode, boolean] {
   if (!row.materialize) {
+    if (
+      row.composed &&
+      !(row.composed.reader && row.composed.ref.sourceId === LOCAL)
+    ) {
+      const [taken, node] = planTakeComposedRow(plan, row.composed);
+      return node ? [taken, node, true] : [plan, row.node, false];
+    }
     return [plan, row.node, false];
   }
   if (row.materialize.root) {
@@ -704,7 +755,9 @@ export function planAddTargetsToNode<T extends GraphPlan>(
                   argument,
                 }
               ),
-              extraAttrs: { embed: "true" },
+              ...(refTarget.reference !== true && {
+                extraAttrs: { embed: "true" },
+              }),
             }
           : ({
               children: List<ID>(),

@@ -15,13 +15,11 @@ import {
   useRow,
   updateView,
   addNodesToLastElement,
+  getPreviousSiblingFromRows,
+  getVisibleParentRow,
 } from "../rowModel";
 import { isEditableNode } from "./temporaryViewState";
-import {
-  getVisibleParentRow,
-  planBatchIndent,
-  planBatchOutdent,
-} from "./batchOperations";
+import { planBatchIndent, planBatchOutdent } from "./batchOperations";
 import {
   getNode,
   isEmptyNodeID,
@@ -34,6 +32,7 @@ import {
   spansToMarkdown,
 } from "../core/nodeSpans";
 import { classifyLinkHref, externalLinkUrl } from "../core/linkPath";
+import { isCanonicalId } from "../core/entityRecognition";
 import {
   calendarEntryTarget,
   calendarFeedHref,
@@ -54,10 +53,11 @@ import { linkStyleForHref } from "./editorDom";
 import { useOnToggleExpanded } from "./SelectNodes";
 import { useApis } from "../Apis";
 import { useData } from "../DataContext";
-import { planMaterializeComputedRow } from "../core/plan";
+import { planMaterializeComputedRow, planTakeComposedRow } from "../core/plan";
 import { getWorkspaceNode } from "../core/knowledge";
 import {
   Plan,
+  applyGesture,
   usePlanner,
   planSetEmptyNodePosition,
   planSaveNodeAndEnsureNodes,
@@ -296,6 +296,18 @@ function reciprocalLinks(
   }, initial).links;
 }
 
+function hasBrokenTarget(row: Row): boolean {
+  const terminal = row.composed?.chain[row.composed.chain.length - 1];
+  return (
+    (row.composed?.kind === "placement" || row.composed?.kind === "speaking") &&
+    terminal !== undefined &&
+    !isCanonicalId(terminal) &&
+    row.composed.flags.some(
+      (flag) => flag === "dangling" || flag === "orphan-source"
+    )
+  );
+}
+
 function InlineLinkSpan({
   span,
   node,
@@ -323,7 +335,8 @@ function InlineLinkSpan({
     (calendarFeedUrl(node) !== undefined ||
       (row.standsFor !== undefined && isCalendarEntryId(row.standsFor.id)));
   const externalUrl = calendarContent ? undefined : externalLinkUrl(span.href);
-  const dead = isDeadLinkTarget(data, span.href, node, sourceId);
+  const dead =
+    hasBrokenTarget(row) || isDeadLinkTarget(data, span.href, node, sourceId);
   const internalHref =
     dead || calendarContent
       ? undefined
@@ -457,6 +470,9 @@ function InlineSpans({
       {node.spans.map((span, index) => {
         const key = `${index}-${span.kind}-${span.text}`;
         if (span.kind === "link") {
+          if (span.struck === true) {
+            return null;
+          }
           return (
             <InlineLinkSpan
               key={key}
@@ -512,26 +528,6 @@ function NodeContent(): JSX.Element {
   return <span className="break-word">{displayTextOf(displayText)}</span>;
 }
 
-function getPreviousSiblingFromRows(
-  rows: List<Row>,
-  row: Row
-): Row | undefined {
-  const { childIndex } = row;
-  if (childIndex === undefined || childIndex === 0) {
-    return undefined;
-  }
-  return rows
-    .slice(0, row.index)
-    .reverse()
-    .find(
-      (candidate) =>
-        candidate.childIndex !== undefined &&
-        candidate.parentRef?.sourceId === row.parentRef?.sourceId &&
-        candidate.parentRef?.id === row.parentRef?.id &&
-        candidate.childIndex < childIndex
-    );
-}
-
 function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
   const row = useRow();
   const { parentNode, viewKey, viewPath } = row;
@@ -568,15 +564,38 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       viewKey: viewPathToString(targetViewPath),
     });
 
-  const editorSpans = currentNode.spans;
   const feedUrl = calendarFeedUrl(currentNode);
   const calendarContent =
     feedUrl !== undefined ||
     isCalendarEntryPlacement(currentNode, parentNode ?? undefined);
+  const rewordEditing =
+    !calendarContent &&
+    row.composed !== undefined &&
+    (row.projected === true ||
+      ((row.composed.kind === "placement" ||
+        row.composed.kind === "speaking") &&
+        row.composed.target !== undefined &&
+        classifyLinkHref(`#${row.composed.target}`) === "node"));
+  const bondHref = `#${row.composed?.target ?? row.node.id}`;
+  const editorSpans: InlineSpan[] = (() => {
+    if (!rewordEditing) {
+      return currentNode.spans;
+    }
+    if (
+      embeddedTarget(currentNode) !== undefined &&
+      row.standsFor?.liveText !== undefined
+    ) {
+      return [{ kind: "link", href: bondHref, text: row.standsFor.liveText }];
+    }
+    return currentNode.spans.filter(
+      (span) => !(span.kind === "link" && span.struck === true)
+    );
+  })();
   const reciprocals = reciprocalLinks(data, row.node, row.sourceId);
   const deadLinkIndexes = editorSpans.flatMap((span, index) =>
     span.kind === "link" &&
-    isDeadLinkTarget(data, span.href, row.node, row.sourceId)
+    (hasBrokenTarget(row) ||
+      isDeadLinkTarget(data, span.href, row.node, row.sourceId))
       ? [index]
       : []
   );
@@ -601,6 +620,58 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
     submitted?: boolean
   ): Promise<void> => {
     const nextSpans = persistedSpans(spans);
+    if (rewordEditing && row.composed) {
+      const unchanged =
+        spansText(nextSpans).trim() === row.composed.text.trim();
+      if (!unchanged) {
+        await executePlan(
+          applyGesture(createPlan(), {
+            kind: "reword",
+            row: row.composed,
+            spans: nextSpans,
+          })
+        );
+        return;
+      }
+      const visibleParent = getVisibleParentRow(rows, row);
+      if (
+        !submitted ||
+        !isCalendarEntryId(row.composed.id) ||
+        !parentNode ||
+        !parentPath ||
+        !visibleParent
+      ) {
+        return;
+      }
+      const [takenPlan, takenNode] = planTakeComposedRow(
+        createPlan(),
+        row.composed
+      );
+      if (!takenNode) {
+        return;
+      }
+      const takenParent = getWorkspaceNode(
+        takenPlan.knowledgeDBs,
+        parentNode.id
+      );
+      const takenIndex = takenParent
+        ? takenParent.children.indexOf(takenNode.id)
+        : -1;
+      if (takenIndex < 0) {
+        return;
+      }
+      await executePlan(
+        planSetEmptyNodePosition(
+          takenPlan,
+          parentNode.id,
+          visibleParent.view,
+          parentPath,
+          paneIndex,
+          takenIndex + 1
+        )
+      );
+      return;
+    }
     // Write gestures take first; read gestures read. A computed row's
     // save materializes the row before the text lands — and an unchanged
     // text writes nothing at all (blur/Escape must not take).
@@ -942,6 +1013,15 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
         onActivateLink={handleActivateLink}
         entityPicker={{ fetchEntityMetadata }}
       />
+      {rewordEditing &&
+        !editorSpans.some((span) => span.kind === "link") &&
+        reciprocals[0] !== undefined && (
+          <IncomingPart
+            relevance={reciprocals[0].relevance}
+            argument={reciprocals[0].argument}
+            ariaHidden
+          />
+        )}
     </>
   );
 }
@@ -960,7 +1040,7 @@ function InteractiveNodeContent({ rows }: { rows: List<Row> }): JSX.Element {
     isInSearchView ||
     isViewingOtherUserContent ||
     virtualType !== undefined ||
-    row.projected === true;
+    (row.projected === true && row.composed === undefined);
 
   if (isLoading) {
     return <LoadingNode />;
@@ -975,17 +1055,7 @@ function InteractiveNodeContent({ rows }: { rows: List<Row> }): JSX.Element {
     return <ErrorContent />;
   }
 
-  // A node-target embed row displays the target's live text; its stored
-  // label is a frozen machine record. Typing gets its meaning in 3.4b as
-  // the rewording gesture — until then the row's text is not editable.
-  // Calendar feed names and entity occurrence labels stay the user's
-  // wording and keep their editor.
-  const embedTargetID = embeddedTarget(row.node);
-  const displaysLiveTarget =
-    embedTargetID !== undefined &&
-    classifyLinkHref(`#${embedTargetID}`) === "node";
-
-  if (isEditableNode(currentNode) && !isReadonly && !displaysLiveTarget) {
+  if (isEditableNode(currentNode) && !isReadonly) {
     return <EditableContent rows={rows} />;
   }
 

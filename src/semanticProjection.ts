@@ -172,6 +172,58 @@ function sourceRootCoveredByTarget(
   return sourceRoot ? localChildLinksTo(graph, target, sourceRoot) : false;
 }
 
+function referencesAncestor(
+  graph: GraphLookup,
+  graphIndex: GraphIndex,
+  noteRoot: ID,
+  targetSourceId: SourceId,
+  ancestorID: ID | undefined,
+  seen: ImmutableSet<ID>
+): boolean {
+  if (ancestorID === undefined || seen.has(ancestorID)) {
+    return false;
+  }
+  const refs = graphIndex.incomingCrefs.get(ancestorID) ?? [];
+  if (
+    refs.some((ref) => {
+      const carrier = getNodeInSource(graph, ref)?.node;
+      return carrier !== undefined && carrier.root === noteRoot;
+    })
+  ) {
+    return true;
+  }
+  const ancestor = getNodeInSource(graph, {
+    sourceId: targetSourceId,
+    id: ancestorID,
+  })?.node;
+  return referencesAncestor(
+    graph,
+    graphIndex,
+    noteRoot,
+    targetSourceId,
+    ancestor?.parent,
+    seen.add(ancestorID)
+  );
+}
+
+function coveredByAncestorReference(
+  graph: GraphLookup,
+  graphIndex: GraphIndex,
+  source: ResolvedNode,
+  target: ResolvedNode | undefined
+): boolean {
+  return target
+    ? referencesAncestor(
+        graph,
+        graphIndex,
+        source.node.root,
+        target.ref.sourceId,
+        target.node.parent,
+        ImmutableSet<ID>([target.node.id])
+      )
+    : false;
+}
+
 function pulledSourceOrder(data: Data, sourceId: SourceId): number | undefined {
   const indexes = [...(data.pull?.matchedSourceIdsByPaneId.values() ?? [])]
     .map((sourceIds) => sourceIds.indexOf(sourceId))
@@ -235,6 +287,9 @@ export function getIncomingCrefsForNode(
     // A reference the view is currently looking through — its carrying
     // row sits on the active expansion path — never queues under itself.
     .filter((source) => !expansionPath.includes(source.node.id))
+    .filter(
+      (source) => !coveredByAncestorReference(graph, graphIndex, source, target)
+    )
     .filter(
       (source) =>
         !isCalendarEntryPlacement(source.node, parentOf(graph, source)?.node)

@@ -1,0 +1,6 @@
+Trip plan <!-- id:t1 -->
+  Venue brief <!-- id:t2 -->
+    Seats thirty <!-- base:v2 -->
+    Near the station <!-- base:v3 -->
+    Book the room early <!-- id:t3 -->
+  Invite the speakers <!-- id:t4 -->

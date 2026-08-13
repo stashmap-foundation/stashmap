@@ -1,19 +1,11 @@
 import { getNode, isSearchId } from "./core/connections";
 import { getWorkspaceNode } from "./core/knowledge";
 import { planRemoveNodeItemById } from "./dataPlanner";
-import {
-  ViewPath,
-  updateViewPathsAfterDisconnect,
-  addNodeToPathWithNodes,
-  viewPathToString,
-  copyViewsWithNewPrefix,
-} from "./rowModel";
+import { updateViewPathsAfterDisconnect } from "./rowModel";
 import {
   Plan,
-  planAddToParent,
   planDeleteNodes,
   planDeleteDescendantNodes,
-  planMoveDescendantNodes,
   planUpdatePanes,
   planUpdateViews,
 } from "./planner";
@@ -81,84 +73,4 @@ export function planDeleteNode(
   const planAfterDescendants = planDeleteDescendantNodes(plan, node);
   const planAfterDelete = planDeleteNodes(planAfterDescendants, node.id);
   return resetInvalidPanes(planAfterDelete, paneIndex);
-}
-
-export function planMoveNode(
-  plan: Plan,
-  sourceNodeID: ID,
-  sourceChildID: ID,
-  sourceParentID: ID,
-  sourceViewPath: ViewPath,
-  targetParentID: ID,
-  targetParentViewPath: ViewPath,
-  insertAtIndex?: number
-): Plan {
-  const sourceNode = getWorkspaceNode(plan.knowledgeDBs, sourceNodeID);
-  if (!sourceNode) {
-    return plan;
-  }
-
-  const [planWithAdd] = planAddToParent(
-    plan,
-    sourceNodeID,
-    targetParentID,
-    insertAtIndex
-  );
-
-  const actualTargetParentNode = getWorkspaceNode(
-    planWithAdd.knowledgeDBs,
-    targetParentID
-  );
-
-  if (!actualTargetParentNode || actualTargetParentNode.children.size === 0) {
-    return planDisconnectFromParent(
-      planWithAdd,
-      sourceParentID,
-      sourceChildID,
-      true
-    );
-  }
-
-  const targetIndex = insertAtIndex ?? actualTargetParentNode.children.size - 1;
-  const targetViewPath = addNodeToPathWithNodes(
-    targetParentViewPath,
-    actualTargetParentNode,
-    targetIndex
-  );
-
-  const sourceKey = viewPathToString(sourceViewPath);
-  const targetKey = viewPathToString(targetViewPath);
-  const preservedSourceViews =
-    sourceKey === targetKey
-      ? planWithAdd.views.filter(
-          (_view, key) => key === sourceKey || key.startsWith(`${sourceKey}:`)
-        )
-      : undefined;
-  const updatedViews = copyViewsWithNewPrefix(
-    planWithAdd.views,
-    sourceKey,
-    targetKey
-  );
-  const planWithViews = planUpdateViews(planWithAdd, updatedViews);
-
-  const disconnectedPlan = planDisconnectFromParent(
-    planWithViews,
-    sourceParentID,
-    sourceChildID,
-    true
-  );
-  const planWithDisconnect =
-    preservedSourceViews && preservedSourceViews.size > 0
-      ? planUpdateViews(
-          disconnectedPlan,
-          disconnectedPlan.views.merge(preservedSourceViews)
-        )
-      : disconnectedPlan;
-
-  return planMoveDescendantNodes(
-    planWithDisconnect,
-    sourceNode,
-    actualTargetParentNode.id,
-    actualTargetParentNode.root
-  );
 }

@@ -56,7 +56,16 @@ if (compositionFixtures.length === 0) {
 function visibleFixtureTree(content: string): string {
   return content
     .split("\n")
-    .map((line) => line.replace(/ <!-- (?:id|base):[^ ]+ -->$/u, ""))
+    .map((line) => {
+      const dangling = / <!-- (?:id|base):[^>]* flag:dangling[^>]* -->$/u.test(
+        line
+      );
+      const stripped = line.replace(/ <!-- (?:id|base):[^>]+ -->$/u, "");
+      const calendarEntry = /^\s*(\{[^}]+\} )?\d{2}\.\d{2}\.\d{4} /u.test(
+        stripped
+      );
+      return dangling && !calendarEntry ? `${stripped}†` : stripped;
+    })
     .join("\n");
 }
 
@@ -75,6 +84,17 @@ test.each(compositionFixtures)(
       pathModule.join(fixturePath, "diff.md"),
       pathModule.join(workspacePath, "diff.md")
     );
+    const sourcesPath = pathModule.join(fixturePath, "sources");
+    if (fs.existsSync(sourcesPath)) {
+      fs.readdirSync(sourcesPath)
+        .filter((file) => file.endsWith(".md"))
+        .forEach((file) => {
+          fs.copyFileSync(
+            pathModule.join(sourcesPath, file),
+            pathModule.join(workspacePath, file)
+          );
+        });
+    }
 
     await renderAppTree({
       path: workspacePath,
@@ -87,7 +107,10 @@ test.each(compositionFixtures)(
     const expected = visibleFixtureTree(
       fs.readFileSync(pathModule.join(fixturePath, "expected.tree"), "utf8")
     );
-    await expectTree(expected, { showGutter: true });
+    await expectTree(expected, {
+      showGutter: true,
+      withoutReferenceRows: true,
+    });
   }
 );
 

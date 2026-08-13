@@ -437,7 +437,6 @@ test("cross-pane drag of an entry lays down a link row, never a copy", async () 
 Salon
   https://scholarium.at/salon.ics
     14.07.2030 Sommerfest
-    ${dunbarText()}
   Notes
 Notes
   ${dunbarText()}
@@ -531,12 +530,13 @@ test("a placed entry keeps its backlinks", async () => {
 Salon
   https://scholarium.at/salon.ics
     14.07.2030 Sommerfest
+      Meine Notiz
+      [I] Salon ↩
     ${dunbarText()}
       [I] Salon ↩
   Was ist cool
   ${dunbarText()}
   14.07.2030 Sommerfest
-    Meine Notiz
   `);
 });
 

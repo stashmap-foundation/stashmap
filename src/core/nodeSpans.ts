@@ -7,6 +7,13 @@ export const plainSpans = (text: string): InlineSpan[] => [
 export const nodeText = (node: GraphNode): string =>
   node.spans.map((span) => span.text).join("");
 
+export const effectiveText = (node: GraphNode): string =>
+  node.spans
+    .filter((span) => !(span.kind === "link" && span.struck === true))
+    .map((span) => span.text)
+    .join("")
+    .trim();
+
 export const spansText = (spans: InlineSpan[]): string =>
   spans.map((span) => span.text).join("");
 
@@ -36,12 +43,30 @@ export const embeddedTarget = (node: GraphNode | undefined): ID | undefined => {
     node?.extraAttrs?.embed !== "true" ||
     node.spans.length !== 1 ||
     node.spans[0]?.kind !== "link" ||
-    !node.spans[0].href.startsWith("#")
+    node.spans[0].struck === true
   ) {
     return undefined;
   }
-  return node.spans[0].href.slice(1);
+  const { href } = node.spans[0];
+  if (href.startsWith("#")) {
+    return href.slice(1);
+  }
+  return classifyLinkHref(href) === "feed" ? href : undefined;
 };
+
+export const rewordingTargets = (node: GraphNode | undefined): ID[] =>
+  node?.extraAttrs?.embed === "true"
+    ? node.spans.flatMap((span) =>
+        span.kind === "link" &&
+        span.struck === true &&
+        span.href.startsWith("#")
+          ? [span.href.slice(1)]
+          : []
+      )
+    : [];
+
+export const placementTarget = (node: GraphNode | undefined): ID | undefined =>
+  embeddedTarget(node) ?? rewordingTargets(node)[0];
 
 export const getAllLinks = (
   node: GraphNode
@@ -71,11 +96,13 @@ function escapeLinkText(text: string): string {
 
 export const spansToMarkdown = (spans: InlineSpan[]): string =>
   spans
-    .map((span) =>
-      span.kind === "text"
-        ? span.text
-        : `[${escapeLinkText(span.text)}](${span.href})`
-    )
+    .map((span) => {
+      if (span.kind === "text") {
+        return span.text;
+      }
+      const link = `[${escapeLinkText(span.text)}](${span.href})`;
+      return span.struck === true ? `~~${link}~~` : link;
+    })
     .join("");
 
 export const linkSpan = (targetID: ID, text: string): InlineSpan => ({

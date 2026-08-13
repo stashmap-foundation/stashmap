@@ -1,0 +1,8 @@
+My note <!-- id:note -->
+  Source <!-- id:embedded -->
+    Live child <!-- base:live -->
+    Embedded own child <!-- id:embedded-child -->
+  {!} Plain source <!-- id:plain -->
+    Plain own child <!-- id:plain-child -->
+  False source <!-- id:false -->
+    False own child <!-- id:false-child -->

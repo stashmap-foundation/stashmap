@@ -8,7 +8,7 @@ import { TemporaryViewProvider, useTemporaryView } from "./temporaryViewState";
 import {
   getDisplayTextForRow,
   getIndependentRows,
-  updateView,
+  updateRowView,
 } from "../rowModel";
 import { useData } from "../DataContext";
 import { useBackend } from "../BackendContext";
@@ -46,7 +46,7 @@ import {
   planSelectAllTemporaryRows,
   planShiftTemporarySelection,
   planToggleTemporarySelection,
-  planExpandNode,
+  planExpandRow,
   planUpdateViews,
   type Plan,
 } from "../planner";
@@ -875,10 +875,10 @@ function planSetSubtreeExpanded(
   expanded: boolean
 ): Plan {
   const updated = expanded
-    ? planExpandNode(plan, row.view, row.viewPath)
+    ? planExpandRow(plan, row)
     : planUpdateViews(
         plan,
-        updateView(plan.views, row.viewPath, {
+        updateRowView(plan.views, row, {
           ...row.view,
           expanded: false,
         })
@@ -1464,7 +1464,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
         (row) =>
           row.sourceId === LOCAL &&
           row.rowType === "occurrence" &&
-          row.occurrence.persisted !== undefined
+          row.occurrence.origin.kind === "written"
       );
       const keys = targetRows.map((row) => row.viewKey);
       const focusIndex = computeFocusIndexAfterDeletion(keys, rows);

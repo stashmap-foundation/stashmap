@@ -145,6 +145,38 @@ Note
   }
 );
 
+test("moving an embed preserves its descendants' expanded state", async () => {
+  const workspacePath = writeOverlayWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      "- Basket A <!-- id:basket-a -->",
+      '  - [Source](#source) <!-- id:embed embed="true" -->',
+      "- Basket B <!-- id:basket-b -->",
+    ].join("\n"),
+    "source.md": [
+      "# Source <!-- id:source -->",
+      "",
+      "- Parent <!-- id:parent -->",
+      "  - Child <!-- id:child -->",
+      "    - Leaf <!-- id:leaf -->",
+    ].join("\n"),
+  });
+  await expandOverlayWorkspace(workspacePath, "note.md");
+  reparentOverlayRow("Source", "Basket B", 3);
+  const expected = `
+Note
+  Basket A
+  Basket B
+    Source
+      Parent
+        Child
+          Leaf
+  `;
+  await expectTree(expected);
+  await expectOverlayTreeAfterReload(workspacePath, expected, false);
+});
+
 test.each(variants)(
   "moving a projected row under an own row outside the embed [%s]",
   async (variant) => {

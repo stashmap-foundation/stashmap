@@ -11,13 +11,18 @@ import {
 } from "./core/connections";
 import { nodeText } from "./core/nodeSpans";
 import { isCalendarEntryId } from "./core/ical";
-import { getIndependentRows, getVisibleParentRow } from "./rowModel";
+import { composedLine, writableLine } from "./core/composition";
+import {
+  getIndependentRows,
+  getVisibleParentRow,
+  viewPathContains,
+} from "./rowModel";
 import { getDocumentForNode } from "./core/Document";
 import {
   Plan,
   applyGesture,
   moveGestureRows,
-  planExpandNode,
+  planExpandRow,
   AddToParentTarget,
 } from "./planner";
 import { planRecordKnowstrSource } from "./core/plan";
@@ -84,10 +89,8 @@ function planRecordForeignSource(
 }
 
 export function isDraggedOccurrence(row: Row, sources: Row[]): boolean {
-  return sources.some(
-    (source) =>
-      row.viewKey === source.viewKey ||
-      row.viewKey.startsWith(`${source.viewKey}:`)
+  return sources.some((source) =>
+    viewPathContains(source.viewPath, row.viewPath)
   );
 }
 
@@ -285,10 +288,8 @@ export function dnd(
     ? sourceDrag.draggedRows
     : [sourceDrag.row];
   const independentRows = getIndependentRows(sources);
-  const dropIntoOwnDescendant = independentRows.some(
-    (row) =>
-      targetParentRow.viewKey === row.viewKey ||
-      targetParentRow.viewKey.startsWith(`${row.viewKey}:`)
+  const dropIntoOwnDescendant = independentRows.some((row) =>
+    viewPathContains(row.viewPath, targetParentRow.viewPath)
   );
   if (dropIntoOwnDescendant) {
     return basePlan;
@@ -298,11 +299,15 @@ export function dnd(
     if (row.rowType !== "occurrence") {
       return undefined;
     }
-    if (row.occurrence.writeLine) {
-      return row.occurrence.writeLine.node.root;
+    const line = writableLine(row.occurrence);
+    if (line) {
+      return line.node.root;
     }
-    return getNode(basePlan.knowledgeDBs, row.occurrence.writeParent, LOCAL)
-      ?.root;
+    return getNode(
+      basePlan.knowledgeDBs,
+      row.occurrence.origin.writeParent,
+      LOCAL
+    )?.root;
   };
   const targetRoot = rootOf(targetParentRow);
   const localRoot =
@@ -323,20 +328,20 @@ export function dnd(
     basePlan.knowledgeDBs,
     basePlan.documents,
     sourceDrag.row.rowType === "occurrence"
-      ? sourceDrag.row.occurrence.line.node
+      ? composedLine(sourceDrag.row.occurrence).node
       : sourceDrag.row.node,
     sourceDrag.row.rowType === "occurrence"
-      ? sourceDrag.row.occurrence.line.ref.sourceId
+      ? composedLine(sourceDrag.row.occurrence).ref.sourceId
       : sourceDrag.row.sourceId
   );
   const targetDocument = getDocumentForNode(
     basePlan.knowledgeDBs,
     basePlan.documents,
     targetParentRow.rowType === "occurrence"
-      ? targetParentRow.occurrence.line.node
+      ? composedLine(targetParentRow.occurrence).node
       : targetParentRow.node,
     targetParentRow.rowType === "occurrence"
-      ? targetParentRow.occurrence.line.ref.sourceId
+      ? composedLine(targetParentRow.occurrence).ref.sourceId
       : targetParentRow.sourceId
   );
   const sameDocument =
@@ -382,14 +387,11 @@ export function dnd(
     }
     const rows = moveGestureRows(moveRows, sourceDrag.orderedRows);
     return applyGesture(
-      recordForeignSources(
-        planExpandNode(basePlan, targetParentRow.view, targetParentRow.viewPath)
-      ),
+      recordForeignSources(planExpandRow(basePlan, targetParentRow)),
       {
         kind: "move",
         rows,
         parent: doorTarget,
-        parentPath: targetParentRow.viewPath,
         after:
           dropAnchor?.rowType === "occurrence"
             ? dropAnchor.occurrence
@@ -419,13 +421,11 @@ export function dnd(
     const target = insertTarget
       ? addFallbackLinkText(insertTarget, sourceDrag.text)
       : makeTarget(targetID, occurrence?.text ?? nodeText(row.node));
-    const edge = occurrence?.line.node ?? row.node;
+    const edge = occurrence ? composedLine(occurrence).node : row.node;
     return { target, relevance: edge.relevance, argument: edge.argument };
   });
   return applyGesture(
-    recordForeignSources(
-      planExpandNode(movedPlan, targetParentRow.view, targetParentRow.viewPath)
-    ),
+    recordForeignSources(planExpandRow(movedPlan, targetParentRow)),
     {
       kind: "place",
       targets,

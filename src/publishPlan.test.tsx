@@ -20,7 +20,7 @@ import {
 } from "./editor/FileDropZone";
 import { entityIdForText } from "./core/entityRecognition";
 import { KIND_KNOWLEDGE_DOCUMENT } from "./nostr";
-import { buildOccurrences } from "./core/composition";
+import { composeNote } from "./core/composition";
 import { graphLookupFromData } from "./core/graphLookup";
 import { ALICE, setup } from "./utils.test";
 
@@ -91,7 +91,7 @@ test("clipboard Markdown survives empty-row materialization and document renderi
     id: EMPTY_NODE_ID,
   };
   const markdown = `[A link to Hello](#e834645e-8bb5-44f7-89b2-41d5054746af)`;
-  const parent = buildOccurrences(graphLookupFromData(plan), {
+  const parent = composeNote(graphLookupFromData(plan), {
     sourceId: LOCAL,
     id: rootId,
   }).root;

@@ -4,7 +4,7 @@ import { QueueStatus } from "./infra/nostr/cache/PublishQueue";
 import { Document as DocumentType } from "./core/Document";
 import { IcalEntry } from "./core/ical";
 import type { AddToParentTarget } from "./core/plan";
-import type { Occurrence } from "./core/composition";
+import type { ComposedRow } from "./core/composition";
 
 declare global {
   type Children = {
@@ -186,7 +186,6 @@ declare global {
   type Row = {
     viewPath: readonly [number, ...ID[]];
     viewKey: string;
-    viewStateKey: string;
     index: number;
     depth: number;
     node: GraphNode;
@@ -215,7 +214,7 @@ declare global {
   } & (
     | {
         rowType: "occurrence";
-        occurrence: Occurrence;
+        occurrence: ComposedRow;
         incomingTarget: undefined;
         incomingParent: undefined;
         incomingEmbed: undefined;
@@ -227,7 +226,7 @@ declare global {
         rowType: "incoming";
         occurrence: undefined;
         incomingTarget: AddToParentTarget;
-        incomingParent: Occurrence | undefined;
+        incomingParent: ComposedRow | undefined;
         incomingEmbed: true | undefined;
         emptyParent: undefined;
         virtualType: "incoming";
@@ -249,7 +248,7 @@ declare global {
         incomingTarget: undefined;
         incomingParent: undefined;
         incomingEmbed: undefined;
-        emptyParent: Occurrence | undefined;
+        emptyParent: ComposedRow | undefined;
         virtualType: undefined;
         action: undefined;
       }

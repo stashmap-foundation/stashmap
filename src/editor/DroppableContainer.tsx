@@ -15,7 +15,7 @@ import {
   usePlanner,
 } from "../planner";
 import { useTemporaryView } from "./temporaryViewState";
-import { buildPaneTarget } from "../rowModel";
+import { buildPaneTarget, viewPathToString } from "../rowModel";
 import { NOTE_TYPE, INDENTATION } from "./Node";
 import { usePaneIndex } from "../SplitPanesContext";
 import {
@@ -102,8 +102,8 @@ function calcDragDirection(
   }
   const item = monitor.getItem();
   if (isDragItem(item)) {
-    const sourceStr = item.row.viewKey;
-    const targetStr = row.viewKey;
+    const sourceStr = viewPathToString(item.row.viewPath);
+    const targetStr = viewPathToString(row.viewPath);
     if (targetStr.startsWith(`${sourceStr}:`)) {
       return undefined;
     }
@@ -216,7 +216,7 @@ export function useDroppable({
     computeDepthLimits(
       currentDepth,
       nextRow?.depth,
-      nextRow?.viewKey,
+      nextRow ? viewPathToString(nextRow.viewPath) : undefined,
       sourceViewKey,
       rootDepth
     );
@@ -250,7 +250,7 @@ export function useDroppable({
 
     const dragItem = monitor.getItem();
     const { minDepth, maxDepth } = calcDepthLimits(
-      isDragItem(dragItem) ? dragItem.row.viewKey : undefined
+      isDragItem(dragItem) ? viewPathToString(dragItem.row.viewPath) : undefined
     );
 
     if (globalDragIndent.anchorX === undefined) {
@@ -309,7 +309,7 @@ export function useDroppable({
           if (globalDragIndent.targetDepth === undefined) {
             const collectDragItem = monitor.getItem();
             const collectSourceViewKey = isDragItem(collectDragItem)
-              ? collectDragItem.row.viewKey
+              ? viewPathToString(collectDragItem.row.viewPath)
               : undefined;
             const { minDepth, maxDepth } =
               calcDepthLimits(collectSourceViewKey);

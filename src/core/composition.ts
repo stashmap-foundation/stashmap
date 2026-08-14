@@ -3,6 +3,7 @@ import { List } from "immutable";
 import { formatPrefixMarkers } from "../documentFormat";
 import { EMPTY_NODE_ID } from "./connections";
 import { isCalendarEntryId } from "./ical";
+import { nodeRefKey } from "./nodeRef";
 import type { AddToParentTarget } from "./plan";
 import {
   GraphLookup,
@@ -19,29 +20,47 @@ import {
   spansText,
 } from "./nodeSpans";
 
-export type OccurrenceLine = {
-  id: ID;
-  target: ID | undefined;
-  position: PositionName[];
-};
-
-export type OccurrenceAttachment =
-  | { kind: "before" | "after"; anchor: string }
-  | { kind: "first-child" | "last-child"; anchor: string };
-
-export type Occurrence = {
+export type ComposedRow = {
   key: string;
+  identity: string;
   id: ID;
-  line: ResolvedNode;
-  content: ResolvedNode;
-  persisted: ResolvedNode | undefined;
-  source: ResolvedNode;
+  origin: {
+    line: ResolvedNode;
+    writeTarget: ID;
+    writeParent: ID;
+    writeParentTarget: ID | undefined;
+    writeChildren: {
+      id: ID;
+      target: ID | undefined;
+      position: PositionName[];
+    }[];
+    writeRoot: GraphNode | undefined;
+    writeFrom: ID | undefined;
+    recordedFrom: ID | undefined;
+    physicalParent: NodeRef | undefined;
+    physicalParentTarget: ID | undefined;
+    physicalPeers: {
+      id: ID;
+      target: ID | undefined;
+      position: PositionName[];
+    }[];
+  } & ({ kind: "projected" } | { kind: "written"; writable: boolean });
+  source: {
+    line: ResolvedNode;
+    parent: NodeRef | undefined;
+    ancestors: ID[];
+    showing: string | undefined;
+  };
+  spans: InlineSpan[];
+  spanSource: NodeRef;
   kind: "placement" | "speaking" | "link" | "own";
   target: ID | undefined;
   chain: ID[];
   text: string;
   relevance: Relevance;
   argument: Argument;
+  ownRelevance: Relevance;
+  ownArgument: Argument;
   judgments: { id: ID; relevance: Relevance; argument: Argument }[];
   flags: (
     | "ambiguous-anchor"
@@ -51,40 +70,41 @@ export type Occurrence = {
     | "orphan-source"
   )[];
   drift: { frozen: string; current: string } | undefined;
-  children: Occurrence[];
-  writeLine: ResolvedNode | undefined;
-  writeTarget: ID;
-  writeKind: "placement" | "speaking" | "link" | "own";
+  children: ComposedRow[];
   editTarget: ID | undefined;
-  writtenRelevance: Relevance;
-  writtenArgument: Argument;
-  writeParent: ID;
-  writeParentTarget: ID | undefined;
-  writeChildren: OccurrenceLine[];
-  writeRoot: GraphNode | undefined;
-  writeFrom: ID | undefined;
-  parentLine: ResolvedNode | undefined;
-  physicalParent: NodeRef | undefined;
-  physicalParentTarget: ID | undefined;
-  physicalPeers: OccurrenceLine[];
-  sourceParent: NodeRef | undefined;
-  sourceAncestors: ID[];
+  effectiveParent: ResolvedNode | undefined;
   positionScope: string;
-  sourceShowing: string | undefined;
-  recordedFrom: ID | undefined;
   position: PositionName[];
-  attachment: OccurrenceAttachment | undefined;
+  attachment:
+    | { kind: "before" | "after"; anchor: string }
+    | { kind: "first-child" | "last-child"; anchor: string }
+    | undefined;
   consumes: boolean;
 };
 
-export type OccurrenceGraph = {
-  root: Occurrence;
+export type CompositionResult = {
+  root: ComposedRow;
+  claims: {
+    id: ID;
+    kind: ComposedRow["kind"];
+    target: ID | undefined;
+    relevance: Relevance;
+    argument: Argument;
+    text: string;
+    context: ID;
+    parent: ID;
+  }[];
+  diagnostics: {
+    code: string;
+    rowId: ID;
+    details: { frozen: string; current: string } | undefined;
+  }[];
 };
 
 export type Gesture =
   | {
       kind: "judge";
-      row: Occurrence;
+      row: ComposedRow;
       relevance: Relevance;
       argument: Argument;
       spans: InlineSpan[];
@@ -92,27 +112,25 @@ export type Gesture =
   | {
       kind: "move";
       rows: {
-        row: Occurrence;
-        sourceParent: Occurrence | undefined;
-        path: readonly [number, ...ID[]];
+        row: ComposedRow;
+        sourceParent: ComposedRow | undefined;
       }[];
-      parent: Occurrence;
-      parentPath: readonly [number, ...ID[]];
-      after: Occurrence | undefined;
+      parent: ComposedRow;
+      after: ComposedRow | undefined;
     }
   | {
       kind: "reword";
-      row: Occurrence;
+      row: ComposedRow;
       spans: InlineSpan[];
     }
   | {
       kind: "edit";
-      row: Occurrence;
+      row: ComposedRow;
       spans: InlineSpan[];
     }
   | {
       kind: "add";
-      parent: Occurrence;
+      parent: ComposedRow;
       spans: InlineSpan[];
       at: number | undefined;
       relevance: Relevance;
@@ -125,23 +143,23 @@ export type Gesture =
         relevance: Relevance;
         argument: Argument;
       }[];
-      parent: Occurrence;
+      parent: ComposedRow;
       at: number | undefined;
-      after: Occurrence | undefined;
+      after: ComposedRow | undefined;
     }
   | {
       kind: "dismiss";
-      row: Occurrence;
+      row: ComposedRow;
       spans: InlineSpan[];
     }
   | {
       kind: "delete";
-      row: Occurrence;
+      row: ComposedRow;
       paneIndex: number;
     }
   | {
       kind: "accept";
-      parent: Occurrence;
+      parent: ComposedRow;
       target: AddToParentTarget;
       relevance: Relevance;
       argument: Argument;
@@ -149,33 +167,40 @@ export type Gesture =
 
 export type PositionName = { kind: "after" | "before" | "parent"; id: ID };
 
-export type MoveSeat = {
-  id: ID;
-  localID: ID | undefined;
-  target: ID | undefined;
-  chain: ID[];
-  position: PositionName[];
-  placement: boolean;
-  reparented: boolean;
-};
-
 export function movePositionWrites(
-  parent: Occurrence,
-  moved: MoveSeat[],
-  after: Occurrence | undefined,
+  parent: ComposedRow,
+  moved: {
+    id: ID;
+    localID: ID | undefined;
+    target: ID | undefined;
+    chain: ID[];
+    position: PositionName[];
+    placement: boolean;
+    reparented: boolean;
+  }[],
+  after: ComposedRow | undefined,
   anchorMoved: boolean
 ): { id: ID; names: PositionName[] }[] {
-  const placementScope = parent.persisted
-    ? parent.kind === "placement"
-    : parent.writeParentTarget !== undefined;
+  const placementScope =
+    parent.origin.kind === "written"
+      ? parent.kind === "placement"
+      : parent.origin.writeParentTarget !== undefined;
   const movedIds = new globalThis.Set(moved.map((seat) => seat.id));
-  const seatFor = (row: Occurrence): MoveSeat => ({
+  const seatFor = (
+    row: ComposedRow
+  ): Parameters<typeof movePositionWrites>[1][number] => ({
     id: row.id,
-    localID: row.writeLine?.node.id,
+    localID:
+      row.origin.kind === "written" && row.origin.writable
+        ? row.origin.line.node.id
+        : undefined,
     target: row.target,
     chain: row.chain,
     position: row.position,
-    placement: row.writeKind === "placement",
+    placement:
+      row.origin.kind === "written" && row.origin.writable
+        ? rowKind(row.origin.line.node) === "placement"
+        : true,
     reparented: false,
   });
   const stationary = parent.children
@@ -190,7 +215,8 @@ export function movePositionWrites(
     ...moved,
     ...stationary.slice(anchorIndex + 1),
   ];
-  const anchorIDFor = (seat: MoveSeat): ID => seat.localID ?? seat.id;
+  const anchorIDFor = (seat: typeof desired[number]): ID =>
+    seat.localID ?? seat.id;
   const parentAnchor = parent.target ?? parent.id;
   const makePosition = (kind: PositionName["kind"], id: ID): PositionName => ({
     kind,
@@ -284,7 +310,7 @@ export function movePositionWrites(
   });
 }
 
-function rowKind(node: GraphNode): Occurrence["kind"] {
+function rowKind(node: GraphNode): ComposedRow["kind"] {
   if (rewordingTargets(node).length > 0) {
     return "speaking";
   }
@@ -300,6 +326,32 @@ function rowKind(node: GraphNode): Occurrence["kind"] {
     return "link";
   }
   return "own";
+}
+
+export function composedLine(row: ComposedRow): ResolvedNode {
+  return row.origin.line;
+}
+
+export function writtenLine(row: ComposedRow): ResolvedNode | undefined {
+  return row.origin.kind === "written" ? row.origin.line : undefined;
+}
+
+export function writableLine(row: ComposedRow): ResolvedNode | undefined {
+  return row.origin.kind === "written" && row.origin.writable
+    ? row.origin.line
+    : undefined;
+}
+
+export function composedContent(row: ComposedRow): ResolvedNode {
+  return {
+    ref: row.spanSource,
+    node: { ...row.origin.line.node, spans: row.spans },
+  };
+}
+
+export function composedWriteKind(row: ComposedRow): ComposedRow["kind"] {
+  const line = writableLine(row);
+  return line ? rowKind(line.node) : "placement";
 }
 
 function rowTargets(node: GraphNode): ID[] {
@@ -408,26 +460,26 @@ function dedupe<T>(values: T[]): T[] {
 }
 
 function withFlag(
-  row: Occurrence,
-  flag: Occurrence["flags"][number]
-): Occurrence {
+  row: ComposedRow,
+  flag: ComposedRow["flags"][number]
+): ComposedRow {
   return row.flags.includes(flag)
     ? row
     : { ...row, flags: [...row.flags, flag] };
 }
 
 function withoutFlag(
-  row: Occurrence,
-  flag: Occurrence["flags"][number]
-): Occurrence {
+  row: ComposedRow,
+  flag: ComposedRow["flags"][number]
+): ComposedRow {
   return row.flags.includes(flag)
     ? { ...row, flags: row.flags.filter((value) => value !== flag) }
     : row;
 }
 
 function paths(
-  rows: Occurrence[],
-  predicate: (row: Occurrence) => boolean,
+  rows: ComposedRow[],
+  predicate: (row: ComposedRow) => boolean,
   prefix: number[] = []
 ): number[][] {
   return rows.flatMap((row, index) => {
@@ -439,21 +491,21 @@ function paths(
   });
 }
 
-function at(rows: Occurrence[], path: number[]): Occurrence | undefined {
+function at(rows: ComposedRow[], path: number[]): ComposedRow | undefined {
   const first = rows[path[0]];
   return path
     .slice(1)
-    .reduce<Occurrence | undefined>(
+    .reduce<ComposedRow | undefined>(
       (row, index) => row?.children[index],
       first
     );
 }
 
 function replace(
-  rows: Occurrence[],
+  rows: ComposedRow[],
   path: number[],
-  replacements: Occurrence[]
-): Occurrence[] {
+  replacements: ComposedRow[]
+): ComposedRow[] {
   const [index, ...rest] = path;
   if (index === undefined) {
     return rows;
@@ -473,7 +525,7 @@ function replace(
 }
 
 function matchPath(
-  rows: Occurrence[],
+  rows: ComposedRow[],
   target: ID
 ): number[] | "ambiguous" | "none" {
   const immediateExact = rows.flatMap((row, index) =>
@@ -516,10 +568,10 @@ function isPathPrefix(prefix: number[], path: number[]): boolean {
 }
 
 function updateByKey(
-  row: Occurrence,
+  row: ComposedRow,
   key: string,
-  update: (found: Occurrence) => Occurrence
-): Occurrence {
+  update: (found: ComposedRow) => ComposedRow
+): ComposedRow {
   if (row.key === key) {
     return update(row);
   }
@@ -529,7 +581,7 @@ function updateByKey(
   };
 }
 
-function removeKeyFromForest(rows: Occurrence[], key: string): Occurrence[] {
+function removeKeyFromForest(rows: ComposedRow[], key: string): ComposedRow[] {
   return rows
     .filter((row) => row.key !== key)
     .map((row) => ({
@@ -538,21 +590,21 @@ function removeKeyFromForest(rows: Occurrence[], key: string): Occurrence[] {
     }));
 }
 
-function removeByKey(row: Occurrence, key: string): Occurrence {
+function removeByKey(row: ComposedRow, key: string): ComposedRow {
   return {
     ...row,
     children: removeKeyFromForest(row.children, key),
   };
 }
 
-function entriesOf(root: Occurrence): {
+function entriesOf(root: ComposedRow): {
   path: number[];
-  row: Occurrence;
+  row: ComposedRow;
   hidden: boolean;
   readerAncestors: ID[];
 }[] {
   const walk = (
-    rows: Occurrence[],
+    rows: ComposedRow[],
     prefix: number[],
     hidden: boolean,
     readerAncestors: ID[]
@@ -560,25 +612,31 @@ function entriesOf(root: Occurrence): {
     rows.flatMap((row, index) => {
       const path = [...prefix, index];
       const rowHidden = hidden || row.relevance === "not_relevant";
-      const nextAncestors = row.persisted
-        ? [...readerAncestors, row.id]
-        : readerAncestors;
+      const nextAncestors =
+        row.origin.kind === "written"
+          ? [...readerAncestors, row.id]
+          : readerAncestors;
       return [
         { path, row, hidden: rowHidden, readerAncestors },
         ...walk(row.children, path, rowHidden, nextAncestors),
       ];
     });
-  return walk(root.children, [], false, root.persisted ? [root.id] : []);
+  return walk(
+    root.children,
+    [],
+    false,
+    root.origin.kind === "written" ? [root.id] : []
+  );
 }
 
 function insertRelative(
-  root: Occurrence,
-  row: Occurrence,
+  root: ComposedRow,
+  row: ComposedRow,
   anchorKey: string,
   kind: PositionName["kind"],
   firstChild: boolean
-): Occurrence {
-  const insert = (current: Occurrence): [Occurrence, boolean] => {
+): ComposedRow {
+  const insert = (current: ComposedRow): [ComposedRow, boolean] => {
     if (current.key === anchorKey && kind === "parent") {
       return [
         {
@@ -607,7 +665,7 @@ function insertRelative(
         true,
       ];
     }
-    return current.children.reduce<[Occurrence, boolean]>(
+    return current.children.reduce<[ComposedRow, boolean]>(
       ([parent, done], child) => {
         if (done) {
           return [parent, true];
@@ -631,22 +689,23 @@ function insertRelative(
   return insert(root)[0];
 }
 
-function resolvePositions(root: Occurrence): Occurrence {
+function resolvePositions(root: ComposedRow): ComposedRow {
   const initial = entriesOf(root);
   const positioned = initial.filter((entry) => entry.row.position.length > 0);
   const decisions = positioned.map((entry) => {
     const names = entry.row.position;
-    const physicalScope = entry.row.physicalParent
+    const physicalScope = entry.row.origin.physicalParent
       ? initial.find(
           (candidate) =>
-            candidate.row.persisted?.node.id === entry.row.physicalParent?.id &&
-            projects(candidate.row.line.node)
+            writtenLine(candidate.row)?.node.id ===
+              entry.row.origin.physicalParent?.id &&
+            projects(candidate.row.origin.line.node)
         )
       : undefined;
     const isPhysicalParent = (
       candidate: ReturnType<typeof entriesOf>[number]
     ): boolean =>
-      entry.row.physicalParent?.id === candidate.row.id &&
+      entry.row.origin.physicalParent?.id === candidate.row.id &&
       candidate.row.key === entry.row.positionScope;
 
     const resolutions = names.map((name) => {
@@ -665,8 +724,8 @@ function resolvePositions(root: Occurrence): Occurrence {
               (flag === "dangling" &&
                 !(
                   name.kind === "parent" &&
-                  candidate.row.persisted?.node.id ===
-                    entry.row.physicalParent?.id
+                  writtenLine(candidate.row)?.node.id ===
+                    entry.row.origin.physicalParent?.id
                 )) ||
               flag === "orphan-source" ||
               flag === "cycle"
@@ -682,7 +741,7 @@ function resolvePositions(root: Occurrence): Occurrence {
       const physicallyScoped = physicalScope
         ? chosen.filter(
             (candidate) =>
-              candidate.row.persisted?.node.id === physicalScope.row.id ||
+              writtenLine(candidate.row)?.node.id === physicalScope.row.id ||
               candidate.readerAncestors.includes(physicalScope.row.id)
           )
         : [];
@@ -710,13 +769,13 @@ function resolvePositions(root: Occurrence): Occurrence {
       decision.entry.path.length === candidate.path.length + 1 &&
       isPathPrefix(candidate.path, decision.entry.path)
     ) {
-      const sourceParent = decision.entry.row.sourceParent?.id;
+      const sourceParent = decision.entry.row.source.parent?.id;
       const remainsWithSource =
         sourceParent !== undefined &&
         (candidate.row.id === sourceParent ||
           candidate.row.chain.includes(sourceParent));
       const remainsPhysical =
-        decision.entry.row.physicalParent?.id === candidate.row.id &&
+        decision.entry.row.origin.physicalParent?.id === candidate.row.id &&
         candidate.row.id === selected.name.id;
       const index = decision.entry.path[decision.entry.path.length - 1];
       const bare = decision.names.every((name) => name.kind === "parent");
@@ -730,7 +789,7 @@ function resolvePositions(root: Occurrence): Occurrence {
       );
       if (bare && parentPeers.length > 1) {
         return parentPeers.every(
-          (peer) => !hasMarker(peer.entry.row.line.node)
+          (peer) => !hasMarker(peer.entry.row.origin.line.node)
         );
       }
       if (remainsWithSource || remainsPhysical) {
@@ -844,7 +903,7 @@ function resolvePositions(root: Occurrence): Occurrence {
       (decision) => decision.entry.row.key !== pivot
     );
     const movableKeys = movable.map((decision) => decision.entry.row.key);
-    const detachedRow = (row: Occurrence): Occurrence => ({
+    const detachedRow = (row: ComposedRow): ComposedRow => ({
       ...row,
       children: movableKeys.reduce(
         (children, key) => removeKeyFromForest(children, key),
@@ -856,9 +915,9 @@ function resolvePositions(root: Occurrence): Occurrence {
       tree
     );
     const placeReady = (
-      current: Occurrence,
+      current: ComposedRow,
       remaining: typeof movable
-    ): Occurrence => {
+    ): ComposedRow => {
       if (remaining.length === 0) {
         return current;
       }
@@ -906,7 +965,7 @@ function resolvePositions(root: Occurrence): Occurrence {
         const firstChild =
           preferred.name.kind === "parent" &&
           decision.names.every((name) => name.kind === "parent");
-        const attachment: OccurrenceAttachment =
+        const attachment: ComposedRow["attachment"] =
           preferred.name.kind === "parent"
             ? {
                 kind: firstChild ? "first-child" : "last-child",
@@ -940,64 +999,100 @@ function resolvePositions(root: Occurrence): Occurrence {
   return positionedTree;
 }
 
+function collectDiagnostics(
+  root: ComposedRow
+): CompositionResult["diagnostics"] {
+  return [
+    ...root.flags.map((code) => ({
+      code,
+      rowId: root.id,
+      details: undefined,
+    })),
+    ...(root.drift
+      ? [{ code: "drift", rowId: root.id, details: root.drift }]
+      : []),
+    ...root.children.flatMap(collectDiagnostics),
+  ];
+}
+
+function dedupeDiagnostics(
+  entries: CompositionResult["diagnostics"]
+): CompositionResult["diagnostics"] {
+  const seen = new globalThis.Set<string>();
+  return entries.filter((entry) => {
+    const key = `${entry.code}:${entry.rowId}:${entry.details?.frozen ?? ""}:${
+      entry.details?.current ?? ""
+    }`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
 function markerText(relevance: Relevance, argument: Argument): string {
   const prefix = formatPrefixMarkers(relevance, argument);
   return prefix === "" ? "" : prefix.replace("(", "{").replace(")", "}");
 }
 
-export function buildWriteRootOccurrence(
+export function createWriteRootRow(
   node: GraphNode,
   sourceId: SourceId
-): Occurrence {
+): ComposedRow {
   const line = { ref: { sourceId, id: node.id }, node };
   const key = `${sourceId}:${node.id}`;
   return {
     key,
+    identity: `source:${nodeRefKey(line.ref)}`,
     id: node.id,
-    line,
-    content: contentLine(line, nodeText(node)),
-    persisted: undefined,
-    source: line,
+    origin: {
+      kind: "projected",
+      line,
+      writeTarget: node.id,
+      writeParent: node.id,
+      writeParentTarget: undefined,
+      writeChildren: [],
+      writeRoot: node,
+      writeFrom: undefined,
+      recordedFrom: undefined,
+      physicalParent: undefined,
+      physicalParentTarget: undefined,
+      physicalPeers: [],
+    },
+    source: {
+      line,
+      parent: undefined,
+      ancestors: [node.id],
+      showing: undefined,
+    },
+    spans: contentLine(line, nodeText(node)).node.spans,
+    spanSource: line.ref,
     kind: rowKind(node),
     target: targetOf(node),
     chain: [node.id],
     text: nodeText(node),
     relevance: node.relevance,
     argument: node.argument,
+    ownRelevance: node.relevance,
+    ownArgument: node.argument,
     judgments: [],
     flags: [],
     drift: undefined,
     children: [],
-    writeLine: undefined,
-    writeTarget: node.id,
-    writeKind: "own",
     editTarget: undefined,
-    writtenRelevance: node.relevance,
-    writtenArgument: node.argument,
-    writeParent: node.id,
-    writeParentTarget: undefined,
-    writeChildren: [],
-    writeRoot: node,
-    writeFrom: undefined,
-    parentLine: undefined,
-    physicalParent: undefined,
-    physicalParentTarget: undefined,
-    physicalPeers: [],
-    sourceParent: undefined,
-    sourceAncestors: [node.id],
+    effectiveParent: undefined,
     positionScope: key,
-    sourceShowing: undefined,
-    recordedFrom: undefined,
     position: positionNames(node),
     attachment: undefined,
     consumes: false,
   };
 }
 
-export function buildOccurrences(
+export function composeNote(
   graph: GraphLookup,
   rootRef: NodeRef
-): OccurrenceGraph {
+): CompositionResult {
   const absorbed = new globalThis.Set<ID>();
   const fileOrder = new globalThis.Map<string, number>();
 
@@ -1024,7 +1119,9 @@ export function buildOccurrences(
         return child ? [child] : [];
       });
 
-  const occurrenceLine = (line: ResolvedNode): OccurrenceLine => ({
+  const occurrenceLine = (
+    line: ResolvedNode
+  ): ComposedRow["origin"]["physicalPeers"][number] => ({
     id: line.node.id,
     target:
       rowKind(line.node) === "placement" ? targetOf(line.node) : undefined,
@@ -1084,61 +1181,93 @@ export function buildOccurrences(
     node: fallbackNode,
   };
 
-  const danglingOccurrence = (
+  const stableScopeKey = (key: string): string =>
+    (key.split("/").at(-1) ?? key)
+      .replace(/^\d+:/u, "")
+      .replace(/^bond:\d+:/u, "bond:")
+      .replace(/^(line|fallback):([^:]+):\d+$/u, "$1:$2")
+      .replace(/^(pending|pending-fallback):\d+:/u, "$1:");
+
+  const danglingComposedRow = (
     line: ResolvedNode,
     key: string,
     positionScope: string,
     physicalParent: NodeRef | undefined
-  ): Occurrence => ({
-    key,
-    id: line.node.id,
-    line,
-    content: contentLine(line, nodeText(line.node)),
-    persisted: isReaderLine(line) ? line : undefined,
-    source: line,
-    kind: "placement",
-    target: line.node.id,
-    chain: [line.node.id],
-    text: nodeText(line.node),
-    relevance: line.node.relevance,
-    argument: line.node.argument,
-    judgments: [],
-    flags: ["dangling"],
-    drift: undefined,
-    children: [],
-    writeLine: undefined,
-    writeTarget: line.node.id,
-    writeKind: "placement",
-    editTarget: isCalendarEntryId(line.node.id) ? line.node.id : undefined,
-    writtenRelevance: line.node.relevance,
-    writtenArgument: line.node.argument,
-    writeParent: rootRef.id,
-    writeParentTarget: undefined,
-    writeChildren: [],
-    writeRoot: undefined,
-    writeFrom: undefined,
-    parentLine: undefined,
-    physicalParent,
-    physicalParentTarget: undefined,
-    physicalPeers: [],
-    sourceParent: undefined,
-    sourceAncestors: [line.node.id],
-    positionScope,
-    sourceShowing: undefined,
-    recordedFrom: undefined,
-    position: positionNames(line.node),
-    attachment: undefined,
-    consumes: false,
-  });
+  ): ComposedRow => {
+    const written = isReaderLine(line);
+    const content = contentLine(line, nodeText(line.node));
+    const origin: ComposedRow["origin"] = written
+      ? {
+          kind: "written",
+          writable: line.ref.sourceId === graph.localSourceId,
+          line,
+          writeTarget: line.node.id,
+          writeParent: rootRef.id,
+          writeParentTarget: undefined,
+          writeChildren: [],
+          writeRoot: undefined,
+          writeFrom: undefined,
+          recordedFrom: undefined,
+          physicalParent,
+          physicalParentTarget: undefined,
+          physicalPeers: [],
+        }
+      : {
+          kind: "projected",
+          line,
+          writeTarget: line.node.id,
+          writeParent: rootRef.id,
+          writeParentTarget: undefined,
+          writeChildren: [],
+          writeRoot: undefined,
+          writeFrom: undefined,
+          recordedFrom: undefined,
+          physicalParent,
+          physicalParentTarget: undefined,
+          physicalPeers: [],
+        };
+    return {
+      key,
+      identity: `source:${nodeRefKey(line.ref)}`,
+      id: line.node.id,
+      origin,
+      source: {
+        line,
+        parent: undefined,
+        ancestors: [line.node.id],
+        showing: undefined,
+      },
+      spans: content.node.spans,
+      spanSource: content.ref,
+      kind: "placement",
+      target: line.node.id,
+      chain: [line.node.id],
+      text: nodeText(line.node),
+      relevance: line.node.relevance,
+      argument: line.node.argument,
+      ownRelevance: line.node.relevance,
+      ownArgument: line.node.argument,
+      judgments: [],
+      flags: ["dangling"],
+      drift: undefined,
+      children: [],
+      editTarget: isCalendarEntryId(line.node.id) ? line.node.id : undefined,
+      effectiveParent: undefined,
+      positionScope,
+      position: positionNames(line.node),
+      attachment: undefined,
+      consumes: false,
+    };
+  };
 
   if (!rootResolved) {
-    const root = danglingOccurrence(
+    const root = danglingComposedRow(
       fallbackLine,
       `${rootRef.sourceId}:${rootRef.id}`,
       `${rootRef.sourceId}:${rootRef.id}`,
       undefined
     );
-    return { root };
+    return { root, claims: [], diagnostics: collectDiagnostics(root) };
   }
 
   const rootTarget = targetOf(rootResolved.node);
@@ -1152,6 +1281,34 @@ export function buildOccurrences(
         id: baseEntry.node.root,
       }) ?? baseEntry
     : undefined;
+
+  const rootScope =
+    projects(rootResolved.node) && rootTarget !== undefined
+      ? rootTarget
+      : rootResolved.node.id;
+  const collectClaims = (
+    owner: ResolvedNode,
+    context: ID
+  ): CompositionResult["claims"] =>
+    childRows(owner).flatMap((child) => {
+      const target = targetOf(child.node);
+      const childContext =
+        projects(child.node) && target !== undefined ? target : child.node.id;
+      return [
+        {
+          id: child.node.id,
+          kind: rowKind(child.node),
+          target,
+          relevance: child.node.relevance,
+          argument: child.node.argument,
+          text: nodeText(child.node),
+          context,
+          parent: owner.node.id,
+        },
+        ...collectClaims(child, childContext),
+      ];
+    });
+  const claims = collectClaims(rootResolved, rootScope);
 
   const scanAbsorbed = (line: ResolvedNode): void => {
     if (projects(line.node)) {
@@ -1175,28 +1332,28 @@ export function buildOccurrences(
   };
   collectFileOrder(rootResolved);
 
-  const makeOccurrence = (
+  const makeComposedRow = (
     line: ResolvedNode,
     source: ResolvedNode,
     key: string,
     positionScope: string,
     physicalParent: NodeRef | undefined,
-    fields: Pick<
-      Occurrence,
-      | "chain"
-      | "content"
-      | "text"
-      | "relevance"
-      | "argument"
-      | "judgments"
-      | "flags"
-      | "drift"
-      | "children"
-      | "sourceParent"
-      | "sourceShowing"
-      | "consumes"
-    >
-  ): Occurrence => {
+    fields: {
+      chain: ID[];
+      identity: string;
+      content: ResolvedNode;
+      text: string;
+      relevance: Relevance;
+      argument: Argument;
+      judgments: ComposedRow["judgments"];
+      flags: ComposedRow["flags"];
+      drift: ComposedRow["drift"];
+      children: ComposedRow[];
+      sourceParent: NodeRef | undefined;
+      sourceShowing: string | undefined;
+      consumes: boolean;
+    }
+  ): ComposedRow => {
     const physical = physicalParent
       ? getNodeInSource(graph, physicalParent)
       : undefined;
@@ -1208,51 +1365,62 @@ export function buildOccurrences(
       : line.node.id;
     const writeKind = writeLine ? rowKind(writeLine.node) : "placement";
     const recordedFrom = persisted ? line.node.extraAttrs?.from : undefined;
-    return {
-      key,
-      id: line.node.id,
+    const originFields = {
       line,
-      content: fields.content,
-      persisted,
-      source,
-      kind: rowKind(line.node),
-      target: targetOf(line.node),
+      writeTarget,
       writeParent: rootRef.id,
       writeParentTarget: undefined,
       writeChildren: [],
       writeRoot: undefined,
       writeFrom: recordedFrom ?? nearestPlacementScope(line)?.node.id,
-      parentLine: undefined,
+      recordedFrom,
       physicalParent,
       physicalParentTarget:
         physical && rowKind(physical.node) === "placement"
           ? targetOf(physical.node)
           : undefined,
       physicalPeers: physical ? childRows(physical).map(occurrenceLine) : [],
-      sourceParent: fields.sourceParent,
-      sourceAncestors: sourceAncestors(source),
+    };
+    const origin: ComposedRow["origin"] = persisted
+      ? {
+          ...originFields,
+          kind: "written",
+          writable: writeLine !== undefined,
+        }
+      : { ...originFields, kind: "projected" };
+    return {
+      key,
+      identity: fields.identity,
+      id: line.node.id,
+      origin,
+      source: {
+        line: source,
+        parent: fields.sourceParent,
+        ancestors: sourceAncestors(source),
+        showing: fields.sourceShowing,
+      },
+      spans: fields.content.node.spans,
+      spanSource: fields.content.ref,
+      kind: rowKind(line.node),
+      target: targetOf(line.node),
       positionScope,
-      sourceShowing: fields.sourceShowing,
-      recordedFrom,
       position: positionNames(line.node),
       attachment: undefined,
       chain: fields.chain,
       text: fields.text,
       relevance: fields.relevance,
       argument: fields.argument,
+      ownRelevance: persisted?.node.relevance,
+      ownArgument: persisted?.node.argument,
       judgments: fields.judgments,
       flags: fields.flags,
       drift: fields.drift,
       children: fields.children,
-      writeLine,
-      writeTarget,
-      writeKind,
       editTarget:
         writeKind === "placement" && isCalendarEntryId(writeTarget)
           ? writeTarget
           : undefined,
-      writtenRelevance: persisted?.node.relevance,
-      writtenArgument: persisted?.node.argument,
+      effectiveParent: undefined,
       consumes: fields.consumes,
     };
   };
@@ -1264,14 +1432,14 @@ export function buildOccurrences(
     positionScope: string,
     withinProjection: boolean,
     physicalParent: NodeRef | undefined
-  ): [Occurrence, ResolvedNode[]] {
+  ): [ComposedRow, ResolvedNode[]] {
     const walk = (
       current: ResolvedNode,
       visited: ID[]
     ): {
       layers: ResolvedNode[];
       chain: ID[];
-      flags: Occurrence["flags"];
+      flags: ComposedRow["flags"];
       terminal: ResolvedNode | undefined;
       merged: ResolvedNode | undefined;
     } => {
@@ -1348,9 +1516,9 @@ export function buildOccurrences(
     const { merged } = walked;
     const bonds: {
       chain: ID[];
-      flags: Occurrence["flags"];
-      children: Occurrence[];
-      judgments: Occurrence["judgments"];
+      flags: ComposedRow["flags"];
+      children: ComposedRow[];
+      judgments: ComposedRow["judgments"];
       pending: ResolvedNode[];
       source: ResolvedNode;
     }[] = merged
@@ -1392,7 +1560,7 @@ export function buildOccurrences(
             children: bond.children,
             judgments: bond.judgments,
             pending,
-            source: bond.source,
+            source: bond.source.line,
           };
         })
       : [];
@@ -1426,7 +1594,7 @@ export function buildOccurrences(
         ? walked.layers.slice(0, -1)
         : walked.layers;
     const layered = [...delegated].reverse().reduce<{
-      children: Occurrence[];
+      children: ComposedRow[];
       pending: ResolvedNode[];
     }>(
       (state, layer) => {
@@ -1490,11 +1658,14 @@ export function buildOccurrences(
         ? { sourceId: source.ref.sourceId, id: source.node.parent }
         : undefined;
     return [
-      makeOccurrence(start, source, key, positionScope, physicalParent, {
+      makeComposedRow(start, source, key, positionScope, physicalParent, {
         chain: dedupe([
           ...walked.chain,
           ...bonds.flatMap((bond) => bond.chain),
         ]),
+        identity: isReaderLine(start)
+          ? nodeRefKey(start.ref)
+          : `${stableScopeKey(positionScope)}/${nodeRefKey(source.ref)}`,
         content: contentLine(contentSource, text),
         text,
         relevance: effective?.relevance,
@@ -1516,13 +1687,13 @@ export function buildOccurrences(
 
   function place(
     claim: ResolvedNode,
-    source: Occurrence,
+    source: ComposedRow,
     active: ID[],
     key: string,
     positionScope: string,
     withinProjection: boolean,
     physicalParent: NodeRef
-  ): [Occurrence, ResolvedNode[]] {
+  ): [ComposedRow, ResolvedNode[]] {
     const judgments = [
       ...(hasMarker(claim.node)
         ? [
@@ -1557,35 +1728,43 @@ export function buildOccurrences(
       claim.node.extraAttrs?.rewordedFrom !== undefined;
     const text = claimSpeaks ? effectiveText(claim.node) : source.text;
     return [
-      makeOccurrence(claim, source.source, key, positionScope, physicalParent, {
-        chain: [claim.node.id, ...source.chain],
-        content:
-          claimSpeaks || (target !== undefined && isCalendarEntryId(target))
-            ? contentLine(claim, text)
-            : source.content,
-        text,
-        relevance: effective?.relevance,
-        argument: effective?.argument,
-        judgments,
-        flags: [...source.flags],
-        drift,
-        children: layered[0],
-        sourceParent: source.sourceParent,
-        sourceShowing: source.key,
-        consumes: positionNames(claim.node).length === 0,
-      }),
+      makeComposedRow(
+        claim,
+        source.source.line,
+        key,
+        positionScope,
+        physicalParent,
+        {
+          chain: [claim.node.id, ...source.chain],
+          identity: source.identity,
+          content:
+            claimSpeaks || (target !== undefined && isCalendarEntryId(target))
+              ? contentLine(claim, text)
+              : composedContent(source),
+          text,
+          relevance: effective?.relevance,
+          argument: effective?.argument,
+          judgments,
+          flags: [...source.flags],
+          drift,
+          children: layered[0],
+          sourceParent: source.source.parent,
+          sourceShowing: source.key,
+          consumes: positionNames(claim.node).length === 0,
+        }
+      ),
       layered[1],
     ];
   }
 
   function applyLayer(
-    inner: Occurrence[],
+    inner: ComposedRow[],
     owner: ResolvedNode,
     active: ID[],
     ownerKey: string,
     positionScope: string,
     withinProjection: boolean
-  ): [Occurrence[], ResolvedNode[]] {
+  ): [ComposedRow[], ResolvedNode[]] {
     const layerClaims = childRows(owner).filter(
       (claim) => !absorbed.has(claim.node.id)
     );
@@ -1625,8 +1804,8 @@ export function buildOccurrences(
           : right.length - left.length
       );
     const groupedResult = groupedPaths.reduce<{
-      sequence: Occurrence[];
-      detached: Occurrence[];
+      sequence: ComposedRow[];
+      detached: ComposedRow[];
       pending: ResolvedNode[];
       consumed: string[];
     }>(
@@ -1651,7 +1830,7 @@ export function buildOccurrences(
             });
           return {
             claim,
-            source: secondaries.reduce<Occurrence>(
+            source: secondaries.reduce<ComposedRow>(
               (combined, secondary) => ({
                 ...combined,
                 children: [...combined.children, ...secondary.children],
@@ -1705,8 +1884,8 @@ export function buildOccurrences(
       )
     );
     const rest = matches.reduce<{
-      positioned: Occurrence[];
-      tail: Occurrence[];
+      positioned: ComposedRow[];
+      tail: ComposedRow[];
       pending: ResolvedNode[];
     }>(
       (state, entry, index) => {
@@ -1773,16 +1952,16 @@ export function buildOccurrences(
   );
 
   const insertPending = (
-    root: Occurrence,
+    root: ComposedRow,
     line: ResolvedNode,
-    row: Occurrence
-  ): Occurrence => {
+    row: ComposedRow
+  ): ComposedRow => {
     const parentId = line.node.parent;
     if (parentId === undefined) {
       return { ...root, children: [...root.children, row] };
     }
-    const insert = (parent: Occurrence): [Occurrence, boolean] => {
-      if (parent.id === parentId && parent.persisted !== undefined) {
+    const insert = (parent: ComposedRow): [ComposedRow, boolean] => {
+      if (parent.id === parentId && parent.origin.kind === "written") {
         const order =
           fileOrder.get(`${parentId}\0${line.node.id}`) ??
           Number.MAX_SAFE_INTEGER;
@@ -1803,7 +1982,7 @@ export function buildOccurrences(
           true,
         ];
       }
-      return parent.children.reduce<[Occurrence, boolean]>(
+      return parent.children.reduce<[ComposedRow, boolean]>(
         ([current, done], child) => {
           if (done) {
             return [current, true];
@@ -1830,40 +2009,40 @@ export function buildOccurrences(
       : { ...updated, children: [...updated.children, row] };
   };
 
-  const consumeOccurrence = (
-    tree: Occurrence,
+  const consumeComposedRow = (
+    tree: ComposedRow,
     occurrenceKey: string
-  ): Occurrence => {
+  ): ComposedRow => {
     const fresh = entriesOf(tree);
     const own = fresh.find((entry) => entry.row.key === occurrenceKey);
     if (
       !own ||
-      own.row.persisted === undefined ||
+      own.row.origin.kind !== "written" ||
       own.row.target === undefined ||
       (!own.row.consumes &&
         !(
-          own.row.sourceShowing !== undefined &&
-          own.row.line.node.extraAttrs?.from === undefined &&
+          own.row.source.showing !== undefined &&
+          own.row.origin.line.node.extraAttrs?.from === undefined &&
           own.row.position.length === 0
         ) &&
         !(
-          own.row.kind === "speaking" && own.row.sourceShowing !== undefined
+          own.row.kind === "speaking" && own.row.source.showing !== undefined
         )) ||
       (own.row.kind === "link" && isCalendarEntryId(own.row.target))
     ) {
       return tree;
     }
-    const from = own.row.line.node.extraAttrs?.from;
-    const sourceTarget = targetOf(own.row.line.node);
+    const from = own.row.origin.line.node.extraAttrs?.from;
+    const sourceTarget = targetOf(own.row.origin.line.node);
     const shownSource =
-      own.row.sourceShowing === undefined
+      own.row.source.showing === undefined
         ? undefined
         : fresh.find(
-            (candidate) => candidate.row.key === own.row.sourceShowing
+            (candidate) => candidate.row.key === own.row.source.showing
           );
     const sourceMoved =
       own.row.position.length > 0 &&
-      own.row.physicalParent?.id !== own.row.sourceParent?.id;
+      own.row.origin.physicalParent?.id !== own.row.source.parent?.id;
     const inFromScope = (
       candidate: ReturnType<typeof entriesOf>[number]
     ): boolean =>
@@ -1882,7 +2061,7 @@ export function buildOccurrences(
       (from === undefined || inFromScope(shownSource))
         ? shownSource
         : undefined;
-    const inOccurrenceScope = (
+    const inComposedRowScope = (
       candidate: ReturnType<typeof entriesOf>[number]
     ): boolean => {
       if (from !== undefined) {
@@ -1891,7 +2070,7 @@ export function buildOccurrences(
       const readerAncestors =
         own.row.position.length > 0
           ? own.readerAncestors.filter(
-              (id) => id !== own.row.physicalParent?.id
+              (id) => id !== own.row.origin.physicalParent?.id
             )
           : own.readerAncestors;
       return readerAncestors.every(
@@ -1902,10 +2081,10 @@ export function buildOccurrences(
       ? [sameShowing]
       : fresh.filter(
           (candidate) =>
-            candidate.row.persisted === undefined &&
+            candidate.row.origin.kind === "projected" &&
             candidate.row.id === sourceTarget &&
             candidate.row.key !== own.row.key &&
-            inOccurrenceScope(candidate)
+            inComposedRowScope(candidate)
         );
     const candidate = candidates.length === 1 ? candidates[0] : undefined;
     if (!candidate) {
@@ -1914,15 +2093,16 @@ export function buildOccurrences(
     const removed = removeByKey(tree, candidate.row.key);
     return updateByKey(removed, own.row.key, (row) => ({
       ...row,
-      sourceShowing: candidate.row.key,
+      identity: candidate.row.identity,
+      source: { ...row.source, showing: candidate.row.key },
     }));
   };
 
   const drain = (
-    tree: Occurrence,
+    tree: ComposedRow,
     queue: ResolvedNode[],
     index: number
-  ): Occurrence => {
+  ): ComposedRow => {
     const [line, ...remaining] = queue;
     if (!line) {
       return tree;
@@ -1936,8 +2116,9 @@ export function buildOccurrences(
         ? undefined
         : entriesOf(tree).find(
             (entry) =>
-              entry.row.persisted !== undefined &&
-              (entry.row.id === from || entry.row.line.node.parent === from)
+              entry.row.origin.kind === "written" &&
+              (entry.row.id === from ||
+                entry.row.origin.line.node.parent === from)
           );
     const fromTarget = fromEntry?.row.target;
     const fromSource =
@@ -1947,7 +2128,7 @@ export function buildOccurrences(
             (entry) =>
               fromEntry !== undefined &&
               isPathPrefix(fromEntry.path, entry.path) &&
-              entry.row.persisted === undefined &&
+              entry.row.origin.kind === "projected" &&
               (entry.row.id === fromTarget ||
                 entry.row.chain.includes(fromTarget))
           )?.row;
@@ -1964,15 +2145,15 @@ export function buildOccurrences(
           line.node.parent === undefined
             ? undefined
             : entriesOf(tree).find(
-                (entry) => entry.row.persisted?.node.id === line.node.parent
+                (entry) => writtenLine(entry.row)?.node.id === line.node.parent
               );
         const nestedProjection = physicalParent
-          ? projects(tree.line.node) ||
+          ? projects(tree.origin.line.node) ||
             entriesOf(tree).some(
               (entry) =>
                 entry.path.length < physicalParent.path.length &&
                 isPathPrefix(entry.path, physicalParent.path) &&
-                projects(entry.row.line.node)
+                projects(entry.row.origin.line.node)
             )
           : false;
         const destinationScope =
@@ -1991,24 +2172,24 @@ export function buildOccurrences(
             : rootRef
         );
         const restoredKey =
-          source.persisted?.node.id === line.node.id
-            ? source.sourceShowing
+          writtenLine(source)?.node.id === line.node.id
+            ? source.source.showing
             : undefined;
         if (restoredKey !== undefined) {
           const restored = resolveLine(
-            source.source,
+            source.source.line,
             source.chain,
             restoredKey,
             source.positionScope,
             true,
-            source.sourceParent
+            source.source.parent
           );
           const restoredTree = {
             ...tree,
             children: replace(tree.children, sourcePath, [restored[0]]),
           };
           const inserted = insertPending(restoredTree, line, placed[0]);
-          return consumeOccurrence(
+          return consumeComposedRow(
             drain(
               inserted,
               [...remaining, ...restored[1], ...placed[1]],
@@ -2019,11 +2200,11 @@ export function buildOccurrences(
         }
         const movedOverlay =
           rowKind(line.node) !== "placement" &&
-          source.persisted === undefined &&
+          source.origin.kind === "projected" &&
           line.node.parent !== undefined &&
           entriesOf(tree).some(
             (entry) =>
-              entry.row.persisted?.node.id === line.node.parent &&
+              writtenLine(entry.row)?.node.id === line.node.parent &&
               !isPathPrefix(entry.path, sourcePath)
           );
         if (movedOverlay) {
@@ -2032,7 +2213,7 @@ export function buildOccurrences(
             children: replace(tree.children, sourcePath, [source]),
           };
           const inserted = insertPending(restoredTree, line, placed[0]);
-          return consumeOccurrence(
+          return consumeComposedRow(
             drain(inserted, [...remaining, ...placed[1]], index + 1),
             placed[0].key
           );
@@ -2041,7 +2222,7 @@ export function buildOccurrences(
           ...tree,
           children: replace(tree.children, sourcePath, [placed[0]]),
         };
-        return consumeOccurrence(
+        return consumeComposedRow(
           drain(replaced, [...remaining, ...placed[1]], index + 1),
           placed[0].key
         );
@@ -2058,41 +2239,44 @@ export function buildOccurrences(
         : undefined
     );
     const inserted = insertPending(tree, line, fallback[0]);
-    return consumeOccurrence(
+    return consumeComposedRow(
       drain(inserted, [...remaining, ...fallback[1]], index + 1),
       fallback[0].key
     );
   };
 
-  const resolveAttachments = (tree: Occurrence): Occurrence => {
+  const resolveAttachments = (tree: ComposedRow): ComposedRow => {
     const occurrenceKeys = entriesOf(tree)
       .filter(
         (entry) =>
-          entry.row.persisted !== undefined && entry.row.target !== undefined
+          entry.row.origin.kind === "written" && entry.row.target !== undefined
       )
       .map((entry) => entry.row.key);
-    const consumed = occurrenceKeys.reduce(consumeOccurrence, tree);
+    const consumed = occurrenceKeys.reduce(consumeComposedRow, tree);
     return resolvePositions(consumed);
   };
 
   const assignRelationships = (
-    row: Occurrence,
-    writeParent: Occurrence,
-    parent: Occurrence | undefined
-  ): Occurrence => {
-    const childParent = row.persisted ? row : writeParent;
+    row: ComposedRow,
+    writeParent: ComposedRow,
+    parent: ComposedRow | undefined
+  ): ComposedRow => {
+    const childParent = row.origin.kind === "written" ? row : writeParent;
     return {
       ...row,
-      writeParent: writeParent.id,
-      writeParentTarget:
-        writeParent.kind === "placement" ? writeParent.target : undefined,
-      writeChildren: childRows(writeParent.line).map(occurrenceLine),
-      writeRoot: undefined,
-      writeFrom:
-        row.recordedFrom ??
-        row.writeFrom ??
-        (row.persisted ? undefined : writeParent.id),
-      parentLine: parent?.line,
+      origin: {
+        ...row.origin,
+        writeParent: writeParent.id,
+        writeParentTarget:
+          writeParent.kind === "placement" ? writeParent.target : undefined,
+        writeChildren: childRows(writeParent.origin.line).map(occurrenceLine),
+        writeRoot: undefined,
+        writeFrom:
+          row.origin.recordedFrom ??
+          row.origin.writeFrom ??
+          (row.origin.kind === "written" ? undefined : writeParent.id),
+      },
+      effectiveParent: parent?.origin.line,
       children: row.children.map((child) =>
         assignRelationships(child, childParent, row)
       ),
@@ -2101,14 +2285,94 @@ export function buildOccurrences(
 
   const composed = drain(resolved[0], resolved[1], 0);
   const positioned = resolveAttachments(composed);
-  const root = assignRelationships(positioned, positioned, undefined);
-
-  return { root };
+  const related = assignRelationships(positioned, positioned, undefined);
+  const occurrences = [
+    { row: related, path: "" },
+    ...entriesOf(related).map((entry) => ({
+      row: entry.row,
+      path: entry.path.join("."),
+    })),
+  ];
+  const candidateIdentity = (row: ComposedRow): string => row.identity;
+  const attachmentIdentity = (row: ComposedRow): string =>
+    `${candidateIdentity(row)}/${nodeRefKey(
+      row.effectiveParent?.ref ?? row.origin.line.ref
+    )}`;
+  const groups = occurrences.reduce((result, entry) => {
+    const candidate = candidateIdentity(entry.row);
+    const group = result.get(candidate) ?? [];
+    result.set(candidate, [...group, entry]);
+    return result;
+  }, new globalThis.Map<string, { row: ComposedRow; path: string }[]>());
+  const canonicalPaths = new globalThis.Map(
+    [...groups.entries()].map(([candidate, entries]) => {
+      const projected = entries.filter(
+        (entry) => entry.row.source.showing !== undefined
+      );
+      const candidates = projected.length > 0 ? projected : entries;
+      const canonical = [...candidates].sort((left, right) => {
+        const byAttachment = attachmentIdentity(left.row).localeCompare(
+          attachmentIdentity(right.row)
+        );
+        const byKey = left.row.key.localeCompare(right.row.key);
+        return byAttachment || byKey || left.path.localeCompare(right.path);
+      })[0];
+      return [candidate, canonical.path];
+    })
+  );
+  const attachmentCounts = occurrences.reduce((counts, entry) => {
+    const candidate = candidateIdentity(entry.row);
+    if (canonicalPaths.get(candidate) === entry.path) {
+      return counts;
+    }
+    const attachment = attachmentIdentity(entry.row);
+    counts.set(attachment, (counts.get(attachment) ?? 0) + 1);
+    return counts;
+  }, new globalThis.Map<string, number>());
+  const identify = (row: ComposedRow, path: string): ComposedRow => {
+    const candidate = candidateIdentity(row);
+    const attachment = attachmentIdentity(row);
+    const identity = (() => {
+      if (canonicalPaths.get(candidate) === path) {
+        return `source:${candidate}`;
+      }
+      return attachmentCounts.get(attachment) === 1
+        ? `attachment:${attachment}`
+        : `attachment:${row.key}:${path}`;
+    })();
+    return {
+      ...row,
+      identity,
+      children: row.children.map((child, index) =>
+        identify(child, path === "" ? `${index}` : `${path}.${index}`)
+      ),
+    };
+  };
+  const root = identify(related, "");
+  const scanShapes = (row: ResolvedNode): CompositionResult["diagnostics"] => [
+    ...(row.node.extraAttrs?.embed === "true" && !projects(row.node)
+      ? [
+          {
+            code: "invalid-embed-shape",
+            rowId: row.node.id,
+            details: undefined,
+          },
+        ]
+      : []),
+    ...childRows(row).flatMap(scanShapes),
+  ];
+  const diagnostics = dedupeDiagnostics([
+    ...collectDiagnostics(root),
+    ...scanShapes(rootResolved),
+    ...(baseRoot ? scanShapes(baseRoot) : []),
+  ]);
+  return { root, claims, diagnostics };
 }
 
-export function treeFromOccurrences(result: OccurrenceGraph): string {
-  const render = (row: Occurrence, depth: number): string[] => {
-    const identity = row.persisted ? `id:${row.id}` : `base:${row.id}`;
+export function treeFromComposition(result: CompositionResult): string {
+  const render = (row: ComposedRow, depth: number): string[] => {
+    const identity =
+      row.origin.kind === "written" ? `id:${row.id}` : `base:${row.id}`;
     const flags = [...row.flags]
       .sort()
       .map((flag) => ` flag:${flag}`)

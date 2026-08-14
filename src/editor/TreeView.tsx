@@ -433,8 +433,9 @@ function Tree(): JSX.Element | null {
       return;
     }
     const byViewKey = rowFocusIntent.viewKey
-      ? treeRoot.querySelector(
-          `[data-row-focusable="true"][data-view-key="${rowFocusIntent.viewKey}"]`
+      ? [...treeRoot.querySelectorAll('[data-row-focusable="true"]')].find(
+          (candidate) =>
+            candidate.getAttribute("data-view-key") === rowFocusIntent.viewKey
         )
       : null;
     const byNodeId = rowFocusIntent.nodeId

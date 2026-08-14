@@ -2,7 +2,7 @@ import fs from "fs";
 import pathModule from "path";
 import { Map as ImmutableMap } from "immutable";
 import { parseToDocumentPreservingExplicitIds } from "./core/Document";
-import { buildOccurrences, treeFromOccurrences } from "./core/composition";
+import { composeNote, treeFromComposition } from "./core/composition";
 import { graphLookupFromData } from "./core/graphLookup";
 import { createEmptyGraphIndex } from "./graphIndex";
 import { LOCAL } from "./core/nodeRef";
@@ -84,7 +84,7 @@ test.each(compositionFixtures)(
       graphIndex: createEmptyGraphIndex(),
     });
 
-    const result = buildOccurrences(graph, {
+    const result = composeNote(graph, {
       sourceId: LOCAL,
       id: document.topNodeShortIds[0],
     });
@@ -93,6 +93,40 @@ test.each(compositionFixtures)(
       pathModule.join(fixturePath, "expected.tree"),
       "utf8"
     );
-    expect(treeFromOccurrences(result)).toEqual(expected);
+    expect(treeFromComposition(result)).toEqual(expected);
+
+    const collectRows = (row: typeof result.root): typeof result.root[] => [
+      row,
+      ...row.children.flatMap(collectRows),
+    ];
+    collectRows(result.root).forEach((row) => {
+      expect(row.origin.line.node.id).toBe(row.id);
+      if (row.origin.kind === "written") {
+        expect(diffNodes.has(row.id)).toBe(true);
+      }
+      row.flags.forEach((code) => {
+        expect(result.diagnostics).toContainEqual({
+          code,
+          rowId: row.id,
+          details: undefined,
+        });
+      });
+      if (row.drift) {
+        expect(result.diagnostics).toContainEqual({
+          code: "drift",
+          rowId: row.id,
+          details: row.drift,
+        });
+      }
+    });
+
+    const root = diffNodes.get(document.topNodeShortIds[0]);
+    const collectClaimIDs = (parent: GraphNode): ID[] =>
+      parent.children.toArray().flatMap((id) => {
+        const child = diffNodes.get(id);
+        return child ? [id, ...collectClaimIDs(child)] : [];
+      });
+    const claimIDs = root ? collectClaimIDs(root) : [];
+    expect(result.claims.map((claim) => claim.id)).toEqual(claimIDs);
   }
 );

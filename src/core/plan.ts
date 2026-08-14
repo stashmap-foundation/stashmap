@@ -11,7 +11,7 @@ import type {
   RefTargetSeed,
   TextSeed,
 } from "./connections";
-import type { Occurrence } from "./composition";
+import { ComposedRow, writableLine } from "./composition";
 import {
   createDocumentFromRootNode,
   Document,
@@ -393,26 +393,30 @@ export function createGraphPlan(props: CreateGraphPlanProps): GraphPlan {
   };
 }
 
-export function planTakeOccurrence<T extends GraphPlan>(
+export function planTakeComposedRow<T extends GraphPlan>(
   plan: T,
-  row: Occurrence
+  row: ComposedRow
 ): [T, GraphNode | undefined] {
-  const direct = row.writeLine
-    ? getWorkspaceNode(plan.knowledgeDBs, row.writeLine.node.id)
+  const line = writableLine(row);
+  const direct = line
+    ? getWorkspaceNode(plan.knowledgeDBs, line.node.id)
     : undefined;
   if (direct) {
     return [plan, direct];
   }
-  const existingParent = getWorkspaceNode(plan.knowledgeDBs, row.writeParent);
-  const parent = existingParent ?? row.writeRoot;
+  const existingParent = getWorkspaceNode(
+    plan.knowledgeDBs,
+    row.origin.writeParent
+  );
+  const parent = existingParent ?? row.origin.writeRoot;
   if (!parent) {
     return [plan, undefined];
   }
   const withParent = existingParent ? plan : planUpsertNodes(plan, parent);
-  if (!existingParent && row.writeRoot !== undefined) {
+  if (!existingParent && row.origin.writeRoot !== undefined) {
     return [withParent, parent];
   }
-  const target = row.writeTarget;
+  const target = row.origin.writeTarget;
   const [next, ids] = planAddTargetsToNode(
     withParent,
     parent.id,

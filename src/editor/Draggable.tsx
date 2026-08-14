@@ -8,6 +8,7 @@ import {
   useDisplayText,
   useIsViewingOtherUserContent,
   useRow,
+  viewPathToString,
 } from "../rowModel";
 import { useData } from "../DataContext";
 import { isEmptyNodeID } from "../core/connections";
@@ -23,12 +24,18 @@ import {
 import { isEditableElement, KeyboardMode } from "./keyboardNavigation";
 import { usePaneIndex } from "../SplitPanesContext";
 
-function markDragDescendants(sourceViewKey: string): void {
-  const prefix = `${sourceViewKey}:`;
-  document.querySelectorAll(".item").forEach((el) => {
-    const key = el.getAttribute("data-view-key");
-    if (key && key.startsWith(prefix)) {
-      el.classList.add("is-dragging-child");
+function markDragDescendants(source: Row, rows: List<Row>): void {
+  const descendants = new globalThis.Set(
+    rows
+      .slice(source.index + 1)
+      .takeWhile((row) => row.depth > source.depth)
+      .map((row) => row.viewKey)
+      .toArray()
+  );
+  document.querySelectorAll(".item").forEach((element) => {
+    const key = element.getAttribute("data-view-key");
+    if (key && descendants.has(key)) {
+      element.classList.add("is-dragging-child");
     }
   });
 }
@@ -83,7 +90,7 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
       type: NOTE_TYPE,
       item: () => {
         clearDropIndent();
-        markDragDescendants(rowViewKey);
+        markDragDescendants(row, rows);
         const draggedRows = selection.has(viewKey)
           ? rows
               .filter((candidate) => selection.has(candidate.viewKey))
@@ -149,6 +156,7 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
         className={`item ${isDragging ? "is-dragging" : ""}`}
         data-row-focusable="true"
         data-view-key={rowViewKey}
+        data-view-path={viewPathToString(row.viewPath)}
         data-row-index={rowIndex}
         data-row-depth={rowDepth}
         data-node-id={

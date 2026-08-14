@@ -5,9 +5,9 @@ import {
   addNodeToPathWithNodes,
   addNodesToLastElement,
   getParentView,
-  resolveRowView,
   isEmptyViewPathID,
   isFileRow,
+  viewKeyForIdentity,
   viewPathToString,
 } from "./rowModel";
 import {
@@ -39,9 +39,12 @@ import {
   lookupNode,
 } from "./core/graphLookup";
 import {
-  Occurrence,
-  buildOccurrences,
-  buildWriteRootOccurrence,
+  ComposedRow,
+  composeNote,
+  createWriteRootRow,
+  composedContent,
+  composedLine,
+  writtenLine,
 } from "./core/composition";
 
 export type TreeResult = {
@@ -168,19 +171,18 @@ function createRow(
           );
         })()
       : undefined;
-  const resolvedView = resolveRowView(data, viewPath, parentRow?.viewStateKey, [
-    viewPath[viewPath.length - 1] as ID,
-  ]);
+  const viewKey = viewPathToString(viewPath);
   return {
     viewPath,
-    viewKey: viewPathToString(viewPath),
-    viewStateKey: resolvedView.key,
+    viewKey,
     index: 0,
     depth: viewPath.length - 1,
     node,
     sourceId,
     ref: { sourceId, id: node.id },
-    view: resolvedView.view,
+    view: data.views.get(viewKey) ?? {
+      expanded: viewPath.length === 2 || isSearchId(nodeID),
+    },
     parentViewPath: parentRow?.viewPath ?? getParentView(viewPath),
     parentRef,
     parentNode,
@@ -193,12 +195,12 @@ function createRow(
   };
 }
 
-function locateOccurrence(root: Occurrence, id: ID): Occurrence | undefined {
+function locateComposedRow(root: ComposedRow, id: ID): ComposedRow | undefined {
   if (root.id === id) {
     return root;
   }
-  return root.children.reduce<Occurrence | undefined>(
-    (found, child) => found ?? locateOccurrence(child, id),
+  return root.children.reduce<ComposedRow | undefined>(
+    (found, child) => found ?? locateComposedRow(child, id),
     undefined
   );
 }
@@ -207,7 +209,7 @@ function occurrenceAt(
   graph: GraphLookup,
   segment: ID,
   sourceId: SourceId
-): Occurrence | undefined {
+): ComposedRow | undefined {
   if (isSearchId(segment) || isEmptyViewPathID(segment)) {
     return undefined;
   }
@@ -220,15 +222,15 @@ function occurrenceAt(
     id: resolved.node.root,
   });
   const rooted = root
-    ? locateOccurrence(buildOccurrences(graph, root.ref).root, segment)
+    ? locateComposedRow(composeNote(graph, root.ref).root, segment)
     : undefined;
-  return rooted ?? buildOccurrences(graph, resolved.ref).root;
+  return rooted ?? composeNote(graph, resolved.ref).root;
 }
 
-function occurrenceNode(occurrence: Occurrence): GraphNode {
+function occurrenceNode(occurrence: ComposedRow): GraphNode {
   return {
-    ...occurrence.line.node,
-    spans: occurrence.content.node.spans,
+    ...composedLine(occurrence).node,
+    spans: composedContent(occurrence).node.spans,
     relevance: occurrence.relevance,
     argument: occurrence.argument,
   };
@@ -236,23 +238,42 @@ function occurrenceNode(occurrence: Occurrence): GraphNode {
 
 function graphParent(
   graph: GraphLookup,
-  occurrence: Occurrence
+  occurrence: ComposedRow
 ): ResolvedNode | undefined {
-  const parent = occurrence.persisted
-    ? occurrence.physicalParent
-    : occurrence.sourceParent;
+  const parent =
+    occurrence.origin.kind === "written"
+      ? occurrence.origin.physicalParent
+      : occurrence.source.parent;
   return parent ? getNodeInSource(graph, parent) : undefined;
 }
 
 type RowBase = ReturnType<typeof createRow>;
 
-function attachOccurrence(row: RowBase, occurrence: Occurrence): Row {
+function occurrenceViewKey(
+  viewPath: ViewPath,
+  occurrence: ComposedRow
+): string {
+  return viewKeyForIdentity(
+    viewPath[0],
+    viewPath[1] ?? occurrence.id,
+    occurrence.identity
+  );
+}
+
+function attachComposedRow(
+  data: Data,
+  row: RowBase,
+  occurrence: ComposedRow
+): Row {
+  const viewKey = occurrenceViewKey(row.viewPath, occurrence);
   return {
     ...row,
+    viewKey,
+    view: data.views.get(viewKey) ?? row.view,
     rowType: "occurrence",
     node: occurrenceNode(occurrence),
-    ref: occurrence.line.ref,
-    sourceId: occurrence.line.ref.sourceId,
+    ref: composedLine(occurrence).ref,
+    sourceId: composedLine(occurrence).ref.sourceId,
     occurrence,
     incomingTarget: undefined,
     incomingParent: undefined,
@@ -263,7 +284,7 @@ function attachOccurrence(row: RowBase, occurrence: Occurrence): Row {
   };
 }
 
-function attachEmpty(row: RowBase, parent: Occurrence | undefined): Row {
+function attachEmpty(row: RowBase, parent: ComposedRow | undefined): Row {
   return {
     ...row,
     rowType: "empty",
@@ -291,16 +312,16 @@ function attachSearch(row: RowBase): Row {
   };
 }
 
-function rowFromOccurrence(
+function rowFromComposedRow(
   data: Data,
   graph: GraphLookup,
   parentRow: Row,
-  occurrence: Occurrence
+  occurrence: ComposedRow
 ): Row {
   const viewPath = appendNodeToPath(parentRow.viewPath, occurrence.id);
   const parent = graphParent(graph, occurrence);
   const childIndex =
-    occurrence.persisted && parent
+    writtenLine(occurrence) && parent
       ? parent.node.children.findIndex((id) => id === occurrence.id)
       : -1;
   const node = occurrenceNode(occurrence);
@@ -309,7 +330,7 @@ function rowFromOccurrence(
     graph,
     viewPath,
     node,
-    occurrence.line.ref.sourceId,
+    composedLine(occurrence).ref.sourceId,
     parentRow,
     parentRow.node,
     parentRow.ref,
@@ -317,15 +338,7 @@ function rowFromOccurrence(
     false,
     undefined
   );
-  const resolvedView = resolveRowView(data, viewPath, parentRow.viewStateKey, [
-    occurrence.id,
-    ...(occurrence.target !== undefined ? [occurrence.target] : []),
-  ]);
-  return {
-    ...attachOccurrence(row, occurrence),
-    view: resolvedView.view,
-    viewStateKey: resolvedView.key,
-  };
+  return attachComposedRow(data, row, occurrence);
 }
 
 function reindexRows(rows: List<Row>): List<Row> {
@@ -386,7 +399,7 @@ function resolveRowStep(
       ? parentRow.occurrence.children.find((child) => child.id === pathID)
       : occurrenceAt(graph, pathID, paneSourceId);
   if (occurrence && parentRow) {
-    return rowFromOccurrence(data, graph, parentRow, occurrence);
+    return rowFromComposedRow(data, graph, parentRow, occurrence);
   }
   if (occurrence) {
     const root = createRow(
@@ -394,7 +407,7 @@ function resolveRowStep(
       graph,
       viewPath,
       occurrenceNode(occurrence),
-      occurrence.line.ref.sourceId,
+      composedLine(occurrence).ref.sourceId,
       undefined,
       undefined,
       undefined,
@@ -402,7 +415,7 @@ function resolveRowStep(
       false,
       undefined
     );
-    return attachOccurrence(root, occurrence);
+    return attachComposedRow(data, root, occurrence);
   }
   if (segments.length === 1 && options?.projectedRoot?.id === pathID) {
     const row = createRow(
@@ -423,10 +436,8 @@ function resolveRowStep(
       parent: undefined,
       root: options.projectedRoot.id,
     };
-    return attachOccurrence(
-      row,
-      buildWriteRootOccurrence(rootNode, graph.localSourceId)
-    );
+    const rootComposedRow = createWriteRootRow(rootNode, graph.localSourceId);
+    return attachComposedRow(data, row, rootComposedRow);
   }
   if (
     pathID !== EMPTY_NODE_ID &&
@@ -715,7 +726,7 @@ function createVirtualRow(
       root: input.parentID,
       relevance: undefined,
     };
-    return buildWriteRootOccurrence(root, graph.localSourceId);
+    return createWriteRootRow(root, graph.localSourceId);
   })();
   return {
     ...row,
@@ -1035,14 +1046,14 @@ function getChildrenForRegularNode(
               .filter((child) =>
                 itemPassesFilters(
                   {
-                    ...child.line.node,
+                    ...composedLine(child).node,
                     relevance: child.relevance,
                     argument: child.argument,
                   },
                   activeFilters
                 )
               )
-              .map((child) => rowFromOccurrence(data, graph, parentRow, child))
+              .map((child) => rowFromComposedRow(data, graph, parentRow, child))
           )
         )
       : childRowPairs.map(({ row }) => row);
@@ -1057,7 +1068,7 @@ function getChildrenForRegularNode(
       : undefined;
   const isBarePastRow = (row: Row): boolean =>
     row.rowType === "occurrence" &&
-    row.occurrence.persisted === undefined &&
+    row.occurrence.origin.kind === "projected" &&
     isPastCalendarRowText(nodeText(row.node), Date.now());
   const hiddenPastCount =
     feedUrl === undefined ? 0 : combinedRows.filter(isBarePastRow).size;
@@ -1173,8 +1184,8 @@ function hasHiddenPastEntries(data: Data, row: Row): boolean {
     return false;
   }
   const childKeys = row.occurrence.children.flatMap((child) =>
-    child.persisted !== undefined &&
-    child.physicalParent?.id === row.occurrence.id
+    child.origin.kind === "written" &&
+    child.origin.physicalParent?.id === row.occurrence.id
       ? [child.target ?? child.id]
       : []
   );

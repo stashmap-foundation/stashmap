@@ -1126,9 +1126,9 @@ function getDropDepthLimitsForRows(
     ? Number(nextRow.getAttribute("data-row-depth"))
     : undefined;
   const nextViewPathStr = nextRow
-    ? nextRow.getAttribute("data-view-key") ?? undefined
+    ? nextRow.getAttribute("data-view-path") ?? undefined
     : undefined;
-  const sourcePathStr = sourceRow.getAttribute("data-view-key") ?? undefined;
+  const sourcePathStr = sourceRow.getAttribute("data-view-path") ?? undefined;
 
   const rootDepth = Math.min(
     ...allRows.map((r) => Number(r.getAttribute("data-row-depth")))

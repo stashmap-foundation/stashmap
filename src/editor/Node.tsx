@@ -10,10 +10,11 @@ import {
   useNodeIndex,
   useDisplayText,
   useIsViewingOtherUserContent,
+  viewKeyForIdentity,
   viewPathToString,
   useCurrentNode,
   useRow,
-  updateView,
+  updateRowView,
   addNodesToLastElement,
   getPreviousSiblingFromRows,
   getVisibleParentRow,
@@ -48,16 +49,21 @@ import { linkStyleForHref } from "./editorDom";
 import { useOnToggleExpanded } from "./SelectNodes";
 import { useApis } from "../Apis";
 import { useData } from "../DataContext";
-import { planTakeOccurrence } from "../core/plan";
+import { planTakeComposedRow } from "../core/plan";
+import {
+  composedContent,
+  composedLine,
+  writtenLine,
+} from "../core/composition";
 import { getWorkspaceNode } from "../core/knowledge";
 import {
   Plan,
   applyGesture,
   usePlanner,
   planSetEmptyNodePosition,
-  planSaveOccurrence,
+  planSaveComposedRow,
   planSaveVirtualNode,
-  planExpandNode,
+  planExpandRow,
   planUpdateViews,
   planRemoveEmptyNodePosition,
   planSetRowFocusIntent,
@@ -151,7 +157,7 @@ function PastDatesActionRow(): JSX.Element {
     executePlan(
       planUpdateViews(
         createPlan(),
-        updateView(data.views, row.viewPath, {
+        updateRowView(data.views, row, {
           ...row.view,
           showPastEntries: !showPast,
         })
@@ -500,7 +506,8 @@ function NodeContent(): JSX.Element {
   const displayText = useDisplayText();
 
   if (row.rowType === "occurrence") {
-    const { content, line } = row.occurrence;
+    const content = composedContent(row.occurrence);
+    const line = composedLine(row.occurrence);
     const reciprocal = reciprocalLinks(data, line.node, line.ref.sourceId)[0];
     if (!hasInlineLinks(content.node) && reference) {
       return <ReferenceContent reference={reference} />;
@@ -575,23 +582,35 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
     isEmptyNode && (isRootEmptyNode || emptyData?.paneIndex === paneIndex);
   const escapeFocusPendingRef = React.useRef(false);
 
-  const planWithRowFocusIntent = (plan: Plan, targetViewPath: ViewPath): Plan =>
+  const planWithRowFocusIntent = (
+    plan: Plan,
+    targetViewPath: ViewPath,
+    nodeId: ID
+  ): Plan =>
     planSetRowFocusIntent(plan, {
       paneIndex,
-      viewKey: viewPathToString(targetViewPath),
+      viewKey:
+        row.rowType === "occurrence"
+          ? row.viewKey
+          : viewKeyForIdentity(
+              paneIndex,
+              targetViewPath[1] ?? nodeId,
+              `source:${nodeRefKey({ sourceId: LOCAL, id: nodeId })}`
+            ),
+      nodeId,
     });
 
   const occurrence = row.rowType === "occurrence" ? row.occurrence : undefined;
   const feedUrl = occurrence
     ? calendarFeedTargetUrl(occurrence.target) ??
-      calendarFeedUrl(occurrence.content.node)
+      calendarFeedUrl(composedContent(occurrence).node)
     : calendarFeedUrl(currentNode);
   const calendarContent =
     feedUrl !== undefined || occurrence?.editTarget !== undefined;
   const rewordEditing =
     !calendarContent &&
     occurrence !== undefined &&
-    (occurrence.persisted === undefined ||
+    (writtenLine(occurrence) === undefined ||
       ((occurrence.kind === "placement" || occurrence.kind === "speaking") &&
         occurrence.target !== undefined &&
         classifyLinkHref(`#${occurrence.target}`) === "node"));
@@ -610,7 +629,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       (span) => !(span.kind === "link" && span.struck === true)
     );
   })();
-  const linkLine = occurrence?.line;
+  const linkLine = occurrence ? composedLine(occurrence) : undefined;
   const linkNode = linkLine?.node ?? row.node;
   const linkSourceId = linkLine?.ref.sourceId ?? row.sourceId;
   const reciprocals = reciprocalLinks(data, linkNode, linkSourceId);
@@ -666,10 +685,13 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       ) {
         if (
           submitted &&
-          occurrence.writeRoot !== undefined &&
+          occurrence.origin.writeRoot !== undefined &&
           !getWorkspaceNode(createPlan().knowledgeDBs, occurrence.id)
         ) {
-          const [withRoot, root] = planTakeOccurrence(createPlan(), occurrence);
+          const [withRoot, root] = planTakeComposedRow(
+            createPlan(),
+            occurrence
+          );
           if (root) {
             await executePlan(
               planSetEmptyNodePosition(
@@ -677,6 +699,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
                 root.id,
                 row.view,
                 viewPath,
+                row.viewKey,
                 paneIndex,
                 0
               )
@@ -685,7 +708,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
         }
         return;
       }
-      const [takenPlan, takenNode] = planTakeOccurrence(
+      const [takenPlan, takenNode] = planTakeComposedRow(
         createPlan(),
         occurrence
       );
@@ -708,6 +731,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
           parentNode.id,
           visibleParent.view,
           parentPath,
+          visibleParent.viewKey,
           paneIndex,
           takenIndex + 1
         )
@@ -720,7 +744,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       viewPath: updatedViewPath,
       node: savedNode,
     } = occurrence
-      ? planSaveOccurrence(initialPlan, nextSpans, occurrence, viewPath)
+      ? planSaveComposedRow(initialPlan, nextSpans, occurrence, viewPath)
       : planSaveVirtualNode(
           initialPlan,
           nextSpans,
@@ -733,7 +757,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
           paneIndex
         );
     const planWithEscFocus = escapeFocusPendingRef.current
-      ? planWithRowFocusIntent(basePlan, updatedViewPath)
+      ? planWithRowFocusIntent(basePlan, updatedViewPath, savedNode.id)
       : basePlan;
     // eslint-disable-next-line functional/immutable-data
     escapeFocusPendingRef.current = false;
@@ -749,6 +773,14 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
           parentNode: savedNode,
           parentView: row.view,
           parentViewPath: updatedViewPath,
+          parentViewKey:
+            row.rowType === "occurrence"
+              ? row.viewKey
+              : viewKeyForIdentity(
+                  paneIndex,
+                  updatedViewPath[1] ?? savedNode.id,
+                  `source:${nodeRefKey({ sourceId: LOCAL, id: savedNode.id })}`
+                ),
           insertAt: 0,
         };
       }
@@ -769,6 +801,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
         parentNode,
         parentView: parentRow.view,
         parentViewPath: parentRow.viewPath,
+        parentViewKey: parentRow.viewKey,
         insertAt,
       };
     })();
@@ -783,6 +816,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       nextPosition.parentNode.id,
       nextPosition.parentView,
       nextPosition.parentViewPath,
+      nextPosition.parentViewKey,
       paneIndex,
       nextPosition.insertAt
     );
@@ -802,25 +836,18 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
         : basePlan;
       if (trimmedText) {
         executePlan(
-          applyGesture(
-            planExpandNode(
-              planWithoutEmpty,
-              prevSibling.view,
-              prevSibling.viewPath
-            ),
-            {
-              kind: "add",
-              parent: prevSibling.occurrence,
-              spans: persistedSpans(spans),
-              at: undefined,
-              relevance: undefined,
-              argument: undefined,
-            }
-          )
+          applyGesture(planExpandRow(planWithoutEmpty, prevSibling), {
+            kind: "add",
+            parent: prevSibling.occurrence,
+            spans: persistedSpans(spans),
+            at: undefined,
+            relevance: undefined,
+            argument: undefined,
+          })
         );
         return;
       }
-      const [planMaterialized, takenPrevSibling] = planTakeOccurrence(
+      const [planMaterialized, takenPrevSibling] = planTakeComposedRow(
         planWithoutEmpty,
         prevSibling.occurrence
       );
@@ -831,10 +858,11 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       );
       executePlan(
         planSetEmptyNodePosition(
-          planExpandNode(planMaterialized, prevSibling.view, takenViewPath),
+          planExpandRow(planMaterialized, prevSibling),
           takenPrevSibling.id,
           prevSibling.view,
           takenViewPath,
+          prevSibling.viewKey,
           paneIndex,
           0
         )
@@ -867,7 +895,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
         : basePlan;
 
       if (!trimmedText) {
-        const [withGrandParent, grandParent] = planTakeOccurrence(
+        const [withGrandParent, grandParent] = planTakeComposedRow(
           planWithoutEmpty,
           grandParentRow.occurrence
         );
@@ -878,6 +906,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
             grandParent.id,
             grandParentRow.view,
             grandParentRow.viewPath,
+            grandParentRow.viewKey,
             paneIndex,
             parentNodeIndex + 1
           )
@@ -940,7 +969,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
   ): void => {
     const { plan: basePlan, node: savedNode } =
       row.rowType === "occurrence"
-        ? planSaveOccurrence(
+        ? planSaveComposedRow(
             createPlan(),
             persistedSpans(currentSpans),
             row.occurrence,

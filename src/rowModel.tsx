@@ -37,13 +37,20 @@ export function isFileRow(row: Pick<Row, "virtualType">): boolean {
   return row.virtualType === undefined;
 }
 
+export function viewPathContains(parent: ViewPath, child: ViewPath): boolean {
+  return (
+    parent.length <= child.length &&
+    parent.every((segment, index) => child[index] === segment)
+  );
+}
+
 export function getIndependentRows(rows: Row[]): Row[] {
   return rows.filter(
     (row) =>
       !rows.some(
         (other) =>
           row.viewKey !== other.viewKey &&
-          row.viewKey.startsWith(`${other.viewKey}:`)
+          viewPathContains(other.viewPath, row.viewPath)
       )
   );
 }
@@ -102,11 +109,11 @@ export function getPreviousSiblingFromRows(
 const EMPTY_VIEW_PATH_PREFIX = "empty-row:";
 
 function encodePathID(id: string): string {
-  return id.replace(/:/g, "%3A");
+  return encodeURIComponent(id);
 }
 
 function decodePathID(encoded: string): string {
-  return encoded.replace(/%3A/g, ":");
+  return decodeURIComponent(encoded);
 }
 
 function createEmptyViewPathID(nodeID: ID): string {
@@ -151,6 +158,14 @@ export function viewPathToString(viewContext: ViewPath): string {
   return `p${paneIndex}:${pathPart}`;
 }
 
+export function viewKeyForIdentity(
+  paneIndex: number,
+  context: ID,
+  identity: string
+): string {
+  return viewPathToString([paneIndex, context, identity]);
+}
+
 export function isRoot(viewPath: ViewPath): boolean {
   return viewPath.length === 2;
 }
@@ -184,40 +199,6 @@ export function getPaneRootItemID(pane: Pane): ID {
   );
 }
 
-export function resolveRowView(
-  data: Data,
-  path: ViewPath,
-  parentStateKey: string | undefined,
-  candidates: ID[]
-): { view: View; key: string } {
-  const exactParent = getParentView(path);
-  const parentKeys = [
-    ...(exactParent ? [viewPathToString(exactParent)] : []),
-    ...(parentStateKey !== undefined ? [parentStateKey] : []),
-  ].filter((key, index, keys) => keys.indexOf(key) === index);
-  const prefixes =
-    parentKeys.length > 0 ? parentKeys : [`p${getPaneIndex(path)}`];
-  const keys = prefixes.flatMap((prefix) =>
-    candidates.map((candidate) => `${prefix}:${encodePathID(candidate)}`)
-  );
-  const found = keys.reduce<{ view: View; key: string } | undefined>(
-    (hit, key) => {
-      if (hit) {
-        return hit;
-      }
-      const view = data.views.get(key);
-      return view ? { view, key } : undefined;
-    },
-    undefined
-  );
-  return (
-    found ?? {
-      view: getDefaultView(candidates[0], isRoot(path)),
-      key: keys[0],
-    }
-  );
-}
-
 export function buildPaneTarget(data: Data, row: Row): EditorNavigationTarget {
   const occurrence = row.rowType === "occurrence" ? row.occurrence : undefined;
   const composedPlacement =
@@ -237,7 +218,7 @@ export function buildPaneTarget(data: Data, row: Row): EditorNavigationTarget {
   const targetSourceId =
     terminalTarget === undefined
       ? row.sourceId
-      : occurrence?.sourceParent?.sourceId ?? row.sourceId;
+      : occurrence?.source.parent?.sourceId ?? row.sourceId;
   const resolvedTarget = terminalTarget
     ? lookupNode(graphLookupFromData(data), terminalTarget, targetSourceId)
     : undefined;
@@ -371,62 +352,29 @@ export function useIsRoot(): boolean {
   return useRow().depth === 1;
 }
 
-export function updateView(views: Views, path: ViewPath, view: View): Views {
-  const key = viewPathToString(path);
-  const nodeID = getLast(path);
-  const defaultView = getDefaultView(nodeID, isRoot(path));
+export function updateViewKey(
+  views: Views,
+  key: string,
+  nodeID: ID,
+  root: boolean,
+  view: View
+): Views {
+  const defaultView = getDefaultView(nodeID, root);
   const isDefault =
     view.expanded === defaultView.expanded &&
     !view.typeFilters &&
     !view.showPastEntries;
-  if (isDefault) {
-    return views.delete(key);
-  }
-  return views.set(key, view);
+  return isDefault ? views.delete(key) : views.set(key, view);
 }
 
-export function copyViewsWithNewPrefix(
-  views: Views,
-  sourceKey: string,
-  targetKey: string
-): Views {
-  const viewsToCopy = views.filter(
-    (_, k) => k.startsWith(`${sourceKey}:`) || k === sourceKey
+export function updateRowView(views: Views, row: Row, view: View): Views {
+  return updateViewKey(
+    views,
+    row.viewKey,
+    row.node.id,
+    isRoot(row.viewPath),
+    view
   );
-  return viewsToCopy.reduce((acc, view, key) => {
-    const newKey = targetKey + key.slice(sourceKey.length);
-    return acc.set(newKey, view);
-  }, views);
-}
-
-function pathContainsSubpath(
-  path: ViewPath,
-  subpath: ViewPathSegment[]
-): boolean {
-  if (subpath.length === 0 || path.length - 1 < subpath.length) {
-    return false;
-  }
-  const segments = path.slice(1) as ViewPathSegment[];
-  return segments.some((_, index) =>
-    subpath.every((segment, offset) => segments[index + offset] === segment)
-  );
-}
-
-export function updateViewPathsAfterDisconnect(
-  views: Views,
-  disconnectNode: ID,
-  fromNode: ID
-): Views {
-  return views.filterNot((_, key) => {
-    try {
-      return pathContainsSubpath(parseViewPath(key), [
-        fromNode,
-        disconnectNode,
-      ]);
-    } catch {
-      return false;
-    }
-  });
 }
 
 export function updateViewPathsAfterPaneDelete(

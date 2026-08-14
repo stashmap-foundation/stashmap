@@ -111,6 +111,10 @@ test.each(compositionFixtures)(
       showGutter: true,
       withoutReferenceRows: true,
     });
+    const viewKeys = screen
+      .getAllByRole("treeitem")
+      .map((row) => row.getAttribute("data-view-key"));
+    expect(new globalThis.Set(viewKeys).size).toBe(viewKeys.length);
   }
 );
 

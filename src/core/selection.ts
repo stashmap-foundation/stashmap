@@ -53,10 +53,3 @@ export function clearSelection(
     anchor: state.anchor,
   };
 }
-
-export function deselectAllChildren(
-  selection: OrderedSet<string>,
-  viewKey: string
-): OrderedSet<string> {
-  return selection.filterNot((sel) => sel.startsWith(viewKey));
-}

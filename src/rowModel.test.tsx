@@ -5,7 +5,6 @@ import { ALICE, setup, expectTree, renderTree, type } from "./utils.test";
 import {
   parseViewPath,
   viewPathToString,
-  updateViewPathsAfterDisconnect,
   updateViewPathsAfterPaneDelete,
   updateViewPathsAfterPaneInsert,
   ViewPath,
@@ -89,46 +88,6 @@ My Notes
       Java
     FPL
   `);
-});
-
-test("Alter View paths after disconnect", () => {
-  const views = Map<string, { e: string }>({
-    "p0:root:r:n": { e: "delete" },
-    "p0:root:r:n:child": { e: "delete" },
-    "p0:root:r:keep": { e: "p0:root:r:keep" },
-    "p0:root2:r:nested:r:n": { e: "delete" },
-    "p0:root2:r:other": { e: "p0:root2:r:other" },
-  });
-  const updatedViews = updateViewPathsAfterDisconnect(
-    views as unknown as Views,
-    "n" as ID,
-    "r" as ID
-  );
-
-  const expectedResult = views
-    .filter((v) => v.e !== "delete")
-    .mapEntries((e) => [e[1].e, e[1]]);
-  expect(updatedViews.keySeq().toJS()).toEqual(expectedResult.keySeq().toJS());
-});
-
-test("Alter View paths after disconnect with pane-prefixed paths", () => {
-  const views = Map<string, { e: string }>({
-    "p0:root:r:n": { e: "delete" },
-    "p0:root:r:n:child": { e: "delete" },
-    "p0:root:r:keep": { e: "p0:root:r:keep" },
-    "p1:root:r:n": { e: "delete" },
-    "p1:root:r:other": { e: "p1:root:r:other" },
-  });
-  const updatedViews = updateViewPathsAfterDisconnect(
-    views as unknown as Views,
-    "n" as ID,
-    "r" as ID
-  );
-
-  const expectedResult = views
-    .filter((v) => v.e !== "delete")
-    .mapEntries((e) => [e[1].e, e[1]]);
-  expect(updatedViews.keySeq().toJS()).toEqual(expectedResult.keySeq().toJS());
 });
 
 test("Parse View path", () => {

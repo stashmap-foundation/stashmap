@@ -104,65 +104,46 @@ export type CompositionResult = {
 export type Gesture =
   | {
       kind: "judge";
-      row: ComposedRow;
+      row: string;
       relevance: Relevance;
       argument: Argument;
+      spans: InlineSpan[];
+    }
+  | {
+      kind: "dismiss";
+      row: string;
+      spans: InlineSpan[];
+      remove: boolean;
+    }
+  | {
+      kind: "reword";
+      row: string;
       spans: InlineSpan[];
     }
   | {
       kind: "move";
-      rows: {
-        row: ComposedRow;
-        sourceParent: ComposedRow | undefined;
-      }[];
-      parent: ComposedRow;
-      after: ComposedRow | undefined;
-    }
-  | {
-      kind: "reword";
-      row: ComposedRow;
-      spans: InlineSpan[];
-    }
-  | {
-      kind: "edit";
-      row: ComposedRow;
-      spans: InlineSpan[];
-    }
-  | {
-      kind: "add";
-      parent: ComposedRow;
-      spans: InlineSpan[];
-      at: number | undefined;
-      relevance: Relevance;
-      argument: Argument;
+      rows: string[];
+      parent: string;
+      after: string | undefined;
     }
   | {
       kind: "place";
-      targets: {
-        target: AddToParentTarget;
-        relevance: Relevance;
-        argument: Argument;
-      }[];
-      parent: ComposedRow;
-      at: number | undefined;
-      after: ComposedRow | undefined;
-    }
-  | {
-      kind: "dismiss";
-      row: ComposedRow;
-      spans: InlineSpan[];
-    }
-  | {
-      kind: "delete";
-      row: ComposedRow;
-      paneIndex: number;
-    }
-  | {
-      kind: "accept";
-      parent: ComposedRow;
-      target: AddToParentTarget;
-      relevance: Relevance;
-      argument: Argument;
+      targets: (
+        | {
+            kind: "spans";
+            spans: InlineSpan[];
+            relevance: Relevance;
+            argument: Argument;
+          }
+        | {
+            kind: "target";
+            target: AddToParentTarget;
+            relevance: Relevance;
+            argument: Argument;
+          }
+      )[];
+      parent: string;
+      after: string | undefined;
     };
 
 export type PositionName = { kind: "after" | "before" | "parent"; id: ID };

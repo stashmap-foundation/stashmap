@@ -101,7 +101,6 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
         return {
           row,
           draggedRows,
-          orderedRows: rows,
           sourcePaneIndex: paneIndex,
           text: displayText,
           isCopyDrag: copyDrag || undefined,

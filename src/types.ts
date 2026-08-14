@@ -4,7 +4,7 @@ import { QueueStatus } from "./infra/nostr/cache/PublishQueue";
 import { Document as DocumentType } from "./core/Document";
 import { IcalEntry } from "./core/ical";
 import type { AddToParentTarget } from "./core/plan";
-import type { ComposedRow } from "./core/composition";
+import type { ComposedRow, CompositionResult } from "./core/composition";
 
 declare global {
   type Children = {
@@ -215,6 +215,7 @@ declare global {
     | {
         rowType: "occurrence";
         occurrence: ComposedRow;
+        composition: CompositionResult;
         incomingTarget: undefined;
         incomingParent: undefined;
         incomingEmbed: undefined;
@@ -225,6 +226,7 @@ declare global {
     | {
         rowType: "incoming";
         occurrence: undefined;
+        composition: CompositionResult | undefined;
         incomingTarget: AddToParentTarget;
         incomingParent: ComposedRow | undefined;
         incomingEmbed: true | undefined;
@@ -235,6 +237,7 @@ declare global {
     | {
         rowType: "search";
         occurrence: undefined;
+        composition: undefined;
         incomingTarget: undefined;
         incomingParent: undefined;
         incomingEmbed: undefined;
@@ -245,6 +248,7 @@ declare global {
     | {
         rowType: "empty";
         occurrence: undefined;
+        composition: CompositionResult | undefined;
         incomingTarget: undefined;
         incomingParent: undefined;
         incomingEmbed: undefined;
@@ -255,6 +259,7 @@ declare global {
     | {
         rowType: "action";
         occurrence: undefined;
+        composition: undefined;
         incomingTarget: undefined;
         incomingParent: undefined;
         incomingEmbed: undefined;

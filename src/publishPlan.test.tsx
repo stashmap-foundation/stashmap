@@ -91,10 +91,11 @@ test("clipboard Markdown survives empty-row materialization and document renderi
     id: EMPTY_NODE_ID,
   };
   const markdown = `[A link to Hello](#e834645e-8bb5-44f7-89b2-41d5054746af)`;
-  const parent = composeNote(graphLookupFromData(plan), {
+  const composition = composeNote(graphLookupFromData(plan), {
     sourceId: LOCAL,
     id: rootId,
-  }).root;
+  });
+  const parent = composition.root;
   const result = planSaveVirtualNode(
     plan,
     parseInlineSpans(markdown),
@@ -102,6 +103,7 @@ test("clipboard Markdown survives empty-row materialization and document renderi
     emptyNode,
     [0, rootId, EMPTY_NODE_ID],
     parent,
+    composition,
     root.id,
     [0, rootId],
     0

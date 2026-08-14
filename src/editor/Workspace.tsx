@@ -1472,10 +1472,11 @@ function usePaneKeyboardNavigation(paneIndex: number): {
         targetRows.reduce(
           (acc, row) =>
             row.rowType === "occurrence"
-              ? applyGesture(acc, {
-                  kind: "delete",
-                  row: row.occurrence,
-                  paneIndex,
+              ? applyGesture(acc, row.composition, {
+                  kind: "dismiss",
+                  row: row.occurrence.key,
+                  spans: row.occurrence.spans,
+                  remove: true,
                 })
               : acc,
           createPlan()

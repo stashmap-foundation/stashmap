@@ -13,6 +13,7 @@ import { createReferenceTarget, isEmptyNodeID } from "../core/connections";
 import { spansText, spansToMarkdown, plainSpans } from "../core/nodeSpans";
 import {
   ComposedRow,
+  CompositionResult,
   composedContent,
   composedLine,
   writableLine,
@@ -44,21 +45,23 @@ function getEditorSpansForRow(
 
 export function planJudgeComposedRow(
   plan: Plan,
+  composition: CompositionResult,
   occurrence: ComposedRow,
   metadata: NodeItemMetadata,
   editorSpans: InlineSpan[] | undefined
 ): Plan {
   const spans = editorSpans ?? plainSpans(occurrence.text);
   if (metadata.relevance === "not_relevant") {
-    return applyGesture(plan, {
+    return applyGesture(plan, composition, {
       kind: "dismiss",
-      row: occurrence,
+      row: occurrence.key,
       spans,
+      remove: false,
     });
   }
-  return applyGesture(plan, {
+  return applyGesture(plan, composition, {
     kind: "judge",
-    row: occurrence,
+    row: occurrence.key,
     relevance:
       "relevance" in metadata
         ? metadata.relevance
@@ -78,7 +81,13 @@ export function planUpdateOneMetadata(
   editorSpans: InlineSpan[] | undefined
 ): Plan {
   if (row.rowType === "occurrence") {
-    return planJudgeComposedRow(acc, row.occurrence, metadata, editorSpans);
+    return planJudgeComposedRow(
+      acc,
+      row.composition,
+      row.occurrence,
+      metadata,
+      editorSpans
+    );
   }
   if (row.rowType === "incoming") {
     const target =
@@ -91,13 +100,19 @@ export function planUpdateOneMetadata(
             row.incomingTarget.linkText
           )
         : row.incomingTarget;
-    return row.incomingParent
-      ? applyGesture(acc, {
-          kind: "accept",
-          parent: row.incomingParent,
-          target,
-          relevance: metadata.relevance ?? row.node.relevance,
-          argument: metadata.argument ?? row.node.argument,
+    return row.incomingParent && row.composition
+      ? applyGesture(acc, row.composition, {
+          kind: "place",
+          parent: row.incomingParent.key,
+          targets: [
+            {
+              kind: "target",
+              target,
+              relevance: metadata.relevance ?? row.node.relevance,
+              argument: metadata.argument ?? row.node.argument,
+            },
+          ],
+          after: row.incomingParent.children.at(-1)?.key,
         })
       : acc;
   }
@@ -113,6 +128,7 @@ export function planUpdateOneMetadata(
         row.node,
         row.viewPath,
         row.rowType === "empty" ? row.emptyParent : undefined,
+        row.composition,
         row.parentNode?.id,
         row.parentViewPath,
         row.viewPath[0],
@@ -198,9 +214,9 @@ function planBatchMove(
       spansToMarkdown(editorSpans) ===
         spansToMarkdown(composedContent(row.occurrence).node.spans)
       ? acc
-      : applyGesture(acc, {
-          kind: "edit",
-          row: row.occurrence,
+      : applyGesture(acc, row.composition, {
+          kind: "reword",
+          row: row.occurrence.key,
           spans: editorSpans,
         });
   }, moved);
@@ -217,17 +233,20 @@ export function planBatchIndent(
   const sortedRows = sortByNodeIndex(rows);
   const firstRow = sortedRows[0];
   const prevSibling = getPreviousSiblingFromRows(orderedRows, firstRow);
-  const parent =
-    prevSibling?.rowType === "occurrence" ? prevSibling.occurrence : undefined;
-  if (!prevSibling || !parent) return undefined;
-  const gestureRows = moveGestureRows(sortedRows, orderedRows);
+  if (prevSibling?.rowType !== "occurrence") return undefined;
+  const parent = prevSibling.occurrence;
+  const gestureRows = moveGestureRows(sortedRows);
   if (gestureRows.length !== sortedRows.length) return undefined;
-  const movedPlan = applyGesture(planExpandRow(plan, prevSibling), {
-    kind: "move",
-    rows: gestureRows,
-    parent,
-    after: parent.children[parent.children.length - 1],
-  });
+  const movedPlan = applyGesture(
+    planExpandRow(plan, prevSibling),
+    prevSibling.composition,
+    {
+      kind: "move",
+      rows: gestureRows,
+      parent: parent.key,
+      after: parent.children[parent.children.length - 1]?.key,
+    }
+  );
   return planBatchMove(sortedRows, movedPlan, editorInfo);
 }
 
@@ -243,18 +262,15 @@ export function planBatchOutdent(
   const parentRow = getVisibleParentRow(orderedRows, firstRow);
   if (parentRow?.rowType !== "occurrence") return undefined;
   const grandParentRow = getVisibleParentRow(orderedRows, parentRow);
-  const parent =
-    grandParentRow?.rowType === "occurrence"
-      ? grandParentRow.occurrence
-      : undefined;
-  if (!grandParentRow || !parent) return undefined;
-  const gestureRows = moveGestureRows(sortedRows, orderedRows);
+  if (grandParentRow?.rowType !== "occurrence") return undefined;
+  const parent = grandParentRow.occurrence;
+  const gestureRows = moveGestureRows(sortedRows);
   if (gestureRows.length !== sortedRows.length) return undefined;
-  const movedPlan = applyGesture(plan, {
+  const movedPlan = applyGesture(plan, grandParentRow.composition, {
     kind: "move",
     rows: gestureRows,
-    parent,
-    after: parentRow.occurrence,
+    parent: parent.key,
+    after: parentRow.occurrence.key,
   });
   return planBatchMove(sortedRows, movedPlan, editorInfo);
 }

@@ -663,13 +663,13 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
     submitted?: boolean
   ): Promise<void> => {
     const nextSpans = persistedSpans(spans);
-    if (rewordEditing && occurrence) {
+    if (rewordEditing && occurrence && row.composition) {
       const unchanged = spansText(nextSpans).trim() === occurrence.text.trim();
       if (!unchanged) {
         await executePlan(
-          applyGesture(createPlan(), {
+          applyGesture(createPlan(), row.composition, {
             kind: "reword",
-            row: occurrence,
+            row: occurrence.key,
             spans: nextSpans,
           })
         );
@@ -752,6 +752,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
           currentNode,
           viewPath,
           row.rowType === "empty" ? row.emptyParent : undefined,
+          row.composition,
           parentNode?.id,
           parentPath,
           paneIndex
@@ -836,14 +837,23 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
         : basePlan;
       if (trimmedText) {
         executePlan(
-          applyGesture(planExpandRow(planWithoutEmpty, prevSibling), {
-            kind: "add",
-            parent: prevSibling.occurrence,
-            spans: persistedSpans(spans),
-            at: undefined,
-            relevance: undefined,
-            argument: undefined,
-          })
+          applyGesture(
+            planExpandRow(planWithoutEmpty, prevSibling),
+            prevSibling.composition,
+            {
+              kind: "place",
+              parent: prevSibling.occurrence.key,
+              targets: [
+                {
+                  kind: "spans",
+                  spans: persistedSpans(spans),
+                  relevance: undefined,
+                  argument: undefined,
+                },
+              ],
+              after: prevSibling.occurrence.children.at(-1)?.key,
+            }
+          )
         );
         return;
       }
@@ -915,13 +925,18 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       }
 
       executePlan(
-        applyGesture(planWithoutEmpty, {
-          kind: "add",
-          parent: grandParentRow.occurrence,
-          spans: persistedSpans(spans),
-          at: parentNodeIndex + 1,
-          relevance: undefined,
-          argument: undefined,
+        applyGesture(planWithoutEmpty, grandParentRow.composition, {
+          kind: "place",
+          parent: grandParentRow.occurrence.key,
+          targets: [
+            {
+              kind: "spans",
+              spans: persistedSpans(spans),
+              relevance: undefined,
+              argument: undefined,
+            },
+          ],
+          after: grandParentRow.occurrence.children[parentNodeIndex]?.key,
         })
       );
       return;
@@ -982,6 +997,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
             currentNode,
             viewPath,
             row.rowType === "empty" ? row.emptyParent : undefined,
+            row.composition,
             parentNode?.id,
             parentPath,
             paneIndex
@@ -1000,10 +1016,11 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       return;
     }
     executePlan(
-      applyGesture(createPlan(), {
-        kind: "delete",
-        row: row.occurrence,
-        paneIndex,
+      applyGesture(createPlan(), row.composition, {
+        kind: "dismiss",
+        row: row.occurrence.key,
+        spans: row.occurrence.spans,
+        remove: true,
       })
     );
   };

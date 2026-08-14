@@ -32,7 +32,6 @@ import { decodePublicKeyInputSync } from "./infra/nostr/publicKeys";
 type DragSource = {
   row: Row;
   draggedRows: Row[];
-  orderedRows: List<Row>;
   sourcePaneIndex: number;
   text?: string;
   isCopyDrag?: boolean;
@@ -371,6 +370,10 @@ export function dnd(
     targetParentRow.rowType === "occurrence"
       ? targetParentRow.occurrence
       : undefined;
+  const doorComposition =
+    targetParentRow.rowType === "occurrence"
+      ? targetParentRow.composition
+      : undefined;
   const moveRows =
     doorTarget !== undefined && targetRoot !== undefined
       ? independentRows.filter(
@@ -382,59 +385,88 @@ export function dnd(
       : [];
   const rest = independentRows.filter((row) => !moveRows.includes(row));
   const movedPlan = (() => {
-    if (moveRows.length === 0 || doorTarget === undefined) {
+    if (
+      moveRows.length === 0 ||
+      doorTarget === undefined ||
+      doorComposition === undefined
+    ) {
       return basePlan;
     }
-    const rows = moveGestureRows(moveRows, sourceDrag.orderedRows);
+    const rows = moveGestureRows(moveRows);
     return applyGesture(
       recordForeignSources(planExpandRow(basePlan, targetParentRow)),
+      doorComposition,
       {
         kind: "move",
         rows,
-        parent: doorTarget,
+        parent: doorTarget.key,
         after:
           dropAnchor?.rowType === "occurrence"
-            ? dropAnchor.occurrence
+            ? dropAnchor.occurrence.key
             : undefined,
       }
     );
   })();
-  if (rest.length === 0 || doorTarget === undefined) {
+  if (
+    rest.length === 0 ||
+    doorTarget === undefined ||
+    doorComposition === undefined
+  ) {
     return movedPlan;
   }
-  const targets = rest.map((row) => {
-    const isPrimarySource = row.viewKey === source;
-    const insertTarget =
-      (isPrimarySource ? sourceDrag.insertTarget : undefined) ??
-      row.incomingTarget;
-    const dragTargetID = isPrimarySource
-      ? sourceDrag.targetId || sourceDrag.nodeId
-      : undefined;
-    const occurrence =
-      row.rowType === "occurrence" ? row.occurrence : undefined;
-    const targetID =
-      dragTargetID ?? occurrence?.target ?? occurrence?.id ?? row.node.id;
-    const makeTarget =
-      sourceDrag.altCopy === true && isCalendarEntryId(targetID)
-        ? createReferenceTarget
-        : createRefTarget;
-    const target = insertTarget
-      ? addFallbackLinkText(insertTarget, sourceDrag.text)
-      : makeTarget(targetID, occurrence?.text ?? nodeText(row.node));
-    const edge = occurrence ? composedLine(occurrence).node : row.node;
-    return { target, relevance: edge.relevance, argument: edge.argument };
-  });
+  const targets = rest.map(
+    (
+      row
+    ): {
+      kind: "target";
+      target: AddToParentTarget;
+      relevance: Relevance;
+      argument: Argument;
+    } => {
+      const isPrimarySource = row.viewKey === source;
+      const insertTarget =
+        (isPrimarySource ? sourceDrag.insertTarget : undefined) ??
+        row.incomingTarget;
+      const dragTargetID = isPrimarySource
+        ? sourceDrag.targetId || sourceDrag.nodeId
+        : undefined;
+      const occurrence =
+        row.rowType === "occurrence" ? row.occurrence : undefined;
+      const targetID =
+        dragTargetID ?? occurrence?.target ?? occurrence?.id ?? row.node.id;
+      const makeTarget =
+        sourceDrag.altCopy === true && isCalendarEntryId(targetID)
+          ? createReferenceTarget
+          : createRefTarget;
+      const target = insertTarget
+        ? addFallbackLinkText(insertTarget, sourceDrag.text)
+        : makeTarget(targetID, occurrence?.text ?? nodeText(row.node));
+      const edge = occurrence ? composedLine(occurrence).node : row.node;
+      return {
+        kind: "target",
+        target,
+        relevance: edge.relevance,
+        argument: edge.argument,
+      };
+    }
+  );
+  const lastMoved = moveRows.at(-1);
+  const fallbackAfter =
+    lastMoved?.rowType === "occurrence"
+      ? lastMoved.occurrence.key
+      : doorTarget.children[dropIndex - 1]?.key;
+  const after =
+    dropAnchor?.rowType === "occurrence"
+      ? dropAnchor.occurrence.key
+      : fallbackAfter;
   return applyGesture(
     recordForeignSources(planExpandRow(movedPlan, targetParentRow)),
+    doorComposition,
     {
       kind: "place",
       targets,
-      parent: doorTarget,
-      at: dropIndex + moveRows.length,
-      after:
-        dropAnchor?.rowType === "occurrence"
-          ? dropAnchor.occurrence
-          : undefined,
+      parent: doorTarget.key,
+      after,
     }
   );
 }

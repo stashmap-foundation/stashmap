@@ -11,7 +11,6 @@ import {
 } from "../rowModel";
 import { useData } from "../DataContext";
 import { isEmptyNodeID } from "../core/connections";
-import { calendarEntryTarget } from "../core/ical";
 import { searchInsertTarget } from "../localSearch";
 import { NOTE_TYPE, Node } from "./Node";
 import { useDroppable, clearDropIndent } from "./DroppableContainer";
@@ -90,7 +89,8 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
               .filter((candidate) => selection.has(candidate.viewKey))
               .toArray()
           : [row];
-        const dragNodeId = row.node.id;
+        const dragNodeId =
+          row.rowType === "occurrence" ? row.occurrence.id : row.node.id;
         return {
           row,
           draggedRows,
@@ -99,9 +99,12 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
           text: displayText,
           isCopyDrag: copyDrag || undefined,
           nodeId: dragNodeId,
-          targetId: calendarEntryTarget(row.node),
+          targetId:
+            row.rowType === "occurrence"
+              ? row.occurrence.target ?? row.occurrence.id
+              : undefined,
           insertTarget:
-            row.materialize?.take ??
+            row.incomingTarget ??
             (virtualType === "search"
               ? searchInsertTarget(data, row.node, row.sourceId)
               : undefined),
@@ -148,7 +151,9 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
         data-view-key={rowViewKey}
         data-row-index={rowIndex}
         data-row-depth={rowDepth}
-        data-node-id={row.node.id}
+        data-node-id={
+          row.rowType === "occurrence" ? row.occurrence.id : row.node.id
+        }
         data-node-text={displayText}
         data-node-mutable={isEditableNode(node) ? "true" : "false"}
         data-selected={isSelected ? "true" : undefined}
@@ -206,9 +211,6 @@ export function ListItem({
     rows,
   });
 
-  // Action rows are buttons in row position: one interaction (click) —
-  // no drag, no drop, no keyboard row focus. As the first virtual row
-  // they carry the footer's dotted separator.
   if (row.action) {
     return (
       <div

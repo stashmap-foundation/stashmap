@@ -19,29 +19,24 @@ import {
   getVisibleParentRow,
 } from "../rowModel";
 import { isEditableNode } from "./temporaryViewState";
+import { isCanonicalId } from "../core/entityRecognition";
 import { planBatchIndent, planBatchOutdent } from "./batchOperations";
 import {
   getNode,
   isEmptyNodeID,
   computeEmptyNodeMetadata,
 } from "../core/connections";
-import {
-  embeddedTarget,
-  isFileLinkHref,
-  spansText,
-  spansToMarkdown,
-} from "../core/nodeSpans";
+import { isFileLinkHref, spansText } from "../core/nodeSpans";
 import { classifyLinkHref, externalLinkUrl } from "../core/linkPath";
-import { isCanonicalId } from "../core/entityRecognition";
 import {
   calendarEntryTarget,
   calendarFeedHref,
+  calendarFeedTargetUrl,
   calendarFeedUrl,
   displayTextOf,
   hiddenPastEntryCount,
   isBareIcalFeedUrl,
   isCalendarEntryId,
-  isCalendarEntryPlacement,
 } from "../core/ical";
 import { useCalendarFeeds } from "../CalendarFeedContext";
 import { resolveDocumentTarget } from "../core/Document";
@@ -53,23 +48,22 @@ import { linkStyleForHref } from "./editorDom";
 import { useOnToggleExpanded } from "./SelectNodes";
 import { useApis } from "../Apis";
 import { useData } from "../DataContext";
-import { planMaterializeComputedRow, planTakeComposedRow } from "../core/plan";
+import { planTakeOccurrence } from "../core/plan";
 import { getWorkspaceNode } from "../core/knowledge";
 import {
   Plan,
   applyGesture,
   usePlanner,
   planSetEmptyNodePosition,
-  planSaveNodeAndEnsureNodes,
+  planSaveOccurrence,
+  planSaveVirtualNode,
   planExpandNode,
   planUpdateViews,
   planRemoveEmptyNodePosition,
-  planAddSpansToParent,
   planSetRowFocusIntent,
   ParsedLine,
 } from "../planner";
 import { parsedLinesToTrees, planPasteMarkdownTrees } from "./FileDropZone";
-import { planDisconnectFromParent } from "../treeMutations";
 import { useNodeIsLoading } from "../LoadingStatus";
 import { NodeCard } from "../commons/Ui";
 import { usePaneIndex, useNavigatePane } from "../SplitPanesContext";
@@ -86,16 +80,12 @@ import { findReciprocalLinkItem } from "../buildReferenceRow";
 export { getNodesInTree } from "../treeTraversal";
 
 function getLevels(viewPath: ViewPath): number {
-  // Subtract 1: for pane index at position 0
-  // This gives: root = 1, first children = 2, nested = 3, etc.
   return viewPath.length - 1;
 }
 
 function ExpandCollapseToggle(): JSX.Element | null {
   const row = useRow();
   const rawDisplayText = useDisplayText();
-  // Feed-as-link rows read by their label; the raw text (with the URL)
-  // belongs to edit mode.
   const displayText = displayTextOf(rawDisplayText);
   const onToggleExpanded = useOnToggleExpanded();
   const isExpanded = useIsExpanded();
@@ -131,10 +121,6 @@ function ExpandCollapseToggle(): JSX.Element | null {
   );
 }
 
-// The action row's content: a button in row position, obviously not
-// content — the wallet's "Register as Shareholder" element, shared
-// instead of reinvented. The label is the action; it always says what a
-// click does. State lives on the action row's own view.
 function PastDatesActionRow(): JSX.Element {
   const data = useData();
   const row = useRow();
@@ -296,15 +282,26 @@ function reciprocalLinks(
   }, initial).links;
 }
 
-function hasBrokenTarget(row: Row): boolean {
-  const terminal = row.composed?.chain[row.composed.chain.length - 1];
+function occurrenceLinkIsDead(row: Row, directlyDead: boolean): boolean {
+  if (row.rowType !== "occurrence") {
+    return directlyDead;
+  }
+  const { occurrence } = row;
+  if (
+    occurrence.kind === "speaking" &&
+    occurrence.flags.includes("orphan-source")
+  ) {
+    return false;
+  }
+  const terminal = occurrence.chain[occurrence.chain.length - 1];
   return (
-    (row.composed?.kind === "placement" || row.composed?.kind === "speaking") &&
-    terminal !== undefined &&
-    !isCanonicalId(terminal) &&
-    row.composed.flags.some(
-      (flag) => flag === "dangling" || flag === "orphan-source"
-    )
+    directlyDead ||
+    ((occurrence.kind === "placement" || occurrence.kind === "speaking") &&
+      terminal !== undefined &&
+      !isCanonicalId(terminal) &&
+      occurrence.flags.some(
+        (flag) => flag === "dangling" || flag === "orphan-source"
+      ))
   );
 }
 
@@ -323,20 +320,21 @@ function InlineLinkSpan({
   const navigatePane = useNavigatePane();
   const row = useRow();
   const isSearchResult = row.virtualType === "search";
-  // An embed shows the target's live text: the row's own label is the
-  // frozen file record, the display follows the source.
+  const occurrence = row.rowType === "occurrence" ? row.occurrence : undefined;
   const displayedText =
-    row.standsFor?.liveText !== undefined &&
-    span.href === `#${row.standsFor.id}`
-      ? row.standsFor.liveText
+    occurrence?.target !== undefined && span.href === `#${occurrence.target}`
+      ? occurrence.text
       : span.text;
   const calendarContent =
     !isSearchResult &&
     (calendarFeedUrl(node) !== undefined ||
-      (row.standsFor !== undefined && isCalendarEntryId(row.standsFor.id)));
+      (occurrence?.target !== undefined &&
+        isCalendarEntryId(occurrence.target)));
   const externalUrl = calendarContent ? undefined : externalLinkUrl(span.href);
-  const dead =
-    hasBrokenTarget(row) || isDeadLinkTarget(data, span.href, node, sourceId);
+  const dead = occurrenceLinkIsDead(
+    row,
+    isDeadLinkTarget(data, span.href, node, sourceId)
+  );
   const internalHref =
     dead || calendarContent
       ? undefined
@@ -497,11 +495,32 @@ function hasInlineLinks(node: GraphNode | undefined): node is GraphNode {
 
 function NodeContent(): JSX.Element {
   const row = useRow();
+  const data = useData();
   const { reference } = row;
   const displayText = useDisplayText();
 
-  if (row.virtualType === undefined && hasInlineLinks(row.node)) {
-    return <InlineSpans node={row.node} sourceId={row.sourceId} />;
+  if (row.rowType === "occurrence") {
+    const { content, line } = row.occurrence;
+    const reciprocal = reciprocalLinks(data, line.node, line.ref.sourceId)[0];
+    if (!hasInlineLinks(content.node) && reference) {
+      return <ReferenceContent reference={reference} />;
+    }
+    return (
+      <>
+        {hasInlineLinks(content.node) ? (
+          <InlineSpans node={content.node} sourceId={content.ref.sourceId} />
+        ) : (
+          <span className="break-word">{displayTextOf(displayText)}</span>
+        )}
+        {reciprocal && (
+          <IncomingPart
+            relevance={reciprocal.relevance}
+            argument={reciprocal.argument}
+            ariaHidden
+          />
+        )}
+      </>
+    );
   }
 
   if (row.virtualType === "search" && hasInlineLinks(row.node)) {
@@ -523,8 +542,6 @@ function NodeContent(): JSX.Element {
     return <InlineSpans node={row.node} sourceId={row.sourceId} />;
   }
 
-  // Read display goes through the one display-text rule (feed links read
-  // by their label); raw text belongs to edit mode only.
   return <span className="break-word">{displayTextOf(displayText)}</span>;
 }
 
@@ -564,38 +581,45 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       viewKey: viewPathToString(targetViewPath),
     });
 
-  const feedUrl = calendarFeedUrl(currentNode);
+  const occurrence = row.rowType === "occurrence" ? row.occurrence : undefined;
+  const feedUrl = occurrence
+    ? calendarFeedTargetUrl(occurrence.target) ??
+      calendarFeedUrl(occurrence.content.node)
+    : calendarFeedUrl(currentNode);
   const calendarContent =
-    feedUrl !== undefined ||
-    isCalendarEntryPlacement(currentNode, parentNode ?? undefined);
+    feedUrl !== undefined || occurrence?.editTarget !== undefined;
   const rewordEditing =
     !calendarContent &&
-    row.composed !== undefined &&
-    (row.projected === true ||
-      ((row.composed.kind === "placement" ||
-        row.composed.kind === "speaking") &&
-        row.composed.target !== undefined &&
-        classifyLinkHref(`#${row.composed.target}`) === "node"));
-  const bondHref = `#${row.composed?.target ?? row.node.id}`;
+    occurrence !== undefined &&
+    (occurrence.persisted === undefined ||
+      ((occurrence.kind === "placement" || occurrence.kind === "speaking") &&
+        occurrence.target !== undefined &&
+        classifyLinkHref(`#${occurrence.target}`) === "node"));
+  const bondHref = `#${occurrence?.target ?? row.node.id}`;
   const editorSpans: InlineSpan[] = (() => {
     if (!rewordEditing) {
       return currentNode.spans;
     }
     if (
-      embeddedTarget(currentNode) !== undefined &&
-      row.standsFor?.liveText !== undefined
+      occurrence !== undefined &&
+      (occurrence.kind === "placement" || occurrence.kind === "speaking")
     ) {
-      return [{ kind: "link", href: bondHref, text: row.standsFor.liveText }];
+      return [{ kind: "link", href: bondHref, text: occurrence.text }];
     }
     return currentNode.spans.filter(
       (span) => !(span.kind === "link" && span.struck === true)
     );
   })();
-  const reciprocals = reciprocalLinks(data, row.node, row.sourceId);
+  const linkLine = occurrence?.line;
+  const linkNode = linkLine?.node ?? row.node;
+  const linkSourceId = linkLine?.ref.sourceId ?? row.sourceId;
+  const reciprocals = reciprocalLinks(data, linkNode, linkSourceId);
   const deadLinkIndexes = editorSpans.flatMap((span, index) =>
     span.kind === "link" &&
-    (hasBrokenTarget(row) ||
-      isDeadLinkTarget(data, span.href, row.node, row.sourceId))
+    occurrenceLinkIsDead(
+      row,
+      isDeadLinkTarget(data, span.href, linkNode, linkSourceId)
+    )
       ? [index]
       : []
   );
@@ -620,14 +644,13 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
     submitted?: boolean
   ): Promise<void> => {
     const nextSpans = persistedSpans(spans);
-    if (rewordEditing && row.composed) {
-      const unchanged =
-        spansText(nextSpans).trim() === row.composed.text.trim();
+    if (rewordEditing && occurrence) {
+      const unchanged = spansText(nextSpans).trim() === occurrence.text.trim();
       if (!unchanged) {
         await executePlan(
           applyGesture(createPlan(), {
             kind: "reword",
-            row: row.composed,
+            row: occurrence,
             spans: nextSpans,
           })
         );
@@ -636,16 +659,35 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       const visibleParent = getVisibleParentRow(rows, row);
       if (
         !submitted ||
-        !isCalendarEntryId(row.composed.id) ||
+        !isCalendarEntryId(occurrence.id) ||
         !parentNode ||
         !parentPath ||
         !visibleParent
       ) {
+        if (
+          submitted &&
+          occurrence.writeRoot !== undefined &&
+          !getWorkspaceNode(createPlan().knowledgeDBs, occurrence.id)
+        ) {
+          const [withRoot, root] = planTakeOccurrence(createPlan(), occurrence);
+          if (root) {
+            await executePlan(
+              planSetEmptyNodePosition(
+                withRoot,
+                root.id,
+                row.view,
+                viewPath,
+                paneIndex,
+                0
+              )
+            );
+          }
+        }
         return;
       }
-      const [takenPlan, takenNode] = planTakeComposedRow(
+      const [takenPlan, takenNode] = planTakeOccurrence(
         createPlan(),
-        row.composed
+        occurrence
       );
       if (!takenNode) {
         return;
@@ -672,47 +714,24 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       );
       return;
     }
-    // Write gestures take first; read gestures read. A computed row's
-    // save materializes the row before the text lands — and an unchanged
-    // text writes nothing at all (blur/Escape must not take).
-    const takeResult = ((): [Plan, GraphNode, ViewPath] | undefined => {
-      if (!row.materialize) {
-        return [createPlan(), currentNode, viewPath];
-      }
-      // Enter is a write gesture (it opens a position below — the row
-      // materializes, per the machine-feeds law); plain blur/Escape with
-      // unchanged text reads only.
-      if (
-        !submitted &&
-        spansToMarkdown(nextSpans) === spansToMarkdown(row.node.spans)
-      ) {
-        return undefined;
-      }
-      const [plan, takenNode] = planMaterializeComputedRow(createPlan(), row);
-      return [
-        plan,
-        takenNode,
-        addNodesToLastElement(viewPath, takenNode.id) as ViewPath,
-      ];
-    })();
-    if (!takeResult) {
-      return;
-    }
-    const [materializedStart, takenNode, takenViewPath] = takeResult;
+    const initialPlan = createPlan();
     const {
       plan: basePlan,
       viewPath: updatedViewPath,
       node: savedNode,
-    } = planSaveNodeAndEnsureNodes(
-      materializedStart,
-      nextSpans,
-      row.materialize ? row.node.id : takenNode.id,
-      takenNode,
-      takenViewPath,
-      parentNode,
-      parentPath,
-      paneIndex
-    );
+    } = occurrence
+      ? planSaveOccurrence(initialPlan, nextSpans, occurrence, viewPath)
+      : planSaveVirtualNode(
+          initialPlan,
+          nextSpans,
+          currentNode.id,
+          currentNode,
+          viewPath,
+          row.rowType === "empty" ? row.emptyParent : undefined,
+          parentNode?.id,
+          parentPath,
+          paneIndex
+        );
     const planWithEscFocus = escapeFocusPendingRef.current
       ? planWithRowFocusIntent(basePlan, updatedViewPath)
       : basePlan;
@@ -740,8 +759,6 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       if (!parentRow) {
         return undefined;
       }
-      // A freshly materialized row has no childIndex; its real position
-      // comes from the plan's current children.
       const insertAt = (() => {
         if (nodeIndex !== undefined) return nodeIndex + 1;
         const parent = getWorkspaceNode(basePlan.knowledgeDBs, parentNode.id);
@@ -779,48 +796,49 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
     const trimmedText = spansText(spans).trim();
 
     if (isEmptyNode) {
-      if (!prevSibling || !parentPath) return;
-      // Indenting onto a computed row takes it first.
-      const [planMaterialized, takenPrevSibling] = planMaterializeComputedRow(
-        basePlan,
-        prevSibling
+      if (prevSibling?.rowType !== "occurrence" || !parentPath) return;
+      const planWithoutEmpty = parentNode
+        ? planRemoveEmptyNodePosition(basePlan, parentNode.id)
+        : basePlan;
+      if (trimmedText) {
+        executePlan(
+          applyGesture(
+            planExpandNode(
+              planWithoutEmpty,
+              prevSibling.view,
+              prevSibling.viewPath
+            ),
+            {
+              kind: "add",
+              parent: prevSibling.occurrence,
+              spans: persistedSpans(spans),
+              at: undefined,
+              relevance: undefined,
+              argument: undefined,
+            }
+          )
+        );
+        return;
+      }
+      const [planMaterialized, takenPrevSibling] = planTakeOccurrence(
+        planWithoutEmpty,
+        prevSibling.occurrence
       );
+      if (!takenPrevSibling) return;
       const takenViewPath = addNodesToLastElement(
         prevSibling.viewPath,
         takenPrevSibling.id
       );
-      const planWithoutEmpty = parentNode
-        ? planRemoveEmptyNodePosition(planMaterialized, parentNode.id)
-        : planMaterialized;
-      const planWithExpand = planExpandNode(
-        planWithoutEmpty,
-        prevSibling.view,
-        takenViewPath
+      executePlan(
+        planSetEmptyNodePosition(
+          planExpandNode(planMaterialized, prevSibling.view, takenViewPath),
+          takenPrevSibling.id,
+          prevSibling.view,
+          takenViewPath,
+          paneIndex,
+          0
+        )
       );
-
-      if (trimmedText) {
-        executePlan(
-          planAddSpansToParent(
-            planWithExpand,
-            persistedSpans(spans),
-            takenPrevSibling,
-            undefined,
-            undefined,
-            undefined
-          )
-        );
-      } else {
-        executePlan(
-          planSetEmptyNodePosition(
-            planWithExpand,
-            takenPrevSibling.id,
-            prevSibling.view,
-            takenViewPath,
-            paneIndex,
-            0
-          )
-        );
-      }
       return;
     }
 
@@ -840,7 +858,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       const parentRow = getVisibleParentRow(rows, row);
       if (!parentRow?.parentNode) return;
       const grandParentRow = getVisibleParentRow(rows, parentRow);
-      if (!grandParentRow) return;
+      if (grandParentRow?.rowType !== "occurrence") return;
       const parentNodeIndex = row.parentChildIndex;
       if (parentNodeIndex === undefined) return;
 
@@ -849,10 +867,15 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
         : basePlan;
 
       if (!trimmedText) {
+        const [withGrandParent, grandParent] = planTakeOccurrence(
+          planWithoutEmpty,
+          grandParentRow.occurrence
+        );
+        if (!grandParent) return;
         executePlan(
           planSetEmptyNodePosition(
-            planWithoutEmpty,
-            parentRow.parentNode.id,
+            withGrandParent,
+            grandParent.id,
             grandParentRow.view,
             grandParentRow.viewPath,
             paneIndex,
@@ -863,14 +886,14 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       }
 
       executePlan(
-        planAddSpansToParent(
-          planWithoutEmpty,
-          persistedSpans(spans),
-          parentRow.parentNode,
-          parentNodeIndex + 1,
-          undefined,
-          undefined
-        )
+        applyGesture(planWithoutEmpty, {
+          kind: "add",
+          parent: grandParentRow.occurrence,
+          spans: persistedSpans(spans),
+          at: parentNodeIndex + 1,
+          relevance: undefined,
+          argument: undefined,
+        })
       );
       return;
     }
@@ -915,16 +938,25 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
     children: ParsedLine[],
     currentSpans: InlineSpan[]
   ): void => {
-    const { plan: basePlan, node: savedNode } = planSaveNodeAndEnsureNodes(
-      createPlan(),
-      persistedSpans(currentSpans),
-      row.node.id,
-      currentNode,
-      viewPath,
-      parentNode,
-      parentPath,
-      paneIndex
-    );
+    const { plan: basePlan, node: savedNode } =
+      row.rowType === "occurrence"
+        ? planSaveOccurrence(
+            createPlan(),
+            persistedSpans(currentSpans),
+            row.occurrence,
+            viewPath
+          )
+        : planSaveVirtualNode(
+            createPlan(),
+            persistedSpans(currentSpans),
+            row.node.id,
+            currentNode,
+            viewPath,
+            row.rowType === "empty" ? row.emptyParent : undefined,
+            parentNode?.id,
+            parentPath,
+            paneIndex
+          );
     const trees = parsedLinesToTrees(children);
     if (!parentNode || !parentPath) {
       executePlan(planPasteMarkdownTrees(basePlan, trees, savedNode, 0));
@@ -935,15 +967,16 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
   };
 
   const handleDelete = (): void => {
-    if (!parentNode) {
+    if (!parentNode || row.rowType !== "occurrence") {
       return;
     }
-    const plan = planDisconnectFromParent(
-      createPlan(),
-      parentNode.id,
-      row.node.id
+    executePlan(
+      applyGesture(createPlan(), {
+        kind: "delete",
+        row: row.occurrence,
+        paneIndex,
+      })
     );
-    executePlan(plan);
   };
 
   const handleEscapeRequest = (): void => {
@@ -951,7 +984,6 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
     escapeFocusPendingRef.current = true;
   };
 
-  // Handle closing empty node editor (Escape with no text)
   const handleClose = (): void => {
     if (!isEmptyNode || !parentPath) return;
     const plan = createPlan();
@@ -1040,13 +1072,12 @@ function InteractiveNodeContent({ rows }: { rows: List<Row> }): JSX.Element {
     isInSearchView ||
     isViewingOtherUserContent ||
     virtualType !== undefined ||
-    (row.projected === true && row.composed === undefined);
+    (row.sourceId !== LOCAL && row.rowType !== "occurrence");
 
   if (isLoading) {
     return <LoadingNode />;
   }
 
-  // For empty placeholder nodes, render EditableContent only if not readonly
   if (isEmptyNode) {
     return isReadonly ? <></> : <EditableContent rows={rows} />;
   }
@@ -1059,7 +1090,6 @@ function InteractiveNodeContent({ rows }: { rows: List<Row> }): JSX.Element {
     return <EditableContent rows={rows} />;
   }
 
-  // Read-only content
   return <NodeContent />;
 }
 
@@ -1097,8 +1127,6 @@ function Indent({
   );
 }
 
-// Incoming references speak ↩ everywhere — the gutter, the filter button,
-// the link cluster. Never a judgment symbol: nobody judged anything.
 function IncomingRefGutterIndicator(): JSX.Element {
   return (
     <span
@@ -1133,9 +1161,9 @@ export function Node({
   const calendarType = (() => {
     if (virtualType !== undefined) return undefined;
     if (calendarFeedUrl(currentNode) !== undefined) return "Calendar";
-    return isCalendarEntryId(row.standsFor?.id ?? currentNode.id)
-      ? "Date"
-      : undefined;
+    const target =
+      row.rowType === "occurrence" ? row.occurrence.target : undefined;
+    return isCalendarEntryId(target ?? currentNode.id) ? "Date" : undefined;
   })();
   const isViewingOtherUser = useIsViewingOtherUserContent();
   const node = row.reference;
@@ -1146,9 +1174,6 @@ export function Node({
   const contentClass = "";
 
   if (row.action) {
-    // Footer-row dress: gutter mark, marker, node-size text — laid out by
-    // the ordinary row grid so it aligns by construction. The ellipsis is
-    // the honest glyph: content elided here.
     return (
       <NodeCard className={cls} cardBodyClassName={clsBody}>
         <div className="indicator-gutter">

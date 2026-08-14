@@ -14,30 +14,19 @@ import { useEditorText } from "./EditorTextContext";
 import { nodeText as getNodeSpanText } from "../core/nodeSpans";
 
 type NodeItemContext = {
-  // Current state
   nodeIndex: number | undefined;
   isVisible: boolean;
   isEmptyNode: boolean;
   nodeText: string;
   currentRow: GraphNode | undefined;
-  // For updating
   viewPath: ViewPath;
   parentView: ViewPath | undefined;
   nodeID: ID | undefined;
   parentNode: GraphNode | undefined;
   childID: ID;
-  // Update function
   updateMetadata: (metadata: NodeItemMetadata) => void;
 };
 
-/**
- * Shared hook for node row context.
- * Used by useUpdateRelevance and useUpdateArgument.
- * Provides common data and an updateMetadata function that handles:
- * - Empty nodes with text: materialize via planSaveNodeAndEnsureNodes
- * - Empty nodes without text: update via planUpdateEmptyNodeMetadata
- * - Regular nodes: optionally save text, then update nodes
- */
 export function useNodeItemContext(): NodeItemContext {
   const row = useRow();
   const { viewPath } = row;
@@ -68,14 +57,11 @@ export function useNodeItemContext(): NodeItemContext {
     !isInSearchView &&
     (isDocumentTopLevel ||
       (nodeIndex !== undefined && parentView !== undefined) ||
-      (row.composed !== undefined &&
+      (row.rowType === "occurrence" &&
         parentView !== undefined &&
         !isViewingOtherUserContent) ||
-      // Computed rows are first-class in behavior: a row carrying a
-      // materialization recipe is as interactive as any placed row.
-      (row.materialize !== undefined && parentView !== undefined));
+      (row.rowType === "incoming" && parentView !== undefined));
 
-  // Get the current row using context-aware lookup
   const currentRow = (() => {
     if (isDocumentTopLevel) {
       return currentNode;

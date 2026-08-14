@@ -11,7 +11,7 @@ import {
   Plan,
   planCreateNoteAtRoot,
   planAddToParent,
-  planSaveNodeAndEnsureNodes,
+  planSaveVirtualNode,
 } from "./planner";
 import { planCreateNodesFromMarkdown } from "./markdownPlan";
 import {
@@ -20,6 +20,8 @@ import {
 } from "./editor/FileDropZone";
 import { entityIdForText } from "./core/entityRecognition";
 import { KIND_KNOWLEDGE_DOCUMENT } from "./nostr";
+import { buildOccurrences } from "./core/composition";
+import { graphLookupFromData } from "./core/graphLookup";
 import { ALICE, setup } from "./utils.test";
 
 function planWithEssay(): { plan: Plan; docId: string; rootId: string } {
@@ -89,13 +91,18 @@ test("clipboard Markdown survives empty-row materialization and document renderi
     id: EMPTY_NODE_ID,
   };
   const markdown = `[A link to Hello](#e834645e-8bb5-44f7-89b2-41d5054746af)`;
-  const result = planSaveNodeAndEnsureNodes(
+  const parent = buildOccurrences(graphLookupFromData(plan), {
+    sourceId: LOCAL,
+    id: rootId,
+  }).root;
+  const result = planSaveVirtualNode(
     plan,
     parseInlineSpans(markdown),
     EMPTY_NODE_ID,
     emptyNode,
     [0, rootId, EMPTY_NODE_ID],
-    root,
+    parent,
+    root.id,
     [0, rootId],
     0
   );

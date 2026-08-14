@@ -16,8 +16,6 @@ import { publishEventToRelays } from "../nostr/nostrPublish";
 export type WorkspaceLoaded = {
   profile: LoadedCliProfile;
   files: WorkspaceMarkdownFile[];
-  // Hex private key from the profile's nsec file, when present. Publishing
-  // signs deposits in the renderer; local work needs no key.
   privateKey?: string;
 };
 

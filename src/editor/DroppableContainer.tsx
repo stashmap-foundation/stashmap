@@ -399,8 +399,6 @@ export function useDroppable({
       const dragRows = dragItem.draggedRows.length
         ? dragItem.draggedRows
         : [dragItem.row];
-      // Dropping on yourself is a depth gesture: with a changed indent it
-      // re-parents relative to the row above; without one it is a no-op.
       const selfDrop = isDraggedOccurrence(row, dragRows);
       if (
         selfDrop &&

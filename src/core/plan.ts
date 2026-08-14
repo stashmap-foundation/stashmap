@@ -11,27 +11,19 @@ import type {
   RefTargetSeed,
   TextSeed,
 } from "./connections";
-import type { ComposedRow } from "./composition";
+import type { Occurrence } from "./composition";
 import {
   createDocumentFromRootNode,
   Document,
   documentKeyOf,
   workspaceDocumentKey,
 } from "./Document";
-import { entityIdForText, isCanonicalId } from "./entityRecognition";
-import { LOCAL } from "./nodeRef";
+import { entityIdForText } from "./entityRecognition";
 import { icalFeedLinkText, isBareIcalFeedUrl } from "./ical";
 import { documentLinkHref } from "./linkPath";
 import { getWorkspaceNode, withWorkspace, workspaceOf } from "./knowledge";
 import { newGraphNode } from "./nodeFactory";
-import {
-  fileLinkSpan,
-  getAllLinks,
-  linkSpan,
-  nodeText,
-  placementTarget,
-  plainSpans,
-} from "./nodeSpans";
+import { fileLinkSpan, linkSpan, nodeText, plainSpans } from "./nodeSpans";
 import {
   LOG_ROOT_ROLE,
   getOwnSystemRoot,
@@ -152,10 +144,6 @@ export function upsertNodesCore<T extends GraphPlan>(
   );
 }
 
-// Log entries are plain block links — the reserved non-projecting form.
-// They mean "you created this, here's the way there", never "that node
-// here with my overlay below": an unfolding Log would swallow edits as
-// Log-file overlays nobody asked for.
 function addCrefToLog<T extends GraphPlan>(plan: T, nodeID: ID): T {
   const [planWithLog, nodes] = planEnsureSystemRoot(plan, LOG_ROOT_ROLE);
   const targetNode = getWorkspaceNode(planWithLog.knowledgeDBs, nodeID);
@@ -405,223 +393,34 @@ export function createGraphPlan(props: CreateGraphPlanProps): GraphPlan {
   };
 }
 
-// The materialization seam (idea.md: write gestures take first; the
-// canonical-id law). A computed row proposes — plain data: its synthetic
-// node, its parent, and nearest-first anchors of the display rows above
-// it — and the workspace disposes: id absent → mint the node at the
-// anchor position; id homed elsewhere → a link row targeting it; id
-// already under this parent → no-op (stale row). Overlay-agnostic: the
-// interpreter never learns what produced the row.
-export type MaterializableRow = {
-  node: GraphNode;
-  parentRef?: NodeRef;
-  sourceId?: SourceId;
-  composed?: ComposedRow;
-  materialize?: {
-    precededBy: ID[];
-    // A prepared take: materialize by adding THIS target (a link row or
-    // document link) instead of minting the row's node.
-    take?: AddToParentTarget;
-    // Judgment defaults inherited from the proposal's source, applied
-    // when the gesture carries none.
-    defaults?: { relevance?: Relevance; argument?: Argument };
-    // The row's parent when that parent is itself computed: the take
-    // materializes the host first, then lands under what it returns.
-    host?: MaterializableRow;
-    root?: true;
-  };
-};
-
-function materializeInsertIndex(
-  plan: GraphPlan,
-  parentNode: GraphNode,
-  precededBy: ID[]
-): number {
-  const matchesAnchor = (childId: ID, anchor: ID): boolean => {
-    if (childId === anchor) return true;
-    const child = getWorkspaceNode(plan.knowledgeDBs, childId);
-    return child
-      ? getAllLinks(child).some((link) => link.targetID === anchor)
-      : false;
-  };
-  const children = parentNode.children.toArray();
-  const found = precededBy
-    .map((anchor) =>
-      children.findIndex((childId) => matchesAnchor(childId, anchor))
-    )
-    .find((index) => index >= 0);
-  return found !== undefined ? found + 1 : 0;
-}
-
-export function planTakeComposedRow<T extends GraphPlan>(
+export function planTakeOccurrence<T extends GraphPlan>(
   plan: T,
-  row: ComposedRow
+  row: Occurrence
 ): [T, GraphNode | undefined] {
-  const direct =
-    row.ref.sourceId === LOCAL
-      ? getWorkspaceNode(plan.knowledgeDBs, row.id)
-      : undefined;
-  if (row.reader && direct) {
+  const direct = row.writeLine
+    ? getWorkspaceNode(plan.knowledgeDBs, row.writeLine.node.id)
+    : undefined;
+  if (direct) {
     return [plan, direct];
   }
-  const parent = getWorkspaceNode(plan.knowledgeDBs, row.writeParent);
+  const existingParent = getWorkspaceNode(plan.knowledgeDBs, row.writeParent);
+  const parent = existingParent ?? row.writeRoot;
   if (!parent) {
     return [plan, undefined];
   }
-  const target = row.reader ? row.target ?? row.id : row.id;
-  const existing = parent.children
-    .map((id) => getWorkspaceNode(plan.knowledgeDBs, id))
-    .find((node) => placementTarget(node) === target);
-  if (existing) {
-    return [plan, existing];
+  const withParent = existingParent ? plan : planUpsertNodes(plan, parent);
+  if (!existingParent && row.writeRoot !== undefined) {
+    return [withParent, parent];
   }
+  const target = row.writeTarget;
   const [next, ids] = planAddTargetsToNode(
-    plan,
+    withParent,
     parent.id,
     createRefTarget(target, row.text)
   );
   return [next, getWorkspaceNode(next.knowledgeDBs, ids[0])];
 }
 
-export function planMaterializeComputedRow<T extends GraphPlan>(
-  plan: T,
-  row: MaterializableRow,
-  metadata?: { relevance?: Relevance; argument?: Argument },
-  placement?: { parentID?: ID; insertIndex?: number }
-): [T, GraphNode, boolean] {
-  if (!row.materialize) {
-    if (
-      row.composed &&
-      !(row.composed.reader && row.composed.ref.sourceId === LOCAL)
-    ) {
-      const [taken, node] = planTakeComposedRow(plan, row.composed);
-      return node ? [taken, node, true] : [plan, row.node, false];
-    }
-    return [plan, row.node, false];
-  }
-  if (row.materialize.root) {
-    const existingRoot = getWorkspaceNode(plan.knowledgeDBs, row.node.id);
-    if (existingRoot) {
-      return [plan, existingRoot, false];
-    }
-    const rootNode: GraphNode = {
-      ...row.node,
-      parent: undefined,
-      root: row.node.id,
-      updated: Date.now(),
-      relevance: metadata?.relevance,
-      argument: metadata?.argument,
-    };
-    const planWithRoot = planUpsertNodes(plan, rootNode);
-    const materializedRoot = getWorkspaceNode(
-      planWithRoot.knowledgeDBs,
-      rootNode.id
-    );
-    return [planWithRoot, materializedRoot ?? rootNode, true];
-  }
-  const parentID = placement?.parentID ?? row.parentRef?.id;
-  if (parentID === undefined) {
-    return [plan, row.node, false];
-  }
-  const parentNode = getWorkspaceNode(plan.knowledgeDBs, parentID);
-  if (!parentNode) {
-    const { host } = row.materialize;
-    if (!host) {
-      return [plan, row.node, false];
-    }
-    const [planWithHost, hostNode] = planMaterializeComputedRow(plan, host);
-    if (!getWorkspaceNode(planWithHost.knowledgeDBs, hostNode.id)) {
-      return [plan, row.node, false];
-    }
-    return planMaterializeComputedRow(planWithHost, row, metadata, {
-      parentID: hostNode.id,
-      insertIndex: placement?.insertIndex,
-    });
-  }
-  const placedChildId = parentNode.children.find((childId) => {
-    if (childId === row.node.id) {
-      return true;
-    }
-    const child = getWorkspaceNode(plan.knowledgeDBs, childId);
-    return child
-      ? getAllLinks(child).some((link) => link.targetID === row.node.id)
-      : false;
-  });
-  if (placedChildId !== undefined) {
-    const already = getWorkspaceNode(plan.knowledgeDBs, placedChildId);
-    return [plan, already ?? row.node, false];
-  }
-  const insertIndex =
-    placement?.insertIndex ??
-    materializeInsertIndex(plan, parentNode, row.materialize.precededBy);
-  if (row.materialize.take !== undefined) {
-    const [planWithTake, ids] = planAddTargetsToNode(
-      plan,
-      parentID,
-      row.materialize.take,
-      insertIndex,
-      metadata?.relevance ?? row.materialize.defaults?.relevance,
-      metadata?.argument ?? row.materialize.defaults?.argument
-    );
-    const takenNode = getWorkspaceNode(planWithTake.knowledgeDBs, ids[0]);
-    return [planWithTake, takenNode ?? row.node, true];
-  }
-  if (isCanonicalId(row.node.id)) {
-    const [planWithPlacement, ids] = planAddTargetsToNode(
-      plan,
-      parentID,
-      { targetID: row.node.id, linkText: nodeText(row.node) },
-      insertIndex,
-      metadata?.relevance ?? row.materialize.defaults?.relevance,
-      metadata?.argument ?? row.materialize.defaults?.argument
-    );
-    const placementNode = getWorkspaceNode(
-      planWithPlacement.knowledgeDBs,
-      ids[0]
-    );
-    return [planWithPlacement, placementNode ?? row.node, true];
-  }
-  const existing = getWorkspaceNode(plan.knowledgeDBs, row.node.id);
-  if (existing) {
-    // Homed elsewhere: this placement becomes a link row (mint or link,
-    // never duplicate) and the gesture applies to the link — judgment at
-    // a placement is placement-local.
-    const [planWithLink, ids] = planAddTargetsToNode(
-      plan,
-      parentID,
-      { targetID: row.node.id, linkText: nodeText(existing) },
-      insertIndex,
-      metadata?.relevance,
-      metadata?.argument
-    );
-    const linkNode = getWorkspaceNode(planWithLink.knowledgeDBs, ids[0]);
-    return [planWithLink, linkNode ?? row.node, true];
-  }
-  // The mint carries the user's explicit judgment or none at all —
-  // projection rows enter the file unjudged.
-  const minted: GraphNode = {
-    ...row.node,
-    parent: parentID,
-    root: parentNode.root,
-    updated: Date.now(),
-    relevance: metadata?.relevance,
-    argument: metadata?.argument,
-  };
-  const planWithNode = planUpsertNodes(plan, minted);
-  const [planAttached] = planAddTargetsToNode(
-    planWithNode,
-    parentID,
-    minted.id,
-    insertIndex
-  );
-  const node = getWorkspaceNode(planAttached.knowledgeDBs, minted.id);
-  return [planAttached, node ?? minted, true];
-}
-
-// The listening side of publication (idea.md): machine-written at the
-// moment an embed is created — the one moment the source is known for
-// certain. One entry per source document; entries are cache, a stale one
-// costs a lookup, never correctness.
 export function planRecordKnowstrSource<T extends GraphPlan>(
   plan: T,
   targetNode: GraphNode,
@@ -810,9 +609,6 @@ export function planAddTargetsToNode<T extends GraphPlan>(
         ];
       }
 
-      // Mint or link: recognized entity text created UNDER a parent is
-      // always a link row targeting the entity (dangling allowed, no page
-      // is created) — the entity's home, if any, lends its text.
       const entityId = entityIdForText(objectText || "");
       const entityHome = entityId
         ? getWorkspaceNode(accPlan.knowledgeDBs, entityId as ID)
@@ -921,7 +717,8 @@ export function planAddTopTargetsToDocument<T extends GraphPlan>(
           relevance,
           argument,
         }),
-        ...(refTarget && { extraAttrs: { embed: "true" } }),
+        ...(refTarget?.reference !== true &&
+          refTarget && { extraAttrs: { embed: "true" } }),
       };
       return [planUpsertNodes(accPlan, topNode), [...accIds, topNode.id]];
     },

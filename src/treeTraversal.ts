@@ -14,21 +14,15 @@ import {
   EMPTY_NODE_ID,
   computeEmptyNodeMetadata,
   createRefTarget,
+  isEmptyNodeID,
   isSearchId,
   itemPassesFilters,
   nodePathLabel as nodePathLabelOf,
 } from "./core/connections";
+import { linkSpan, nodeText, plainSpans } from "./core/nodeSpans";
 import {
-  embeddedTarget,
-  linkSpan,
-  nodeText,
-  plainSpans,
-} from "./core/nodeSpans";
-import {
-  calendarEntryTarget,
-  embeddedFeedUrl,
+  calendarFeedTargetUrl,
   hiddenPastEntryCount,
-  isCalendarEntryId,
   isPastCalendarRowText,
 } from "./core/ical";
 import { getDocumentByIdOrFilePath, type Document } from "./core/Document";
@@ -44,14 +38,17 @@ import {
   graphLookupFromData,
   lookupNode,
 } from "./core/graphLookup";
-import { ComposedRow, composeNote } from "./core/composition";
+import {
+  Occurrence,
+  buildOccurrences,
+  buildWriteRootOccurrence,
+} from "./core/composition";
 
 export type TreeResult = {
   rows: List<Row>;
 };
 
 type TreeTraversalOptions = {
-  isMarkdownExport?: boolean;
   projectedRoot?: GraphNode;
 };
 
@@ -122,29 +119,21 @@ function createRow(
   childIndex: number | undefined,
   isFirstVirtual: boolean,
   virtualType: Row["virtualType"] | undefined
-): Row {
+): Omit<
+  Row,
+  | "rowType"
+  | "occurrence"
+  | "incomingTarget"
+  | "incomingParent"
+  | "incomingEmbed"
+  | "emptyParent"
+  | "action"
+> {
   const nodeID = node.id;
   const inheritedVirtualType =
     parentRow?.virtualType === "search" ? parentRow.virtualType : undefined;
   const rowVirtualType =
     virtualType ?? (isSearchId(nodeID) ? "search" : inheritedVirtualType);
-  const projected =
-    parentRow !== undefined &&
-    (parentRow.projected === true ||
-      (embeddedTarget(parentRow.node) !== undefined &&
-        !parentRow.node.children.includes(nodeID)));
-  const standsFor = (() => {
-    const targetID = embeddedTarget(node);
-    if (targetID === undefined) {
-      return undefined;
-    }
-    const target = lookupNode(graph, targetID, sourceId)?.node;
-    return target ? { id: targetID, liveText: nodeText(target) } : undefined;
-  })();
-  const provenance =
-    rowVirtualType === "incoming"
-      ? { kind: rowVirtualType, sourceId }
-      : undefined;
   const pane = data.panes[viewPath[0]];
   const reference =
     rowVirtualType === "incoming"
@@ -198,30 +187,27 @@ function createRow(
     parentChildIndex: parentRow?.childIndex,
     childIndex,
     hasChildren: false,
-    ...(standsFor && { standsFor }),
-    ...(projected && { projected: true }),
     isFirstVirtual,
     virtualType: rowVirtualType,
-    provenance,
     reference,
   };
 }
 
-function locateComposedRow(root: ComposedRow, id: ID): ComposedRow | undefined {
+function locateOccurrence(root: Occurrence, id: ID): Occurrence | undefined {
   if (root.id === id) {
     return root;
   }
-  return root.children.reduce<ComposedRow | undefined>(
-    (found, child) => found ?? locateComposedRow(child, id),
+  return root.children.reduce<Occurrence | undefined>(
+    (found, child) => found ?? locateOccurrence(child, id),
     undefined
   );
 }
 
-function composedAt(
+function occurrenceAt(
   graph: GraphLookup,
   segment: ID,
   sourceId: SourceId
-): ComposedRow | undefined {
+): Occurrence | undefined {
   if (isSearchId(segment) || isEmptyViewPathID(segment)) {
     return undefined;
   }
@@ -233,65 +219,97 @@ function composedAt(
     sourceId: resolved.ref.sourceId,
     id: resolved.node.root,
   });
-  return root
-    ? locateComposedRow(composeNote(graph, root.ref).root, segment)
+  const rooted = root
+    ? locateOccurrence(buildOccurrences(graph, root.ref).root, segment)
     : undefined;
+  return rooted ?? buildOccurrences(graph, resolved.ref).root;
+}
+
+function occurrenceNode(occurrence: Occurrence): GraphNode {
+  return {
+    ...occurrence.line.node,
+    spans: occurrence.content.node.spans,
+    relevance: occurrence.relevance,
+    argument: occurrence.argument,
+  };
 }
 
 function graphParent(
   graph: GraphLookup,
-  composed: ComposedRow
+  occurrence: Occurrence
 ): ResolvedNode | undefined {
-  if (composed.reader && composed.writtenParent !== undefined) {
-    return getNodeInSource(graph, {
-      sourceId: composed.ref.sourceId,
-      id: composed.writtenParent,
-    });
-  }
-  return composed.sourceParent
-    ? getNodeInSource(graph, composed.sourceParent)
-    : undefined;
+  const parent = occurrence.persisted
+    ? occurrence.physicalParent
+    : occurrence.sourceParent;
+  return parent ? getNodeInSource(graph, parent) : undefined;
 }
 
-function attachComposed(row: Row, composed: ComposedRow): Row {
-  const standsFor =
-    composed.target === undefined ||
-    (composed.kind !== "placement" && composed.kind !== "speaking")
-      ? undefined
-      : { id: composed.target, liveText: composed.text };
+type RowBase = ReturnType<typeof createRow>;
+
+function attachOccurrence(row: RowBase, occurrence: Occurrence): Row {
   return {
     ...row,
-    node: {
-      ...composed.node,
-      relevance: composed.relevance,
-      argument: composed.argument,
-    },
-    ref: composed.ref,
-    sourceId: composed.ref.sourceId,
-    composed,
-    ...(standsFor && { standsFor }),
-    projected: composed.reader ? undefined : true,
+    rowType: "occurrence",
+    node: occurrenceNode(occurrence),
+    ref: occurrence.line.ref,
+    sourceId: occurrence.line.ref.sourceId,
+    occurrence,
+    incomingTarget: undefined,
+    incomingParent: undefined,
+    incomingEmbed: undefined,
+    emptyParent: undefined,
+    virtualType: undefined,
+    action: undefined,
   };
 }
 
-function rowFromComposed(
+function attachEmpty(row: RowBase, parent: Occurrence | undefined): Row {
+  return {
+    ...row,
+    rowType: "empty",
+    occurrence: undefined,
+    incomingTarget: undefined,
+    incomingParent: undefined,
+    incomingEmbed: undefined,
+    emptyParent: parent,
+    virtualType: undefined,
+    action: undefined,
+  };
+}
+
+function attachSearch(row: RowBase): Row {
+  return {
+    ...row,
+    rowType: "search",
+    occurrence: undefined,
+    incomingTarget: undefined,
+    incomingParent: undefined,
+    incomingEmbed: undefined,
+    emptyParent: undefined,
+    virtualType: "search",
+    action: undefined,
+  };
+}
+
+function rowFromOccurrence(
   data: Data,
   graph: GraphLookup,
   parentRow: Row,
-  composed: ComposedRow
+  occurrence: Occurrence
 ): Row {
-  const viewPath = appendNodeToPath(parentRow.viewPath, composed.id);
-  const parent = graphParent(graph, composed);
+  const viewPath = appendNodeToPath(parentRow.viewPath, occurrence.id);
+  const parent = graphParent(graph, occurrence);
   const childIndex =
-    composed.reader && parent
-      ? parent.node.children.findIndex((id) => id === composed.id)
+    occurrence.persisted && parent
+      ? parent.node.children.findIndex((id) => id === occurrence.id)
       : -1;
+  const node = occurrenceNode(occurrence);
   const row = createRow(
     data,
     graph,
     viewPath,
-    composed.node,
-    composed.ref.sourceId,
+    node,
+    occurrence.line.ref.sourceId,
     parentRow,
     parentRow.node,
     parentRow.ref,
@@ -300,11 +318,11 @@ function rowFromComposed(
     undefined
   );
   const resolvedView = resolveRowView(data, viewPath, parentRow.viewStateKey, [
-    composed.id,
-    ...(composed.target !== undefined ? [composed.target] : []),
+    occurrence.id,
+    ...(occurrence.target !== undefined ? [occurrence.target] : []),
   ]);
   return {
-    ...attachComposed(row, composed),
+    ...attachOccurrence(row, occurrence),
     view: resolvedView.view,
     viewStateKey: resolvedView.key,
   };
@@ -363,19 +381,20 @@ function resolveRowStep(
   const paneSourceId = sourceIdForPath(data, viewPath);
   const segments = expansionPathOf(viewPath);
   const pathID = segments[segments.length - 1];
-  const composed = parentRow?.composed
-    ? parentRow.composed.children.find((child) => child.id === pathID)
-    : composedAt(graph, pathID, paneSourceId);
-  if (composed && parentRow) {
-    return rowFromComposed(data, graph, parentRow, composed);
+  const occurrence =
+    parentRow?.rowType === "occurrence"
+      ? parentRow.occurrence.children.find((child) => child.id === pathID)
+      : occurrenceAt(graph, pathID, paneSourceId);
+  if (occurrence && parentRow) {
+    return rowFromOccurrence(data, graph, parentRow, occurrence);
   }
-  if (composed) {
+  if (occurrence) {
     const root = createRow(
       data,
       graph,
       viewPath,
-      composed.node,
-      composed.ref.sourceId,
+      occurrenceNode(occurrence),
+      occurrence.line.ref.sourceId,
       undefined,
       undefined,
       undefined,
@@ -383,7 +402,7 @@ function resolveRowStep(
       false,
       undefined
     );
-    return attachComposed(root, composed);
+    return attachOccurrence(root, occurrence);
   }
   if (segments.length === 1 && options?.projectedRoot?.id === pathID) {
     const row = createRow(
@@ -399,7 +418,23 @@ function resolveRowStep(
       false,
       undefined
     );
-    return { ...row, materialize: { precededBy: [], root: true } };
+    const rootNode: GraphNode = {
+      ...options.projectedRoot,
+      parent: undefined,
+      root: options.projectedRoot.id,
+    };
+    return attachOccurrence(
+      row,
+      buildWriteRootOccurrence(rootNode, graph.localSourceId)
+    );
+  }
+  if (
+    pathID !== EMPTY_NODE_ID &&
+    !isEmptyViewPathID(pathID) &&
+    !isSearchId(pathID) &&
+    parentRow?.rowType !== "search"
+  ) {
+    return undefined;
   }
   const childIndex = parentRow
     ? getNodeIndexForPath(parentRow.node, pathID)
@@ -428,12 +463,10 @@ function resolveRowStep(
   if (!node) {
     return undefined;
   }
-  // A path segment that is not a file child of its parent (a projected
-  // row) belongs to the source that resolved it, not to the parent.
   const rowSourceId = edgeNode
     ? parentRow?.sourceId ?? resolved?.ref.sourceId ?? paneSourceId
     : resolved?.ref.sourceId ?? parentRow?.sourceId ?? paneSourceId;
-  return createRow(
+  const row = createRow(
     data,
     graph,
     viewPath,
@@ -446,6 +479,12 @@ function resolveRowStep(
     false,
     undefined
   );
+  return isEmptyNodeID(node.id)
+    ? attachEmpty(
+        row,
+        parentRow?.rowType === "occurrence" ? parentRow.occurrence : undefined
+      )
+    : attachSearch(row);
 }
 
 function resolveRowForPath(
@@ -485,18 +524,21 @@ function createChildRow(
   if (childID === EMPTY_NODE_ID) {
     const emptyNode = getEmptyNodeItem(data, parentNode);
     return emptyNode
-      ? createRow(
-          data,
-          graph,
-          viewPath,
-          emptyNode,
-          graph.localSourceId,
-          parentRow,
-          parentNode,
-          parentRef,
-          childIndex,
-          false,
-          undefined
+      ? attachEmpty(
+          createRow(
+            data,
+            graph,
+            viewPath,
+            emptyNode,
+            graph.localSourceId,
+            parentRow,
+            parentNode,
+            parentRef,
+            childIndex,
+            false,
+            undefined
+          ),
+          parentRow.rowType === "occurrence" ? parentRow.occurrence : undefined
         )
       : undefined;
   }
@@ -505,18 +547,20 @@ function createChildRow(
     id: childID,
   });
   return child
-    ? createRow(
-        data,
-        graph,
-        viewPath,
-        child.node,
-        child.ref.sourceId,
-        parentRow,
-        parentNode,
-        parentRef,
-        childIndex,
-        false,
-        undefined
+    ? attachSearch(
+        createRow(
+          data,
+          graph,
+          viewPath,
+          child.node,
+          child.ref.sourceId,
+          parentRow,
+          parentNode,
+          parentRef,
+          childIndex,
+          false,
+          undefined
+        )
       )
     : undefined;
 }
@@ -617,8 +661,7 @@ function createVirtualRow(
   graph: GraphLookup,
   input: VirtualFooterInput,
   rowRef: NodeRef,
-  isFirstVirtual: boolean,
-  priorAnchors: ID[] = []
+  isFirstVirtual: boolean
 ): Row {
   const sourceNodeID = rowRef.id;
   const { node, sourceId } = createVirtualRowNode(data, graph, input, rowRef);
@@ -647,38 +690,54 @@ function createVirtualRow(
     isFirstVirtual,
     "incoming"
   );
-  const parentChildren = input.parentID
-    ? getNodeInSource(graph, {
-        sourceId: input.parentSourceId,
-        id: input.parentID,
-      })?.node.children.toArray() ?? []
-    : [];
   const inherited = getNodeInSource(graph, {
     sourceId,
     id: sourceNodeID,
   })?.node;
+  const resolvedParent = input.parentID
+    ? occurrenceAt(graph, input.parentID, input.parentSourceId)
+    : undefined;
+  const writeParent = (() => {
+    if (input.parentRow?.rowType === "occurrence") {
+      return input.parentRow.occurrence;
+    }
+    if (resolvedParent) {
+      return resolvedParent;
+    }
+    if (input.parentID === undefined) {
+      return undefined;
+    }
+    const root: GraphNode = {
+      children: List<ID>(),
+      id: input.parentID,
+      spans: input.parentRow?.node.spans ?? plainSpans(input.parentID),
+      updated: input.parentUpdated,
+      root: input.parentID,
+      relevance: undefined,
+    };
+    return buildWriteRootOccurrence(root, graph.localSourceId);
+  })();
   return {
     ...row,
-    materialize: {
-      precededBy: [...priorAnchors, ...([...parentChildren].reverse() as ID[])],
-      take: incomingTakeTarget(graph, sourceNodeID, sourceId),
-      defaults: {
-        relevance: inherited?.relevance,
-        argument: inherited?.argument,
-      },
-      ...(input.parentRow?.materialize ||
-      input.parentRow?.composed?.reader === false
-        ? { host: input.parentRow }
-        : {}),
+    rowType: "incoming",
+    occurrence: undefined,
+    incomingTarget: incomingTakeTarget(graph, sourceNodeID, sourceId),
+    incomingParent: writeParent,
+    incomingEmbed:
+      row.reference?.sourceId === LOCAL && input.parentSourceId === LOCAL
+        ? true
+        : undefined,
+    emptyParent: undefined,
+    virtualType: "incoming",
+    action: undefined,
+    node: {
+      ...row.node,
+      relevance: inherited?.relevance,
+      argument: inherited?.argument,
     },
   };
 }
 
-// The action row: a full-text, clickable, button-shaped thing in row
-// position that is obviously not content — the wallet's "Register as
-// Shareholder" element, shared instead of reinvented. One interaction
-// (click), no gutter, no editor, no judgment. Carries its own view
-// state (showPastEntries), so the reveal survives collapse/expand.
 function createFooterActionRow(
   data: Data,
   graph: GraphLookup,
@@ -687,7 +746,7 @@ function createFooterActionRow(
   parentSourceId: SourceId,
   id: ID,
   label: string,
-  action: Row["action"]
+  action: "toggle-past-entries"
 ): Row {
   const node: GraphNode = {
     children: List<ID>(),
@@ -713,7 +772,17 @@ function createFooterActionRow(
     false,
     undefined
   );
-  return { ...row, action };
+  return {
+    ...row,
+    rowType: "action",
+    occurrence: undefined,
+    incomingTarget: undefined,
+    incomingParent: undefined,
+    incomingEmbed: undefined,
+    emptyParent: undefined,
+    virtualType: undefined,
+    action,
+  };
 }
 
 function createPastDatesActionRow(
@@ -744,7 +813,6 @@ function appendVirtualFooterRows(
   const groups = groupIncomingRefs(graph, input.incomingCrefs);
   const incomingRows = input.incomingCrefs.reduce<{
     rows: Row[];
-    priorAnchors: ID[];
     emittedGroupKeys: ImmutableSet<string>;
   }>(
     (acc, rowRef) => {
@@ -753,33 +821,27 @@ function appendVirtualFooterRows(
       const group = groups.get(key);
       const grouped =
         group !== undefined && group.refs.length >= INCOMING_GROUP_THRESHOLD;
-      const nextPriorAnchors = [rowRef.id, ...acc.priorAnchors];
       if (grouped && acc.emittedGroupKeys.has(key)) {
-        return {
-          ...acc,
-          priorAnchors: nextPriorAnchors,
-        };
+        return acc;
       }
       const row = createVirtualRow(
         data,
         graph,
         input,
         grouped ? group.rootRef : rowRef,
-        acc.rows.length === 0,
-        acc.priorAnchors
+        acc.rows.length === 0
       );
       return {
         rows: [
           ...acc.rows,
           grouped ? withIncomingGroupChildren(row, group.refs) : row,
         ],
-        priorAnchors: nextPriorAnchors,
         emittedGroupKeys: grouped
           ? acc.emittedGroupKeys.add(key)
           : acc.emittedGroupKeys,
       };
     },
-    { rows: [], priorAnchors: [], emittedGroupKeys: ImmutableSet<string>() }
+    { rows: [], emittedGroupKeys: ImmutableSet<string>() }
   ).rows;
   return { rows: initial.rows.concat(incomingRows) };
 }
@@ -805,8 +867,7 @@ function createIncomingGroupChildRow(
   data: Data,
   graph: GraphLookup,
   parentRow: Row,
-  childID: ID,
-  index: number
+  childID: ID
 ): Row | undefined {
   const sourceNode = getNodeInSource(graph, {
     sourceId: parentRow.sourceId,
@@ -842,23 +903,21 @@ function createIncomingGroupChildRow(
     false,
     "incoming"
   );
-  const priorChildIds = parentRow.node.children.slice(0, index).reverse();
   return {
     ...row,
+    rowType: "incoming",
+    occurrence: undefined,
     reference: shortIncomingReference(row.reference),
-    materialize: {
-      precededBy: [
-        ...priorChildIds.toArray(),
-        ...(parentRow.materialize?.precededBy ?? []),
-      ],
-      take: incomingTakeTarget(graph, childID, parentRow.sourceId),
-      defaults: {
-        relevance: sourceNode.relevance,
-        argument: sourceNode.argument,
-      },
-      ...(parentRow.materialize?.host
-        ? { host: parentRow.materialize.host }
-        : {}),
+    incomingTarget: incomingTakeTarget(graph, childID, parentRow.sourceId),
+    incomingParent: parentRow.incomingParent,
+    incomingEmbed: parentRow.incomingEmbed,
+    emptyParent: undefined,
+    virtualType: "incoming",
+    action: undefined,
+    node: {
+      ...row.node,
+      relevance: sourceNode.relevance,
+      argument: sourceNode.argument,
     },
   };
 }
@@ -870,8 +929,8 @@ function getIncomingGroupChildren(
 ): TreeResult {
   return {
     rows: parentRow.node.children
-      .map((childID, index) =>
-        createIncomingGroupChildRow(data, graph, parentRow, childID, index)
+      .map((childID) =>
+        createIncomingGroupChildRow(data, graph, parentRow, childID)
       )
       .filter((row): row is Row => row !== undefined)
       .toList(),
@@ -918,8 +977,7 @@ function getChildrenForRegularNode(
   parentRow: Row,
   rootNode: ID | undefined,
   author: SourceId,
-  typeFilters: Pane["typeFilters"],
-  options?: TreeTraversalOptions
+  typeFilters: Pane["typeFilters"]
 ): TreeResult {
   const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
   const directNode: ResolvedNode = { ref: parentRow.ref, node: parentRow.node };
@@ -952,53 +1010,54 @@ function getChildrenForRegularNode(
           index
         ),
       }))
-      .filter(({ childID, row }) =>
-        options?.isMarkdownExport
-          ? row !== undefined && childID !== EMPTY_NODE_ID
-          : childID === EMPTY_NODE_ID ||
-            (row !== undefined && itemPassesFilters(row.node, activeFilters))
+      .filter(
+        ({ childID, row }) =>
+          childID === EMPTY_NODE_ID ||
+          (row !== undefined && itemPassesFilters(row.node, activeFilters))
       )
       .filter(
         (pair): pair is { childID: ID; row: Row } => pair.row !== undefined
       )
       .toList();
 
-  if (options?.isMarkdownExport) {
-    return { rows: rawChildRows().map(({ row }) => row) };
-  }
-
-  const childRowPairs = parentRow.composed
-    ? List<{ childID: ID; row: Row }>()
-    : rawChildRows();
-  const combinedRows = parentRow.composed
-    ? spliceEmptyRows(
-        data,
-        graph,
-        parentRow,
-        List(
-          parentRow.composed.children
-            .filter((child) =>
-              itemPassesFilters(
-                {
-                  ...child.node,
-                  relevance: child.relevance,
-                  argument: child.argument,
-                },
-                activeFilters
+  const childRowPairs =
+    parentRow.rowType === "occurrence"
+      ? List<{ childID: ID; row: Row }>()
+      : rawChildRows();
+  const combinedRows =
+    parentRow.rowType === "occurrence"
+      ? spliceEmptyRows(
+          data,
+          graph,
+          parentRow,
+          List(
+            parentRow.occurrence.children
+              .filter((child) =>
+                itemPassesFilters(
+                  {
+                    ...child.line.node,
+                    relevance: child.relevance,
+                    argument: child.argument,
+                  },
+                  activeFilters
+                )
               )
-            )
-            .map((child) => rowFromComposed(data, graph, parentRow, child))
+              .map((child) => rowFromOccurrence(data, graph, parentRow, child))
+          )
         )
-      )
-    : childRowPairs.map(({ row }) => row);
+      : childRowPairs.map(({ row }) => row);
 
   if (!isFileRow(parentRow)) {
     return { rows: combinedRows };
   }
 
-  const feedUrl = embeddedFeedUrl(nodes);
+  const feedUrl =
+    parentRow.rowType === "occurrence"
+      ? calendarFeedTargetUrl(parentRow.occurrence.target)
+      : undefined;
   const isBarePastRow = (row: Row): boolean =>
-    row.composed?.reader === false &&
+    row.rowType === "occurrence" &&
+    row.occurrence.persisted === undefined &&
     isPastCalendarRowText(nodeText(row.node), Date.now());
   const hiddenPastCount =
     feedUrl === undefined ? 0 : combinedRows.filter(isBarePastRow).size;
@@ -1020,7 +1079,11 @@ function getChildrenForRegularNode(
   const incomingCrefs = getIncomingCrefsForNode(
     data,
     visibleAuthors,
-    parentRow.standsFor?.id ?? nodes.id,
+    (parentRow.rowType === "occurrence" &&
+    (parentRow.occurrence.kind === "placement" ||
+      parentRow.occurrence.kind === "speaking")
+      ? parentRow.occurrence.target
+      : undefined) ?? nodes.id,
     nodeSourceId,
     expansionPathOf(parentRow.viewPath),
     allChildNodes,
@@ -1040,8 +1103,6 @@ function getChildrenForRegularNode(
     incomingCrefs: visibleIncomingCrefs,
   });
 
-  // The action row leads the footer block: it carries the dotted
-  // separator (isFirstVirtual) and the real virtual rows lose it.
   const footerRows = actionRow
     ? List<Row>([{ ...actionRow, isFirstVirtual: true }]).concat(
         footerResult.rows.map((footerRow) => ({
@@ -1062,8 +1123,7 @@ function getTreeChildrenForResolvedRow(
   parentRow: Row,
   rootNode: ID | undefined,
   author: SourceId,
-  typeFilters: Pane["typeFilters"],
-  options?: TreeTraversalOptions
+  typeFilters: Pane["typeFilters"]
 ): TreeResult {
   if (
     parentRow.virtualType === "incoming" &&
@@ -1078,8 +1138,7 @@ function getTreeChildrenForResolvedRow(
     parentRow,
     rootNode,
     author,
-    typeFilters,
-    options
+    typeFilters
   );
 }
 
@@ -1104,24 +1163,21 @@ export function getTreeChildren(
   };
 }
 
-function hasHiddenPastEntries(
-  data: Data,
-  graph: GraphLookup,
-  node: GraphNode,
-  sourceId: SourceId
-): boolean {
-  const feedUrl = embeddedFeedUrl(node);
+function hasHiddenPastEntries(data: Data, row: Row): boolean {
+  if (row.rowType !== "occurrence") {
+    return false;
+  }
+  const feedUrl = calendarFeedTargetUrl(row.occurrence.target);
   const entries = feedUrl ? data.calendarFeeds?.get(feedUrl) : undefined;
   if (!entries) {
     return false;
   }
-  const childKeys = node.children.toArray().map((childId) => {
-    const child = getNodeInSource(graph, { sourceId, id: childId })?.node;
-    return (
-      calendarEntryTarget(child) ??
-      (child && isCalendarEntryId(child.id) ? child.id : childId)
-    );
-  });
+  const childKeys = row.occurrence.children.flatMap((child) =>
+    child.persisted !== undefined &&
+    child.physicalParent?.id === row.occurrence.id
+      ? [child.target ?? child.id]
+      : []
+  );
   return hiddenPastEntryCount(childKeys, entries, Date.now()) > 0;
 }
 
@@ -1132,8 +1188,7 @@ function getNodesInRows(
   ctx: List<Row>,
   rootNode: ID | undefined,
   author: SourceId,
-  typeFilters: Pane["typeFilters"],
-  options?: TreeTraversalOptions
+  typeFilters: Pane["typeFilters"]
 ): TreeResult {
   return rootRows.reduce<TreeResult>((result, rootRow) => {
     const childResult = getTreeChildrenForResolvedRow(
@@ -1142,23 +1197,18 @@ function getNodesInRows(
       rootRow,
       rootNode,
       author,
-      typeFilters,
-      options
+      typeFilters
     );
     const row = {
       ...rootRow,
       hasChildren:
         childResult.rows.size > 0 ||
-        (isFileRow(rootRow) &&
-          hasHiddenPastEntries(data, graph, rootRow.node, rootRow.sourceId)),
+        (isFileRow(rootRow) && hasHiddenPastEntries(data, rootRow)),
     };
     const withRoot = {
       rows: result.rows.push(row),
     };
-    const shouldRecurse = options?.isMarkdownExport
-      ? true
-      : rootRow.view.expanded;
-    if (!shouldRecurse) {
+    if (!rootRow.view.expanded) {
       return withRoot;
     }
 
@@ -1169,8 +1219,7 @@ function getNodesInRows(
       withRoot.rows,
       rootNode,
       author,
-      typeFilters,
-      options
+      typeFilters
     );
   }, emptyTreeResult(ctx));
 }
@@ -1204,8 +1253,7 @@ export function getNodesInTree(
         contextRows,
         rootNode,
         author,
-        typeFilters,
-        options
+        typeFilters
       ).rows
     ),
   };

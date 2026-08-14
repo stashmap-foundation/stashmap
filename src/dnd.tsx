@@ -10,7 +10,7 @@ import {
   getNode,
 } from "./core/connections";
 import { nodeText } from "./core/nodeSpans";
-import { calendarEntryTarget, isCalendarEntryId } from "./core/ical";
+import { isCalendarEntryId } from "./core/ical";
 import { getIndependentRows, getVisibleParentRow } from "./rowModel";
 import { getDocumentForNode } from "./core/Document";
 import {
@@ -50,9 +50,6 @@ function addFallbackLinkText(
   return createRefTarget(target.targetID, text);
 }
 
-// Dragging a row from another user's document records that document in
-// knowstr_sources of ours — the one moment the source is known for
-// certain, so foreign ids resolve on a future fetch.
 function planRecordForeignSource(
   plan: Plan,
   sourcePane: Pane | undefined,
@@ -114,9 +111,6 @@ function getDropDestinationEndOfVisibleRoot(
     : undefined;
 }
 
-// A computed row has no childIndex; its drop position derives from the
-// nearest preceding PLACED sibling in display order — your arrangement
-// wins where displayed, the merge re-slots the projections around it.
 function placedIndexAfter(rows: List<Row>, row: Row): number {
   const previousPlaced = rows
     .slice(0, row.index)
@@ -135,9 +129,6 @@ function placedIndexAfter(rows: List<Row>, row: Row): number {
 type DropDestination = {
   parentRow: Row;
   insertAtIndex: number;
-  // The display row the insertion conceptually follows. When it is a
-  // computed row, the drop materializes it — arranging something
-  // relative to an entry is touching it.
   anchorRow?: Row;
 };
 
@@ -191,8 +182,6 @@ function getDropBeforeParentDestination(
   if (!parentRow) {
     return getDropDestinationEndOfVisibleRoot(rows);
   }
-  // Inserting before a row = after its display predecessor under the
-  // same parent, which may be a computed row.
   const displayPredecessor = rows.get(dropBefore.index - 1);
   const anchorRow =
     displayPredecessor &&
@@ -306,13 +295,14 @@ export function dnd(
   }
   const sourcePane = basePlan.panes[sourceDrag.sourcePaneIndex];
   const rootOf = (row: Row): ID | undefined => {
-    if (!row.composed) {
+    if (row.rowType !== "occurrence") {
       return undefined;
     }
-    if (row.composed.reader) {
-      return row.node.root;
+    if (row.occurrence.writeLine) {
+      return row.occurrence.writeLine.node.root;
     }
-    return getNode(basePlan.knowledgeDBs, row.composed.scope, LOCAL)?.root;
+    return getNode(basePlan.knowledgeDBs, row.occurrence.writeParent, LOCAL)
+      ?.root;
   };
   const targetRoot = rootOf(targetParentRow);
   const localRoot =
@@ -332,14 +322,22 @@ export function dnd(
   const sourceDocument = getDocumentForNode(
     basePlan.knowledgeDBs,
     basePlan.documents,
-    sourceDrag.row.node,
-    sourceDrag.row.sourceId
+    sourceDrag.row.rowType === "occurrence"
+      ? sourceDrag.row.occurrence.line.node
+      : sourceDrag.row.node,
+    sourceDrag.row.rowType === "occurrence"
+      ? sourceDrag.row.occurrence.line.ref.sourceId
+      : sourceDrag.row.sourceId
   );
   const targetDocument = getDocumentForNode(
     basePlan.knowledgeDBs,
     basePlan.documents,
-    targetParentRow.node,
-    targetParentRow.sourceId
+    targetParentRow.rowType === "occurrence"
+      ? targetParentRow.occurrence.line.node
+      : targetParentRow.node,
+    targetParentRow.rowType === "occurrence"
+      ? targetParentRow.occurrence.line.ref.sourceId
+      : targetParentRow.sourceId
   );
   const sameDocument =
     sourceDocument !== undefined &&
@@ -350,8 +348,9 @@ export function dnd(
     (row.viewKey === source
       ? sourceDrag.targetId || sourceDrag.nodeId
       : undefined) ??
-    calendarEntryTarget(row.node) ??
-    row.node.id;
+    (row.rowType === "occurrence"
+      ? row.occurrence.target ?? row.occurrence.id
+      : row.node.id);
   const rowCopies = (row: Row): boolean =>
     sourceDrag.isCopyDrag === true ||
     (sourceDrag.altCopy === true &&
@@ -363,12 +362,15 @@ export function dnd(
   ) {
     return basePlan;
   }
-  const doorTarget = targetParentRow.composed;
+  const doorTarget =
+    targetParentRow.rowType === "occurrence"
+      ? targetParentRow.occurrence
+      : undefined;
   const moveRows =
     doorTarget !== undefined && targetRoot !== undefined
       ? independentRows.filter(
           (row) =>
-            row.composed !== undefined &&
+            row.rowType === "occurrence" &&
             rootOf(row) === targetRoot &&
             !rowCopies(row)
         )
@@ -388,7 +390,10 @@ export function dnd(
         rows,
         parent: doorTarget,
         parentPath: targetParentRow.viewPath,
-        after: dropAnchor?.composed,
+        after:
+          dropAnchor?.rowType === "occurrence"
+            ? dropAnchor.occurrence
+            : undefined,
       }
     );
   })();
@@ -399,20 +404,22 @@ export function dnd(
     const isPrimarySource = row.viewKey === source;
     const insertTarget =
       (isPrimarySource ? sourceDrag.insertTarget : undefined) ??
-      row.materialize?.take;
+      row.incomingTarget;
     const dragTargetID = isPrimarySource
       ? sourceDrag.targetId || sourceDrag.nodeId
       : undefined;
+    const occurrence =
+      row.rowType === "occurrence" ? row.occurrence : undefined;
     const targetID =
-      dragTargetID ?? calendarEntryTarget(row.node) ?? row.node.id;
+      dragTargetID ?? occurrence?.target ?? occurrence?.id ?? row.node.id;
     const makeTarget =
       sourceDrag.altCopy === true && isCalendarEntryId(targetID)
         ? createReferenceTarget
         : createRefTarget;
     const target = insertTarget
       ? addFallbackLinkText(insertTarget, sourceDrag.text)
-      : makeTarget(targetID, nodeText(row.node));
-    const edge = row.composed ? row.composed.node : row.node;
+      : makeTarget(targetID, occurrence?.text ?? nodeText(row.node));
+    const edge = occurrence?.line.node ?? row.node;
     return { target, relevance: edge.relevance, argument: edge.argument };
   });
   return applyGesture(
@@ -424,7 +431,10 @@ export function dnd(
       targets,
       parent: doorTarget,
       at: dropIndex + moveRows.length,
-      after: dropAnchor?.composed,
+      after:
+        dropAnchor?.rowType === "occurrence"
+          ? dropAnchor.occurrence
+          : undefined,
     }
   );
 }

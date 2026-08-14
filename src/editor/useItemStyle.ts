@@ -48,18 +48,12 @@ export function useItemStyle(): ItemStyle {
   const row = useRow();
   const currentRow = row.node;
   const { virtualType } = row;
-  // Node-type rendering (like violet for entities): a calendar entry with
-  // a past date dims — derived from the row's own id and text, so file
-  // rows render correctly with no feed fetch. An explicit judgment
-  // un-dims: deliberate emphasis beats default de-emphasis.
+  const occurrence = row.rowType === "occurrence" ? row.occurrence : undefined;
   const isPastCalendarRow =
     !!currentRow &&
-    isCalendarEntryId(row.standsFor?.id ?? currentRow.id) &&
+    isCalendarEntryId(occurrence?.target ?? currentRow.id) &&
     currentRow.relevance === undefined &&
-    isPastCalendarRowText(
-      row.standsFor?.liveText ?? nodeText(currentRow),
-      Date.now()
-    );
+    isPastCalendarRowText(occurrence?.text ?? nodeText(currentRow), Date.now());
 
   if (isViewingOtherUserContent) {
     const relevance = currentRow?.relevance;

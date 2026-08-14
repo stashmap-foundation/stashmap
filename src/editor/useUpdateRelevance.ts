@@ -1,5 +1,3 @@
-import { usePlanner } from "../planner";
-import { planDisconnectFromParent } from "../treeMutations";
 import { useNodeItemContext } from "./useNodeItemContext";
 
 // Relevance mapped to levels (for 3-dot UI):
@@ -57,7 +55,6 @@ type UseUpdateRelevanceResult = {
   // Actions
   setRelevance: (relevance: Relevance) => void;
   setLevel: (level: number) => void;
-  removeFromList: () => void;
   // Visibility
   isVisible: boolean;
 };
@@ -67,15 +64,8 @@ type UseUpdateRelevanceResult = {
  * Used by RelevanceSelector.
  */
 export function useUpdateRelevance(): UseUpdateRelevanceResult {
-  const { createPlan, executePlan } = usePlanner();
-  const {
-    isVisible,
-    nodeText,
-    currentRow,
-    parentNode,
-    childID,
-    updateMetadata,
-  } = useNodeItemContext();
+  const { isVisible, nodeText, currentRow, updateMetadata } =
+    useNodeItemContext();
 
   const rawRelevance = currentRow?.relevance;
   const currentRelevance: Relevance =
@@ -90,19 +80,12 @@ export function useUpdateRelevance(): UseUpdateRelevanceResult {
     setRelevance(levelToRelevance(level));
   };
 
-  const removeFromList = (): void => {
-    if (!isVisible || !parentNode) return;
-    const plan = planDisconnectFromParent(createPlan(), parentNode.id, childID);
-    executePlan(plan);
-  };
-
   return {
     currentRelevance,
     currentLevel,
     nodeText,
     setRelevance,
     setLevel,
-    removeFromList,
     isVisible,
   };
 }

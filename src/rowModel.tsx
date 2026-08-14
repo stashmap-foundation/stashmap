@@ -33,9 +33,6 @@ export function useRow(): Row {
   return row;
 }
 
-// A row is either file content or a proposal about file content. Node
-// types decide how a row RENDERS; only file rows BEHAVE — host overlays,
-// fetch feeds, offer row furniture like the past chip.
 export function isFileRow(row: Pick<Row, "virtualType">): boolean {
   return row.virtualType === undefined;
 }
@@ -77,7 +74,8 @@ export function getVisibleParentRow(
       (candidate) =>
         candidate.depth < row.depth &&
         (rowRefsEqual(candidate.ref, row.parentRef) ||
-          candidate.standsFor?.id === row.parentRef?.id)
+          (candidate.rowType === "occurrence" &&
+            candidate.occurrence.target === row.parentRef?.id))
     );
 }
 
@@ -103,7 +101,6 @@ export function getPreviousSiblingFromRows(
 
 const EMPTY_VIEW_PATH_PREFIX = "empty-row:";
 
-// Encode path IDs to handle colons in ref IDs (ref:ctx:target format)
 function encodePathID(id: string): string {
   return id.replace(/:/g, "%3A");
 }
@@ -187,11 +184,6 @@ export function getPaneRootItemID(pane: Pane): ID {
   );
 }
 
-// A row's view state lives under its full path of stable ids. When a touch
-// swaps a row's id (a judged base row becomes the reader's claim line), the
-// swapped-in row inherits state through its target: each candidate joins the
-// parent's resolved key with the row's id or its target, so the takeover
-// chains to every depth without rewriting stored keys.
 export function resolveRowView(
   data: Data,
   path: ViewPath,
@@ -227,15 +219,16 @@ export function resolveRowView(
 }
 
 export function buildPaneTarget(data: Data, row: Row): EditorNavigationTarget {
+  const occurrence = row.rowType === "occurrence" ? row.occurrence : undefined;
   const composedPlacement =
-    row.composed?.kind === "placement" || row.composed?.kind === "speaking";
+    occurrence?.kind === "placement" || occurrence?.kind === "speaking";
   const terminalTarget =
     composedPlacement &&
-    row.composed?.flags.some(
+    occurrence.flags.some(
       (flag) =>
         flag === "cycle" || flag === "dangling" || flag === "orphan-source"
     )
-      ? row.composed.chain[row.composed.chain.length - 1]
+      ? occurrence.chain[occurrence.chain.length - 1]
       : undefined;
   const targetID =
     row.virtualType === "search"
@@ -244,7 +237,7 @@ export function buildPaneTarget(data: Data, row: Row): EditorNavigationTarget {
   const targetSourceId =
     terminalTarget === undefined
       ? row.sourceId
-      : row.composed?.sourceParent?.sourceId ?? row.sourceId;
+      : occurrence?.sourceParent?.sourceId ?? row.sourceId;
   const resolvedTarget = terminalTarget
     ? lookupNode(graphLookupFromData(data), terminalTarget, targetSourceId)
     : undefined;
@@ -349,8 +342,8 @@ export function useCurrentEdge(): GraphNode {
 
 export function getDisplayTextForRow(row: Row): string {
   const { reference } = row;
-  if (row.standsFor?.liveText !== undefined) {
-    return row.standsFor.liveText;
+  if (row.rowType === "occurrence") {
+    return row.occurrence.text;
   }
   if (
     row.virtualType === undefined &&
@@ -457,7 +450,6 @@ export function updateViewPathsAfterPaneInsert(
   views: Views,
   insertedPaneIndex: number
 ): Views {
-  // When inserting a pane at index N, shift all pane indices >= N up by 1
   return views.mapKeys((key) => {
     const match = key.match(/^p(\d+):/);
     if (!match) return key;

@@ -4,7 +4,7 @@ import { QueueStatus } from "./infra/nostr/cache/PublishQueue";
 import { Document as DocumentType } from "./core/Document";
 import { IcalEntry } from "./core/ical";
 import type { AddToParentTarget } from "./core/plan";
-import type { ComposedRow } from "./core/composition";
+import type { Occurrence } from "./core/composition";
 
 declare global {
   type Children = {
@@ -161,9 +161,6 @@ declare global {
     documents: Map<string, DocumentType>;
     documentByFilePath: Map<string, DocumentType>;
     publishEventsStatus: EventState;
-    // Fetched calendar feeds, keyed by feed URL — the read path of the
-    // machine-feeds law. Projections derive from these at row-build time
-    // and never enter knowledgeDBs.
     calendarFeeds?: Map<string, IcalEntry[]>;
     pull?: PullOverlayData;
 
@@ -202,30 +199,7 @@ declare global {
     parentChildIndex: number | undefined;
     childIndex: number | undefined;
     hasChildren: boolean;
-    provenance?: {
-      kind: "incoming";
-      sourceId: SourceId;
-    };
-    // The materialization recipe (idea.md: write gestures take first).
-    // Plain data attached by the row's producer: nearest-first anchors,
-    // optionally a prepared take (references enter as references) and
-    // judgment defaults inherited from the proposal's source. Present =
-    // the row is computed and a write gesture must materialize it first.
-    materialize?: {
-      precededBy: ID[];
-      take?: AddToParentTarget;
-      defaults?: { relevance?: Relevance; argument?: Argument };
-      host?: Pick<Row, "node" | "parentRef" | "materialize">;
-      root?: true;
-    };
-    standsFor?: { id: ID; liveText?: string };
-    composed?: ComposedRow;
-    projected?: true;
     isFirstVirtual: boolean;
-    virtualType: "search" | "incoming" | undefined;
-    // The action row: a button in row position, obviously not content.
-    // One interaction (click); no gutter, no editor, no judgment, no drag.
-    action?: "toggle-past-entries";
     reference:
       | {
           id: ID;
@@ -238,22 +212,67 @@ declare global {
           displayAs?: "incoming";
         }
       | undefined;
-  };
+  } & (
+    | {
+        rowType: "occurrence";
+        occurrence: Occurrence;
+        incomingTarget: undefined;
+        incomingParent: undefined;
+        incomingEmbed: undefined;
+        emptyParent: undefined;
+        virtualType: undefined;
+        action: undefined;
+      }
+    | {
+        rowType: "incoming";
+        occurrence: undefined;
+        incomingTarget: AddToParentTarget;
+        incomingParent: Occurrence | undefined;
+        incomingEmbed: true | undefined;
+        emptyParent: undefined;
+        virtualType: "incoming";
+        action: undefined;
+      }
+    | {
+        rowType: "search";
+        occurrence: undefined;
+        incomingTarget: undefined;
+        incomingParent: undefined;
+        incomingEmbed: undefined;
+        emptyParent: undefined;
+        virtualType: "search";
+        action: undefined;
+      }
+    | {
+        rowType: "empty";
+        occurrence: undefined;
+        incomingTarget: undefined;
+        incomingParent: undefined;
+        incomingEmbed: undefined;
+        emptyParent: Occurrence | undefined;
+        virtualType: undefined;
+        action: undefined;
+      }
+    | {
+        rowType: "action";
+        occurrence: undefined;
+        incomingTarget: undefined;
+        incomingParent: undefined;
+        incomingEmbed: undefined;
+        emptyParent: undefined;
+        virtualType: undefined;
+        action: "toggle-past-entries";
+      }
+  );
 
   type View = {
     expanded?: boolean;
-    // Calendar feed nodes: project bare past entries too (default: only
-    // upcoming entries project; file content always shows).
     showPastEntries?: boolean;
     typeFilters?: Array<Relevance | "incoming" | "contains">;
   };
 
-  // Context is the path of ancestor node IDs leading to the head node
-  // e.g., [scholarium-id, places-id] when viewing via "Scholarium > Places > Node"
   type Context = List<ID>;
 
-  // Relevance levels for node children
-  // undefined = "contains" (no relevance set, default for new children)
   type Relevance =
     | "relevant"
     | "maybe_relevant"
@@ -261,7 +280,6 @@ declare global {
     | "not_relevant"
     | undefined;
 
-  // Argument types (evidence) for node children
   type Argument = "confirms" | "contra" | undefined;
 
   type RootSystemRole = "log";

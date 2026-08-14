@@ -3,8 +3,6 @@ import { icalEntryId } from "./icalId";
 import { spansText } from "./nodeSpans";
 import { classifyLinkHref } from "./linkPath";
 
-// Write-time recognition only: a pasted or typed bare feed URL gets
-// wrapped into the typed feed link. Read paths never sniff URLs.
 const ICAL_URL_RE =
   /(webcal:\/\/[^\s\]()]+|https?:\/\/[^\s\]()]+\.ics(\?[^\s\]()]*)?)/iu;
 
@@ -14,8 +12,6 @@ export function isCalendarEntryId(id: string): boolean {
   return id.startsWith("ical:");
 }
 
-// The feed-as-link form: `[any name](feed:<url>)`. The scheme declares the
-// row a calendar-feed node; readers dispatch on it, never on the URL shape.
 export function icalFeedLinkPartsOf(
   text: string
 ): { label: string; url: string } | undefined {
@@ -38,11 +34,12 @@ export function calendarFeedUrl(node: GraphNode): string | undefined {
     : undefined;
 }
 
-// The projecting form: only a feed link carrying the explicit embed attr
-// is a machine embed. A plain feed link keeps its calendar dress but
-// projects nothing.
-export function embeddedFeedUrl(node: GraphNode): string | undefined {
-  return node.extraAttrs?.embed === "true" ? calendarFeedUrl(node) : undefined;
+export function calendarFeedTargetUrl(
+  target: ID | undefined
+): string | undefined {
+  return target !== undefined && classifyLinkHref(target) === "feed"
+    ? target.slice("feed:".length)
+    : undefined;
 }
 
 export function calendarEntryTarget(
@@ -98,22 +95,14 @@ export function displayTextOf(text: string): string {
   return icalFeedLinkPartsOf(text)?.label ?? text;
 }
 
-// A projected calendar entry: the literal-VEVENT subset of the machine-feeds
-// spec (UID, DTSTART, SUMMARY). Recurring events are skipped in v1 —
-// expansion is committed later work; the id scheme reserves @<RECURRENCE-ID>.
 export type IcalEntry = {
   readonly id: string;
   readonly uid: string;
   readonly summary: string;
-  // Milliseconds since epoch; undefined when DTSTART is missing or
-  // unparseable. Z values are UTC instants; naive local values are
-  // interpreted in the client's local time, matching the Dart side.
   readonly startMs?: number;
   readonly allDay: boolean;
 };
 
-// Unfolds RFC 5545 folded lines: CRLF (or LF) followed by a space or tab
-// continues the previous line.
 function unfold(content: string): string[] {
   return content.split(/\r?\n/u).reduce<string[]>((lines, line) => {
     if ((line.startsWith(" ") || line.startsWith("\t")) && lines.length > 0) {
@@ -123,17 +112,12 @@ function unfold(content: string): string[] {
   }, []);
 }
 
-// RFC 5545 TEXT unescaping: \n and \N become newlines, any other escaped
-// character becomes itself.
 function unescapeText(value: string): string {
   return value.replace(/\\(.)/gu, (_, next: string) =>
     next === "n" || next === "N" ? "\n" : next
   );
 }
 
-// RFC 5545 DATE/DATE-TIME is ISO 8601 basic format; reshape to the
-// extended form and let the platform parse — Z as UTC, naive as local,
-// date-only as local midnight (bare dates would parse as UTC).
 function parseIcalDateTime(value: string | undefined): number | undefined {
   if (value === undefined) {
     return undefined;
@@ -175,15 +159,6 @@ function buildEntry(raw: RawVevent): IcalEntry | undefined {
   };
 }
 
-// Hand-rolled on purpose (library trial verdict, Dart side): the Dart
-// candidates die on bad events or corrupt TEXT escapes, and both mirrors
-// must match byte-for-byte against the shared fixtures — a library on one
-// side only makes them less alike.
-//
-// Parses an iCalendar feed into projected entries, in calendar order
-// (entries without a parseable start sort last, original order kept).
-// Content without a BEGIN:VCALENDAR container throws — a server error page
-// must never read as an empty calendar.
 export function parseIcalFeed(content: string): IcalEntry[] {
   const lines = unfold(content);
   if (!lines.some((line) => line.startsWith("BEGIN:VCALENDAR"))) {
@@ -265,9 +240,6 @@ function startOfDay(nowMs: number): number {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 }
 
-// Pastness is a fact about the node's type, never a judgment: calendar
-// entries render date-aware because of what they ARE (like entities render
-// violet), and the user's judgments stay human-only.
 export function isPastIcalEntry(entry: IcalEntry, nowMs: number): boolean {
   if (entry.startMs === undefined) {
     return false;
@@ -279,9 +251,6 @@ function pad2(value: number): string {
   return String(value).padStart(2, "0");
 }
 
-// The projected row text: the date is text, not decoration — exactly how
-// people hand-write calendars in outlines. Times render in local wall
-// time; all-day entries carry no time; undated entries are bare summary.
 export function icalEntryDisplayText(entry: IcalEntry): string {
   if (entry.startMs === undefined) {
     return entry.summary;
@@ -311,8 +280,6 @@ export function isPastCalendarRowText(text: string, nowMs: number): boolean {
   return dateMs < startOfDay(nowMs);
 }
 
-// The count behind the feed row's past chip: bare past entries currently
-// hidden from projection.
 export function hiddenPastEntryCount(
   childIds: readonly string[],
   entries: readonly IcalEntry[],

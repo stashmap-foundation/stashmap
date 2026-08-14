@@ -41,6 +41,7 @@ import { PublishingStatusWrapper } from "./PublishingStatusWrapper";
 import { SignInMenuBtn } from "../SignIn";
 import {
   usePlanner,
+  applyGesture,
   planClearTemporarySelection,
   planSelectAllTemporaryRows,
   planShiftTemporarySelection,
@@ -86,7 +87,6 @@ import {
   planBatchIndent,
   planBatchOutdent,
 } from "./batchOperations";
-import { planDeleteNode } from "../treeMutations";
 import { MobileActionBar } from "./MobileActionBar";
 import { nodeText } from "../core/nodeSpans";
 import { defaultEntitySurfaceTitle } from "../entityLabels";
@@ -1460,13 +1460,24 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       e.preventDefault();
       const targetRows = getIndependentRows(
         getActionTargetRows(selection, activeRow, rows)
-      ).filter((row) => row.sourceId === LOCAL && !row.projected);
+      ).filter(
+        (row) =>
+          row.sourceId === LOCAL &&
+          row.rowType === "occurrence" &&
+          row.occurrence.persisted !== undefined
+      );
       const keys = targetRows.map((row) => row.viewKey);
       const focusIndex = computeFocusIndexAfterDeletion(keys, rows);
       const result = planClearTemporarySelection(
         targetRows.reduce(
           (acc, row) =>
-            planDeleteNode(acc, row.node.id, row.parentNode?.id, paneIndex),
+            row.rowType === "occurrence"
+              ? applyGesture(acc, {
+                  kind: "delete",
+                  row: row.occurrence,
+                  paneIndex,
+                })
+              : acc,
           createPlan()
         )
       );
@@ -1533,9 +1544,6 @@ function usePaneKeyboardNavigation(paneIndex: number): {
     if (filterId) {
       e.preventDefault();
       toggleFilter(filterId);
-      // If the focused row was removed by the filter change, focus falls to
-      // <body> and subsequent keypresses won't reach this handler. Recapture
-      // focus on the pane wrapper so keyboard shortcuts keep working.
       window.setTimeout(() => {
         if (document.activeElement === document.body) {
           root.focus();

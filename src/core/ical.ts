@@ -26,12 +26,18 @@ export function icalFeedUrlOf(text: string): string | undefined {
   return icalFeedLinkPartsOf(text)?.url;
 }
 
-export function calendarFeedUrl(node: GraphNode): string | undefined {
-  if (node.spans.length !== 1) return undefined;
-  const span = node.spans[0];
+export function calendarFeedUrlFromSpans(
+  spans: InlineSpan[]
+): string | undefined {
+  if (spans.length !== 1) return undefined;
+  const span = spans[0];
   return span.kind === "link" && classifyLinkHref(span.href) === "feed"
     ? span.href.slice("feed:".length)
     : undefined;
+}
+
+export function calendarFeedUrl(node: GraphNode): string | undefined {
+  return calendarFeedUrlFromSpans(node.spans);
 }
 
 export function calendarFeedTargetUrl(

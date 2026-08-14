@@ -11,10 +11,16 @@ import {
 } from "./core/connections";
 import { nodeText } from "./core/nodeSpans";
 import { isCalendarEntryId } from "./core/ical";
-import { composedLine, writableLine } from "./core/composition";
+import { writableLine } from "./core/composition";
 import {
   getIndependentRows,
   getVisibleParentRow,
+  rowArgument,
+  rowChildIndex,
+  rowID,
+  rowNode,
+  rowRelevance,
+  rowSourceId,
   viewPathContains,
 } from "./rowModel";
 import { getDocumentForNode } from "./core/Document";
@@ -60,21 +66,20 @@ function planRecordForeignSource(
   sourceRow: Row,
   targetNode: GraphNode
 ): Plan {
-  if (sourceRow.sourceId === LOCAL) {
+  const sourceId = rowSourceId(sourceRow);
+  if (sourceId === LOCAL) {
     return plan;
   }
-  const coordinate =
-    sourcePane?.routeCoordinate ?? sourceCoordinate(sourceRow.sourceId);
-  const pubkey =
-    coordinate?.pubkey ?? decodePublicKeyInputSync(sourceRow.sourceId);
+  const coordinate = sourcePane?.routeCoordinate ?? sourceCoordinate(sourceId);
+  const pubkey = coordinate?.pubkey ?? decodePublicKeyInputSync(sourceId);
   if (!pubkey) {
     return plan;
   }
   const sourceDocument = getDocumentForNode(
     plan.knowledgeDBs,
     plan.documents,
-    sourceRow.node,
-    sourceRow.sourceId
+    rowNode(sourceRow),
+    sourceId
   );
   const doc = sourceDocument?.docId ?? coordinate?.dTag;
   if (!doc) {
@@ -94,11 +99,7 @@ export function isDraggedOccurrence(row: Row, sources: Row[]): boolean {
 }
 
 function getVisibleRootRow(rows: List<Row>): Row | undefined {
-  const firstRow = rows.first();
-  if (!firstRow || firstRow.parentRef) {
-    return undefined;
-  }
-  return firstRow;
+  return rows.first();
 }
 
 function getDropDestinationEndOfVisibleRoot(
@@ -108,23 +109,24 @@ function getDropDestinationEndOfVisibleRoot(
   return rootRow
     ? {
         parentRow: rootRow,
-        insertAtIndex: rootRow.node.children.size || 0,
+        insertAtIndex:
+          rootRow.rowType === "occurrence"
+            ? rootRow.occurrence.children.length
+            : rootRow.node.children.size,
       }
     : undefined;
 }
 
 function placedIndexAfter(rows: List<Row>, row: Row): number {
-  const previousPlaced = rows
-    .slice(0, row.index)
-    .reverse()
-    .find(
-      (candidate) =>
-        candidate.childIndex !== undefined &&
-        candidate.parentRef?.sourceId === row.parentRef?.sourceId &&
-        candidate.parentRef?.id === row.parentRef?.id
-    );
-  return previousPlaced?.childIndex !== undefined
-    ? previousPlaced.childIndex + 1
+  const childIndex = rowChildIndex(row);
+  if (childIndex !== undefined) {
+    return childIndex + 1;
+  }
+  const parent = getVisibleParentRow(rows, row);
+  return parent?.rowType === "occurrence" && row.rowType === "occurrence"
+    ? parent.occurrence.children.findIndex(
+        (child) => child.key === row.occurrence.key
+      ) + 1
     : 0;
 }
 
@@ -138,22 +140,24 @@ function getInsertAfterRow(
   rows: List<Row>,
   row: Row
 ): DropDestination | undefined {
-  if (!row.parentRef) {
+  const parentRow = getVisibleParentRow(rows, row);
+  if (!parentRow) {
     return {
       parentRow: row,
-      insertAtIndex: row.node.children.size || 0,
+      insertAtIndex:
+        row.rowType === "occurrence"
+          ? row.occurrence.children.length
+          : row.node.children.size,
     };
   }
-  const parentRow = getVisibleParentRow(rows, row);
   if (!parentRow) {
     return undefined;
   }
+  const childIndex = rowChildIndex(row);
   return {
     parentRow,
     insertAtIndex:
-      row.childIndex !== undefined
-        ? row.childIndex + 1
-        : placedIndexAfter(rows, row),
+      childIndex === undefined ? placedIndexAfter(rows, row) : childIndex + 1,
     anchorRow: row,
   };
 }
@@ -187,13 +191,14 @@ function getDropBeforeParentDestination(
   const displayPredecessor = rows.get(dropBefore.index - 1);
   const anchorRow =
     displayPredecessor &&
-    displayPredecessor.parentRef?.sourceId === dropBefore.parentRef?.sourceId &&
-    displayPredecessor.parentRef?.id === dropBefore.parentRef?.id
+    displayPredecessor.depth === dropBefore.depth &&
+    getVisibleParentRow(rows, displayPredecessor)?.viewKey === parentRow.viewKey
       ? displayPredecessor
       : undefined;
   return {
     parentRow,
-    insertAtIndex: dropBefore.childIndex ?? placedIndexAfter(rows, dropBefore),
+    insertAtIndex:
+      rowChildIndex(dropBefore) ?? placedIndexAfter(rows, dropBefore),
     anchorRow,
   };
 }
@@ -203,7 +208,7 @@ function getRootDepth(rows: List<Row>): number {
   if (!firstRow) {
     return 0;
   }
-  return firstRow.parentRef ? firstRow.depth - 1 : firstRow.depth;
+  return firstRow.depth;
 }
 
 function findNextNonDraggedRow(
@@ -231,12 +236,19 @@ function resolveDropByDepth(
     if (dropBefore && dropBefore.depth === clampedDepth) {
       return {
         parentRow: prevRow,
-        insertAtIndex: dropBefore.childIndex ?? prevRow.node.children.size,
+        insertAtIndex:
+          rowChildIndex(dropBefore) ??
+          (prevRow.rowType === "occurrence"
+            ? prevRow.occurrence.children.length
+            : prevRow.node.children.size),
       };
     }
     return {
       parentRow: prevRow,
-      insertAtIndex: prevRow.node.children.size || 0,
+      insertAtIndex:
+        prevRow.rowType === "occurrence"
+          ? prevRow.occurrence.children.length
+          : prevRow.node.children.size,
     };
   }
 
@@ -317,7 +329,7 @@ export function dnd(
     localRoot
       ? independentRows.reduce(
           (acc, row) =>
-            row.sourceId === LOCAL
+            rowSourceId(row) === LOCAL
               ? acc
               : planRecordForeignSource(acc, sourcePane, row, localRoot),
           plan
@@ -326,22 +338,14 @@ export function dnd(
   const sourceDocument = getDocumentForNode(
     basePlan.knowledgeDBs,
     basePlan.documents,
-    sourceDrag.row.rowType === "occurrence"
-      ? composedLine(sourceDrag.row.occurrence).node
-      : sourceDrag.row.node,
-    sourceDrag.row.rowType === "occurrence"
-      ? composedLine(sourceDrag.row.occurrence).ref.sourceId
-      : sourceDrag.row.sourceId
+    rowNode(sourceDrag.row),
+    rowSourceId(sourceDrag.row)
   );
   const targetDocument = getDocumentForNode(
     basePlan.knowledgeDBs,
     basePlan.documents,
-    targetParentRow.rowType === "occurrence"
-      ? composedLine(targetParentRow.occurrence).node
-      : targetParentRow.node,
-    targetParentRow.rowType === "occurrence"
-      ? composedLine(targetParentRow.occurrence).ref.sourceId
-      : targetParentRow.sourceId
+    rowNode(targetParentRow),
+    rowSourceId(targetParentRow)
   );
   const sameDocument =
     sourceDocument !== undefined &&
@@ -354,14 +358,14 @@ export function dnd(
       : undefined) ??
     (row.rowType === "occurrence"
       ? row.occurrence.target ?? row.occurrence.id
-      : row.node.id);
+      : rowID(row));
   const rowCopies = (row: Row): boolean =>
     sourceDrag.isCopyDrag === true ||
     (sourceDrag.altCopy === true &&
       (!sameDocument || isCalendarEntryId(rowTargetID(row))));
   if (
     sourceDrag.isCopyDrag !== true &&
-    independentRows.some((row) => !row.parentRef) &&
+    independentRows.some((row) => row.parentViewPath === undefined) &&
     sameDocument
   ) {
     return basePlan;
@@ -433,20 +437,19 @@ export function dnd(
       const occurrence =
         row.rowType === "occurrence" ? row.occurrence : undefined;
       const targetID =
-        dragTargetID ?? occurrence?.target ?? occurrence?.id ?? row.node.id;
+        dragTargetID ?? occurrence?.target ?? occurrence?.id ?? rowID(row);
       const makeTarget =
         sourceDrag.altCopy === true && isCalendarEntryId(targetID)
           ? createReferenceTarget
           : createRefTarget;
       const target = insertTarget
         ? addFallbackLinkText(insertTarget, sourceDrag.text)
-        : makeTarget(targetID, occurrence?.text ?? nodeText(row.node));
-      const edge = occurrence ? composedLine(occurrence).node : row.node;
+        : makeTarget(targetID, occurrence?.text ?? nodeText(rowNode(row)));
       return {
         kind: "target",
         target,
-        relevance: edge.relevance,
-        argument: edge.argument,
+        relevance: rowRelevance(row),
+        argument: rowArgument(row),
       };
     }
   );

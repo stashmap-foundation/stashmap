@@ -64,10 +64,12 @@ type UseUpdateRelevanceResult = {
  * Used by RelevanceSelector.
  */
 export function useUpdateRelevance(): UseUpdateRelevanceResult {
-  const { isVisible, nodeText, currentRow, updateMetadata } =
-    useNodeItemContext();
-
-  const rawRelevance = currentRow?.relevance;
+  const {
+    isVisible,
+    nodeText,
+    relevance: rawRelevance,
+    updateMetadata,
+  } = useNodeItemContext();
   const currentRelevance: Relevance =
     (rawRelevance as string) === "" ? undefined : rawRelevance;
   const currentLevel = relevanceToLevel(currentRelevance);

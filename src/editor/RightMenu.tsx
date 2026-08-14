@@ -3,8 +3,9 @@ import {
   useIsRoot,
   useIsInSearchView,
   useIsViewingOtherUserContent,
-  useCurrentNode,
   useRow,
+  rowID,
+  rowSourceId,
 } from "../rowModel";
 import { isEmptyNodeID } from "../core/connections";
 import { LOCAL } from "../core/nodeRef";
@@ -16,15 +17,15 @@ import { OpenInSplitPaneButton } from "./OpenInSplitPaneButton";
 
 export function RightMenu(): JSX.Element {
   const row = useRow();
-  const { virtualType, sourceId } = row;
+  const { virtualType } = row;
+  const sourceId = rowSourceId(row);
   const isVirtualItem = virtualType === "incoming";
   const isRoot = useIsRoot();
   const pane = useCurrentPane();
-  const currentNode = useCurrentNode();
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
   const isInSearchView = useIsInSearchView();
   const isDocumentTopLevel =
-    isRoot && pane.documentId !== undefined && !isVirtualItem && !!currentNode;
+    isRoot && pane.documentId !== undefined && !isVirtualItem;
 
   const isReadonly =
     (isRoot && !isDocumentTopLevel) ||
@@ -38,7 +39,7 @@ export function RightMenu(): JSX.Element {
         {!isReadonly && <RelevanceSelector virtualType={virtualType} />}
       </div>
       <div className="evidence-slot">{!isReadonly && <EvidenceSelector />}</div>
-      {!isEmptyNodeID(currentNode.id) && (
+      {!isEmptyNodeID(rowID(row)) && (
         <div className="action-slot">
           <FullscreenButton />
           <OpenInSplitPaneButton />

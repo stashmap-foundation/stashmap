@@ -4,10 +4,10 @@ import { ConnectableElement, useDrag } from "react-dnd";
 import { getEmptyImage } from "react-dnd-html5-backend";
 import {
   useIsInSearchView,
-  useCurrentNode,
   useDisplayText,
   useIsViewingOtherUserContent,
   useRow,
+  rowID,
   viewPathToString,
 } from "../rowModel";
 import { useData } from "../DataContext";
@@ -16,7 +16,6 @@ import { searchInsertTarget } from "../localSearch";
 import { NOTE_TYPE, Node } from "./Node";
 import { useDroppable, clearDropIndent } from "./DroppableContainer";
 import {
-  isEditableNode,
   useIsEditingOn,
   useIsSelected,
   useTemporaryView,
@@ -80,10 +79,9 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
     const { selection } = useTemporaryView();
     const data = useData();
     const isNodeBeeingEdited = useIsEditingOn();
-    const node = useCurrentNode();
     const { virtualType, viewKey } = row;
     const displayText = useDisplayText();
-    const isEmptyNode = isEmptyNodeID(row.node.id);
+    const isEmptyNode = isEmptyNodeID(rowID(row));
     const disableDrag = isNodeBeeingEdited || isEmptyNode;
 
     const [{ isDragging }, drag, preview] = useDrag({
@@ -162,7 +160,7 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
           row.rowType === "occurrence" ? row.occurrence.id : row.node.id
         }
         data-node-text={displayText}
-        data-node-mutable={isEditableNode(node) ? "true" : "false"}
+        data-node-mutable="true"
         data-selected={isSelected ? "true" : undefined}
         role="treeitem"
         aria-label={displayText}
@@ -207,7 +205,7 @@ export function ListItem({
   const selected = useIsSelected();
   const rowDepth = row.depth;
   const isActiveRow = activeRowKey === viewKey;
-  const isEmptyNode = isEmptyNodeID(row.node.id);
+  const isEmptyNode = isEmptyNodeID(rowID(row));
 
   const isReadonly = isInSearchView || isViewingOtherUserContent;
 

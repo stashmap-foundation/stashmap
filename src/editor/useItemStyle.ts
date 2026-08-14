@@ -1,6 +1,12 @@
 import { CSSProperties } from "react";
-import { useIsViewingOtherUserContent, useRow } from "../rowModel";
-import { nodeText } from "../core/nodeSpans";
+import {
+  getDisplayTextForRow,
+  rowArgument,
+  rowID,
+  rowRelevance,
+  useIsViewingOtherUserContent,
+  useRow,
+} from "../rowModel";
 import { ENTITY_SCHEME_RE } from "../core/linkPath";
 import { TYPE_COLORS } from "../core/constants";
 import { isCalendarEntryId, isPastCalendarRowText } from "../core/ical";
@@ -46,18 +52,17 @@ function isReferenceVirtualType(virtualType: Row["virtualType"]): boolean {
 export function useItemStyle(): ItemStyle {
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
   const row = useRow();
-  const currentRow = row.node;
   const { virtualType } = row;
   const occurrence = row.rowType === "occurrence" ? row.occurrence : undefined;
+  const relevance = rowRelevance(row);
+  const argument = rowArgument(row);
+  const id = rowID(row);
   const isPastCalendarRow =
-    !!currentRow &&
-    isCalendarEntryId(occurrence?.target ?? currentRow.id) &&
-    currentRow.relevance === undefined &&
-    isPastCalendarRowText(occurrence?.text ?? nodeText(currentRow), Date.now());
+    isCalendarEntryId(occurrence?.target ?? id) &&
+    relevance === undefined &&
+    isPastCalendarRowText(getDisplayTextForRow(row), Date.now());
 
   if (isViewingOtherUserContent) {
-    const relevance = currentRow?.relevance;
-    const argument = currentRow?.argument;
     const normalizedRelevance =
       relevance === ("" as string) ? undefined : relevance;
     const argumentStyle = getArgumentTextStyle(argument);
@@ -82,11 +87,9 @@ export function useItemStyle(): ItemStyle {
     };
   }
 
-  const relevance = currentRow?.relevance;
-  const argument = currentRow?.argument;
   const normalizedRelevance =
     relevance === ("" as string) ? undefined : relevance;
-  const isEntityNode = !!currentRow && ENTITY_SCHEME_RE.test(currentRow.id);
+  const isEntityNode = ENTITY_SCHEME_RE.test(id);
 
   return {
     cardStyle: {},

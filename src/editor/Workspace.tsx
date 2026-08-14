@@ -8,6 +8,10 @@ import { TemporaryViewProvider, useTemporaryView } from "./temporaryViewState";
 import {
   getDisplayTextForRow,
   getIndependentRows,
+  rowArgument,
+  rowNode,
+  rowRelevance,
+  rowSourceId,
   updateRowView,
 } from "../rowModel";
 import { useData } from "../DataContext";
@@ -1271,7 +1275,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
           return;
         }
         executePlan(
-          planPasteMarkdownTrees(createPlan(), trees, parentRow.node, 0)
+          planPasteMarkdownTrees(createPlan(), trees, rowNode(parentRow), 0)
         );
       });
       return;
@@ -1462,7 +1466,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
         getActionTargetRows(selection, activeRow, rows)
       ).filter(
         (row) =>
-          row.sourceId === LOCAL &&
+          rowSourceId(row) === LOCAL &&
           row.rowType === "occurrence" &&
           row.occurrence.origin.kind === "written"
       );
@@ -1512,7 +1516,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       );
       const targetRelevance = SYMBOL_TO_RELEVANCE[e.key];
       const relevance =
-        activeRowData?.node.relevance === targetRelevance
+        activeRowData && rowRelevance(activeRowData) === targetRelevance
           ? undefined
           : targetRelevance;
       executePlan(planBatchRelevance(plan, targetRows, relevance));
@@ -1533,7 +1537,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
         return undefined;
       })();
       const argument: Argument =
-        activeRowData?.node.argument === targetArgument
+        activeRowData && rowArgument(activeRowData) === targetArgument
           ? undefined
           : targetArgument;
       executePlan(planBatchArgument(plan, targetRows, argument));

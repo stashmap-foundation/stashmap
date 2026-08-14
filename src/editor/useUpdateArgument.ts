@@ -11,9 +11,11 @@ type UseUpdateArgumentResult = {
  * Used by EvidenceSelector.
  */
 export function useUpdateArgument(): UseUpdateArgumentResult {
-  const { isVisible, currentRow, updateMetadata } = useNodeItemContext();
-
-  const currentArgument = currentRow?.argument;
+  const {
+    isVisible,
+    argument: currentArgument,
+    updateMetadata,
+  } = useNodeItemContext();
 
   const setArgument = (argument: Argument): void => {
     updateMetadata({ argument });

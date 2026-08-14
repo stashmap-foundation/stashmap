@@ -2,7 +2,7 @@ import { List, Map, OrderedSet, Set as ImmutableSet } from "immutable";
 import { addNodesToGraphIndex, createEmptyGraphIndex } from "./graphIndex";
 import { buildReferenceItem } from "./buildReferenceRow";
 import { graphLookupFromData } from "./core/graphLookup";
-import { buildPaneTarget, ViewPath } from "./rowModel";
+import { buildPaneTarget, rowSourceId, rowSpans, ViewPath } from "./rowModel";
 import { getNodesInTree } from "./treeTraversal";
 import { linkSpan, plainSpans } from "./core/nodeSpans";
 
@@ -261,10 +261,8 @@ test("incoming ref owner rows keep source identity when owner ids also collide",
     ).rows.filter((row) => row.depth > 1),
   };
 
-  expect(incomingRows.rows.map((row) => row.sourceId).toArray()).toEqual([
-    SOURCE_B,
-  ]);
-  expect(incomingRows.rows.map((row) => row.node.spans).toArray()).toEqual([
+  expect(incomingRows.rows.map(rowSourceId).toArray()).toEqual([SOURCE_B]);
+  expect(incomingRows.rows.map(rowSpans).toArray()).toEqual([
     [linkSpan("root", "Root B")],
   ]);
 });

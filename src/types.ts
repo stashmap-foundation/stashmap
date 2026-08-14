@@ -188,15 +188,8 @@ declare global {
     viewKey: string;
     index: number;
     depth: number;
-    node: GraphNode;
-    sourceId: SourceId;
-    ref: NodeRef;
     view: View;
     parentViewPath: readonly [number, ...ID[]] | undefined;
-    parentRef: NodeRef | undefined;
-    parentNode: GraphNode | undefined;
-    parentChildIndex: number | undefined;
-    childIndex: number | undefined;
     hasChildren: boolean;
     isFirstVirtual: boolean;
     reference:
@@ -223,50 +216,60 @@ declare global {
         virtualType: undefined;
         action: undefined;
       }
-    | {
-        rowType: "incoming";
-        occurrence: undefined;
-        composition: CompositionResult | undefined;
-        incomingTarget: AddToParentTarget;
-        incomingParent: ComposedRow | undefined;
-        incomingEmbed: true | undefined;
-        emptyParent: undefined;
-        virtualType: "incoming";
-        action: undefined;
-      }
-    | {
-        rowType: "search";
-        occurrence: undefined;
-        composition: undefined;
-        incomingTarget: undefined;
-        incomingParent: undefined;
-        incomingEmbed: undefined;
-        emptyParent: undefined;
-        virtualType: "search";
-        action: undefined;
-      }
-    | {
-        rowType: "empty";
-        occurrence: undefined;
-        composition: CompositionResult | undefined;
-        incomingTarget: undefined;
-        incomingParent: undefined;
-        incomingEmbed: undefined;
-        emptyParent: ComposedRow | undefined;
-        virtualType: undefined;
-        action: undefined;
-      }
-    | {
-        rowType: "action";
-        occurrence: undefined;
-        composition: undefined;
-        incomingTarget: undefined;
-        incomingParent: undefined;
-        incomingEmbed: undefined;
-        emptyParent: undefined;
-        virtualType: undefined;
-        action: "toggle-past-entries";
-      }
+    | ({
+        node: GraphNode;
+        sourceId: SourceId;
+        ref: NodeRef;
+        parentRef: NodeRef | undefined;
+        parentNode: GraphNode | undefined;
+        parentChildIndex: number | undefined;
+        childIndex: number | undefined;
+      } & (
+        | {
+            rowType: "incoming";
+            occurrence: undefined;
+            composition: CompositionResult | undefined;
+            incomingTarget: AddToParentTarget;
+            incomingParent: ComposedRow | undefined;
+            incomingEmbed: true | undefined;
+            emptyParent: undefined;
+            virtualType: "incoming";
+            action: undefined;
+          }
+        | {
+            rowType: "search";
+            occurrence: undefined;
+            composition: undefined;
+            incomingTarget: undefined;
+            incomingParent: undefined;
+            incomingEmbed: undefined;
+            emptyParent: undefined;
+            virtualType: "search";
+            action: undefined;
+          }
+        | {
+            rowType: "empty";
+            occurrence: undefined;
+            composition: CompositionResult | undefined;
+            incomingTarget: undefined;
+            incomingParent: undefined;
+            incomingEmbed: undefined;
+            emptyParent: ComposedRow | undefined;
+            virtualType: undefined;
+            action: undefined;
+          }
+        | {
+            rowType: "action";
+            occurrence: undefined;
+            composition: undefined;
+            incomingTarget: undefined;
+            incomingParent: undefined;
+            incomingEmbed: undefined;
+            emptyParent: undefined;
+            virtualType: undefined;
+            action: "toggle-past-entries";
+          }
+      ))
   );
 
   type View = {

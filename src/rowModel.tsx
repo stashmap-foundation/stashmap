@@ -14,6 +14,7 @@ import {
 import { isCanonicalId } from "./core/entityRecognition";
 import { nodeText } from "./core/nodeSpans";
 import { graphLookupFromData, lookupNode } from "./core/graphLookup";
+import { composedLine, writtenLine } from "./core/composition";
 import { EditorNavigationTarget } from "./editor/linkOperations";
 import { searchTargetID } from "./localSearch";
 
@@ -55,55 +56,77 @@ export function getIndependentRows(rows: Row[]): Row[] {
   );
 }
 
-function rowRefsEqual(
-  left: NodeRef | undefined,
-  right: NodeRef | undefined
-): boolean {
-  return (
-    left !== undefined &&
-    right !== undefined &&
-    left.sourceId === right.sourceId &&
-    left.id === right.id
+export function rowNode(row: Row): GraphNode {
+  return row.rowType === "occurrence"
+    ? composedLine(row.occurrence).node
+    : row.node;
+}
+
+export function rowID(row: Row): ID {
+  return row.rowType === "occurrence" ? row.occurrence.id : row.node.id;
+}
+
+export function rowSourceId(row: Row): SourceId {
+  return row.rowType === "occurrence"
+    ? composedLine(row.occurrence).ref.sourceId
+    : row.sourceId;
+}
+
+export function rowRef(row: Row): NodeRef {
+  return row.rowType === "occurrence"
+    ? composedLine(row.occurrence).ref
+    : row.ref;
+}
+
+export function rowSpans(row: Row): InlineSpan[] {
+  return row.rowType === "occurrence" ? row.occurrence.spans : row.node.spans;
+}
+
+export function rowRelevance(row: Row): Relevance {
+  return row.rowType === "occurrence"
+    ? row.occurrence.relevance
+    : row.node.relevance;
+}
+
+export function rowArgument(row: Row): Argument {
+  return row.rowType === "occurrence"
+    ? row.occurrence.argument
+    : row.node.argument;
+}
+
+export function rowChildIndex(row: Row): number | undefined {
+  if (row.rowType !== "occurrence") {
+    return row.childIndex;
+  }
+  const line = writtenLine(row.occurrence);
+  if (!line) {
+    return undefined;
+  }
+  const index = row.occurrence.origin.physicalPeers.findIndex(
+    (peer) => peer.id === line.node.id
   );
+  return index < 0 ? undefined : index;
 }
 
 export function getVisibleParentRow(
   rows: List<Row>,
   row: Row
 ): Row | undefined {
-  if (!row.parentRef) {
-    return undefined;
-  }
   return rows
     .slice(0, row.index)
     .reverse()
-    .find(
-      (candidate) =>
-        candidate.depth < row.depth &&
-        (rowRefsEqual(candidate.ref, row.parentRef) ||
-          (candidate.rowType === "occurrence" &&
-            candidate.occurrence.target === row.parentRef?.id))
-    );
+    .find((candidate) => candidate.depth === row.depth - 1);
 }
 
 export function getPreviousSiblingFromRows(
   rows: List<Row>,
   row: Row
 ): Row | undefined {
-  const { childIndex } = row;
-  if (childIndex === undefined || childIndex === 0) {
-    return undefined;
-  }
   return rows
     .slice(0, row.index)
     .reverse()
-    .find(
-      (candidate) =>
-        candidate.childIndex !== undefined &&
-        candidate.parentRef?.sourceId === row.parentRef?.sourceId &&
-        candidate.parentRef?.id === row.parentRef?.id &&
-        candidate.childIndex < childIndex
-    );
+    .takeWhile((candidate) => candidate.depth >= row.depth)
+    .find((candidate) => candidate.depth === row.depth);
 }
 
 const EMPTY_VIEW_PATH_PREFIX = "empty-row:";
@@ -211,14 +234,15 @@ export function buildPaneTarget(data: Data, row: Row): EditorNavigationTarget {
     )
       ? occurrence.chain[occurrence.chain.length - 1]
       : undefined;
+  const sourceId = rowSourceId(row);
   const targetID =
-    row.virtualType === "search"
+    row.rowType === "search"
       ? searchTargetID(row.node)
       : row.reference?.id ?? terminalTarget;
   const targetSourceId =
     terminalTarget === undefined
-      ? row.sourceId
-      : occurrence?.source.parent?.sourceId ?? row.sourceId;
+      ? sourceId
+      : occurrence?.source.parent?.sourceId ?? sourceId;
   const resolvedTarget = terminalTarget
     ? lookupNode(graphLookupFromData(data), terminalTarget, targetSourceId)
     : undefined;
@@ -234,7 +258,7 @@ export function buildPaneTarget(data: Data, row: Row): EditorNavigationTarget {
       ? {
           sourceId: targetSourceId,
           rootNodeId: terminalTarget,
-          fallbackLabel: nodeText(row.node),
+          fallbackLabel: getDisplayTextForRow(row),
         }
       : { sourceId: targetSourceId };
   }
@@ -245,10 +269,10 @@ export function buildPaneTarget(data: Data, row: Row): EditorNavigationTarget {
         scrollToId: refInfo.scrollToId,
       }
     : {
-        sourceId: row.sourceId,
-        rootNodeId: row.node.id,
-        ...(isCanonicalId(row.node.id) && {
-          fallbackLabel: nodeText(row.node),
+        sourceId,
+        rootNodeId: rowID(row),
+        ...(isCanonicalId(rowID(row)) && {
+          fallbackLabel: getDisplayTextForRow(row),
         }),
       };
 }
@@ -302,23 +326,19 @@ export function addNodeToPathWithNodes(
   return [...pathWithNodes, nextSegment] as ViewPath;
 }
 
-export function useCurrentNode(): GraphNode {
-  return useRow().node;
-}
-
 export function useIsViewingOtherUserContent(): boolean {
   const { user } = useData();
   const { workspace } = useBackend();
   const row = useRow();
-  return (!user && !workspace) || row.sourceId !== LOCAL;
+  return (!user && !workspace) || rowSourceId(row) !== LOCAL;
 }
 
 export function useNodeIndex(): number | undefined {
-  return useRow().childIndex;
+  return rowChildIndex(useRow());
 }
 
 export function useCurrentEdge(): GraphNode {
-  return useRow().node;
+  return rowNode(useRow());
 }
 
 export function getDisplayTextForRow(row: Row): string {
@@ -371,7 +391,7 @@ export function updateRowView(views: Views, row: Row, view: View): Views {
   return updateViewKey(
     views,
     row.viewKey,
-    row.node.id,
+    rowID(row),
     isRoot(row.viewPath),
     view
   );

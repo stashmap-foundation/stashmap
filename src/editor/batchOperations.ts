@@ -14,8 +14,6 @@ import { spansText, spansToMarkdown, plainSpans } from "../core/nodeSpans";
 import {
   ComposedRow,
   CompositionResult,
-  composedContent,
-  composedLine,
   writableLine,
 } from "../core/composition";
 
@@ -63,13 +61,8 @@ export function planJudgeComposedRow(
     kind: "judge",
     row: occurrence.key,
     relevance:
-      "relevance" in metadata
-        ? metadata.relevance
-        : composedLine(occurrence).node.relevance,
-    argument:
-      "argument" in metadata
-        ? metadata.argument
-        : composedLine(occurrence).node.argument,
+      "relevance" in metadata ? metadata.relevance : occurrence.relevance,
+    argument: "argument" in metadata ? metadata.argument : occurrence.argument,
     spans,
   });
 }
@@ -181,24 +174,17 @@ export function planBatchArgument(
   return planClearSelection(updated);
 }
 
-function refsEqual(
-  left: NodeRef | undefined,
-  right: NodeRef | undefined
-): boolean {
-  if (!left || !right) {
-    return left === right;
-  }
-  return left.sourceId === right.sourceId && left.id === right.id;
-}
-
-function allSameParent(rows: Row[]): boolean {
+function allSameParent(rows: Row[], orderedRows: List<Row>): boolean {
   if (rows.length === 0) return false;
-  const firstParent = rows[0].parentRef;
-  return rows.every((row) => refsEqual(row.parentRef, firstParent));
+  const firstParent = getVisibleParentRow(orderedRows, rows[0]);
+  return rows.every(
+    (row) =>
+      getVisibleParentRow(orderedRows, row)?.viewKey === firstParent?.viewKey
+  );
 }
 
 function sortByNodeIndex(rows: Row[]): Row[] {
-  return [...rows].sort((a, b) => (a.childIndex ?? 0) - (b.childIndex ?? 0));
+  return [...rows].sort((left, right) => left.index - right.index);
 }
 
 function planBatchMove(
@@ -211,8 +197,7 @@ function planBatchMove(
     return !editorSpans ||
       row.rowType !== "occurrence" ||
       writableLine(row.occurrence) === undefined ||
-      spansToMarkdown(editorSpans) ===
-        spansToMarkdown(composedContent(row.occurrence).node.spans)
+      spansToMarkdown(editorSpans) === spansToMarkdown(row.occurrence.spans)
       ? acc
       : applyGesture(acc, row.composition, {
           kind: "reword",
@@ -229,7 +214,7 @@ export function planBatchIndent(
   orderedRows: List<Row>,
   editorInfo?: EditorInfo
 ): Plan | undefined {
-  if (!allSameParent(rows)) return undefined;
+  if (!allSameParent(rows, orderedRows)) return undefined;
   const sortedRows = sortByNodeIndex(rows);
   const firstRow = sortedRows[0];
   const prevSibling = getPreviousSiblingFromRows(orderedRows, firstRow);
@@ -256,7 +241,7 @@ export function planBatchOutdent(
   orderedRows: List<Row>,
   editorInfo?: EditorInfo
 ): Plan | undefined {
-  if (!allSameParent(rows)) return undefined;
+  if (!allSameParent(rows, orderedRows)) return undefined;
   const sortedRows = sortByNodeIndex(rows);
   const firstRow = sortedRows[0];
   const parentRow = getVisibleParentRow(orderedRows, firstRow);

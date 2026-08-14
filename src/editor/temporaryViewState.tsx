@@ -60,10 +60,6 @@ export function useIsEditingOn(): boolean {
   return isEditingOn(editingViews, viewKey);
 }
 
-export function isEditableNode(node: GraphNode | undefined): boolean {
-  return node !== undefined;
-}
-
 export function TemporaryViewProvider({
   children,
 }: {

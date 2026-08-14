@@ -9,6 +9,8 @@ import {
   ViewPath,
   getDisplayTextForRow,
   getPaneRootItemID,
+  rowID,
+  rowNode,
   viewPathToString,
 } from "../rowModel";
 import { EMPTY_NODE_ID } from "../core/connections";
@@ -209,7 +211,7 @@ export function PaneTreeResultProvider({
   // the projection rows appear when the fetch resolves.
   useEffect(() => {
     treeResult.rows.forEach((row) => {
-      const feedUrl = calendarFeedUrl(row.node);
+      const feedUrl = calendarFeedUrl(rowNode(row));
       if (feedUrl) {
         requestFeed(feedUrl);
       }
@@ -292,7 +294,7 @@ function PlainTreeRows({
     if (handledScrollToIdRef.current === scrollToId) {
       return;
     }
-    const index = rows.findIndex((row) => row.node.id === scrollToId);
+    const index = rows.findIndex((row) => rowID(row) === scrollToId);
     if (index >= 0) {
       const row = containerRef.current?.querySelector(
         `[data-row-index="${index}"]`
@@ -473,7 +475,7 @@ function Tree(): JSX.Element | null {
   ]);
 
   if (
-    (rows.size === 0 || rootRow?.node.id === EMPTY_NODE_ID) &&
+    (rows.size === 0 || (rootRow && rowID(rootRow) === EMPTY_NODE_ID)) &&
     pane.sourceId !== LOCAL &&
     (pane.documentId !== undefined || pane.rootNodeId !== undefined)
   ) {

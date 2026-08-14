@@ -10,6 +10,7 @@ import { useTemporaryView } from "./temporaryViewState";
 import { usePaneTreeResult } from "./TreeView";
 import { usePlanner } from "../planner";
 import { getRowKey } from "./keyboardNavigation";
+import { rowArgument, rowRelevance } from "../rowModel";
 import { planBatchRelevance, planBatchArgument } from "./batchOperations";
 import {
   getActionTargetRows,
@@ -112,8 +113,9 @@ export function MobileActionBar({
   if (!currentRow) return null;
   if (isRowReadonly(currentRow, isOtherUser, isInSearch)) return null;
   if (isUserEntryRow(activeRow)) return null;
-  const currentLevel = relevanceToLevel(currentRow.node.relevance);
-  const currentArgument = currentRow.node.argument;
+  const currentRelevance = rowRelevance(currentRow);
+  const currentLevel = relevanceToLevel(currentRelevance);
+  const currentArgument = rowArgument(currentRow);
 
   const innerNode = activeRow.querySelector(".inner-node");
   if (!innerNode) return null;
@@ -127,9 +129,7 @@ export function MobileActionBar({
         ? ("not_relevant" as Relevance)
         : SYMBOL_TO_RELEVANCE[LEVEL_SYMBOLS[level]];
     const relevance: Relevance =
-      currentRow.node.relevance === targetRelevance
-        ? undefined
-        : targetRelevance;
+      currentRelevance === targetRelevance ? undefined : targetRelevance;
     executePlan(planBatchRelevance(plan, targetRows, relevance));
     refocusPaneAfterRowMutation(root);
   };

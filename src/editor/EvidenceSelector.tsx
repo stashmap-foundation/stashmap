@@ -1,13 +1,13 @@
 import React from "react";
 import { TYPE_COLORS } from "../core/constants";
 import { useUpdateArgument } from "./useUpdateArgument";
-import { useCurrentNode, useDisplayText, useRow } from "../rowModel";
+import { useDisplayText, useRow } from "../rowModel";
 import { usePlanner } from "../planner";
 import { preventEditorBlur } from "./AddNode";
 import { useEditorText } from "./EditorTextContext";
 import { useTemporaryView } from "./temporaryViewState";
 import { planBatchArgument, EditorInfo } from "./batchOperations";
-import { nodeText, spansText } from "../core/nodeSpans";
+import { spansText } from "../core/nodeSpans";
 import { usePaneTreeResult } from "./TreeView";
 
 function getArgumentColor(argument: Argument): string {
@@ -45,7 +45,6 @@ export function EvidenceSelector(): JSX.Element | null {
   const { virtualType } = row;
   const isAcceptableVirtual = virtualType === "incoming";
   const { viewKey } = row;
-  const currentNode = useCurrentNode();
   const nodeDisplayText = useDisplayText();
   const editorTextContext = useEditorText();
   const editorSpans = editorTextContext?.spans;
@@ -56,11 +55,7 @@ export function EvidenceSelector(): JSX.Element | null {
 
   if (!isVisible && !isAcceptableVirtual) return null;
 
-  const nodeName =
-    editorText.trim() ||
-    nodeDisplayText ||
-    (currentNode ? nodeText(currentNode) : "") ||
-    "row";
+  const nodeName = editorText.trim() || nodeDisplayText || "row";
 
   const isInSelection = selection.has(viewKey) && selection.size > 1;
 

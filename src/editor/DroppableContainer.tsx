@@ -15,7 +15,7 @@ import {
   usePlanner,
 } from "../planner";
 import { useTemporaryView } from "./temporaryViewState";
-import { buildPaneTarget, viewPathToString } from "../rowModel";
+import { buildPaneTarget, rowNode, viewPathToString } from "../rowModel";
 import { NOTE_TYPE, INDENTATION } from "./Node";
 import { usePaneIndex } from "../SplitPanesContext";
 import {
@@ -186,7 +186,7 @@ function getRootDepth(rows: List<Row>): number {
   if (!firstRow) {
     return 0;
   }
-  return firstRow.parentRef ? firstRow.depth - 1 : firstRow.depth;
+  return firstRow.depth;
 }
 
 export function useDroppable({
@@ -384,7 +384,7 @@ export function useDroppable({
             planPasteMarkdownTrees(
               plan,
               importedTrees,
-              dropDestination.parentRow.node,
+              rowNode(dropDestination.parentRow),
               dropDestination.insertAtIndex
             )
           );

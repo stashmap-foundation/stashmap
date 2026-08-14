@@ -6,13 +6,13 @@ import {
   levelToRelevance,
   RELEVANCE_LABELS,
 } from "./useUpdateRelevance";
-import { useCurrentNode, useDisplayText, useRow } from "../rowModel";
+import { useDisplayText, useRow } from "../rowModel";
 import { usePlanner } from "../planner";
 import { preventEditorBlur } from "./AddNode";
 import { useEditorText } from "./EditorTextContext";
 import { useTemporaryView } from "./temporaryViewState";
 import { planBatchRelevance, EditorInfo } from "./batchOperations";
-import { nodeText, spansText } from "../core/nodeSpans";
+import { spansText } from "../core/nodeSpans";
 import { usePaneTreeResult } from "./TreeView";
 
 type RelevanceSelectorProps = {
@@ -67,7 +67,6 @@ export function RelevanceSelector({
 
   const row = useRow();
   const { viewKey } = row;
-  const currentNode = useCurrentNode();
   const rows = usePaneTreeResult()?.rows.toArray() ?? [row];
   const { createPlan, executePlan } = usePlanner();
   const parentPath = row.parentViewPath;
@@ -89,10 +88,7 @@ export function RelevanceSelector({
   const isContains = displayLevel === -1;
   const displayText = isVirtual
     ? nodeDisplayText
-    : editorText.trim() ||
-      nodeDisplayText ||
-      (currentNode ? nodeText(currentNode) : "") ||
-      "";
+    : editorText.trim() || nodeDisplayText;
 
   const isInSelection = selection.has(viewKey) && selection.size > 1;
 

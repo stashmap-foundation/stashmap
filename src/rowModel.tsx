@@ -78,6 +78,12 @@ export function rowRef(row: Row): NodeRef {
     : row.ref;
 }
 
+export function rowContentKey(row: Row): string {
+  return row.rowType === "occurrence"
+    ? row.occurrence.key
+    : `${row.sourceId}:${row.node.id}`;
+}
+
 export function rowSpans(row: Row): InlineSpan[] {
   return row.rowType === "occurrence" ? row.occurrence.spans : row.node.spans;
 }

@@ -1,8 +1,6 @@
 import React from "react";
 import { Map } from "immutable";
-import { LOCAL } from "./core/nodeRef";
 import { newDB } from "./core/knowledge";
-import { injectEmptyNodesIntoKnowledgeDBs } from "./core/connections";
 import {
   useDocumentKnowledgeDBs,
   useDocumentGraphIndex,
@@ -73,8 +71,6 @@ export function MergeKnowledgeDB({
   pull?: PullOverlayData;
 }): JSX.Element {
   const data = useData();
-  const { temporaryEvents } = data.publishEventsStatus;
-
   const documentDBs = useDocumentKnowledgeDBs();
   const documentGraphIndex = useDocumentGraphIndex();
   const documentRecords = useDocuments();
@@ -95,17 +91,11 @@ export function MergeKnowledgeDB({
   const mergedDocumentByFilePath = documentByFilePath
     ? documentsByPath.merge(data.documentByFilePath).merge(documentByFilePath)
     : documentsByPath.merge(data.documentByFilePath);
-  const injectedDBs = injectEmptyNodesIntoKnowledgeDBs(
-    baseDBs,
-    temporaryEvents,
-    LOCAL
-  );
-
   return (
     <DataContext.Provider
       value={{
         ...data,
-        knowledgeDBs: injectedDBs,
+        knowledgeDBs: baseDBs,
         graphIndex: mergedGraphIndex,
         documents: mergedDocuments,
         documentByFilePath: mergedDocumentByFilePath,

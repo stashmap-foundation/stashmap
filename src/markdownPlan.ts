@@ -9,12 +9,12 @@ import { materializeTree, WalkContext } from "./core/markdownNodes";
 import { MarkdownTreeNode } from "./core/markdownTree";
 import {
   GraphPlan,
-  Plan,
   planAddTargetsToNode,
   planMoveDescendantNodes,
   planUpsertNodes,
-} from "./planner";
-import { planUpsertRootDocument, withDocumentRoot } from "./core/plan";
+  planUpsertRootDocument,
+  withDocumentRoot,
+} from "./core/plan";
 import { newGraphNode } from "./core/nodeFactory";
 import { plainSpans } from "./core/nodeSpans";
 
@@ -159,15 +159,15 @@ function planInsertMarkdownTreesByParentId<T extends GraphPlan>(
   };
 }
 
-export function planInsertMarkdownTrees(
-  plan: Plan,
+export function planInsertMarkdownTrees<T extends GraphPlan>(
+  plan: T,
   trees: MarkdownTreeNode[],
   parentNode: GraphNode,
   insertAtIndex?: number,
   relevance?: Relevance,
   argument?: Argument
 ): {
-  plan: Plan;
+  plan: T;
   topItemIDs: ID[];
   topNodeIDs: ID[];
   actualItemIDs: Array<ID>;

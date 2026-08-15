@@ -2,16 +2,10 @@ import React from "react";
 import { List } from "immutable";
 import { DndProvider, useDragLayer, XYCoord } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
-import { nip19 } from "nostr-tools";
 import { LOCAL } from "./core/nodeRef";
-import {
-  createRefTarget,
-  createReferenceTarget,
-  getNode,
-} from "./core/connections";
+import { getNode } from "./core/connections";
 import { nodeText } from "./core/nodeSpans";
 import { isCalendarEntryId } from "./core/ical";
-import { writableLine } from "./core/composition";
 import {
   getIndependentRows,
   getVisibleParentRow,
@@ -28,12 +22,11 @@ import {
   Plan,
   applyGesture,
   moveGestureRows,
+  placeGestureTarget,
   planExpandRow,
   AddToParentTarget,
+  writableLine,
 } from "./planner";
-import { planRecordKnowstrSource } from "./core/plan";
-import { sourceCoordinate } from "./navigationUrl";
-import { decodePublicKeyInputSync } from "./infra/nostr/publicKeys";
 
 type DragSource = {
   row: Row;
@@ -46,51 +39,6 @@ type DragSource = {
   targetId?: ID;
   insertTarget?: AddToParentTarget;
 };
-
-function addFallbackLinkText(
-  target: AddToParentTarget,
-  text: string | undefined
-): AddToParentTarget {
-  if (typeof target === "string" || !("targetID" in target)) {
-    return target;
-  }
-  if (target.linkText || !text) {
-    return target;
-  }
-  return createRefTarget(target.targetID, text);
-}
-
-function planRecordForeignSource(
-  plan: Plan,
-  sourcePane: Pane | undefined,
-  sourceRow: Row,
-  targetNode: GraphNode
-): Plan {
-  const sourceId = rowSourceId(sourceRow);
-  if (sourceId === LOCAL) {
-    return plan;
-  }
-  const coordinate = sourcePane?.routeCoordinate ?? sourceCoordinate(sourceId);
-  const pubkey = coordinate?.pubkey ?? decodePublicKeyInputSync(sourceId);
-  if (!pubkey) {
-    return plan;
-  }
-  const sourceDocument = getDocumentForNode(
-    plan.knowledgeDBs,
-    plan.documents,
-    rowNode(sourceRow),
-    sourceId
-  );
-  const doc = sourceDocument?.docId ?? coordinate?.dTag;
-  if (!doc) {
-    return plan;
-  }
-  return planRecordKnowstrSource(plan, targetNode, {
-    author: nip19.npubEncode(pubkey),
-    doc,
-    relays: coordinate?.relays ?? [],
-  });
-}
 
 export function isDraggedOccurrence(row: Row, sources: Row[]): boolean {
   return sources.some((source) =>
@@ -305,7 +253,6 @@ export function dnd(
   if (dropIntoOwnDescendant) {
     return basePlan;
   }
-  const sourcePane = basePlan.panes[sourceDrag.sourcePaneIndex];
   const rootOf = (row: Row): ID | undefined => {
     if (row.rowType !== "occurrence") {
       return undefined;
@@ -321,20 +268,6 @@ export function dnd(
     )?.root;
   };
   const targetRoot = rootOf(targetParentRow);
-  const localRoot =
-    targetRoot === undefined
-      ? undefined
-      : getNode(basePlan.knowledgeDBs, targetRoot, LOCAL);
-  const recordForeignSources = (plan: Plan): Plan =>
-    localRoot
-      ? independentRows.reduce(
-          (acc, row) =>
-            rowSourceId(row) === LOCAL
-              ? acc
-              : planRecordForeignSource(acc, sourcePane, row, localRoot),
-          plan
-        )
-      : plan;
   const sourceDocument = getDocumentForNode(
     basePlan.knowledgeDBs,
     basePlan.documents,
@@ -398,7 +331,7 @@ export function dnd(
     }
     const rows = moveGestureRows(moveRows);
     return applyGesture(
-      recordForeignSources(planExpandRow(basePlan, targetParentRow)),
+      planExpandRow(basePlan, targetParentRow),
       doorComposition,
       {
         kind: "move",
@@ -418,41 +351,29 @@ export function dnd(
   ) {
     return movedPlan;
   }
-  const targets = rest.map(
-    (
-      row
-    ): {
-      kind: "target";
-      target: AddToParentTarget;
-      relevance: Relevance;
-      argument: Argument;
-    } => {
-      const isPrimarySource = row.viewKey === source;
-      const insertTarget =
-        (isPrimarySource ? sourceDrag.insertTarget : undefined) ??
-        row.incomingTarget;
-      const dragTargetID = isPrimarySource
-        ? sourceDrag.targetId || sourceDrag.nodeId
-        : undefined;
-      const occurrence =
-        row.rowType === "occurrence" ? row.occurrence : undefined;
-      const targetID =
-        dragTargetID ?? occurrence?.target ?? occurrence?.id ?? rowID(row);
-      const makeTarget =
-        sourceDrag.altCopy === true && isCalendarEntryId(targetID)
-          ? createReferenceTarget
-          : createRefTarget;
-      const target = insertTarget
-        ? addFallbackLinkText(insertTarget, sourceDrag.text)
-        : makeTarget(targetID, occurrence?.text ?? nodeText(rowNode(row)));
-      return {
-        kind: "target",
-        target,
-        relevance: rowRelevance(row),
-        argument: rowArgument(row),
-      };
-    }
-  );
+  const targets = rest.map((row) => {
+    const isPrimarySource = row.viewKey === source;
+    const insertTarget =
+      (isPrimarySource ? sourceDrag.insertTarget : undefined) ??
+      row.incomingTarget;
+    const dragTargetID = isPrimarySource
+      ? sourceDrag.targetId || sourceDrag.nodeId
+      : undefined;
+    const occurrence =
+      row.rowType === "occurrence" ? row.occurrence : undefined;
+    const targetID =
+      dragTargetID ?? occurrence?.target ?? occurrence?.id ?? rowID(row);
+    const text = occurrence?.text ?? nodeText(rowNode(row));
+    return placeGestureTarget(
+      insertTarget,
+      targetID,
+      sourceDrag.text ?? text,
+      rowSourceId(row),
+      sourceDrag.altCopy === true && isCalendarEntryId(targetID),
+      rowRelevance(row),
+      rowArgument(row)
+    );
+  });
   const lastMoved = moveRows.at(-1);
   const fallbackAfter =
     lastMoved?.rowType === "occurrence"
@@ -463,7 +384,7 @@ export function dnd(
       ? dropAnchor.occurrence.key
       : fallbackAfter;
   return applyGesture(
-    recordForeignSources(planExpandRow(movedPlan, targetParentRow)),
+    planExpandRow(movedPlan, targetParentRow),
     doorComposition,
     {
       kind: "place",

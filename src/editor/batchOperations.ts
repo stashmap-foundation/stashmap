@@ -4,18 +4,17 @@ import {
   Plan,
   applyGesture,
   moveGestureRows,
+  placeGestureTarget,
   planExpandRow,
   planSaveVirtualNode,
   planUpdateEmptyNodeMetadata,
+  composedWriteKind,
+  writableLine,
 } from "../planner";
 import { NodeItemMetadata } from "../nodeItemMetadata";
 import { createReferenceTarget, isEmptyNodeID } from "../core/connections";
-import { spansText, spansToMarkdown, plainSpans } from "../core/nodeSpans";
-import {
-  ComposedRow,
-  CompositionResult,
-  writableLine,
-} from "../core/composition";
+import { spansText, spansToMarkdown } from "../core/nodeSpans";
+import { ComposedRow, CompositionResult } from "../core/composition";
 
 export type EditorInfo = {
   spans: InlineSpan[];
@@ -48,22 +47,26 @@ export function planJudgeComposedRow(
   metadata: NodeItemMetadata,
   editorSpans: InlineSpan[] | undefined
 ): Plan {
-  const spans = editorSpans ?? plainSpans(occurrence.text);
-  if (metadata.relevance === "not_relevant") {
-    return applyGesture(plan, composition, {
-      kind: "dismiss",
-      row: occurrence.key,
-      spans,
-      remove: false,
-    });
-  }
-  return applyGesture(plan, composition, {
+  const kind = composedWriteKind(occurrence);
+  const changed =
+    editorSpans !== undefined &&
+    spansText(editorSpans).trim() !== "" &&
+    (kind === "placement" || kind === "speaking"
+      ? spansText(editorSpans).trim() !== occurrence.text.trim()
+      : spansToMarkdown(editorSpans) !== spansToMarkdown(occurrence.spans));
+  const edited = changed
+    ? applyGesture(plan, composition, {
+        kind: "reword",
+        row: occurrence.key,
+        spans: editorSpans,
+      })
+    : plan;
+  return applyGesture(edited, composition, {
     kind: "judge",
     row: occurrence.key,
     relevance:
       "relevance" in metadata ? metadata.relevance : occurrence.relevance,
     argument: "argument" in metadata ? metadata.argument : occurrence.argument,
-    spans,
   });
 }
 
@@ -93,17 +96,23 @@ export function planUpdateOneMetadata(
             row.incomingTarget.linkText
           )
         : row.incomingTarget;
-    return row.incomingParent && row.composition
+    return row.incomingParent &&
+      row.composition &&
+      typeof target !== "string" &&
+      "targetID" in target
       ? applyGesture(acc, row.composition, {
           kind: "place",
           parent: row.incomingParent.key,
           targets: [
-            {
-              kind: "target",
+            placeGestureTarget(
               target,
-              relevance: metadata.relevance ?? row.node.relevance,
-              argument: metadata.argument ?? row.node.argument,
-            },
+              target.targetID,
+              target.linkText ?? "",
+              row.sourceId,
+              target.reference === true,
+              metadata.relevance ?? row.node.relevance,
+              metadata.argument ?? row.node.argument
+            ),
           ],
           after: row.incomingParent.children.at(-1)?.key,
         })
@@ -113,24 +122,22 @@ export function planUpdateOneMetadata(
     if (!row.parentViewPath) {
       return acc;
     }
-    if (editorSpans && spansText(editorSpans).trim() !== "") {
+    if (
+      row.rowType === "empty" &&
+      editorSpans &&
+      spansText(editorSpans).trim() !== ""
+    ) {
       return planSaveVirtualNode(
         acc,
         editorSpans,
-        row.node.id,
-        row.node,
-        row.viewPath,
-        row.rowType === "empty" ? row.emptyParent : undefined,
-        row.composition,
-        row.parentNode?.id,
-        row.parentViewPath,
+        row,
         row.viewPath[0],
         metadata.relevance,
         metadata.argument
       ).plan;
     }
-    return row.parentNode
-      ? planUpdateEmptyNodeMetadata(acc, row.parentNode.id, metadata)
+    return row.parentKey
+      ? planUpdateEmptyNodeMetadata(acc, row.parentKey, metadata)
       : acc;
   }
   return acc;

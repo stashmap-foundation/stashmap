@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-use-before-define, functional/immutable-data, no-nested-ternary */
 import React, { Dispatch, SetStateAction, useRef } from "react";
 import { List, OrderedSet, Set as ImmutableSet } from "immutable";
-import { UnsignedEvent } from "nostr-tools";
+import { nip19, UnsignedEvent } from "nostr-tools";
 import {
   KIND_DELETE,
   KIND_KNOWLEDGE_DOCUMENT,
@@ -13,6 +13,7 @@ import { useExecutor } from "./ExecutorContext";
 import {
   Document as KnowstrDocument,
   documentKeyOf,
+  getDocumentForNode,
   withDocumentRealWorldEntities,
 } from "./core/Document";
 import { renderDocumentMarkdown } from "./documentRenderer";
@@ -20,13 +21,12 @@ import { buildDocumentEvent } from "./nodesDocumentEvent";
 import { newStorageKey } from "./storageEncryption";
 import {
   EMPTY_NODE_ID,
-  isEmptyNodeID,
   computeEmptyNodeMetadata,
   createRefTarget,
+  createReferenceTarget,
   deleteNodes,
   getNode,
 } from "./core/connections";
-import type { TextSeed } from "./core/connections";
 import {
   AddToParentTarget,
   GraphPlan,
@@ -34,8 +34,9 @@ import {
   planAddTargetsToNode,
   planDeleteDescendantNodes,
   planDeleteNodes,
-  planTakeComposedRow,
+  planRecordKnowstrSource,
   planUpsertNodes,
+  recognizedTargetSpans,
   withDocumentRoot,
 } from "./core/plan";
 import {
@@ -45,26 +46,36 @@ import {
   updateViewKey,
 } from "./rowModel";
 import {
+  nodeRowKind,
+  nodeTarget,
   nodeText,
   plainSpans,
   spansText,
   spansToMarkdown,
 } from "./core/nodeSpans";
+import {
+  calendarFeedHref,
+  calendarFeedTargetUrl,
+  calendarFeedUrlFromSpans,
+  isBareIcalFeedUrl,
+} from "./core/ical";
 import { classifyLinkHref } from "./core/linkPath";
 import { LOCAL } from "./core/nodeRef";
+import { routeCoordinateSourceId, sourceCoordinate } from "./navigationUrl";
+import { decodePublicKeyInputSync } from "./infra/nostr/publicKeys";
 import { entityIdForText } from "./core/entityRecognition";
+import {
+  MarkdownTreeNode,
+  parseInlineSpans,
+  parseMarkdown,
+} from "./core/markdownTree";
+import { parseMarkdownImportFiles } from "./core/markdownImport";
+import { planInsertMarkdownTrees } from "./markdownPlan";
 import { getWorkspaceNode } from "./core/knowledge";
 import {
-  Gesture,
   ComposedRow,
   CompositionResult,
-  PositionName,
-  clearPosition,
-  movePositionWrites,
-  positionAttrs,
-  composedLine,
-  composedWriteKind,
-  writableLine,
+  writtenLine,
 } from "./core/composition";
 import {
   MultiSelectionState,
@@ -92,6 +103,433 @@ type WorkspacePlan = GraphPlan &
   };
 
 export type Plan = WorkspacePlan;
+
+export type Gesture =
+  | {
+      kind: "judge";
+      row: string;
+      relevance: Relevance;
+      argument: Argument;
+    }
+  | {
+      kind: "dismiss";
+      row: string;
+    }
+  | {
+      kind: "reword";
+      row: string;
+      spans: InlineSpan[];
+    }
+  | {
+      kind: "move";
+      rows: string[];
+      parent: string;
+      after: string | undefined;
+    }
+  | {
+      kind: "place";
+      targets: (
+        | {
+            kind: "spans";
+            spans: InlineSpan[];
+            relevance: Relevance;
+            argument: Argument;
+          }
+        | {
+            kind: "node";
+            id: ID;
+            sourceId: SourceId;
+            text: string;
+            reference: boolean;
+            relevance: Relevance;
+            argument: Argument;
+          }
+        | {
+            kind: "document";
+            sourceId: SourceId;
+            docId: string;
+            filePath: string | undefined;
+            text: string;
+            relevance: Relevance;
+            argument: Argument;
+          }
+        | {
+            kind: "outline";
+            lines: { text: string; depth: number }[];
+          }
+        | {
+            kind: "markdown";
+            files: { name: string; markdown: string }[];
+          }
+        | {
+            kind: "clipboard";
+            text: string;
+          }
+      )[];
+      parent: string;
+      after: string | undefined;
+    };
+
+export function movePositionWrites(
+  parent: ComposedRow,
+  moved: {
+    id: ID;
+    localID: ID | undefined;
+    target: ID | undefined;
+    chain: ID[];
+    position: ComposedRow["position"];
+    placement: boolean;
+    reparented: boolean;
+  }[],
+  after: ComposedRow | undefined,
+  anchorMoved: boolean
+): { id: ID; names: ComposedRow["position"] }[] {
+  const placementScope =
+    parent.origin.kind === "written"
+      ? parent.kind === "placement"
+      : parent.origin.writeParentTarget !== undefined;
+  const movedIds = new globalThis.Set(moved.map((seat) => seat.id));
+  const seatFor = (
+    row: ComposedRow
+  ): Parameters<typeof movePositionWrites>[1][number] => ({
+    id: row.id,
+    localID:
+      row.origin.kind === "written" && row.origin.writable
+        ? row.origin.line.node.id
+        : undefined,
+    target: row.target,
+    chain: row.chain,
+    position: row.position,
+    placement:
+      row.origin.kind === "written" && row.origin.writable
+        ? nodeRowKind(row.origin.line.node) === "placement"
+        : true,
+    reparented: false,
+  });
+  const stationary = parent.children
+    .filter((row) => !movedIds.has(row.id))
+    .map(seatFor);
+  const anchorIndex =
+    after === undefined
+      ? -1
+      : stationary.findIndex((seat) => seat.id === after.id);
+  const desired = [
+    ...stationary.slice(0, anchorIndex + 1),
+    ...moved,
+    ...stationary.slice(anchorIndex + 1),
+  ];
+  const anchorIDFor = (seat: typeof desired[number]): ID =>
+    seat.localID ?? seat.id;
+  const parentAnchor = parent.target ?? parent.id;
+  const makePosition = (
+    kind: ComposedRow["position"][number]["kind"],
+    id: ID
+  ): ComposedRow["position"][number] => ({
+    kind,
+    id,
+  });
+  const namesAt = (index: number): ComposedRow["position"] => {
+    const seat = desired[index];
+    const predecessor = desired[index - 1];
+    const successor = movedIds.has(seat.id)
+      ? desired.slice(index + 1).find((other) => !movedIds.has(other.id))
+      : desired[index + 1];
+    const siblings: ComposedRow["position"] = [
+      ...(predecessor ? [makePosition("after", anchorIDFor(predecessor))] : []),
+      ...(successor ? [makePosition("before", anchorIDFor(successor))] : []),
+    ];
+    return [
+      ...siblings,
+      ...(seat.reparented || (movedIds.has(seat.id) && siblings.length === 0)
+        ? [makePosition("parent", parentAnchor)]
+        : []),
+    ];
+  };
+  const movedSeats = new globalThis.Set(
+    moved.flatMap((seat) => [
+      seat.id,
+      ...(seat.localID !== undefined ? [seat.localID] : []),
+      ...(seat.target !== undefined ? [seat.target] : []),
+    ])
+  );
+  const affected = new globalThis.Set<ID>(
+    moved.flatMap((seat) => (seat.localID !== undefined ? [seat.localID] : []))
+  );
+  desired.forEach((seat) => {
+    if (
+      seat.localID !== undefined &&
+      seat.position.some((name) => movedSeats.has(name.id))
+    ) {
+      affected.add(seat.localID);
+    }
+  });
+  const expandAffected = (): void => {
+    const occupied = desired.flatMap((seat, index) =>
+      seat.localID !== undefined && affected.has(seat.localID)
+        ? [desired[index - 1]]
+        : []
+    );
+    const displaced = desired.flatMap((seat) => {
+      const occupies = occupied.some((predecessor) =>
+        predecessor
+          ? seat.position.some(
+              (name) =>
+                name.kind === "after" &&
+                (name.id === predecessor.id ||
+                  predecessor.chain.includes(name.id))
+            )
+          : seat.position.length > 0 &&
+            seat.position.every((name) => name.kind === "parent")
+      );
+      return seat.localID !== undefined &&
+        !affected.has(seat.localID) &&
+        occupies
+        ? [seat.localID]
+        : [];
+    });
+    displaced.forEach((id) => affected.add(id));
+    if (displaced.length > 0) {
+      expandAffected();
+    }
+  };
+  expandAffected();
+  return desired.flatMap((seat, index) => {
+    if (seat.localID === undefined || !affected.has(seat.localID)) {
+      return [];
+    }
+    if (
+      !placementScope &&
+      (!seat.placement || (!anchorMoved && movedIds.has(seat.id)))
+    ) {
+      return seat.position.length === 0
+        ? []
+        : [{ id: seat.localID, names: [] }];
+    }
+    const names = namesAt(index);
+    const signature = seat.position
+      .map((name) => `${name.kind}:${name.id}`)
+      .join(" ");
+    const nextSignature = names
+      .map((name) => `${name.kind}:${name.id}`)
+      .join(" ");
+    return signature === nextSignature ? [] : [{ id: seat.localID, names }];
+  });
+}
+
+export function movePositionSeat(
+  row: ComposedRow,
+  localID: ID | undefined,
+  reparented: boolean
+): Parameters<typeof movePositionWrites>[1][number] {
+  return {
+    id: row.id,
+    localID: localID ?? writableLine(row)?.node.id,
+    target: row.target,
+    chain: row.chain,
+    position: row.position,
+    placement: composedWriteKind(row) === "placement",
+    reparented,
+  };
+}
+
+export function writeFromForMove(
+  row: ComposedRow,
+  parent: ComposedRow
+): ID | undefined {
+  const writeKind = composedWriteKind(row);
+  if (writeKind !== "placement" && writeKind !== "speaking") {
+    return undefined;
+  }
+  const writtenTarget = parent.kind === "placement" ? parent.target : undefined;
+  const scopeTarget =
+    parent.origin.kind === "written"
+      ? writtenTarget
+      : parent.origin.writeParentTarget;
+  return scopeTarget !== undefined && row.source.ancestors.includes(scopeTarget)
+    ? undefined
+    : row.origin.writeFrom;
+}
+
+export function dependentPositionWrites(
+  row: ComposedRow
+): { id: ID; names: ComposedRow["position"] }[] {
+  const index = row.origin.physicalPeers.findIndex(
+    (line) => line.id === row.id
+  );
+  const previous = index > 0 ? row.origin.physicalPeers[index - 1] : undefined;
+  const writeKind = composedWriteKind(row);
+  const represented =
+    writeKind === "placement" || writeKind === "speaking"
+      ? row.target
+      : undefined;
+  const reAnchor = represented ?? row.position[0]?.id ?? previous?.id;
+  return row.origin.physicalPeers.flatMap((line) => {
+    if (!line.position.some((name) => name.id === row.id)) {
+      return [];
+    }
+    const names = line.position.flatMap((name) => {
+      if (name.id !== row.id) {
+        return [name];
+      }
+      return reAnchor === undefined ? [] : [{ ...name, id: reAnchor }];
+    });
+    return [{ id: line.id, names }];
+  });
+}
+
+export function sourcePositionWrites(
+  rows: { row: ComposedRow; sourceParent: ComposedRow | undefined }[]
+): { id: ID; names: ComposedRow["position"] }[] {
+  const moved = new globalThis.Set(rows.map((entry) => entry.row));
+  const seatIds = new globalThis.Set(
+    rows.flatMap((entry) => [
+      entry.row.id,
+      ...(entry.row.target ? [entry.row.target] : []),
+    ])
+  );
+  const parents = rows
+    .flatMap((entry) => (entry.sourceParent ? [entry.sourceParent] : []))
+    .filter((parent, index, all) => all.indexOf(parent) === index);
+  return parents.flatMap((sourceParent) => {
+    const remaining = sourceParent.children.filter((row) => !moved.has(row));
+    return remaining.flatMap((row, index) => {
+      const line = writableLine(row);
+      if (
+        !line ||
+        row.flags.includes("ambiguous-anchor") ||
+        row.flags.includes("lapsed") ||
+        !row.position.some((name) => seatIds.has(name.id))
+      ) {
+        return [];
+      }
+      const predecessor = remaining[index - 1];
+      const successor = remaining[index + 1];
+      const predecessorName: ComposedRow["position"][number] | undefined =
+        predecessor ? { kind: "after", id: predecessor.id } : undefined;
+      const successorName: ComposedRow["position"][number] | undefined =
+        successor ? { kind: "before", id: successor.id } : undefined;
+      const names = [predecessorName, successorName].flatMap((name) =>
+        name ? [name] : []
+      );
+      return [{ id: line.node.id, names }];
+    });
+  });
+}
+export function writableLine(
+  row: ComposedRow
+): ComposedRow["origin"]["line"] | undefined {
+  return row.origin.kind === "written" && row.origin.writable
+    ? row.origin.line
+    : undefined;
+}
+export function composedWriteKind(row: ComposedRow): ComposedRow["kind"] {
+  const line = writableLine(row);
+  return line ? nodeRowKind(line.node) : "placement";
+}
+
+export function rowEditing(row: ComposedRow): {
+  calendar: boolean;
+  reword: boolean;
+  spans: InlineSpan[];
+  target: ID | undefined;
+  href: string | undefined;
+} {
+  const writeKind = composedWriteKind(row);
+  const feedUrl =
+    calendarFeedTargetUrl(row.target) ?? calendarFeedUrlFromSpans(row.spans);
+  const calendar = row.editTarget !== undefined || feedUrl !== undefined;
+  const reword =
+    !calendar &&
+    (writtenLine(row) === undefined ||
+      ((writeKind === "placement" || writeKind === "speaking") &&
+        row.target !== undefined &&
+        classifyLinkHref(`#${row.target}`) === "node"));
+  const rewordSpans: InlineSpan[] =
+    writeKind === "placement" || writeKind === "speaking"
+      ? [
+          {
+            kind: "link",
+            href: `#${row.target ?? row.id}`,
+            text: row.text,
+          },
+        ]
+      : row.spans.filter(
+          (span) => !(span.kind === "link" && span.struck === true)
+        );
+  const spans = reword ? rewordSpans : row.spans;
+  const targetHref =
+    row.editTarget !== undefined ? `#${row.editTarget}` : undefined;
+  const href = targetHref ?? (feedUrl ? calendarFeedHref(feedUrl) : undefined);
+  return { calendar, reword, spans, target: row.editTarget, href };
+}
+
+export function rewordedSpans(
+  row: ComposedRow,
+  spans: InlineSpan[]
+): InlineSpan[] {
+  const spoken = spans.map(
+    (span): InlineSpan =>
+      span.kind === "link" ? { kind: "text", text: span.text } : span
+  );
+  const last = spoken[spoken.length - 1];
+  const words: InlineSpan[] =
+    last?.kind === "text"
+      ? [
+          ...spoken.slice(0, -1),
+          { kind: "text", text: `${last.text.trimEnd()} ` },
+        ]
+      : [...spoken, { kind: "text", text: " " }];
+  const line = writableLine(row);
+  const existingBonds =
+    line && composedWriteKind(row) === "speaking"
+      ? line.node.spans.filter(
+          (span) => span.kind === "link" && span.struck === true
+        )
+      : [];
+  const bonds: InlineSpan[] =
+    existingBonds.length > 0
+      ? existingBonds
+      : [
+          {
+            kind: "link",
+            href: `#${row.origin.writeTarget}`,
+            text: row.text.trim(),
+            struck: true,
+          },
+        ];
+  return [...words, ...bonds];
+}
+
+export function writeSpans(spans: InlineSpan[]): InlineSpan[] {
+  const text = spansText(spans).trim();
+  return isBareIcalFeedUrl(text)
+    ? [{ kind: "link", href: calendarFeedHref(text), text }]
+    : spans;
+}
+
+export function standaloneEmbedHref(spans: InlineSpan[]): string | undefined {
+  const span =
+    spans.length === 1 && spans[0]?.kind === "link" ? spans[0] : undefined;
+  return span &&
+    (span.href.startsWith("#") || classifyLinkHref(span.href) === "feed")
+    ? span.href
+    : undefined;
+}
+export function clearPosition(
+  attrs: Record<string, string> | undefined
+): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(attrs ?? {}).filter(
+      ([key]) => key !== "after" && key !== "before" && key !== "parent"
+    )
+  );
+}
+
+export function positionAttrs(
+  names: ComposedRow["position"]
+): Record<string, string> {
+  return Object.fromEntries(names.map((name) => [name.kind, name.id]));
+}
 
 function composedRowByKey(
   row: ComposedRow,
@@ -132,11 +570,33 @@ function createPlacement(
   return [next, getWorkspaceNode(next.knowledgeDBs, ids[0])];
 }
 
-function localParentFor(
-  plan: Plan,
-  row: ComposedRow
-): [Plan, GraphNode | undefined] {
-  return planTakeComposedRow(plan, row);
+function writeRow(plan: Plan, row: ComposedRow): [Plan, GraphNode | undefined] {
+  const line = writableLine(row);
+  const existing = line
+    ? getWorkspaceNode(plan.knowledgeDBs, line.node.id)
+    : undefined;
+  if (existing) {
+    return [plan, existing];
+  }
+  const writeParent = getWorkspaceNode(
+    plan.knowledgeDBs,
+    row.origin.writeParent
+  );
+  const parent = writeParent ?? row.origin.writeRoot;
+  if (!parent) {
+    return [plan, undefined];
+  }
+  const withParent = writeParent ? plan : planUpsertNodes(plan, parent);
+  return !writeParent && row.origin.writeRoot
+    ? [withParent, parent]
+    : createPlacement(
+        withParent,
+        parent.id,
+        row.origin.writeTarget,
+        row.text,
+        undefined,
+        undefined
+      );
 }
 
 export function nextUpdated(node: GraphNode): number {
@@ -191,20 +651,23 @@ function withoutAttrs(
   );
 }
 
-function rowSeat(
-  row: ComposedRow,
-  localID: ID | undefined,
-  reparented: boolean
-): Parameters<typeof movePositionWrites>[1][number] {
-  return {
-    id: row.id,
-    localID: localID ?? writableLine(row)?.node.id,
-    target: row.target,
-    chain: row.chain,
-    position: row.position,
-    placement: composedWriteKind(row) === "placement",
-    reparented,
-  };
+function applyPositionWrites(
+  plan: Plan,
+  writes: { id: ID; names: ComposedRow["position"] }[]
+): Plan {
+  return writes.reduce((current, write) => {
+    const node = getWorkspaceNode(current.knowledgeDBs, write.id);
+    return node
+      ? planUpsertNodes(current, {
+          ...node,
+          extraAttrs: {
+            ...clearPosition(node.extraAttrs),
+            ...positionAttrs(write.names),
+          },
+          updated: nextUpdated(node),
+        })
+      : current;
+  }, plan);
 }
 
 function applyMoveNames(
@@ -214,65 +677,9 @@ function applyMoveNames(
   after: ComposedRow | undefined,
   anchorMoved: boolean
 ): Plan {
-  return movePositionWrites(parent, moved, after, anchorMoved).reduce(
-    (current, write) => {
-      const node = getWorkspaceNode(current.knowledgeDBs, write.id);
-      return node
-        ? planUpsertNodes(current, {
-            ...node,
-            extraAttrs: {
-              ...clearPosition(node.extraAttrs),
-              ...positionAttrs(write.names),
-            },
-            updated: nextUpdated(node),
-          })
-        : current;
-    },
-    plan
-  );
-}
-
-function rewordingSpans(row: ComposedRow, spans: InlineSpan[]): InlineSpan[] {
-  const spoken = spans.map(
-    (span): InlineSpan =>
-      span.kind === "link" ? { kind: "text", text: span.text } : span
-  );
-  const last = spoken[spoken.length - 1];
-  const words: InlineSpan[] =
-    last?.kind === "text"
-      ? [
-          ...spoken.slice(0, -1),
-          { kind: "text", text: `${last.text.trimEnd()} ` },
-        ]
-      : [...spoken, { kind: "text", text: " " }];
-  const line = writableLine(row);
-  const existingBonds =
-    line && composedWriteKind(row) === "speaking"
-      ? line.node.spans.filter(
-          (span) => span.kind === "link" && span.struck === true
-        )
-      : [];
-  const bonds: InlineSpan[] =
-    existingBonds.length > 0
-      ? existingBonds
-      : [
-          {
-            kind: "link",
-            href: `#${row.origin.writeTarget}`,
-            text: row.text.trim(),
-            struck: true,
-          },
-        ];
-  return [...words, ...bonds];
-}
-
-function isRewording(row: ComposedRow, spans: InlineSpan[]): boolean {
-  return (
-    spansText(spans).trim() !== "" &&
-    (writableLine(row) === undefined ||
-      composedWriteKind(row) === "placement" ||
-      composedWriteKind(row) === "speaking") &&
-    spansText(spans).trim() !== row.text.trim()
+  return applyPositionWrites(
+    plan,
+    movePositionWrites(parent, moved, after, anchorMoved)
   );
 }
 
@@ -289,74 +696,49 @@ function containingScope(row: ComposedRow): ID {
   return row.origin.writeParent;
 }
 
-function repairDependentAnchors(plan: Plan, row: ComposedRow): Plan {
-  const index = row.origin.physicalPeers.findIndex(
-    (line) => line.id === row.id
+function writtenNode(plan: Plan, row: ComposedRow): GraphNode | undefined {
+  const line = writableLine(row);
+  const direct = line
+    ? getWorkspaceNode(plan.knowledgeDBs, line.node.id)
+    : undefined;
+  if (direct) {
+    return direct;
+  }
+  const scope = getWorkspaceNode(plan.knowledgeDBs, containingScope(row));
+  if (!scope) {
+    return undefined;
+  }
+  const original = new globalThis.Set(
+    row.origin.writeChildren.map((child) => child.id)
   );
-  const previous = index > 0 ? row.origin.physicalPeers[index - 1] : undefined;
-  const represented =
-    composedWriteKind(row) === "placement" ||
-    composedWriteKind(row) === "speaking"
-      ? row.target
-      : undefined;
-  const reAnchor = represented ?? row.position[0]?.id ?? previous?.id;
-  return row.origin.physicalPeers.reduce((current, line) => {
-    if (!line.position.some((name) => name.id === row.id)) {
-      return current;
-    }
-    const sibling = getWorkspaceNode(current.knowledgeDBs, line.id);
-    if (!sibling) {
-      return current;
-    }
-    const names = line.position.flatMap((name) => {
-      if (name.id !== row.id) {
-        return [name];
-      }
-      return reAnchor === undefined ? [] : [{ ...name, id: reAnchor }];
-    });
-    return planUpsertNodes(current, {
-      ...sibling,
-      extraAttrs: {
-        ...clearPosition(sibling.extraAttrs),
-        ...positionAttrs(names),
-      },
-      updated: nextUpdated(sibling),
-    });
-  }, plan);
+  return scope.children
+    .toArray()
+    .reverse()
+    .flatMap((id) => {
+      const node = getWorkspaceNode(plan.knowledgeDBs, id);
+      return node ? [node] : [];
+    })
+    .find(
+      (node) =>
+        !original.has(node.id) && nodeTarget(node) === row.origin.writeTarget
+    );
+}
+
+function repairDependentAnchors(plan: Plan, row: ComposedRow): Plan {
+  return applyPositionWrites(plan, dependentPositionWrites(row));
 }
 
 function judge(
   plan: Plan,
   row: ComposedRow,
   relevance: Relevance,
-  argument: Argument,
-  spans: InlineSpan[]
+  argument: Argument
 ): Plan {
-  const writable = writableLine(row);
-  const existing = writable
-    ? getWorkspaceNode(plan.knowledgeDBs, writable.node.id)
-    : undefined;
-  const rewording = isRewording(row, spans);
-  const persistedSpans = rewording ? rewordingSpans(row, spans) : spans;
+  const existing = writtenNode(plan, row);
   if (existing) {
     const stamp = (current: Plan, node: GraphNode): Plan =>
       planUpsertNodes(current, {
         ...node,
-        spans: (() => {
-          if (
-            (composedWriteKind(row) === "placement" ||
-              composedWriteKind(row) === "speaking") &&
-            !rewording
-          ) {
-            return node.spans;
-          }
-          if (spansText(persistedSpans).trim() === "") {
-            return node.spans;
-          }
-          return spansText(persistedSpans).trim() === nodeText(node).trim()
-            ? node.spans
-            : persistedSpans;
-        })(),
         relevance,
         argument,
         updated: nextUpdated(node),
@@ -429,84 +811,21 @@ function judge(
   }
   const ownRelevance = relevance !== row.relevance ? relevance : undefined;
   const ownArgument = argument !== row.argument ? argument : undefined;
-  const [withRow, created] = createPlacement(
+  return createPlacement(
     withParent,
     parent.id,
     row.origin.writeTarget,
     row.text,
     ownRelevance,
     ownArgument
-  );
-  return created && rewording
-    ? planUpdateNodeSpans(withRow, created.id, persistedSpans)
-    : withRow;
+  )[0];
 }
 
 function repairSourceDependents(
   plan: Plan,
   rows: { row: ComposedRow; sourceParent: ComposedRow | undefined }[]
 ): Plan {
-  const moved = new globalThis.Set(rows.map((entry) => entry.row));
-  const seatIds = new globalThis.Set(
-    rows.flatMap((entry) => [
-      entry.row.id,
-      ...(entry.row.target ? [entry.row.target] : []),
-    ])
-  );
-  const parents = rows
-    .flatMap((entry) => (entry.sourceParent ? [entry.sourceParent] : []))
-    .filter((parent, index, all) => all.indexOf(parent) === index);
-  return parents.reduce((current, sourceParent) => {
-    const remaining = sourceParent.children.filter((row) => !moved.has(row));
-    return remaining.reduce((acc, row, index) => {
-      const line = writableLine(row);
-      const node = line
-        ? getWorkspaceNode(acc.knowledgeDBs, line.node.id)
-        : undefined;
-      if (
-        !node ||
-        row.flags.includes("ambiguous-anchor") ||
-        row.flags.includes("lapsed") ||
-        !row.position.some((name) => seatIds.has(name.id))
-      ) {
-        return acc;
-      }
-      const predecessor = remaining[index - 1];
-      const successor = remaining[index + 1];
-      const names: PositionName[] = [
-        ...(predecessor
-          ? [{ kind: "after" as const, id: predecessor.id }]
-          : []),
-        ...(successor ? [{ kind: "before" as const, id: successor.id }] : []),
-      ];
-      return planUpsertNodes(acc, {
-        ...node,
-        extraAttrs: {
-          ...clearPosition(node.extraAttrs),
-          ...positionAttrs(names),
-        },
-        updated: nextUpdated(node),
-      });
-    }, current);
-  }, plan);
-}
-
-function fromForMove(row: ComposedRow, parent: ComposedRow): ID | undefined {
-  const writesPlacement =
-    composedWriteKind(row) === "placement" ||
-    composedWriteKind(row) === "speaking";
-  if (!writesPlacement) {
-    return undefined;
-  }
-  const scopeTarget =
-    parent.origin.kind === "written"
-      ? parent.kind === "placement"
-        ? parent.target
-        : undefined
-      : parent.origin.writeParentTarget;
-  return scopeTarget !== undefined && row.source.ancestors.includes(scopeTarget)
-    ? undefined
-    : row.origin.writeFrom;
+  return applyPositionWrites(plan, sourcePositionWrites(rows));
 }
 
 function move(
@@ -519,7 +838,7 @@ function move(
     plan,
     rows.filter((entry) => entry.sourceParent?.key !== parentRow.key)
   );
-  const [withParent, parent] = localParentFor(repaired, parentRow);
+  const [withParent, parent] = writeRow(repaired, parentRow);
   if (!parent) {
     return plan;
   }
@@ -542,7 +861,7 @@ function move(
       if (!node) {
         return current;
       }
-      const from = fromForMove(entry.row, parentRow);
+      const from = writeFromForMove(entry.row, parentRow);
       const recorded =
         from === undefined
           ? entry.row.origin.recordedFrom === undefined
@@ -568,7 +887,7 @@ function move(
     movedRows.plan,
     parentRow,
     rows.map((entry) =>
-      rowSeat(
+      movePositionSeat(
         entry.row,
         movedRows.ids.get(entry.row.id),
         entry.sourceParent?.key !== parentRow.key
@@ -587,14 +906,150 @@ export function moveGestureRows(
   );
 }
 
-function targetOfAddedLine(target: AddToParentTarget): ID | undefined {
+export function placeGestureTarget(
+  target: AddToParentTarget | undefined,
+  id: ID,
+  text: string,
+  sourceId: SourceId,
+  reference: boolean,
+  relevance: Relevance,
+  argument: Argument
+): Extract<Gesture, { kind: "place" }>["targets"][number] {
+  if (target === undefined) {
+    return {
+      kind: "node",
+      id,
+      sourceId,
+      text,
+      reference,
+      relevance,
+      argument,
+    };
+  }
   if (typeof target === "string") {
-    return undefined;
+    return {
+      kind: "node",
+      id: target,
+      sourceId,
+      text,
+      reference: false,
+      relevance,
+      argument,
+    };
   }
   if ("targetID" in target) {
-    return target.reference === true ? undefined : target.targetID;
+    return {
+      kind: "node",
+      id: target.targetID,
+      sourceId,
+      text: target.linkText ?? text,
+      reference: target.reference === true,
+      relevance,
+      argument,
+    };
   }
-  return "text" in target ? entityIdForText(target.text) : undefined;
+  if ("docId" in target) {
+    return {
+      kind: "document",
+      sourceId: target.sourceId,
+      docId: target.docId,
+      filePath: target.filePath,
+      text: target.linkText ?? text,
+      relevance,
+      argument,
+    };
+  }
+  return {
+    kind: "spans",
+    spans: plainSpans(target.text),
+    relevance,
+    argument,
+  };
+}
+
+function outlineTrees(
+  lines: { text: string; depth: number }[]
+): MarkdownTreeNode[] {
+  if (lines.length === 0) {
+    return [];
+  }
+  const minimum = Math.min(...lines.map((line) => line.depth));
+  const roots: MarkdownTreeNode[] = [];
+  const stack: MarkdownTreeNode[] = [];
+  lines.forEach((line) => {
+    const depth = line.depth - minimum;
+    const node: MarkdownTreeNode = {
+      spans: parseInlineSpans(line.text),
+      children: [],
+    };
+    stack.length = Math.min(depth, stack.length);
+    if (stack.length === 0) {
+      roots.push(node);
+    } else {
+      stack[stack.length - 1].children.push(node);
+    }
+    stack.push(node);
+  });
+  return roots;
+}
+
+function linkedTrees(
+  plan: Plan,
+  trees: MarkdownTreeNode[]
+): MarkdownTreeNode[] {
+  return trees.map((tree) => {
+    const text = spansText(tree.spans);
+    const recognized = tree.uuid
+      ? undefined
+      : recognizedTargetSpans(plan, text);
+    return {
+      ...tree,
+      spans: recognized ?? tree.spans,
+      ...(recognized && {
+        extraAttrs: { ...tree.extraAttrs, embed: "true" },
+      }),
+      children: linkedTrees(plan, tree.children),
+    };
+  });
+}
+
+function recordSource(
+  plan: Plan,
+  target: GraphNode,
+  sourceId: SourceId,
+  sourceNode: GraphNode | undefined,
+  docHint: string | undefined
+): Plan {
+  if (sourceId === LOCAL) {
+    return plan;
+  }
+  const decoded = decodePublicKeyInputSync(sourceId);
+  const coordinate =
+    plan.panes
+      .map((pane) => pane.routeCoordinate)
+      .find(
+        (candidate) =>
+          candidate !== undefined &&
+          (routeCoordinateSourceId(candidate) === sourceId ||
+            candidate.pubkey === decoded)
+      ) ?? sourceCoordinate(sourceId);
+  const pubkey = coordinate?.pubkey ?? decoded;
+  const sourceDocument = sourceNode
+    ? getDocumentForNode(
+        plan.knowledgeDBs,
+        plan.documents,
+        sourceNode,
+        sourceId
+      )
+    : undefined;
+  const doc = docHint ?? sourceDocument?.docId ?? coordinate?.dTag;
+  return pubkey && doc
+    ? planRecordKnowstrSource(plan, target, {
+        author: nip19.npubEncode(pubkey),
+        doc,
+        relays: coordinate?.relays ?? [],
+      })
+    : plan;
 }
 
 function place(
@@ -603,7 +1058,7 @@ function place(
   after: ComposedRow | undefined,
   gesture: Extract<Gesture, { kind: "place" }>
 ): Plan {
-  const [withParent, parent] = localParentFor(plan, parentRow);
+  const [withParent, parent] = writeRow(plan, parentRow);
   if (!parent) {
     return plan;
   }
@@ -617,59 +1072,112 @@ function place(
     plan: Plan;
     seats: Parameters<typeof movePositionWrites>[1];
   }>(
-    (acc, entry, index) => {
-      const [next, ids] =
-        entry.kind === "spans"
-          ? planAddSpansToParent(
-              acc.plan,
-              entry.spans,
-              parent,
-              insertAt === undefined ? undefined : insertAt + index,
-              entry.relevance,
-              entry.argument
-            )
-          : planAddTargetsToNode(
-              acc.plan,
-              parent.id,
-              entry.target,
-              insertAt === undefined ? undefined : insertAt + index,
-              entry.relevance,
-              entry.argument
-            );
-      const node =
-        ids[0] === undefined
-          ? undefined
-          : getWorkspaceNode(next.knowledgeDBs, ids[0]);
-      if (!node) {
-        return { plan: next, seats: acc.seats };
-      }
+    (acc, entry) => {
+      const at =
+        insertAt === undefined ? undefined : insertAt + acc.seats.length;
+      const [next, ids] = (() => {
+        if (entry.kind === "spans") {
+          return planAddSpansToParent(
+            acc.plan,
+            writeSpans(entry.spans),
+            parent,
+            at,
+            entry.relevance,
+            entry.argument
+          );
+        }
+        if (entry.kind === "node") {
+          return planAddTargetsToNode(
+            acc.plan,
+            parent.id,
+            entry.reference
+              ? createReferenceTarget(entry.id, entry.text)
+              : createRefTarget(entry.id, entry.text),
+            at,
+            entry.relevance,
+            entry.argument
+          );
+        }
+        if (entry.kind === "document") {
+          return planAddTargetsToNode(
+            acc.plan,
+            parent.id,
+            {
+              sourceId: entry.sourceId,
+              docId: entry.docId,
+              filePath: entry.filePath,
+              linkText: entry.text,
+            },
+            at,
+            entry.relevance,
+            entry.argument
+          );
+        }
+        const trees = (() => {
+          if (entry.kind === "outline") {
+            return outlineTrees(entry.lines);
+          }
+          if (entry.kind === "markdown") {
+            return parseMarkdownImportFiles(entry.files);
+          }
+          return entry.text.split("\n").some((line) => /^#{1,6}\s/u.test(line))
+            ? parseMarkdown(entry.text).tree
+            : outlineTrees(parseClipboardText(entry.text));
+        })();
+        const inserted = planInsertMarkdownTrees(
+          acc.plan,
+          linkedTrees(acc.plan, trees),
+          parent,
+          at
+        );
+        return [inserted.plan, inserted.actualItemIDs];
+      })();
+      const nodes = ids.flatMap((id) => {
+        const node = getWorkspaceNode(next.knowledgeDBs, id);
+        return node ? [node] : [];
+      });
       const href =
-        entry.kind === "spans" ? soleEmbedLinkHref(entry.spans) : undefined;
-      const target =
-        entry.kind === "target"
-          ? targetOfAddedLine(entry.target)
-          : href?.startsWith("#")
-          ? href.slice(1)
-          : href;
-      return {
-        plan: next,
-        seats: [
-          ...acc.seats,
-          {
-            id: node.id,
-            localID: node.id,
-            target,
-            chain: [node.id, ...(target !== undefined ? [target] : [])],
-            position: [],
-            placement: target !== undefined,
-            reparented: false,
-          },
-        ],
-      };
+        entry.kind === "spans"
+          ? standaloneEmbedHref(writeSpans(entry.spans))
+          : undefined;
+      const seats = nodes.map((node) => {
+        const target =
+          entry.kind === "node" && !entry.reference
+            ? entry.id
+            : href?.startsWith("#")
+            ? href.slice(1)
+            : href ?? nodeTarget(node);
+        return {
+          id: node.id,
+          localID: node.id,
+          target,
+          chain: [node.id, ...(target !== undefined ? [target] : [])],
+          position: [],
+          placement: target !== undefined,
+          reparented: false,
+        };
+      });
+      return { plan: next, seats: [...acc.seats, ...seats] };
     },
     { plan: withParent, seats: [] }
   );
-  return applyMoveNames(added.plan, parentRow, added.seats, after, false);
+  const sourced = gesture.targets.reduce((current, target) => {
+    if (target.kind === "node") {
+      return recordSource(
+        current,
+        parent,
+        target.sourceId,
+        getNode(current.knowledgeDBs, target.id, target.sourceId),
+        undefined
+      );
+    }
+    return target.kind === "document"
+      ? recordSource(current, parent, target.sourceId, undefined, target.docId)
+      : current;
+  }, added.plan);
+  return after === undefined && parentRow.children.length === 0
+    ? sourced
+    : applyMoveNames(sourced, parentRow, added.seats, after, false);
 }
 
 function resetInvalidPanes(plan: Plan, paneIndex?: number): Plan {
@@ -722,22 +1230,22 @@ function editComposedRow(
   plan: Plan,
   row: ComposedRow,
   spans: InlineSpan[]
-): [Plan, GraphNode | undefined] {
-  const [withRow, node] = planTakeComposedRow(plan, row);
+): Plan {
+  const [withRow, node] = writeRow(plan, row);
   if (!node) {
-    return [plan, undefined];
+    return plan;
   }
+  const { href, target } = rowEditing(row);
   const labelSpan: InlineSpan | undefined =
-    row.editTarget !== undefined && node.id !== row.editTarget
+    href !== undefined && (target === undefined || node.id !== target)
       ? {
           kind: "link",
-          href: `#${row.editTarget}`,
+          href,
           text: spansText(spans),
         }
       : undefined;
   const editedSpans = labelSpan ? [labelSpan] : spans;
-  const edited = planUpdateNodeSpans(withRow, node.id, editedSpans);
-  return [edited, getWorkspaceNode(edited.knowledgeDBs, node.id)];
+  return planUpdateNodeSpans(withRow, node.id, editedSpans);
 }
 
 export function applyGesture(
@@ -747,17 +1255,11 @@ export function applyGesture(
 ): Plan {
   if (gesture.kind === "judge") {
     const row = rowForGesture(composition, gesture.row);
-    return row
-      ? judge(plan, row, gesture.relevance, gesture.argument, gesture.spans)
-      : plan;
+    return row ? judge(plan, row, gesture.relevance, gesture.argument) : plan;
   }
   if (gesture.kind === "dismiss") {
     const row = rowForGesture(composition, gesture.row);
-    return row
-      ? gesture.remove
-        ? deleteComposedRow(plan, row)
-        : judge(plan, row, "not_relevant", row.argument, gesture.spans)
-      : plan;
+    return row ? deleteComposedRow(plan, row) : plan;
   }
   if (gesture.kind === "move") {
     const parent = rowForGesture(composition, gesture.parent);
@@ -768,11 +1270,28 @@ export function applyGesture(
       const found = composedRowByKey(composition.root, key, undefined);
       return found ? [{ row: found[0], sourceParent: found[1] }] : [];
     });
-    return parent &&
-      rows.length === gesture.rows.length &&
-      (!gesture.after || after)
-      ? move(plan, rows, parent, after)
-      : plan;
+    if (
+      !parent ||
+      rows.length !== gesture.rows.length ||
+      (gesture.after && !after)
+    ) {
+      return plan;
+    }
+    const moved = move(plan, rows, parent, after);
+    const parentNode = writtenNode(moved, parent);
+    return parentNode
+      ? rows.reduce(
+          (current, { row }) =>
+            recordSource(
+              current,
+              parentNode,
+              row.origin.line.ref.sourceId,
+              row.origin.line.node,
+              undefined
+            ),
+          moved
+        )
+      : moved;
   }
   if (gesture.kind === "place") {
     const parent = rowForGesture(composition, gesture.parent);
@@ -787,11 +1306,9 @@ export function applyGesture(
   if (!row) {
     return plan;
   }
-  if (
-    composedWriteKind(row) !== "placement" &&
-    composedWriteKind(row) !== "speaking"
-  ) {
-    return editComposedRow(plan, row, gesture.spans)[0];
+  const spans = writeSpans(gesture.spans);
+  if (!rowEditing(row).reword) {
+    return editComposedRow(plan, row, spans);
   }
   const line = writableLine(row);
   const existing = line
@@ -812,21 +1329,8 @@ export function applyGesture(
         row.ownArgument
       );
   return node
-    ? planUpdateNodeSpans(withRow, node.id, rewordingSpans(row, gesture.spans))
+    ? planUpdateNodeSpans(withRow, node.id, rewordedSpans(row, spans))
     : plan;
-}
-
-function soleEmbedLinkHref(spans: InlineSpan[]): string | undefined {
-  const span =
-    spans.length === 1 && spans[0]?.kind === "link" ? spans[0] : undefined;
-  return span &&
-    (span.href.startsWith("#") || classifyLinkHref(span.href) === "feed")
-    ? span.href
-    : undefined;
-}
-
-function isStandaloneEmbedLink(spans: InlineSpan[]): boolean {
-  return soleEmbedLinkHref(spans) !== undefined;
 }
 
 export function planUpdateNodeSpans(
@@ -841,10 +1345,10 @@ export function planUpdateNodeSpans(
   ) {
     return plan;
   }
-  const nextEmbedHref = soleEmbedLinkHref(spans);
+  const nextEmbedHref = standaloneEmbedHref(spans);
   const stampEmbed =
     nextEmbedHref !== undefined &&
-    nextEmbedHref !== soleEmbedLinkHref(currentNode.spans);
+    nextEmbedHref !== standaloneEmbedHref(currentNode.spans);
   return planUpsertNodes(plan, {
     ...currentNode,
     spans,
@@ -852,43 +1356,6 @@ export function planUpdateNodeSpans(
       extraAttrs: { ...currentNode.extraAttrs, embed: "true" },
     }),
     updated: nextUpdated(currentNode),
-  });
-}
-
-export function planUpdateNodeText(plan: Plan, nodeID: ID, text: string): Plan {
-  return planUpdateNodeSpans(plan, nodeID, plainSpans(text));
-}
-
-function removeEmptyNodeFromKnowledgeDBs(
-  knowledgeDBs: KnowledgeDBs,
-  sourceId: SourceId,
-  nodeID: ID
-): KnowledgeDBs {
-  const myDB = knowledgeDBs.get(sourceId);
-  if (!myDB) {
-    return knowledgeDBs;
-  }
-
-  const existingNodeID = nodeID;
-  const existingNodes = myDB.nodes.get(existingNodeID);
-  if (!existingNodes) {
-    return knowledgeDBs;
-  }
-
-  const filteredItems = existingNodes.children.filter(
-    (itemID) => !isEmptyNodeID(itemID)
-  );
-  if (filteredItems.size === existingNodes.children.size) {
-    return knowledgeDBs;
-  }
-
-  const updatedNodes = myDB.nodes.set(existingNodeID, {
-    ...existingNodes,
-    children: filteredItems,
-  });
-  return knowledgeDBs.set(sourceId, {
-    ...myDB,
-    nodes: updatedNodes,
   });
 }
 
@@ -1013,17 +1480,15 @@ export function planSelectAllTemporaryRows(
   });
 }
 
-export function planRemoveEmptyNodePosition(plan: Plan, nodeID: ID): Plan {
+export function planRemoveEmptyNodePosition(
+  plan: Plan,
+  parentKey: string
+): Plan {
   return {
     ...plan,
-    knowledgeDBs: removeEmptyNodeFromKnowledgeDBs(
-      plan.knowledgeDBs,
-      LOCAL,
-      nodeID
-    ),
     temporaryEvents: plan.temporaryEvents.push({
       type: "REMOVE_EMPTY_NODE",
-      nodeID,
+      parentKey,
     }),
   };
 }
@@ -1069,10 +1534,9 @@ function planAddSpansToParent(
   argument: Argument
 ): [Plan, ID[]] {
   if (spans.every((span) => span.kind === "text")) {
-    const [planWithNode, node] = planCreateNode(plan, spansText(spans));
     return planAddToParent(
-      planWithNode,
-      node,
+      plan,
+      { text: spansText(spans) },
       parentNode.id,
       insertAtIndex,
       relevance,
@@ -1086,7 +1550,7 @@ function planAddSpansToParent(
       relevance,
       argument,
     }),
-    ...(isStandaloneEmbedLink(spans) && {
+    ...(standaloneEmbedHref(spans) !== undefined && {
       extraAttrs: { embed: "true" },
     }),
   };
@@ -1103,11 +1567,6 @@ function planAddSpansToParent(
 /**
  * Create a new node value for insertion into the current node tree.
  */
-export function planCreateNode(plan: Plan, text: string): [Plan, TextSeed] {
-  const node: TextSeed = { text };
-  return [plan, node];
-}
-
 export type ParsedLine = { text: string; depth: number };
 
 export function parseClipboardText(text: string): ParsedLine[] {
@@ -1173,7 +1632,7 @@ export function planCreateNoteAtRoot(
     ...withDocumentRoot(
       newGraphNode(spans, entityId ? { uuid: entityId } : {})
     ),
-    ...(isStandaloneEmbedLink(spans) && {
+    ...(standaloneEmbedHref(spans) !== undefined && {
       extraAttrs: { embed: "true" },
     }),
   };
@@ -1200,80 +1659,87 @@ export function planCreateNoteAtRoot(
   return { plan: resultPlan, viewPath: newViewPath, node: createdNode };
 }
 
-export function planSaveComposedRow(
+function placeAtEmptyRow(
   plan: Plan,
+  row: Extract<Row, { rowType: "empty" }>,
+  targets: Extract<Gesture, { kind: "place" }>["targets"]
+): Plan {
+  const { parentKey } = row;
+  const emptyNodes = computeEmptyNodeMetadata(
+    plan.publishEventsStatus.temporaryEvents
+  );
+  const metadata = parentKey ? emptyNodes.get(parentKey) : undefined;
+  const withoutEmpty = parentKey
+    ? planRemoveEmptyNodePosition(plan, parentKey)
+    : plan;
+  return row.emptyParent && row.composition
+    ? applyGesture(withoutEmpty, row.composition, {
+        kind: "place",
+        parent: row.emptyParent.key,
+        targets,
+        after: row.emptyParent.children[(metadata?.index ?? 0) - 1]?.key,
+      })
+    : withoutEmpty;
+}
+
+export function planPasteAtEmptyRow(
+  plan: Plan,
+  row: Extract<Row, { rowType: "empty" }>,
   spans: InlineSpan[],
-  row: ComposedRow,
-  viewPath: ViewPath
-): SaveNodeResult {
-  const [edited, node] = editComposedRow(plan, row, spans);
-  return {
-    plan: edited,
-    viewPath,
-    node: node ?? composedLine(row).node,
-  };
+  lines: ParsedLine[]
+): Plan {
+  const metadata = row.parentKey
+    ? computeEmptyNodeMetadata(plan.publishEventsStatus.temporaryEvents).get(
+        row.parentKey
+      )
+    : undefined;
+  return placeAtEmptyRow(plan, row, [
+    {
+      kind: "spans",
+      spans,
+      relevance: metadata?.nodeItem.relevance,
+      argument: metadata?.nodeItem.argument,
+    },
+    { kind: "outline", lines },
+  ]);
 }
 
 export function planSaveVirtualNode(
   plan: Plan,
   spans: InlineSpan[],
-  nodeID: ID,
-  currentNode: GraphNode,
-  viewPath: ViewPath,
-  parent: ComposedRow | undefined,
-  composition: CompositionResult | undefined,
-  parentNodeID: ID | undefined,
-  parentViewPath: ViewPath | undefined,
+  row: Extract<Row, { rowType: "empty" }>,
   paneIndex: number,
-  relevance?: Relevance,
-  argument?: Argument
+  relevance: Relevance,
+  argument: Argument
 ): SaveNodeResult {
-  const text = spansText(spans);
-  const trimmedText = text.trim();
-
-  if (isEmptyNodeID(nodeID)) {
-    if (!parentViewPath) {
-      if (!trimmedText) return { plan, viewPath, node: currentNode };
-      return planCreateNoteAtRoot(plan, spans, paneIndex);
-    }
-
-    if (!trimmedText) {
-      const resultPlan = parentNodeID
-        ? planRemoveEmptyNodePosition(plan, parentNodeID)
-        : plan;
-      return { plan: resultPlan, viewPath, node: currentNode };
-    }
-
-    const emptyNodeMetadata = computeEmptyNodeMetadata(
-      plan.publishEventsStatus.temporaryEvents
-    );
-    const metadata = parentNodeID
-      ? emptyNodeMetadata.get(parentNodeID)
-      : undefined;
-    const emptyNodeIndex = metadata?.index ?? 0;
-    const planWithoutEmpty = parentNodeID
-      ? planRemoveEmptyNodePosition(plan, parentNodeID)
-      : plan;
-    const resultPlan =
-      parent && composition
-        ? applyGesture(planWithoutEmpty, composition, {
-            kind: "place",
-            parent: parent.key,
-            targets: [
-              {
-                kind: "spans",
-                spans,
-                relevance: relevance ?? metadata?.nodeItem.relevance,
-                argument: argument ?? metadata?.nodeItem.argument,
-              },
-            ],
-            after: parent.children[emptyNodeIndex - 1]?.key,
-          })
-        : planWithoutEmpty;
-    return { plan: resultPlan, viewPath, node: currentNode };
+  const text = spansText(spans).trim();
+  if (!row.parentViewPath) {
+    return text
+      ? planCreateNoteAtRoot(plan, spans, paneIndex)
+      : { plan, viewPath: row.viewPath, node: row.node };
   }
-
-  return { plan, viewPath, node: currentNode };
+  const { parentKey } = row;
+  if (!text) {
+    return {
+      plan: parentKey ? planRemoveEmptyNodePosition(plan, parentKey) : plan,
+      viewPath: row.viewPath,
+      node: row.node,
+    };
+  }
+  const metadata = parentKey
+    ? computeEmptyNodeMetadata(plan.publishEventsStatus.temporaryEvents).get(
+        parentKey
+      )
+    : undefined;
+  const result = placeAtEmptyRow(plan, row, [
+    {
+      kind: "spans",
+      spans,
+      relevance: relevance ?? metadata?.nodeItem.relevance,
+      argument: argument ?? metadata?.nodeItem.argument,
+    },
+  ]);
+  return { plan: result, viewPath: row.viewPath, node: row.node };
 }
 
 type ExecutePlan = (plan: Plan) => Promise<void>;
@@ -1420,17 +1886,14 @@ export function usePlanner(): Planner {
 
 export function planSetEmptyNodePosition(
   plan: Plan,
-  parentID: ID,
+  parentNode: GraphNode,
   parentView: View,
   parentViewPath: ViewPath,
   parentViewKey: string,
+  parentKey: string,
   paneIndex: number,
   insertIndex: number
 ): Plan {
-  const parentNode = getWorkspaceNode(plan.knowledgeDBs, parentID);
-  if (!parentNode) {
-    return plan;
-  }
   const planWithExpanded = parentView.expanded
     ? plan
     : planUpdateViews(
@@ -1438,7 +1901,7 @@ export function planSetEmptyNodePosition(
         updateViewKey(
           plan.views,
           parentViewKey,
-          parentID,
+          parentNode.id,
           parentViewPath.length === 2,
           { ...parentView, expanded: true }
         )
@@ -1448,7 +1911,7 @@ export function planSetEmptyNodePosition(
     ...planWithExpanded,
     temporaryEvents: planWithExpanded.temporaryEvents.push({
       type: "ADD_EMPTY_NODE",
-      nodeID: parentNode.id,
+      parentKey,
       index: insertIndex,
       nodeItem: {
         children: List<ID>(),
@@ -1466,13 +1929,13 @@ export function planSetEmptyNodePosition(
 
 export function planUpdateEmptyNodeMetadata(
   plan: Plan,
-  nodeID: ID,
+  parentKey: string,
   metadata: { relevance?: Relevance; argument?: Argument }
 ): Plan {
   const currentMetadata = computeEmptyNodeMetadata(
     plan.publishEventsStatus.temporaryEvents
   );
-  const existing = currentMetadata.get(nodeID);
+  const existing = currentMetadata.get(parentKey);
   if (!existing) {
     return plan;
   }
@@ -1487,7 +1950,7 @@ export function planUpdateEmptyNodeMetadata(
     ...plan,
     temporaryEvents: plan.temporaryEvents.push({
       type: "ADD_EMPTY_NODE",
-      nodeID,
+      parentKey,
       index: existing.index,
       nodeItem: updatedNodeItem,
       paneIndex: existing.paneIndex,

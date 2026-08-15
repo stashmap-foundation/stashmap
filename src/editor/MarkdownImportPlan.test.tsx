@@ -19,7 +19,6 @@ import { execute } from "../infra/nostr/executor";
 import { processEvents } from "../eventProcessing";
 import {
   parseMarkdownImportFiles,
-  parseTextToTrees,
   planImportMarkdownFilesAtEmptyRoot,
 } from "./FileDropZone";
 import {
@@ -493,25 +492,6 @@ Money
   await screen.findByText("Is Awesome");
 });
 
-test("parseTextToTrees detects markdown headers", () => {
-  const headerTrees = parseTextToTrees("# Root\n## Child");
-  expect(headerTrees).toEqual([
-    {
-      spans: plainSpans("Root"),
-      children: [
-        {
-          spans: plainSpans("Child"),
-          children: [],
-          blockKind: "heading",
-          headingLevel: 2,
-        },
-      ],
-      blockKind: "heading",
-      headingLevel: 1,
-    },
-  ]);
-});
-
 test("parseMarkdownHierarchy parses combined prefix markers (-!)", () => {
   const trees = parseTree("# Root\n- (-!) contra and relevant\n");
   expect(trees).toEqual([
@@ -596,21 +576,6 @@ test("parseMarkdownHierarchy parses prefix markers on paragraph blocks", () => {
         }),
       ],
     }),
-  ]);
-});
-
-test("parseTextToTrees falls back to indentation parser", () => {
-  const indentTrees = parseTextToTrees("Root\n\tChild\n\t\tGrandchild");
-  expect(indentTrees).toEqual([
-    {
-      spans: plainSpans("Root"),
-      children: [
-        {
-          spans: plainSpans("Child"),
-          children: [{ spans: plainSpans("Grandchild"), children: [] }],
-        },
-      ],
-    },
   ]);
 });
 

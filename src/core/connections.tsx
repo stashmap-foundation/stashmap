@@ -284,74 +284,17 @@ type EmptyNodeData = {
   paneIndex: number;
 };
 
-// Compute current empty node data from temporary events
-// Events are processed in order: ADD sets data, REMOVE clears it
 export function computeEmptyNodeMetadata(
   temporaryEvents: List<TemporaryEvent>
-): Map<ID, EmptyNodeData> {
+): Map<string, EmptyNodeData> {
   return temporaryEvents.reduce((metadata, event) => {
     if (event.type === "ADD_EMPTY_NODE") {
-      return metadata.set(event.nodeID, {
+      return metadata.set(event.parentKey, {
         index: event.index,
         nodeItem: event.nodeItem,
         paneIndex: event.paneIndex,
       });
     }
-    if (event.type === "REMOVE_EMPTY_NODE") {
-      return metadata.delete(event.nodeID);
-    }
-    return metadata;
-  }, Map<ID, EmptyNodeData>());
-}
-
-// Inject empty nodes back into nodes based on temporaryEvents
-// This is called after processEvents to add empty placeholder nodes
-export function injectEmptyNodesIntoKnowledgeDBs(
-  knowledgeDBs: KnowledgeDBs,
-  temporaryEvents: List<TemporaryEvent>,
-  myself: SourceId
-): KnowledgeDBs {
-  // Compute current metadata from event stream
-  const emptyNodeMetadata = computeEmptyNodeMetadata(temporaryEvents);
-
-  if (emptyNodeMetadata.size === 0) {
-    return knowledgeDBs;
-  }
-
-  const myDB = knowledgeDBs.get(myself);
-  if (!myDB) {
-    return knowledgeDBs;
-  }
-
-  // For each empty node, insert into the corresponding nodes with its metadata
-  const updatedNodes = emptyNodeMetadata.reduce((nodes, data, nodeID) => {
-    const existingNodeID = nodeID;
-    const existingNodes = nodes.get(existingNodeID);
-    if (!existingNodes) {
-      return nodes;
-    }
-
-    // Check if empty node is already injected (from parent MergeKnowledgeDB)
-    const alreadyHasEmpty = existingNodes.children.some(
-      (itemID) => itemID === EMPTY_NODE_ID
-    );
-    if (alreadyHasEmpty) {
-      return nodes;
-    }
-
-    // Insert empty node at the specified index with its metadata (relevance, argument)
-    const updatedItems = existingNodes.children.insert(
-      data.index,
-      EMPTY_NODE_ID
-    );
-    return nodes.set(existingNodeID, {
-      ...existingNodes,
-      children: updatedItems,
-    });
-  }, myDB.nodes);
-
-  return knowledgeDBs.set(myself, {
-    ...myDB,
-    nodes: updatedNodes,
-  });
+    return metadata.delete(event.parentKey);
+  }, Map<string, EmptyNodeData>());
 }

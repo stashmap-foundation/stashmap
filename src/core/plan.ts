@@ -1,17 +1,12 @@
 /* eslint-disable @typescript-eslint/no-use-before-define, functional/no-let, functional/immutable-data, no-continue, no-nested-ternary */
 import { List, Map, Set as ImmutableSet } from "immutable";
 import { v4 } from "uuid";
-import {
-  createRefTarget,
-  ensureNodeNativeFields,
-  isSearchId,
-} from "./connections";
+import { ensureNodeNativeFields, isSearchId } from "./connections";
 import type {
   DocumentLinkTargetSeed,
   RefTargetSeed,
   TextSeed,
 } from "./connections";
-import { ComposedRow, writableLine } from "./composition";
 import {
   createDocumentFromRootNode,
   Document,
@@ -53,6 +48,20 @@ export type GraphPlan = GraphPlanData & {
   affectedDocuments: ImmutableSet<string>;
   deletedDocs: ImmutableSet<string>;
 };
+
+export function recognizedTargetSpans(
+  plan: GraphPlan,
+  text: string
+): InlineSpan[] | undefined {
+  const entityId = entityIdForText(text);
+  if (entityId) {
+    const home = getWorkspaceNode(plan.knowledgeDBs, entityId);
+    return [linkSpan(entityId, home ? nodeText(home) : text.trim())];
+  }
+  return isBareIcalFeedUrl(text)
+    ? plainSpans(icalFeedLinkText(text.trim()))
+    : undefined;
+}
 
 function planEnsureSystemRoot<T extends GraphPlan>(
   plan: T,
@@ -393,38 +402,6 @@ export function createGraphPlan(props: CreateGraphPlanProps): GraphPlan {
   };
 }
 
-export function planTakeComposedRow<T extends GraphPlan>(
-  plan: T,
-  row: ComposedRow
-): [T, GraphNode | undefined] {
-  const line = writableLine(row);
-  const direct = line
-    ? getWorkspaceNode(plan.knowledgeDBs, line.node.id)
-    : undefined;
-  if (direct) {
-    return [plan, direct];
-  }
-  const existingParent = getWorkspaceNode(
-    plan.knowledgeDBs,
-    row.origin.writeParent
-  );
-  const parent = existingParent ?? row.origin.writeRoot;
-  if (!parent) {
-    return [plan, undefined];
-  }
-  const withParent = existingParent ? plan : planUpsertNodes(plan, parent);
-  if (!existingParent && row.origin.writeRoot !== undefined) {
-    return [withParent, parent];
-  }
-  const target = row.origin.writeTarget;
-  const [next, ids] = planAddTargetsToNode(
-    withParent,
-    parent.id,
-    createRefTarget(target, row.text)
-  );
-  return [next, getWorkspaceNode(next.knowledgeDBs, ids[0])];
-}
-
 export function planRecordKnowstrSource<T extends GraphPlan>(
   plan: T,
   targetNode: GraphNode,
@@ -613,22 +590,8 @@ export function planAddTargetsToNode<T extends GraphPlan>(
         ];
       }
 
-      const entityId = entityIdForText(objectText || "");
-      const entityHome = entityId
-        ? getWorkspaceNode(accPlan.knowledgeDBs, entityId as ID)
-        : undefined;
-      const feedWrapped =
-        !entityId && isBareIcalFeedUrl(objectText || "")
-          ? icalFeedLinkText((objectText || "").trim())
-          : undefined;
-      const childSpans = entityId
-        ? [
-            linkSpan(
-              entityId as ID,
-              entityHome ? nodeText(entityHome) : (objectText || "").trim()
-            ),
-          ]
-        : plainSpans(feedWrapped ?? (objectText || ""));
+      const recognized = recognizedTargetSpans(accPlan, objectText || "");
+      const childSpans = recognized ?? plainSpans(objectText || "");
       const childNode = newGraphNode(childSpans, {
         root: parentNode.root,
         parent: parentNode.id,
@@ -637,9 +600,7 @@ export function planAddTargetsToNode<T extends GraphPlan>(
         ...childNode,
         relevance,
         argument,
-        ...((entityId || feedWrapped) && {
-          extraAttrs: { embed: "true" },
-        }),
+        ...(recognized && { extraAttrs: { embed: "true" } }),
       };
       return [
         planUpsertNodes(accPlan, nodeWithMetadata),

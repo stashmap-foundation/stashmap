@@ -68,6 +68,52 @@ export const rewordingTargets = (node: GraphNode | undefined): ID[] =>
 export const placementTarget = (node: GraphNode | undefined): ID | undefined =>
   embeddedTarget(node) ?? rewordingTargets(node)[0];
 
+export const nodeTargets = (node: GraphNode): ID[] => {
+  const rewording = rewordingTargets(node);
+  if (rewording.length > 0) {
+    return rewording;
+  }
+  if (node.extraAttrs?.rewordedFrom !== undefined) {
+    const span = node.spans.find(
+      (candidate) =>
+        candidate.kind === "link" &&
+        candidate.struck !== true &&
+        candidate.href.startsWith("#")
+    );
+    return span?.kind === "link" ? [span.href.slice(1)] : [];
+  }
+  const embedded = embeddedTarget(node);
+  if (embedded !== undefined) {
+    return [embedded];
+  }
+  const span = node.spans.length === 1 ? node.spans[0] : undefined;
+  return span?.kind === "link" &&
+    span.struck !== true &&
+    span.href.startsWith("#")
+    ? [span.href.slice(1)]
+    : [];
+};
+
+export const nodeTarget = (node: GraphNode): ID | undefined =>
+  nodeTargets(node)[0];
+
+export const nodeRowKind = (
+  node: GraphNode
+): "placement" | "speaking" | "link" | "own" => {
+  if (rewordingTargets(node).length > 0) {
+    return "speaking";
+  }
+  if (embeddedTarget(node) !== undefined) {
+    return "placement";
+  }
+  const span = node.spans.length === 1 ? node.spans[0] : undefined;
+  return span?.kind === "link" &&
+    span.struck !== true &&
+    span.href.startsWith("#")
+    ? "link"
+    : "own";
+};
+
 export const getAllLinks = (
   node: GraphNode
 ): { targetID: ID; text: string }[] =>

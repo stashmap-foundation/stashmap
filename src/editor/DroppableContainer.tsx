@@ -10,19 +10,18 @@ import {
 } from "../dnd";
 import {
   AddToParentTarget,
+  applyGesture,
   planSetTemporarySelectionState,
   planUpdatePanes,
   usePlanner,
 } from "../planner";
 import { useTemporaryView } from "./temporaryViewState";
-import { buildPaneTarget, rowNode, viewPathToString } from "../rowModel";
+import { buildPaneTarget, viewPathToString } from "../rowModel";
 import { NOTE_TYPE, INDENTATION } from "./Node";
 import { usePaneIndex } from "../SplitPanesContext";
 import {
   MarkdownImportFile,
-  parseMarkdownImportFiles,
   planImportMarkdownFilesAtEmptyRoot,
-  planPasteMarkdownTrees,
 } from "./FileDropZone";
 
 type DragItemType = {
@@ -375,18 +374,23 @@ export function useDroppable({
             return;
           }
 
-          const importedTrees = parseMarkdownImportFiles(markdownFiles);
-          if (importedTrees.length === 0) {
+          const { parentRow } = dropDestination;
+          if (parentRow.rowType !== "occurrence") {
             return;
           }
-
+          const preceding =
+            parentRow.occurrence.children[dropDestination.insertAtIndex - 1];
+          const after =
+            dropDestination.anchorRow?.rowType === "occurrence"
+              ? dropDestination.anchorRow.occurrence.key
+              : preceding?.key;
           await executePlan(
-            planPasteMarkdownTrees(
-              plan,
-              importedTrees,
-              rowNode(dropDestination.parentRow),
-              dropDestination.insertAtIndex
-            )
+            applyGesture(plan, parentRow.composition, {
+              kind: "place",
+              parent: parentRow.occurrence.key,
+              targets: [{ kind: "markdown", files: markdownFiles }],
+              after,
+            })
           );
         })();
         return item;

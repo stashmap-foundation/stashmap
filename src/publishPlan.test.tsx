@@ -1,23 +1,17 @@
 import { type Document, withDocumentRealWorldEntities } from "./core/Document";
 import { LOCAL } from "./core/nodeRef";
 import { getAllLinks, plainSpans } from "./core/nodeSpans";
-import { EMPTY_NODE_ID } from "./core/connections";
 import { parseInlineSpans } from "./core/markdownTree";
 import { renderDocumentMarkdown } from "./documentRenderer";
-import { newGraphNode } from "./rowModel";
 import {
   createPlan,
   buildDocumentEvents,
   Plan,
   planCreateNoteAtRoot,
   planAddToParent,
-  planSaveVirtualNode,
+  applyGesture,
 } from "./planner";
 import { planCreateNodesFromMarkdown } from "./markdownPlan";
-import {
-  parseTextToTrees,
-  planPasteMarkdownTrees,
-} from "./editor/FileDropZone";
 import { entityIdForText } from "./core/entityRecognition";
 import { KIND_KNOWLEDGE_DOCUMENT } from "./nostr";
 import { composeNote } from "./core/composition";
@@ -39,6 +33,19 @@ function planWithEssay(): { plan: Plan; docId: string; rootId: string } {
     docId: document.docId,
     rootId: document.topNodeShortIds[0],
   };
+}
+
+function pasteText(plan: Plan, rootId: ID, text: string): Plan {
+  const composition = composeNote(graphLookupFromData(plan), {
+    sourceId: LOCAL,
+    id: rootId,
+  });
+  return applyGesture(plan, composition, {
+    kind: "place",
+    parent: composition.root.key,
+    targets: [{ kind: "clipboard", text }],
+    after: undefined,
+  });
 }
 
 function documentByRoot(plan: Plan, rootId: ID): Document {
@@ -86,34 +93,31 @@ test("clipboard Markdown survives empty-row materialization and document renderi
   const { plan, docId, rootId } = planWithEssay();
   const root = plan.knowledgeDBs.get(LOCAL)?.nodes.get(rootId);
   if (!root) throw new Error("Missing root");
-  const emptyNode = {
-    ...newGraphNode(plainSpans(""), { root: rootId, parent: rootId }),
-    id: EMPTY_NODE_ID,
-  };
   const markdown = `[A link to Hello](#e834645e-8bb5-44f7-89b2-41d5054746af)`;
   const composition = composeNote(graphLookupFromData(plan), {
     sourceId: LOCAL,
     id: rootId,
   });
   const parent = composition.root;
-  const result = planSaveVirtualNode(
-    plan,
-    parseInlineSpans(markdown),
-    EMPTY_NODE_ID,
-    emptyNode,
-    [0, rootId, EMPTY_NODE_ID],
-    parent,
-    composition,
-    root.id,
-    [0, rootId],
-    0
-  );
-  const document = result.plan.documents.find(
+  const result = applyGesture(plan, composition, {
+    kind: "place",
+    parent: parent.key,
+    targets: [
+      {
+        kind: "spans",
+        spans: parseInlineSpans(markdown),
+        relevance: undefined,
+        argument: undefined,
+      },
+    ],
+    after: undefined,
+  });
+  const document = result.documents.find(
     (candidate) => candidate.docId === docId
   );
   if (!document) throw new Error("Missing document");
 
-  expect(renderDocumentMarkdown(result.plan.knowledgeDBs, document)).toContain(
+  expect(renderDocumentMarkdown(result.knowledgeDBs, document)).toContain(
     `- ${markdown}`
   );
 });
@@ -137,12 +141,7 @@ test("marker created under a parent becomes a link row, never a duplicate", () =
     throw new Error("parent missing");
   }
 
-  const pasted = planPasteMarkdownTrees(
-    plan,
-    parseTextToTrees(CONTRACT_ID),
-    parent,
-    0
-  );
+  const pasted = pasteText(plan, parent.id, CONTRACT_ID);
   // No entity node is minted under a parent…
   expect(
     pasted.knowledgeDBs.get(LOCAL)?.nodes.get(`asset:${CONTRACT_ID}`)
@@ -178,12 +177,7 @@ test("link placements contribute real-world entities", () => {
   if (!parent) {
     throw new Error("parent missing");
   }
-  const pasted = planPasteMarkdownTrees(
-    plan,
-    parseTextToTrees(CONTRACT_ID),
-    parent,
-    0
-  );
+  const pasted = pasteText(plan, parent.id, CONTRACT_ID);
   const document = pasted.documents.valueSeq().find((d) => d.docId === docId);
   if (!document) {
     throw new Error("document missing");

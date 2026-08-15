@@ -1,10 +1,12 @@
 import { List } from "immutable";
 import { newGraphNode } from "../rowModel";
 import { execute } from "../infra/nostr/executor";
-import { createPlan, planUpsertNodes } from "../planner";
+import { applyGesture, createPlan, planUpsertNodes } from "../planner";
 import { processEvents } from "../eventProcessing";
 import { ALICE, setup, UpdateState, requireUser } from "../utils.test";
-import { planPasteMarkdownTrees } from "./FileDropZone";
+import { composeNote } from "../core/composition";
+import { graphLookupFromData } from "../core/graphLookup";
+import { LOCAL } from "../core/nodeRef";
 import { parseMarkdown } from "../core/markdownTree";
 
 import { linkSpan, nodeText, plainSpans } from "../core/nodeSpans";
@@ -34,12 +36,21 @@ async function uploadMarkdown(alice: UpdateState): Promise<KnowledgeData> {
     root: wsID,
   };
   const basePlan = planUpsertNodes(createPlan(alice()), workspaceNode);
-  const plan = planPasteMarkdownTrees(
-    basePlan,
-    parseTree(TEST_FILE),
-    workspaceNode,
-    0
-  );
+  const composition = composeNote(graphLookupFromData(basePlan), {
+    sourceId: LOCAL,
+    id: workspaceNode.id,
+  });
+  const plan = applyGesture(basePlan, composition, {
+    kind: "place",
+    parent: composition.root.key,
+    targets: [
+      {
+        kind: "markdown",
+        files: [{ name: "programming-languages.md", markdown: TEST_FILE }],
+      },
+    ],
+    after: undefined,
+  });
   await execute({
     ...alice(),
     plan,

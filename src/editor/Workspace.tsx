@@ -9,7 +9,6 @@ import {
   getDisplayTextForRow,
   getIndependentRows,
   rowArgument,
-  rowNode,
   rowRelevance,
   rowSourceId,
   updateRowView,
@@ -54,7 +53,6 @@ import {
   planUpdateViews,
   type Plan,
 } from "../planner";
-import { parseTextToTrees, planPasteMarkdownTrees } from "./FileDropZone";
 import { getNodeText } from "../core/connections";
 import { isCanonicalId } from "../core/entityRecognition";
 import { getOwnLogRoot } from "../core/systemRoots";
@@ -1270,12 +1268,16 @@ function usePaneKeyboardNavigation(paneIndex: number): {
         return;
       }
       navigator.clipboard.readText().then((text) => {
-        const trees = parseTextToTrees(text);
-        if (trees.length === 0) {
+        if (text.trim() === "" || parentRow.rowType !== "occurrence") {
           return;
         }
         executePlan(
-          planPasteMarkdownTrees(createPlan(), trees, rowNode(parentRow), 0)
+          applyGesture(createPlan(), parentRow.composition, {
+            kind: "place",
+            parent: parentRow.occurrence.key,
+            targets: [{ kind: "clipboard", text }],
+            after: undefined,
+          })
         );
       });
       return;
@@ -1479,8 +1481,6 @@ function usePaneKeyboardNavigation(paneIndex: number): {
               ? applyGesture(acc, row.composition, {
                   kind: "dismiss",
                   row: row.occurrence.key,
-                  spans: row.occurrence.spans,
-                  remove: true,
                 })
               : acc,
           createPlan()

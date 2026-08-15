@@ -8,7 +8,7 @@ import {
   isEmptyViewPathID,
   isFileRow,
   rowChildIndex,
-  rowID,
+  rowContentKey,
   rowNode,
   rowRef as refForRow,
   rowSourceId,
@@ -48,7 +48,6 @@ import {
   ComposedRow,
   CompositionResult,
   composeNote,
-  createWriteRootRow,
   composedLine,
 } from "./core/composition";
 
@@ -137,6 +136,7 @@ function createRow(
   ref: NodeRef;
   view: View;
   parentViewPath: ViewPath | undefined;
+  parentKey: string | undefined;
   parentRef: NodeRef | undefined;
   parentNode: GraphNode | undefined;
   parentChildIndex: number | undefined;
@@ -198,6 +198,7 @@ function createRow(
       expanded: viewPath.length === 2 || isSearchId(nodeID),
     },
     parentViewPath: parentRow?.viewPath ?? getParentView(viewPath),
+    parentKey: parentRow ? rowContentKey(parentRow) : undefined,
     parentRef,
     parentNode,
     parentChildIndex: parentRow ? rowChildIndex(parentRow) : undefined,
@@ -216,6 +217,21 @@ function locateComposedRow(root: ComposedRow, id: ID): ComposedRow | undefined {
   return root.children.reduce<ComposedRow | undefined>(
     (found, child) => found ?? locateComposedRow(child, id),
     undefined
+  );
+}
+
+function composeProjectedRoot(
+  graph: GraphLookup,
+  node: GraphNode
+): CompositionResult {
+  const ref = { sourceId: graph.localSourceId, id: node.id };
+  return composeNote(
+    {
+      ...graph,
+      feeds: new globalThis.Map(graph.feeds).set(node.id, { ref, node }),
+      writeRoots: new globalThis.Map(graph.writeRoots).set(node.id, node),
+    },
+    ref
   );
 }
 
@@ -274,6 +290,7 @@ function occurrenceRow(
       expanded: viewPath.length === 2,
     },
     parentViewPath: parentRow?.viewPath ?? getParentView(viewPath),
+    parentKey: parentRow ? rowContentKey(parentRow) : undefined,
     hasChildren: false,
     isFirstVirtual: false,
     reference: undefined,
@@ -347,13 +364,13 @@ function reindexRows(rows: List<Row>): List<Row> {
 
 function getEmptyNodeItem(
   data: Data,
-  parentNode: GraphNode | undefined
+  parentRow: Row | undefined
 ): GraphNode | undefined {
-  if (!parentNode) {
+  if (!parentRow) {
     return undefined;
   }
   return computeEmptyNodeMetadata(data.publishEventsStatus.temporaryEvents).get(
-    parentNode.id as ID
+    rowContentKey(parentRow)
   )?.nodeItem;
 }
 
@@ -413,18 +430,13 @@ function resolveRowStep(
       parent: undefined,
       root: options.projectedRoot.id,
     };
-    const rootComposedRow = createWriteRootRow(rootNode, graph.localSourceId);
-    const rootComposition: CompositionResult = {
-      root: rootComposedRow,
-      claims: [],
-      diagnostics: [],
-    };
+    const rootComposition = composeProjectedRoot(graph, rootNode);
     return occurrenceRow(
       data,
       viewPath,
       undefined,
       rootComposition,
-      rootComposedRow
+      rootComposition.root
     );
   }
   if (
@@ -435,19 +447,29 @@ function resolveRowStep(
   ) {
     return undefined;
   }
-  const childIndex = parentRow
-    ? getNodeIndexForPath(rowNode(parentRow), pathID)
-    : undefined;
-  const childID =
-    childIndex === undefined || parentRow === undefined
+  const emptyData =
+    parentRow && (pathID === EMPTY_NODE_ID || isEmptyViewPathID(pathID))
+      ? computeEmptyNodeMetadata(data.publishEventsStatus.temporaryEvents).get(
+          rowContentKey(parentRow)
+        )
+      : undefined;
+  const childIndex =
+    emptyData?.index ??
+    (parentRow ? getNodeIndexForPath(rowNode(parentRow), pathID) : undefined);
+  const childID = (() => {
+    if (emptyData !== undefined) {
+      return EMPTY_NODE_ID;
+    }
+    return childIndex === undefined || parentRow === undefined
       ? undefined
       : rowNode(parentRow).children.get(childIndex);
+  })();
   const edgeNode = (() => {
     if (!parentRow || childID === undefined) {
       return undefined;
     }
     if (childID === EMPTY_NODE_ID) {
-      return getEmptyNodeItem(data, rowNode(parentRow));
+      return getEmptyNodeItem(data, parentRow);
     }
     return getNodeInSource(graph, {
       sourceId: rowSourceId(parentRow),
@@ -531,7 +553,7 @@ function createChildRow(
     childIndex
   );
   if (childID === EMPTY_NODE_ID) {
-    const emptyNode = getEmptyNodeItem(data, parentNode);
+    const emptyNode = getEmptyNodeItem(data, parentRow);
     return emptyNode
       ? attachEmpty(
           createRow(
@@ -710,34 +732,28 @@ function createVirtualRow(
   const resolvedParent = input.parentID
     ? occurrenceAt(graph, input.parentID, input.parentSourceId)
     : undefined;
-  const fallbackRoot =
+  const fallbackComposition =
     input.parentID === undefined
       ? undefined
-      : createWriteRootRow(
-          {
-            children: List<ID>(),
-            id: input.parentID,
-            spans:
-              input.parentRow === undefined
-                ? plainSpans(input.parentID)
-                : rowSpans(input.parentRow),
-            updated: input.parentUpdated,
-            root: input.parentID,
-            relevance: undefined,
-          },
-          graph.localSourceId
-        );
+      : composeProjectedRoot(graph, {
+          children: List<ID>(),
+          id: input.parentID,
+          spans:
+            input.parentRow === undefined
+              ? plainSpans(input.parentID)
+              : rowSpans(input.parentRow),
+          updated: input.parentUpdated,
+          root: input.parentID,
+          relevance: undefined,
+        });
   const writeParent =
     input.parentRow?.rowType === "occurrence"
       ? input.parentRow.occurrence
-      : resolvedParent?.[1] ?? fallbackRoot;
+      : resolvedParent?.[1] ?? fallbackComposition?.root;
   const composition =
     input.parentRow?.rowType === "occurrence"
       ? input.parentRow.composition
-      : resolvedParent?.[0] ??
-        (fallbackRoot
-          ? { root: fallbackRoot, claims: [], diagnostics: [] }
-          : undefined);
+      : resolvedParent?.[0] ?? fallbackComposition;
   return {
     ...row,
     rowType: "incoming",
@@ -967,34 +983,35 @@ function spliceEmptyRows(
   parentRow: Row,
   rows: List<Row>
 ): List<Row> {
+  const empty = computeEmptyNodeMetadata(
+    data.publishEventsStatus.temporaryEvents
+  ).get(rowContentKey(parentRow));
+  if (!empty) {
+    return rows;
+  }
   const parentNode = rowNode(parentRow);
-  const parentRef = refForRow(parentRow);
-  return parentNode.children.toArray().reduce((current, id, index) => {
-    if (id !== EMPTY_NODE_ID) {
-      return current;
-    }
-    const empty = createChildRow(
+  const viewPath: ViewPath = [
+    ...parentRow.viewPath,
+    `empty-row:${parentNode.id}`,
+  ];
+  const row = attachEmpty(
+    createRow(
       data,
       graph,
+      viewPath,
+      empty.nodeItem,
+      graph.localSourceId,
       parentRow,
       parentNode,
-      parentRef,
-      id,
-      index
-    );
-    if (!empty) {
-      return current;
-    }
-    const preceding = parentNode.children.slice(0, index).reverse();
-    const anchor = preceding.reduce<number>(
-      (found, candidate) =>
-        found >= 0
-          ? found
-          : current.findIndex((row) => rowID(row) === candidate),
-      -1
-    );
-    return current.insert(anchor + 1, empty);
-  }, rows);
+      refForRow(parentRow),
+      empty.index,
+      false,
+      undefined
+    ),
+    parentRow.rowType === "occurrence" ? parentRow.occurrence : undefined,
+    parentRow.composition
+  );
+  return rows.insert(Math.min(empty.index, rows.size), row);
 }
 
 function getChildrenForRegularNode(

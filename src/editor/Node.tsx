@@ -13,12 +13,12 @@ import {
   viewKeyForIdentity,
   viewPathToString,
   useRow,
+  rowContentKey,
   rowID,
   rowNode,
   rowSourceId,
   rowSpans,
   updateRowView,
-  addNodesToLastElement,
   getPreviousSiblingFromRows,
   getVisibleParentRow,
 } from "../rowModel";
@@ -33,13 +33,11 @@ import { isFileLinkHref, spansText } from "../core/nodeSpans";
 import { classifyLinkHref, externalLinkUrl } from "../core/linkPath";
 import {
   calendarEntryTarget,
-  calendarFeedHref,
   calendarFeedTargetUrl,
   calendarFeedUrl,
   calendarFeedUrlFromSpans,
   displayTextOf,
   hiddenPastEntryCount,
-  isBareIcalFeedUrl,
   isCalendarEntryId,
 } from "../core/ical";
 import { useCalendarFeeds } from "../CalendarFeedContext";
@@ -52,23 +50,22 @@ import { linkStyleForHref } from "./editorDom";
 import { useOnToggleExpanded } from "./SelectNodes";
 import { useApis } from "../Apis";
 import { useData } from "../DataContext";
-import { planTakeComposedRow } from "../core/plan";
-import { composedLine, writtenLine } from "../core/composition";
+import { composedLine } from "../core/composition";
 import { getWorkspaceNode } from "../core/knowledge";
 import {
   Plan,
   applyGesture,
   usePlanner,
   planSetEmptyNodePosition,
-  planSaveComposedRow,
   planSaveVirtualNode,
+  planPasteAtEmptyRow,
   planExpandRow,
   planUpdateViews,
   planRemoveEmptyNodePosition,
   planSetRowFocusIntent,
   ParsedLine,
+  rowEditing,
 } from "../planner";
-import { parsedLinesToTrees, planPasteMarkdownTrees } from "./FileDropZone";
 import { useNodeIsLoading } from "../LoadingStatus";
 import { NodeCard } from "../commons/Ui";
 import { usePaneIndex, useNavigatePane } from "../SplitPanesContext";
@@ -594,8 +591,8 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
   const emptyNodeMetadata = computeEmptyNodeMetadata(
     data.publishEventsStatus.temporaryEvents
   );
-  const emptyData = parentNode
-    ? emptyNodeMetadata.get(parentNode.id)
+  const emptyData = visibleParent
+    ? emptyNodeMetadata.get(rowContentKey(visibleParent))
     : undefined;
   const isRootEmptyNode = isEmptyNode && !parentPath;
   const shouldAutoFocus =
@@ -621,34 +618,14 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
     });
 
   const occurrence = row.rowType === "occurrence" ? row.occurrence : undefined;
+  const editing = occurrence ? rowEditing(occurrence) : undefined;
   const feedUrl = occurrence
     ? calendarFeedTargetUrl(occurrence.target) ??
       calendarFeedUrlFromSpans(occurrence.spans)
     : calendarFeedUrl(currentNode);
-  const calendarContent =
-    feedUrl !== undefined || occurrence?.editTarget !== undefined;
-  const rewordEditing =
-    !calendarContent &&
-    occurrence !== undefined &&
-    (writtenLine(occurrence) === undefined ||
-      ((occurrence.kind === "placement" || occurrence.kind === "speaking") &&
-        occurrence.target !== undefined &&
-        classifyLinkHref(`#${occurrence.target}`) === "node"));
-  const bondHref = `#${occurrence?.target ?? rowID(row)}`;
-  const editorSpans: InlineSpan[] = (() => {
-    if (!rewordEditing) {
-      return rowSpans(row);
-    }
-    if (
-      occurrence !== undefined &&
-      (occurrence.kind === "placement" || occurrence.kind === "speaking")
-    ) {
-      return [{ kind: "link", href: bondHref, text: occurrence.text }];
-    }
-    return rowSpans(row).filter(
-      (span) => !(span.kind === "link" && span.struck === true)
-    );
-  })();
+  const calendarContent = editing?.calendar ?? feedUrl !== undefined;
+  const rewordEditing = !calendarContent && editing?.reword === true;
+  const editorSpans = editing?.spans ?? rowSpans(row);
   const linkLine = occurrence ? composedLine(occurrence) : undefined;
   const linkNode = linkLine?.node ?? rowNode(row);
   const linkSourceId = linkLine?.ref.sourceId ?? rowSourceId(row);
@@ -668,22 +645,48 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
         span.kind === "link" && externalLinkUrl(span.href) ? [index] : []
       );
   const calendarLinkIndexes = calendarContent ? [0] : [];
-  const persistedSpans = (spans: InlineSpan[]): InlineSpan[] => {
-    const text = spansText(spans).trim();
-    if (feedUrl && spans.every((span) => span.kind === "text")) {
-      return [{ kind: "link", href: calendarFeedHref(feedUrl), text }];
+  const prepareEmptyInside = (
+    plan: Plan,
+    parentRow: Extract<Row, { rowType: "occurrence" }>,
+    insertIndex: number
+  ): Plan =>
+    planSetEmptyNodePosition(
+      planExpandRow(plan, parentRow),
+      rowNode(parentRow),
+      parentRow.view,
+      parentRow.viewPath,
+      parentRow.viewKey,
+      rowContentKey(parentRow),
+      paneIndex,
+      insertIndex
+    );
+
+  const saveRow = (
+    plan: Plan,
+    spans: InlineSpan[]
+  ): { plan: Plan; viewPath: ViewPath; node: GraphNode } => {
+    if (row.rowType === "occurrence") {
+      return {
+        plan: applyGesture(plan, row.composition, {
+          kind: "reword",
+          row: row.occurrence.key,
+          spans,
+        }),
+        viewPath,
+        node: currentNode,
+      };
     }
-    return isBareIcalFeedUrl(text)
-      ? [{ kind: "link", href: calendarFeedHref(text), text }]
-      : spans;
+    return row.rowType === "empty"
+      ? planSaveVirtualNode(plan, spans, row, paneIndex, undefined, undefined)
+      : { plan, viewPath, node: currentNode };
   };
 
   const handleSave = async (
     spans: InlineSpan[],
     submitted?: boolean
   ): Promise<void> => {
-    const nextSpans = persistedSpans(spans);
-    if (rewordEditing && occurrence && row.composition) {
+    const nextSpans = spans;
+    if (rewordEditing && occurrence && row.rowType === "occurrence") {
       const unchanged = spansText(nextSpans).trim() === occurrence.text.trim();
       if (!unchanged) {
         await executePlan(
@@ -693,69 +696,13 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
             spans: nextSpans,
           })
         );
-        return;
-      }
-      const submittedParent = getVisibleParentRow(rows, row);
-      if (
-        !submitted ||
-        !isCalendarEntryId(occurrence.id) ||
-        !parentNode ||
-        !parentPath ||
-        !submittedParent
+      } else if (
+        submitted &&
+        occurrence.origin.writeRoot !== undefined &&
+        !getWorkspaceNode(createPlan().knowledgeDBs, occurrence.id)
       ) {
-        if (
-          submitted &&
-          occurrence.origin.writeRoot !== undefined &&
-          !getWorkspaceNode(createPlan().knowledgeDBs, occurrence.id)
-        ) {
-          const [withRoot, root] = planTakeComposedRow(
-            createPlan(),
-            occurrence
-          );
-          if (root) {
-            await executePlan(
-              planSetEmptyNodePosition(
-                withRoot,
-                root.id,
-                row.view,
-                viewPath,
-                row.viewKey,
-                paneIndex,
-                0
-              )
-            );
-          }
-        }
-        return;
+        await executePlan(prepareEmptyInside(createPlan(), row, 0));
       }
-      const [takenPlan, takenNode] = planTakeComposedRow(
-        createPlan(),
-        occurrence
-      );
-      if (!takenNode) {
-        return;
-      }
-      const takenParent = getWorkspaceNode(
-        takenPlan.knowledgeDBs,
-        parentNode.id
-      );
-      const takenIndex = takenParent
-        ? takenParent.children.indexOf(takenNode.id)
-        : -1;
-      if (takenIndex < 0) {
-        return;
-      }
-      await executePlan(
-        planSetEmptyNodePosition(
-          takenPlan,
-          parentNode.id,
-          submittedParent.view,
-          parentPath,
-          submittedParent.viewKey,
-          paneIndex,
-          takenIndex + 1
-        )
-      );
       return;
     }
     const initialPlan = createPlan();
@@ -763,20 +710,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       plan: basePlan,
       viewPath: updatedViewPath,
       node: savedNode,
-    } = occurrence
-      ? planSaveComposedRow(initialPlan, nextSpans, occurrence, viewPath)
-      : planSaveVirtualNode(
-          initialPlan,
-          nextSpans,
-          currentNode.id,
-          currentNode,
-          viewPath,
-          row.rowType === "empty" ? row.emptyParent : undefined,
-          row.composition,
-          parentNode?.id,
-          parentPath,
-          paneIndex
-        );
+    } = saveRow(initialPlan, nextSpans);
     const planWithEscFocus = escapeFocusPendingRef.current
       ? planWithRowFocusIntent(basePlan, updatedViewPath, savedNode.id)
       : basePlan;
@@ -802,6 +736,10 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
                   updatedViewPath[1] ?? savedNode.id,
                   `source:${nodeRefKey({ sourceId: LOCAL, id: savedNode.id })}`
                 ),
+          parentKey:
+            row.rowType === "occurrence"
+              ? rowContentKey(row)
+              : `${LOCAL}:${savedNode.id}`,
           insertAt: 0,
         };
       }
@@ -813,16 +751,23 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
         return undefined;
       }
       const insertAt = (() => {
-        if (nodeIndex !== undefined) return nodeIndex + 1;
-        const parent = getWorkspaceNode(basePlan.knowledgeDBs, parentNode.id);
-        const index = parent ? parent.children.indexOf(savedNode.id) : -1;
-        return index >= 0 ? index + 1 : 0;
+        if (
+          row.rowType === "occurrence" &&
+          parentRow.rowType === "occurrence"
+        ) {
+          const index = parentRow.occurrence.children.findIndex(
+            (child) => child.key === row.occurrence.key
+          );
+          return index < 0 ? 0 : index + 1;
+        }
+        return nodeIndex === undefined ? 0 : nodeIndex + 1;
       })();
       return {
         parentNode,
         parentView: parentRow.view,
         parentViewPath: parentRow.viewPath,
         parentViewKey: parentRow.viewKey,
+        parentKey: rowContentKey(parentRow),
         insertAt,
       };
     })();
@@ -834,10 +779,11 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
 
     const plan = planSetEmptyNodePosition(
       basePlan,
-      nextPosition.parentNode.id,
+      nextPosition.parentNode,
       nextPosition.parentView,
       nextPosition.parentViewPath,
       nextPosition.parentViewKey,
+      nextPosition.parentKey,
       paneIndex,
       nextPosition.insertAt
     );
@@ -850,8 +796,8 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
 
     if (isEmptyNode) {
       if (prevSibling?.rowType !== "occurrence" || !parentPath) return;
-      const planWithoutEmpty = parentNode
-        ? planRemoveEmptyNodePosition(basePlan, parentNode.id)
+      const planWithoutEmpty = row.parentKey
+        ? planRemoveEmptyNodePosition(basePlan, row.parentKey)
         : basePlan;
       if (trimmedText) {
         executePlan(
@@ -864,7 +810,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
               targets: [
                 {
                   kind: "spans",
-                  spans: persistedSpans(spans),
+                  spans,
                   relevance: undefined,
                   argument: undefined,
                 },
@@ -875,31 +821,12 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
         );
         return;
       }
-      const [planMaterialized, takenPrevSibling] = planTakeComposedRow(
-        planWithoutEmpty,
-        prevSibling.occurrence
-      );
-      if (!takenPrevSibling) return;
-      const takenViewPath = addNodesToLastElement(
-        prevSibling.viewPath,
-        takenPrevSibling.id
-      );
-      executePlan(
-        planSetEmptyNodePosition(
-          planExpandRow(planMaterialized, prevSibling),
-          takenPrevSibling.id,
-          prevSibling.view,
-          takenViewPath,
-          prevSibling.viewKey,
-          paneIndex,
-          0
-        )
-      );
+      executePlan(prepareEmptyInside(planWithoutEmpty, prevSibling, 0));
       return;
     }
 
     const result = planBatchIndent(basePlan, [row], rows, {
-      spans: persistedSpans(spans),
+      spans,
       viewKey,
     });
     if (result) executePlan(result);
@@ -924,24 +851,15 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       );
       if (parentNodeIndex < 0) return;
 
-      const planWithoutEmpty = parentNode
-        ? planRemoveEmptyNodePosition(basePlan, parentNode.id)
+      const planWithoutEmpty = row.parentKey
+        ? planRemoveEmptyNodePosition(basePlan, row.parentKey)
         : basePlan;
 
       if (!trimmedText) {
-        const [withGrandParent, grandParent] = planTakeComposedRow(
-          planWithoutEmpty,
-          grandParentRow.occurrence
-        );
-        if (!grandParent) return;
         executePlan(
-          planSetEmptyNodePosition(
-            withGrandParent,
-            grandParent.id,
-            grandParentRow.view,
-            grandParentRow.viewPath,
-            grandParentRow.viewKey,
-            paneIndex,
+          prepareEmptyInside(
+            planWithoutEmpty,
+            grandParentRow,
             parentNodeIndex + 1
           )
         );
@@ -955,7 +873,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
           targets: [
             {
               kind: "spans",
-              spans: persistedSpans(spans),
+              spans,
               relevance: undefined,
               argument: undefined,
             },
@@ -967,7 +885,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
     }
 
     const result = planBatchOutdent(basePlan, [row], rows, {
-      spans: persistedSpans(spans),
+      spans,
       viewKey,
     });
     if (result) executePlan(result);
@@ -1004,33 +922,32 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
     children: ParsedLine[],
     currentSpans: InlineSpan[]
   ): void => {
-    const { plan: basePlan, node: savedNode } =
-      row.rowType === "occurrence"
-        ? planSaveComposedRow(
-            createPlan(),
-            persistedSpans(currentSpans),
-            row.occurrence,
-            viewPath
-          )
-        : planSaveVirtualNode(
-            createPlan(),
-            persistedSpans(currentSpans),
-            rowID(row),
-            currentNode,
-            viewPath,
-            row.rowType === "empty" ? row.emptyParent : undefined,
-            row.composition,
-            parentNode?.id,
-            parentPath,
-            paneIndex
-          );
-    const trees = parsedLinesToTrees(children);
-    if (!parentNode || !parentPath) {
-      executePlan(planPasteMarkdownTrees(basePlan, trees, savedNode, 0));
+    if (row.rowType === "empty") {
+      executePlan(
+        planPasteAtEmptyRow(createPlan(), row, currentSpans, children)
+      );
       return;
     }
-    const insertAt = nodeIndex !== undefined ? nodeIndex + 1 : 0;
-    executePlan(planPasteMarkdownTrees(basePlan, trees, parentNode, insertAt));
+    const { plan: basePlan } = saveRow(createPlan(), currentSpans);
+    const placementParent =
+      !parentNode || !parentPath ? row : getVisibleParentRow(rows, row);
+    if (
+      row.rowType !== "occurrence" ||
+      placementParent?.rowType !== "occurrence"
+    ) {
+      return;
+    }
+    executePlan(
+      applyGesture(basePlan, placementParent.composition, {
+        kind: "place",
+        parent: placementParent.occurrence.key,
+        targets: [{ kind: "outline", lines: children }],
+        after:
+          placementParent.viewKey === row.viewKey
+            ? undefined
+            : row.occurrence.key,
+      })
+    );
   };
 
   const handleDelete = (): void => {
@@ -1041,8 +958,6 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       applyGesture(createPlan(), row.composition, {
         kind: "dismiss",
         row: row.occurrence.key,
-        spans: row.occurrence.spans,
-        remove: true,
       })
     );
   };
@@ -1055,8 +970,8 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
   const handleClose = (): void => {
     if (!isEmptyNode || !parentPath) return;
     const plan = createPlan();
-    if (parentNode) {
-      executePlan(planRemoveEmptyNodePosition(plan, parentNode.id));
+    if (row.parentKey) {
+      executePlan(planRemoveEmptyNodePosition(plan, row.parentKey));
     }
   };
 

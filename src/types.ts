@@ -101,12 +101,12 @@ declare global {
   type TemporaryEvent =
     | {
         type: "ADD_EMPTY_NODE";
-        nodeID: ID;
+        parentKey: string;
         index: number;
         nodeItem: GraphNode;
         paneIndex: number;
       }
-    | { type: "REMOVE_EMPTY_NODE"; nodeID: ID };
+    | { type: "REMOVE_EMPTY_NODE"; parentKey: string };
 
   type EventState = PublishEvents<EventAttachment> & {
     temporaryView: TemporaryViewState;
@@ -190,6 +190,7 @@ declare global {
     depth: number;
     view: View;
     parentViewPath: readonly [number, ...ID[]] | undefined;
+    parentKey: string | undefined;
     hasChildren: boolean;
     isFirstVirtual: boolean;
     reference:

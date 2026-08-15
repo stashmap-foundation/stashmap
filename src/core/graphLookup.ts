@@ -14,6 +14,7 @@ export type GraphLookup = {
   localSourceId: SourceId;
   sourceOrder: readonly SourceId[];
   feeds: Map<ID, ResolvedNode>;
+  writeRoots: Map<ID, GraphNode>;
 };
 
 const UNSAFE_MARKDOWN_ID_RE = /\s|["'<>]|-->/u;
@@ -78,6 +79,7 @@ export function graphLookupFromData(data: GraphLookupData): GraphLookup {
     localSourceId: LOCAL,
     sourceOrder: sourceOrderFromData(data),
     feeds: feedSources(data.calendarFeeds),
+    writeRoots: new Map<ID, GraphNode>(),
   };
 }
 

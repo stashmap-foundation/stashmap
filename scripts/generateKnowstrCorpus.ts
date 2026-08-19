@@ -27,7 +27,7 @@ import { parseToDocumentPreservingExplicitIds } from "../src/core/Document";
 import { renderDocumentMarkdown } from "../src/documentRenderer";
 import { LOCAL } from "../src/core/nodeRef";
 import { spansToMarkdown } from "../src/core/nodeSpans";
-import { composeFixtureTree } from "../src/treeTraversal";
+import { composeFixtureTree } from "../src/testFixtures/compositionCorpus";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

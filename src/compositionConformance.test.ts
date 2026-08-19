@@ -1,12 +1,6 @@
-/**
- * Conformance: every composition fixture under test/corpus/ runs through the
- * production parser and composer; the projected tree MUST match
- * expected.tree byte-for-byte. scripts/generateKnowstrCorpus.ts is the sole
- * expectation generator — this test never rewrites expectations.
- */
 import * as fs from "fs";
 import * as path from "path";
-import { composeFixtureTree } from "./treeTraversal";
+import { composeFixtureTree } from "./testFixtures/compositionCorpus";
 
 const corpusDir = path.resolve(__dirname, "../test/corpus");
 const fixtures = fs

@@ -70,32 +70,30 @@ type TreeTraversalOptions = {
   projectedRoot?: GraphNode;
 };
 
-function embedProjection(
+function embedChain(
   graph: GraphLookup,
   node: GraphNode,
   ref: NodeRef,
   openTargets: ImmutableSet<ID>
-): {
-  standsFor: Row["standsFor"];
-  target: ResolvedNode | undefined;
-  cycle: boolean;
-} {
+): { targets: ResolvedNode[]; cycle: boolean } {
   const targetID = embeddedTarget(node);
   if (targetID === undefined) {
-    return { standsFor: undefined, target: undefined, cycle: false };
+    return { targets: [], cycle: false };
   }
   if (openTargets.has(targetID)) {
-    return { standsFor: undefined, target: undefined, cycle: true };
+    return { targets: [], cycle: true };
   }
   const target = lookupNode(graph, targetID, ref.sourceId);
   if (!target) {
-    return { standsFor: undefined, target: undefined, cycle: false };
+    return { targets: [], cycle: false };
   }
-  return {
-    standsFor: { id: targetID, liveText: nodeText(target.node) },
-    target,
-    cycle: false,
-  };
+  const inner = embedChain(
+    graph,
+    target.node,
+    target.ref,
+    openTargets.add(targetID)
+  );
+  return { targets: [target, ...inner.targets], cycle: inner.cycle };
 }
 
 function buildShowing(
@@ -106,25 +104,36 @@ function buildShowing(
   openTargets: ImmutableSet<ID>
 ): Showing {
   const name = [...trail, resolved.node.id];
-  const { standsFor, target, cycle } = embedProjection(
+  const { targets, cycle } = embedChain(
     graph,
     resolved.node,
     resolved.ref,
     openTargets
   );
-  const projected = target
-    ? childrenOf(graph, target)
+  const terminal = targets[targets.length - 1];
+  const standsFor =
+    terminal && !cycle
+      ? { id: targets[0].ref.id, liveText: nodeText(terminal.node) }
+      : undefined;
+  const projected = targets.reduceRight<Showing[]>(
+    (acc, target, index) => [
+      ...acc,
+      ...childrenOf(graph, target)
         .filter((child) => child.node.id !== EMPTY_NODE_ID)
         .map((child) =>
           buildShowing(
             graph,
             child,
             { kind: "projected", target },
-            name,
-            openTargets.add(target.ref.id)
+            [...name, ...targets.slice(0, index).map((step) => step.ref.id)],
+            targets
+              .slice(0, index + 1)
+              .reduce((open, step) => open.add(step.ref.id), openTargets)
           )
-        )
-    : [];
+        ),
+    ],
+    []
+  );
   const lines = resolved.node.children
     .toArray()
     .flatMap((childID, childIndex) => {

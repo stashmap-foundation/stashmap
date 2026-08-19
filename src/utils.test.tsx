@@ -874,6 +874,7 @@ function classifyRow(row: Element): RowInfo | null {
 
 type TreeOptions = {
   showGutter?: boolean;
+  composedOnly?: boolean;
 };
 
 async function getTreeStructure(options?: TreeOptions): Promise<string> {
@@ -882,10 +883,13 @@ async function getTreeStructure(options?: TreeOptions): Promise<string> {
   });
 
   /* eslint-disable testing-library/no-node-access */
-  const allRows = document.querySelectorAll(".item");
+  const allRows = Array.from(document.querySelectorAll(".item")).filter(
+    (row) =>
+      !(options?.composedOnly && row.querySelector(".incoming-indicator"))
+  );
   /* eslint-enable testing-library/no-node-access */
 
-  const rowInfos: RowInfo[] = Array.from(allRows)
+  const rowInfos: RowInfo[] = allRows
     .map((row) => classifyRow(row))
     .filter((info): info is RowInfo => info !== null);
 

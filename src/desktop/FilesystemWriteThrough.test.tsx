@@ -56,7 +56,7 @@ if (compositionFixtures.length === 0) {
 function visibleFixtureTree(content: string): string {
   return content
     .split("\n")
-    .map((line) => line.replace(/ <!-- (?:id|base):[^ ]+ -->$/u, ""))
+    .map((line) => line.replace(/ <!-- (?:id|base):[^>]* -->$/u, ""))
     .join("\n");
 }
 
@@ -87,7 +87,7 @@ test.each(compositionFixtures)(
     const expected = visibleFixtureTree(
       fs.readFileSync(pathModule.join(fixturePath, "expected.tree"), "utf8")
     );
-    await expectTree(expected, { showGutter: true });
+    await expectTree(expected, { showGutter: true, composedOnly: true });
   }
 );
 

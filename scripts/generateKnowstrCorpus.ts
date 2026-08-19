@@ -27,6 +27,7 @@ import { parseToDocumentPreservingExplicitIds } from "../src/core/Document";
 import { renderDocumentMarkdown } from "../src/documentRenderer";
 import { LOCAL } from "../src/core/nodeRef";
 import { spansToMarkdown } from "../src/core/nodeSpans";
+import { composeFixtureTree } from "../src/treeTraversal";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -119,6 +120,33 @@ function generateFixture(inputsDir: string, expectedDir: string, file: string) {
   console.log(`generated ${name}`);
 }
 
+function generateCompositionFixture(corpusDir: string, fixture: string) {
+  const fixtureDir = path.join(corpusDir, fixture);
+  const files = ["source.md", "diff.md"].map((name) => ({
+    name,
+    content: fs.readFileSync(path.join(fixtureDir, name), "utf8"),
+  }));
+  fs.writeFileSync(
+    path.join(fixtureDir, "expected.tree"),
+    composeFixtureTree(files, "diff.md")
+  );
+  console.log(`generated ${fixture}/expected.tree`);
+}
+
+function compositionFixtureDirs(corpusDir: string): string[] {
+  return fs
+    .readdirSync(corpusDir, { withFileTypes: true })
+    .filter(
+      (entry) =>
+        entry.isDirectory() &&
+        ["source.md", "diff.md"].every((file) =>
+          fs.existsSync(path.join(corpusDir, entry.name, file))
+        )
+    )
+    .map((entry) => entry.name)
+    .sort();
+}
+
 function main() {
   const corpusDir = process.argv[2];
   if (!corpusDir) {
@@ -133,7 +161,13 @@ function main() {
     .filter((file) => file.endsWith(".md"))
     .sort();
   files.forEach((file) => generateFixture(inputsDir, expectedDir, file));
-  console.log(`done: ${files.length} fixtures`);
+  const compositionFixtures = compositionFixtureDirs(corpusDir);
+  compositionFixtures.forEach((fixture) =>
+    generateCompositionFixture(corpusDir, fixture)
+  );
+  console.log(
+    `done: ${files.length} fixtures, ${compositionFixtures.length} composition fixtures`
+  );
 }
 
 main();

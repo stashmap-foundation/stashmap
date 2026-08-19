@@ -80,6 +80,39 @@ Note
   `);
 });
 
+test("a user's own line below an embed appears after the projected rows", async () => {
+  const workspacePath = writeWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [Old Label](#src) <!-- id:emb embed="true" -->',
+      "  - My own note <!-- id:own -->",
+    ].join("\n"),
+    "source.md": [
+      "# Source <!-- id:src -->",
+      "",
+      "- Argument A <!-- id:a -->",
+      "- Argument B <!-- id:b -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await expectTree(`
+Note
+  Source
+    Argument A
+    Argument B
+    My own note
+  `);
+});
+
 test("Log entries are plain links and stay flat", async () => {
   const [alice] = setup([ALICE]);
   const { relayPool } = renderApp(alice());

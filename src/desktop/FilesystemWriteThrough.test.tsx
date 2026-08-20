@@ -56,7 +56,16 @@ if (compositionFixtures.length === 0) {
 function visibleFixtureTree(content: string): string {
   return content
     .split("\n")
-    .map((line) => line.replace(/ <!-- (?:id|base):[^>]* -->$/u, ""))
+    .map((line) => {
+      const match = line.match(
+        /^(.*) <!-- (?:id|base):\S+((?: flag:\S+)*) -->$/u
+      );
+      if (!match) {
+        return line;
+      }
+      const [, text, flags] = match;
+      return flags.includes("flag:dangling") ? `${text}†` : text;
+    })
     .join("\n");
 }
 

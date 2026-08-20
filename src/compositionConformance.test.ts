@@ -81,6 +81,40 @@ test("a user's own line below an embed carries the embed in its name", () => {
   ]);
 });
 
+test("expected.tree text is accessible display text", () => {
+  const tree = composeFixtureTree(
+    [
+      {
+        name: "source.md",
+        content: [
+          "# Source <!-- id:root -->",
+          "",
+          "- See [Spain](#wd:Q29) and **compare** <!-- id:a -->",
+          "- My words ~~[Old words](#u1)~~ <!-- id:b -->",
+          "- Escaped \\* star and `code` <!-- id:c -->",
+          "- ~~struck~~ text with ![Alt words](https://example.org/x.png) <!-- id:d -->",
+          "",
+        ].join("\n"),
+      },
+      {
+        name: "diff.md",
+        content: '# [Source](#root) <!-- id:o0 embed="true" -->\n',
+      },
+    ],
+    "diff.md"
+  );
+  expect(tree).toBe(
+    [
+      "Source <!-- id:o0 -->",
+      "  See Spain and compare <!-- base:a -->",
+      "  My words <!-- base:b -->",
+      "  Escaped * star and code <!-- base:c -->",
+      "  struck text with Alt words <!-- base:d -->",
+      "",
+    ].join("\n")
+  );
+});
+
 test("a cycle attaches to the embed line that reopens an open source", () => {
   const [root] = composeFixtureShowings(
     fixtureFiles("04-embed-cycle"),

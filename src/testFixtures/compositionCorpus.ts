@@ -1,15 +1,17 @@
 import { Map } from "immutable";
 import { LOCAL } from "../core/nodeRef";
 import { parseToDocumentPreservingExplicitIds } from "../core/Document";
-import { nodeText } from "../core/nodeSpans";
+import { accessibleLineText } from "../core/markdownTree";
+import { spansToMarkdown } from "../core/nodeSpans";
 import { GraphLookup, lookupNode } from "../core/graphLookup";
 import { createEmptyGraphIndex } from "../graphIndex";
 import {
   Showing,
   closesCycle,
+  leavesDangling,
+  presentedLineOf,
   projectedChildShowings,
   showingTreeForRoot,
-  standsForOf,
 } from "../showings";
 
 const RELEVANCE_MARKS: Record<string, string> = {
@@ -39,8 +41,12 @@ function expectedTreeLines(
     return [];
   }
   const identity = `${projected ? "base" : "id"}:${showing.node.id}`;
-  const flags = closesCycle(showing) ? " flag:cycle" : "";
-  const text = standsForOf(showing)?.liveText ?? nodeText(showing.node);
+  const flags = `${closesCycle(showing) ? " flag:cycle" : ""}${
+    leavesDangling(showing) ? " flag:dangling" : ""
+  }`;
+  const text = accessibleLineText(
+    spansToMarkdown(presentedLineOf(showing).node.spans)
+  );
   const line = `${"  ".repeat(depth)}${rowMarker(
     showing.node
   )}${text} <!-- ${identity}${flags} -->`;

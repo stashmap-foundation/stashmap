@@ -15,6 +15,7 @@ const RELEVANCE_MARKS: Record<string, string> = {
   relevant: "!",
   maybe_relevant: "?",
   little_relevant: "~",
+  not_relevant: "x",
 };
 
 const ARGUMENT_MARKS: Record<string, string> = {
@@ -30,9 +31,6 @@ function rowMarker(node: GraphNode): string {
 }
 
 function expectedTreeLines(drawn: Drawn, depth: number): string[] {
-  if (drawn.node.relevance === "not_relevant") {
-    return [];
-  }
   const identity = `${drawn.projected ? "base" : "id"}:${drawn.node.id}`;
   const flags = `${drawn.cycle ? " flag:cycle" : ""}${
     drawn.dangling ? " flag:dangling" : ""

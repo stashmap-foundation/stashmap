@@ -4,6 +4,7 @@ import { QueueStatus } from "./infra/nostr/cache/PublishQueue";
 import { Document as DocumentType } from "./core/Document";
 import { IcalEntry } from "./core/ical";
 import type { AddToParentTarget } from "./core/plan";
+import type { Showing } from "./showings";
 
 declare global {
   type Children = {
@@ -217,6 +218,7 @@ declare global {
       root?: true;
     };
     standsFor?: { id: ID; liveText?: string };
+    showing?: Showing;
     // Projected embed content: the target's rows rendered at a placement.
     // Readonly in this step — touches materialize diffs in a later one.
     projected?: true;

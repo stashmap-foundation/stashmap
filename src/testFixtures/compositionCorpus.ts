@@ -9,8 +9,8 @@ import {
   Showing,
   closesCycle,
   leavesDangling,
+  linesShownThrough,
   presentedLineOf,
-  projectedChildShowings,
   showingTreeForRoot,
 } from "../showings";
 
@@ -52,8 +52,8 @@ function expectedTreeLines(
   )}${text} <!-- ${identity}${flags} -->`;
   return [
     line,
-    ...projectedChildShowings(showing.target).flatMap(({ child }) =>
-      expectedTreeLines(child, depth + 1, true)
+    ...linesShownThrough(showing.target).flatMap(({ line: shown }) =>
+      expectedTreeLines(shown, depth + 1, true)
     ),
     ...showing.children.flatMap((child) =>
       expectedTreeLines(child, depth + 1, projected)

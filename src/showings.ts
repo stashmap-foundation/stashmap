@@ -109,14 +109,14 @@ export function leavesDangling(showing: Showing): boolean {
   );
 }
 
-export function projectedChildShowings(
+export function linesShownThrough(
   target: Showing | undefined
-): { owner: Showing; child: Showing }[] {
+): { source: Showing; line: Showing }[] {
   if (!target) {
     return [];
   }
   return [
-    ...projectedChildShowings(target.target),
-    ...target.children.map((child) => ({ owner: target, child })),
+    ...linesShownThrough(target.target),
+    ...target.children.map((line) => ({ source: target, line })),
   ];
 }

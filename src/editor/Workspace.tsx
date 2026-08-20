@@ -886,7 +886,7 @@ function planSetSubtreeExpanded(
   const currentData = { ...data, views: updated.views };
   return getTreeChildren(
     currentData,
-    row.viewPath,
+    row,
     pane.rootNodeId,
     pane.sourceId,
     pane.typeFilters

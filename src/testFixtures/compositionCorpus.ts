@@ -10,7 +10,7 @@ import {
   projectedChildShowings,
   showingTreeForRoot,
   standsForOf,
-} from "../treeTraversal";
+} from "../showings";
 
 const RELEVANCE_MARKS: Record<string, string> = {
   relevant: "!",

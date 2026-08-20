@@ -54,9 +54,34 @@ if (compositionFixtures.length === 0) {
 }
 
 function visibleFixtureTree(content: string): string {
-  return content
-    .split("\n")
-    .map((line) => line.replace(/ <!-- (?:id|base):[^>]* -->$/u, ""))
+  const kept = content.split("\n").reduce<{
+    lines: string[];
+    dismissedIndent: number | undefined;
+  }>(
+    (acc, line) => {
+      const indent = line.match(/^ */u)?.[0].length ?? 0;
+      if (acc.dismissedIndent !== undefined && indent > acc.dismissedIndent) {
+        return acc;
+      }
+      if (/^ *\{x[+-]?\} /u.test(line)) {
+        return { lines: acc.lines, dismissedIndent: indent };
+      }
+      return { lines: [...acc.lines, line], dismissedIndent: undefined };
+    },
+    { lines: [], dismissedIndent: undefined }
+  ).lines;
+  return kept
+    .map((line) => {
+      const match = line.match(
+        /^( *)(?:\{([!?~x]?)([+-]?)\} )?(.*) <!-- (id|base):[^>]* -->$/u
+      );
+      if (!match) {
+        return line;
+      }
+      const [, indent, relevance = "", argument = "", text, kind] = match;
+      const marks = kind === "base" ? relevance : `${relevance}${argument}`;
+      return marks ? `${indent}{${marks}} ${text}` : `${indent}${text}`;
+    })
     .join("\n");
 }
 

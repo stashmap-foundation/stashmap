@@ -1,6 +1,7 @@
 import { Set as ImmutableSet } from "immutable";
 import { EMPTY_NODE_ID } from "./core/connections";
-import { embeddedTarget, nodeText } from "./core/nodeSpans";
+import { embeddedTarget, nodeText, spansToMarkdown } from "./core/nodeSpans";
+import { accessibleLineText } from "./core/markdownTree";
 import {
   GraphLookup,
   ResolvedNode,
@@ -119,4 +120,65 @@ export function linesShownThrough(
     ...linesShownThrough(target.target),
     ...target.children.map((line) => ({ source: target, line })),
   ];
+}
+
+export type Drawn = {
+  node: GraphNode;
+  ref: NodeRef;
+  name: ID[];
+  projected: boolean;
+  standsFor: Row["standsFor"];
+  spans: InlineSpan[];
+  cycle: boolean;
+  dangling: boolean;
+  place:
+    | { kind: "root" }
+    | { kind: "line"; childIndex: number }
+    | { kind: "shown"; home: ResolvedNode };
+  children: Drawn[];
+};
+
+function drawLine(
+  showing: Showing,
+  place: Drawn["place"],
+  projected: boolean
+): Drawn {
+  const shown = linesShownThrough(showing.target).map(({ source, line }) =>
+    drawLine(
+      line,
+      { kind: "shown", home: { node: source.node, ref: source.ref } },
+      true
+    )
+  );
+  const lines = showing.children.flatMap((line) =>
+    line.reached.kind === "line"
+      ? [
+          drawLine(
+            line,
+            { kind: "line", childIndex: line.reached.childIndex },
+            projected
+          ),
+        ]
+      : []
+  );
+  return {
+    node: showing.node,
+    ref: showing.ref,
+    name: showing.name,
+    projected,
+    standsFor: standsForOf(showing),
+    spans: presentedLineOf(showing).node.spans,
+    cycle: closesCycle(showing),
+    dangling: leavesDangling(showing),
+    place,
+    children: [...shown, ...lines],
+  };
+}
+
+export function drawShowing(root: Showing): Drawn {
+  return drawLine(root, { kind: "root" }, false);
+}
+
+export function drawnText(drawn: Drawn): string {
+  return accessibleLineText(spansToMarkdown(drawn.spans));
 }

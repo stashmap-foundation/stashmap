@@ -33,7 +33,6 @@ import {
   spansText,
   spansToMarkdown,
 } from "../core/nodeSpans";
-import { closesCycle, leavesDangling } from "../showings";
 import { classifyLinkHref, externalLinkUrl } from "../core/linkPath";
 import {
   calendarEntryTarget,
@@ -324,15 +323,7 @@ function InlineLinkSpan({
     (calendarFeedUrl(node) !== undefined ||
       (row.standsFor !== undefined && isCalendarEntryId(row.standsFor.id)));
   const externalUrl = calendarContent ? undefined : externalLinkUrl(span.href);
-  const rowShowing = row.showing;
-  const composedLink =
-    rowShowing !== undefined &&
-    embeddedTarget(rowShowing.node) !== undefined &&
-    span.href === `#${embeddedTarget(rowShowing.node)}`;
-  const dead = composedLink
-    ? leavesDangling(rowShowing)
-    : isDeadLinkTarget(data, span.href, node, sourceId);
-  const cycle = composedLink && closesCycle(rowShowing);
+  const dead = isDeadLinkTarget(data, span.href, node, sourceId);
   const internalHref =
     dead || calendarContent
       ? undefined
@@ -358,15 +349,6 @@ function InlineLinkSpan({
       aria-hidden="true"
     >
       †
-    </sup>
-  ) : null;
-  const cyclePart = cycle ? (
-    <sup
-      className="incoming-part cycle-link-part"
-      data-link-furniture="cycle"
-      aria-hidden="true"
-    >
-      ↻
     </sup>
   ) : null;
   if (calendarContent) {
@@ -404,7 +386,6 @@ function InlineLinkSpan({
         </span>
         {externalPart}
         {deadPart}
-        {cyclePart}
         {reciprocal && (
           <IncomingPart
             relevance={reciprocal.relevance}
@@ -451,7 +432,6 @@ function InlineLinkSpan({
       >
         {displayedText}
       </a>
-      {cyclePart}
       {reciprocal && (
         <IncomingPart
           relevance={reciprocal.relevance}

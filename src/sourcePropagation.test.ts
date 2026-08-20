@@ -3,7 +3,7 @@ import { addNodesToGraphIndex, createEmptyGraphIndex } from "./graphIndex";
 import { buildReferenceItem } from "./buildReferenceRow";
 import { graphLookupFromData } from "./core/graphLookup";
 import { buildPaneTarget, ViewPath } from "./rowModel";
-import { getNodesInTree, getTreeChildren } from "./treeTraversal";
+import { getTreeChildren } from "./treeTraversal";
 import { linkSpan, plainSpans } from "./core/nodeSpans";
 
 const LOCAL = "local" as PublicKey;
@@ -124,17 +124,7 @@ test("tree rows and fullscreen targets stay in the pane source for duplicate ids
   const data = duplicateSourceData();
   const rootPath: ViewPath = [0, "root"];
 
-  const rootRow = getNodesInTree(
-    data,
-    List([rootPath]),
-    "root",
-    SOURCE_B,
-    undefined
-  ).rows.first();
-  if (!rootRow) {
-    throw new Error("Missing root row");
-  }
-  const children = getTreeChildren(data, rootRow, "root", SOURCE_B, undefined);
+  const children = getTreeChildren(data, rootPath, "root", SOURCE_B, undefined);
   const childRow = children.rows.first();
 
   expect(childRow?.viewPath).toEqual([0, "root", "child"]);
@@ -202,19 +192,9 @@ test("incoming refs for duplicate ids stay scoped to the target source", () => {
     ...baseData,
     panes: [{ ...baseData.panes[0], rootNodeId: "target" }],
   };
-  const targetRow = getNodesInTree(
-    data,
-    List<ViewPath>([[0, "target"]]),
-    "target",
-    SOURCE_B,
-    undefined
-  ).rows.first();
-  if (!targetRow) {
-    throw new Error("Missing target row");
-  }
   const incomingRows = getTreeChildren(
     data,
-    targetRow,
+    [0, "target"],
     "target",
     SOURCE_B,
     undefined
@@ -258,19 +238,9 @@ test("incoming ref owner rows keep source identity when owner ids also collide",
     ...baseData,
     panes: [{ ...baseData.panes[0], rootNodeId: "target" }],
   };
-  const targetRow = getNodesInTree(
-    data,
-    List<ViewPath>([[0, "target"]]),
-    "target",
-    SOURCE_B,
-    undefined
-  ).rows.first();
-  if (!targetRow) {
-    throw new Error("Missing target row");
-  }
   const incomingRows = getTreeChildren(
     data,
-    targetRow,
+    [0, "target"],
     "target",
     SOURCE_B,
     undefined

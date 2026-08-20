@@ -1,16 +1,13 @@
 import { Map } from "immutable";
 import { LOCAL } from "../core/nodeRef";
 import { parseToDocumentPreservingExplicitIds } from "../core/Document";
-import { accessibleLineText } from "../core/markdownTree";
-import { spansToMarkdown } from "../core/nodeSpans";
 import { GraphLookup, lookupNode } from "../core/graphLookup";
 import { createEmptyGraphIndex } from "../graphIndex";
 import {
+  Drawn,
   Showing,
-  closesCycle,
-  leavesDangling,
-  linesShownThrough,
-  presentedLineOf,
+  drawShowing,
+  drawnText,
   showingTreeForRoot,
 } from "../showings";
 
@@ -32,38 +29,26 @@ function rowMarker(node: GraphNode): string {
   return marks ? `{${marks}} ` : "";
 }
 
-function expectedTreeLines(
-  showing: Showing,
-  depth: number,
-  projected: boolean
-): string[] {
-  if (showing.node.relevance === "not_relevant") {
+function expectedTreeLines(drawn: Drawn, depth: number): string[] {
+  if (drawn.node.relevance === "not_relevant") {
     return [];
   }
-  const identity = `${projected ? "base" : "id"}:${showing.node.id}`;
-  const flags = `${closesCycle(showing) ? " flag:cycle" : ""}${
-    leavesDangling(showing) ? " flag:dangling" : ""
+  const identity = `${drawn.projected ? "base" : "id"}:${drawn.node.id}`;
+  const flags = `${drawn.cycle ? " flag:cycle" : ""}${
+    drawn.dangling ? " flag:dangling" : ""
   }`;
-  const text = accessibleLineText(
-    spansToMarkdown(presentedLineOf(showing).node.spans)
-  );
-  const line = `${"  ".repeat(depth)}${rowMarker(
-    showing.node
-  )}${text} <!-- ${identity}${flags} -->`;
+  const line = `${"  ".repeat(depth)}${rowMarker(drawn.node)}${drawnText(
+    drawn
+  )} <!-- ${identity}${flags} -->`;
   return [
     line,
-    ...linesShownThrough(showing.target).flatMap(({ line: shown }) =>
-      expectedTreeLines(shown, depth + 1, true)
-    ),
-    ...showing.children.flatMap((child) =>
-      expectedTreeLines(child, depth + 1, projected)
-    ),
+    ...drawn.children.flatMap((child) => expectedTreeLines(child, depth + 1)),
   ];
 }
 
-export function projectExpectedTree(roots: Showing[]): string {
+export function projectExpectedTree(roots: Drawn[]): string {
   return roots
-    .flatMap((root) => expectedTreeLines(root, 0, false))
+    .flatMap((root) => expectedTreeLines(root, 0))
     .map((line) => `${line}\n`)
     .join("");
 }
@@ -103,5 +88,7 @@ export function composeFixtureTree(
   files: { name: string; content: string }[],
   openName: string
 ): string {
-  return projectExpectedTree(composeFixtureShowings(files, openName));
+  return projectExpectedTree(
+    composeFixtureShowings(files, openName).map(drawShowing)
+  );
 }

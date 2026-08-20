@@ -26,24 +26,19 @@ function buildShowing(
   resolved: ResolvedNode,
   reached: Showing["reached"],
   trail: ID[],
-  openTargets: ImmutableSet<ID>
+  openPath: ImmutableSet<ID>
 ): Showing {
   const name = [...trail, resolved.node.id];
+  const path = openPath.add(resolved.node.id);
   const targetID = embeddedTarget(resolved.node);
   const childTrail = targetID === undefined ? trail : name;
-  const cycle = targetID !== undefined && openTargets.has(targetID);
+  const cycle = targetID !== undefined && path.has(targetID);
   const resolvedTarget =
     targetID !== undefined && !cycle
       ? lookupNode(graph, targetID, resolved.ref.sourceId)
       : undefined;
   const target = resolvedTarget
-    ? buildShowing(
-        graph,
-        resolvedTarget,
-        { kind: "target" },
-        childTrail,
-        openTargets.add(resolvedTarget.ref.id)
-      )
+    ? buildShowing(graph, resolvedTarget, { kind: "target" }, childTrail, path)
     : undefined;
   const children = resolved.node.children
     .toArray()
@@ -62,7 +57,7 @@ function buildShowing(
               child,
               { kind: "line", childIndex },
               childTrail,
-              openTargets
+              path
             ),
           ]
         : [];
@@ -82,13 +77,7 @@ export function showingTreeForRoot(
   graph: GraphLookup,
   root: ResolvedNode
 ): Showing {
-  return buildShowing(
-    graph,
-    root,
-    { kind: "root" },
-    [],
-    ImmutableSet([root.node.id])
-  );
+  return buildShowing(graph, root, { kind: "root" }, [], ImmutableSet());
 }
 
 export function presentedLineOf(showing: Showing): Showing {

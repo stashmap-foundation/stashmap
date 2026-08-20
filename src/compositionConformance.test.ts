@@ -129,7 +129,10 @@ test("an embed of a structural ancestor closes the cycle at once", () => {
 });
 
 test("a self-embed closes the cycle on its own line", () => {
-  const [root] = composeFixtureShowings(fixtureFiles("08-self-embed"), "diff.md");
+  const [root] = composeFixtureShowings(
+    fixtureFiles("08-self-embed"),
+    "diff.md"
+  );
   const myself = root.target?.children[0];
   expect(myself?.node.id).toBe("s");
   expect(myself?.cycle).toBe(true);

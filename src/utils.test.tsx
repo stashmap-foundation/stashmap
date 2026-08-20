@@ -709,6 +709,32 @@ function getItemPrefix(innerNode: Element | null, isRef: boolean): string {
   return "";
 }
 
+function styledJudgment(row: Element): {
+  relevance: string | undefined;
+  evidence: string | undefined;
+} {
+  /* eslint-disable testing-library/no-node-access */
+  const styled = row.querySelector<HTMLElement>(".node-content-wrapper > span");
+  /* eslint-enable testing-library/no-node-access */
+  if (!styled) {
+    return { relevance: undefined, evidence: undefined };
+  }
+  const { color, textDecoration } = styled.style;
+  const evidence = (() => {
+    if (color === "rgb(133, 153, 0)" || color === "#859900") {
+      return "+";
+    }
+    if (color === "rgb(220, 50, 47)" || color === "#dc322f") {
+      return "-";
+    }
+    return undefined;
+  })();
+  return {
+    relevance: textDecoration.includes("line-through") ? "x" : undefined,
+    evidence,
+  };
+}
+
 function getGutter(row: Element): string | undefined {
   /* eslint-disable testing-library/no-node-access */
   const relevanceSelector = row.querySelector(".relevance-selector");
@@ -739,7 +765,12 @@ function getGutter(row: Element): string | undefined {
     // eslint-disable-next-line testing-library/no-node-access
     ([className]) => row.querySelector(`.${className}`) !== null
   )?.[1];
-  return `${relevance ?? indicator ?? ""}${evidence ?? ""}` || undefined;
+  const styled = styledJudgment(row);
+  return (
+    `${relevance ?? indicator ?? styled.relevance ?? ""}${
+      evidence ?? styled.evidence ?? ""
+    }` || undefined
+  );
 }
 
 function classifyRow(row: Element): RowInfo | null {

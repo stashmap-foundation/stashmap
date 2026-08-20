@@ -71,17 +71,7 @@ function visibleFixtureTree(content: string): string {
     { lines: [], dismissedIndent: undefined }
   ).lines;
   return kept
-    .map((line) => {
-      const match = line.match(
-        /^( *)(?:\{([!?~x]?)([+-]?)\} )?(.*) <!-- (id|base):[^>]* -->$/u
-      );
-      if (!match) {
-        return line;
-      }
-      const [, indent, relevance = "", argument = "", text, kind] = match;
-      const marks = kind === "base" ? relevance : `${relevance}${argument}`;
-      return marks ? `${indent}{${marks}} ${text}` : `${indent}${text}`;
-    })
+    .map((line) => line.replace(/ <!-- (?:id|base):[^>]* -->$/u, ""))
     .join("\n");
 }
 

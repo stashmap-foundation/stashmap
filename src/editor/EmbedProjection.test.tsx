@@ -351,7 +351,7 @@ Source
   Descendant
 Target
   Source↩
-    Target↩
+    Target↻↩
     Descendant
   `);
 });

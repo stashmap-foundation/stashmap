@@ -64,7 +64,10 @@ function visibleFixtureTree(content: string): string {
         return line;
       }
       const [, text, flags] = match;
-      return flags.includes("flag:dangling") ? `${text}†` : text;
+      if (flags.includes("flag:dangling")) {
+        return `${text}†`;
+      }
+      return flags.includes("flag:cycle") ? `${text}↻` : text;
     })
     .join("\n");
 }

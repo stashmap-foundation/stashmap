@@ -476,7 +476,7 @@ test("judging a backlink under a projected entry takes the entry first", async (
 Salon
   https://scholarium.at/salon.ics
     14.07.2030 Sommerfest
-      {!} Salon
+      {!} Salon↻
       [I] Salon ↩
     ${dunbarText()}
   Was ist cool
@@ -493,7 +493,7 @@ Salon
 Salon
   https://scholarium.at/salon.ics
     14.07.2030 Sommerfest
-      {!} Salon
+      {!} Salon↻
       [I] Salon ↩
     ${dunbarText()}
   Was ist cool

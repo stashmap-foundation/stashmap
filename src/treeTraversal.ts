@@ -7,6 +7,7 @@ import {
   getLast,
   getParentView,
   getViewForNode,
+  isEmptyViewPathID,
   isFileRow,
   viewPathToString,
 } from "./rowModel";
@@ -46,12 +47,7 @@ import {
   graphLookupFromData,
   lookupNode,
 } from "./core/graphLookup";
-import {
-  Showing,
-  linesShownThrough,
-  showingTreeForRoot,
-  standsForOf,
-} from "./showings";
+import { Drawn, drawShowing, showingTreeForRoot } from "./showings";
 
 export type TreeResult = {
   rows: List<Row>;
@@ -119,7 +115,7 @@ type RowInput = {
   childIndex?: number;
   isFirstVirtual?: boolean;
   virtualType?: Row["virtualType"];
-  showing?: Showing;
+  standsFor?: Row["standsFor"];
 };
 
 function createRow(data: Data, graph: GraphLookup, input: RowInput): Row {
@@ -131,7 +127,6 @@ function createRow(data: Data, graph: GraphLookup, input: RowInput): Row {
     parentNode,
     parentRef,
     childIndex,
-    showing,
   } = input;
   const nodeID = node.id;
   const inheritedVirtualType =
@@ -143,7 +138,7 @@ function createRow(data: Data, graph: GraphLookup, input: RowInput): Row {
     (parentRow.projected === true ||
       (embeddedTarget(parentRow.node) !== undefined &&
         !parentRow.node.children.includes(nodeID)));
-  const standsFor = showing ? standsForOf(showing) : undefined;
+  const { standsFor } = input;
   const provenance =
     rowVirtualType === "incoming"
       ? { kind: rowVirtualType, sourceId }
@@ -198,7 +193,6 @@ function createRow(data: Data, graph: GraphLookup, input: RowInput): Row {
     childIndex,
     hasChildren: false,
     ...(standsFor && { standsFor }),
-    ...(showing && { showing }),
     ...(projected && { projected: true }),
     isFirstVirtual: input.isFirstVirtual === true,
     virtualType: rowVirtualType,
@@ -261,20 +255,20 @@ function resolveRootNode(
     : undefined;
 }
 
-function rootRowForShowing(
+function rootRowForDrawn(
   data: Data,
   graph: GraphLookup,
-  showing: Showing,
+  drawn: Drawn,
   rootPath: ViewPath,
   options?: TreeTraversalOptions
 ): Row {
   const row = createRow(data, graph, {
     viewPath: rootPath,
-    node: showing.node,
-    sourceId: showing.ref.sourceId,
-    showing,
+    node: drawn.node,
+    sourceId: drawn.ref.sourceId,
+    standsFor: drawn.standsFor,
   });
-  return options?.projectedRoot?.id === showing.node.id
+  return options?.projectedRoot?.id === drawn.node.id
     ? { ...row, materialize: { precededBy: [], root: true } }
     : row;
 }
@@ -788,33 +782,33 @@ function getIncomingGroupChildren(
   };
 }
 
-function projectedRowFromShowing(
+function shownRow(
   data: Data,
   graph: GraphLookup,
   parentRow: Row,
-  source: Showing,
-  line: Showing
+  drawn: Drawn,
+  home: ResolvedNode
 ): Row {
   const parentPath = addNodesToLastElement(
     parentRow.viewPath,
     parentRow.node.id
   );
   return createRow(data, graph, {
-    viewPath: appendNodeToPath(parentPath, line.node.id),
-    node: line.node,
-    sourceId: line.ref.sourceId,
+    viewPath: appendNodeToPath(parentPath, drawn.node.id),
+    node: drawn.node,
+    sourceId: drawn.ref.sourceId,
     parentRow,
-    parentNode: source.node,
-    parentRef: source.ref,
-    showing: line,
+    parentNode: home.node,
+    parentRef: home.ref,
+    standsFor: drawn.standsFor,
   });
 }
 
-function fileRowFromShowing(
+function fileRow(
   data: Data,
   graph: GraphLookup,
   parentRow: Row,
-  showing: Showing,
+  drawn: Drawn,
   childIndex: number
 ): Row {
   return createRow(data, graph, {
@@ -823,13 +817,13 @@ function fileRowFromShowing(
       parentRow.node,
       childIndex
     ),
-    node: showing.node,
-    sourceId: showing.ref.sourceId,
+    node: drawn.node,
+    sourceId: drawn.ref.sourceId,
     parentRow,
     parentNode: parentRow.node,
     parentRef: parentRow.ref,
     childIndex,
-    showing,
+    standsFor: drawn.standsFor,
   });
 }
 
@@ -865,62 +859,69 @@ function emptyChildIndexes(parentRow: Row): number[] {
     );
 }
 
-function fileRows(
+function convertDrawnChildren(
   data: Data,
   graph: GraphLookup,
   parentRow: Row,
-  parentShowing: Showing | undefined,
+  parentDrawn: Drawn | undefined,
   activeFilters: NonNullable<Pane["typeFilters"]>
-): List<Row> {
-  const lines = (parentShowing ? parentShowing.children : []).flatMap((line) =>
-    line.reached.kind === "line"
-      ? [{ childIndex: line.reached.childIndex, line }]
+): { rows: List<Row>; drawn: Map<string, Drawn> } {
+  const children = parentDrawn ? parentDrawn.children : [];
+  const shownPairs = children.flatMap((child) => {
+    if (
+      child.place.kind !== "shown" ||
+      !itemPassesFilters(child.node, activeFilters)
+    ) {
+      return [];
+    }
+    return [
+      {
+        row: shownRow(data, graph, parentRow, child, child.place.home),
+        child,
+      },
+    ];
+  });
+  const lineEntries = children.flatMap((child) =>
+    child.place.kind === "line"
+      ? [{ childIndex: child.place.childIndex, child }]
       : []
   );
   const empties = emptyChildIndexes(parentRow).map((childIndex) => ({
     childIndex,
-    line: undefined,
+    child: undefined,
   }));
-  const ordered = [...lines, ...empties].sort(
-    (left, right) => left.childIndex - right.childIndex
-  );
-  return List(
-    ordered.flatMap(({ childIndex, line }) => {
-      if (!line) {
-        const row = emptyChildRow(data, graph, parentRow, childIndex);
-        return row ? [row] : [];
+  const filePairs = [...lineEntries, ...empties]
+    .sort((left, right) => left.childIndex - right.childIndex)
+    .flatMap(
+      ({ childIndex, child }): { row: Row; child: Drawn | undefined }[] => {
+        if (!child) {
+          const row = emptyChildRow(data, graph, parentRow, childIndex);
+          return row ? [{ row, child: undefined }] : [];
+        }
+        if (!itemPassesFilters(child.node, activeFilters)) {
+          return [];
+        }
+        return [
+          { row: fileRow(data, graph, parentRow, child, childIndex), child },
+        ];
       }
-      if (!itemPassesFilters(line.node, activeFilters)) {
-        return [];
-      }
-      return [fileRowFromShowing(data, graph, parentRow, line, childIndex)];
-    })
-  );
+    );
+  const pairs = [...shownPairs, ...filePairs];
+  return {
+    rows: List(pairs.map(({ row }) => row)),
+    drawn: Map<string, Drawn>(
+      pairs.flatMap(({ row, child }): [string, Drawn][] =>
+        child ? [[row.viewKey, child]] : []
+      )
+    ),
+  };
 }
 
-function convertChildShowings(
-  data: Data,
-  graph: GraphLookup,
-  parentRow: Row,
-  parentShowing: Showing | undefined,
-  activeFilters: NonNullable<Pane["typeFilters"]>
-): List<Row> {
-  const projected = List(
-    linesShownThrough(parentShowing ? parentShowing.target : undefined).flatMap(
-      ({ source, line }) =>
-        itemPassesFilters(line.node, activeFilters)
-          ? [projectedRowFromShowing(data, graph, parentRow, source, line)]
-          : []
+function fileChildNodes(parentDrawn: Drawn | undefined): List<GraphNode> {
+  return List(
+    (parentDrawn ? parentDrawn.children : []).flatMap((child) =>
+      child.place.kind === "line" ? [child.node] : []
     )
-  );
-  return projected.concat(
-    fileRows(data, graph, parentRow, parentShowing, activeFilters)
-  );
-}
-
-function fileChildNodes(parentShowing: Showing | undefined): List<GraphNode> {
-  return List(
-    (parentShowing ? parentShowing.children : []).map((showing) => showing.node)
   );
 }
 
@@ -967,22 +968,26 @@ function childRowsForRow(
   data: Data,
   graph: GraphLookup,
   parentRow: Row,
+  parentDrawn: Drawn | undefined,
   rootNode: ID | undefined,
   author: SourceId,
   typeFilters: Pane["typeFilters"]
-): List<Row> {
+): { rows: List<Row>; drawn: Map<string, Drawn> } {
   if (
     parentRow.virtualType === "incoming" &&
     parentRow.node.children.size > 0
   ) {
-    return getIncomingGroupChildren(data, graph, parentRow).rows;
+    return {
+      rows: getIncomingGroupChildren(data, graph, parentRow).rows,
+      drawn: Map<string, Drawn>(),
+    };
   }
   const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
-  const converted = convertChildShowings(
+  const converted = convertDrawnChildren(
     data,
     graph,
     parentRow,
-    parentRow.showing,
+    parentDrawn,
     activeFilters
   );
 
@@ -991,7 +996,7 @@ function childRowsForRow(
   }
 
   const rowsByChildId = Map<ID, Row>(
-    converted.flatMap((row): [ID, Row][] => {
+    converted.rows.flatMap((row): [ID, Row][] => {
       if (row.childIndex === undefined) {
         return [];
       }
@@ -1006,14 +1011,14 @@ function childRowsForRow(
     parentRow.node,
     parentRow.ref.sourceId,
     rowsByChildId,
-    converted,
+    converted.rows,
     typeFilters
   );
   const footer = footerRowsForFileRow(
     data,
     graph,
     parentRow,
-    fileChildNodes(parentRow.showing),
+    fileChildNodes(parentDrawn),
     rootNode,
     author,
     activeFilters
@@ -1030,20 +1035,99 @@ function childRowsForRow(
       )
     : footer;
 
-  return mergedRows.concat(footerRows);
+  return { rows: mergedRows.concat(footerRows), drawn: converted.drawn };
+}
+
+function drawnRowAtPath(
+  data: Data,
+  graph: GraphLookup,
+  path: ViewPath,
+  options?: TreeTraversalOptions
+): { row: Row; drawn: Drawn | undefined } | undefined {
+  const [paneIndex, rootSegment, ...rest] = path;
+  const rootPath: ViewPath = [paneIndex, rootSegment];
+  const resolved = resolveRootNode(data, graph, rootPath, options);
+  if (!resolved) {
+    return undefined;
+  }
+  const rootDrawn = drawShowing(showingTreeForRoot(graph, resolved));
+  return rest.reduce<{ row: Row; drawn: Drawn | undefined } | undefined>(
+    (found, segment) => {
+      if (!found) {
+        return undefined;
+      }
+      if (isEmptyViewPathID(segment)) {
+        const childIndex = found.row.node.children.indexOf(EMPTY_NODE_ID);
+        const row =
+          childIndex >= 0
+            ? emptyChildRow(data, graph, found.row, childIndex)
+            : undefined;
+        return row ? { row, drawn: undefined } : undefined;
+      }
+      const children = found.drawn ? found.drawn.children : [];
+      const lineMatch = children.find(
+        (child) => child.place.kind === "line" && child.node.id === segment
+      );
+      if (lineMatch && lineMatch.place.kind === "line") {
+        return {
+          row: fileRow(
+            data,
+            graph,
+            found.row,
+            lineMatch,
+            lineMatch.place.childIndex
+          ),
+          drawn: lineMatch,
+        };
+      }
+      const shownMatch = children.find(
+        (child) => child.place.kind === "shown" && child.node.id === segment
+      );
+      if (!shownMatch || shownMatch.place.kind !== "shown") {
+        return undefined;
+      }
+      return {
+        row: shownRow(
+          data,
+          graph,
+          found.row,
+          shownMatch,
+          shownMatch.place.home
+        ),
+        drawn: shownMatch,
+      };
+    },
+    {
+      row: rootRowForDrawn(data, graph, rootDrawn, rootPath, options),
+      drawn: rootDrawn,
+    }
+  );
 }
 
 export function getTreeChildren(
   data: Data,
-  parentRow: Row,
+  parentPath: ViewPath,
   rootNode: ID | undefined,
   author: SourceId,
-  typeFilters: Pane["typeFilters"]
+  typeFilters: Pane["typeFilters"],
+  options?: TreeTraversalOptions
 ): TreeResult {
   const graph = graphLookupFromData(data);
+  const found = drawnRowAtPath(data, graph, parentPath, options);
+  if (!found) {
+    return { rows: List<Row>() };
+  }
   return {
     rows: reindexRows(
-      childRowsForRow(data, graph, parentRow, rootNode, author, typeFilters)
+      childRowsForRow(
+        data,
+        graph,
+        found.row,
+        found.drawn,
+        rootNode,
+        author,
+        typeFilters
+      ).rows
     ),
   };
 }
@@ -1073,6 +1157,7 @@ function getNodesInRows(
   data: Data,
   graph: GraphLookup,
   rows: List<Row>,
+  drawnByKey: Map<string, Drawn>,
   acc: List<Row>,
   rootNode: ID | undefined,
   author: SourceId,
@@ -1083,6 +1168,7 @@ function getNodesInRows(
       data,
       graph,
       row,
+      drawnByKey.get(row.viewKey),
       rootNode,
       author,
       typeFilters
@@ -1090,7 +1176,7 @@ function getNodesInRows(
     const withHasChildren = {
       ...row,
       hasChildren:
-        children.size > 0 ||
+        children.rows.size > 0 ||
         (isFileRow(row) &&
           hasHiddenPastEntries(data, graph, row.node, row.sourceId)),
     };
@@ -1101,7 +1187,8 @@ function getNodesInRows(
     return getNodesInRows(
       data,
       graph,
-      children,
+      children.rows,
+      children.drawn,
       pushed,
       rootNode,
       author,
@@ -1115,17 +1202,23 @@ function rootRowsForPaths(
   graph: GraphLookup,
   rootPaths: List<ViewPath>,
   options?: TreeTraversalOptions
-): List<Row> {
-  return List(
-    rootPaths.toArray().flatMap((rootPath) => {
-      const resolved = resolveRootNode(data, graph, rootPath, options);
-      if (!resolved) {
-        return [];
-      }
-      const showing = showingTreeForRoot(graph, resolved);
-      return [rootRowForShowing(data, graph, showing, rootPath, options)];
-    })
-  );
+): { rows: List<Row>; drawn: Map<string, Drawn> } {
+  const roots = rootPaths.toArray().flatMap((rootPath) => {
+    const resolved = resolveRootNode(data, graph, rootPath, options);
+    if (!resolved) {
+      return [];
+    }
+    const drawn = drawShowing(showingTreeForRoot(graph, resolved));
+    return [
+      { row: rootRowForDrawn(data, graph, drawn, rootPath, options), drawn },
+    ];
+  });
+  return {
+    rows: List(roots.map(({ row }) => row)),
+    drawn: Map<string, Drawn>(
+      roots.map(({ row, drawn }) => [row.viewKey, drawn])
+    ),
+  };
 }
 
 export function getNodesInTree(
@@ -1143,7 +1236,8 @@ export function getNodesInTree(
       getNodesInRows(
         data,
         graph,
-        roots,
+        roots.rows,
+        roots.drawn,
         List<Row>(),
         rootNode,
         author,
@@ -1166,14 +1260,16 @@ export function getNodesInDocument(
     )
   );
   const graph = graphLookupFromData(data);
-  const topRows = rootRowsForPaths(data, graph, topNodePaths);
+  const tops = rootRowsForPaths(data, graph, topNodePaths);
+  const topRows = tops.rows;
   const topNodes = topRows.map((row) => row.node);
   const treeResult = {
     rows: reindexRows(
       getNodesInRows(
         data,
         graph,
-        topRows,
+        tops.rows,
+        tops.drawn,
         List<Row>(),
         undefined,
         document.sourceId,

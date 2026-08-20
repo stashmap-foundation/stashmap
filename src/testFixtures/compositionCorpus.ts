@@ -4,7 +4,13 @@ import { parseToDocumentPreservingExplicitIds } from "../core/Document";
 import { nodeText } from "../core/nodeSpans";
 import { GraphLookup, lookupNode } from "../core/graphLookup";
 import { createEmptyGraphIndex } from "../graphIndex";
-import { Showing, showingTreeForRoot } from "../treeTraversal";
+import {
+  Showing,
+  closesCycle,
+  projectedChildShowings,
+  showingTreeForRoot,
+  standsForOf,
+} from "../treeTraversal";
 
 const RELEVANCE_MARKS: Record<string, string> = {
   relevant: "!",
@@ -24,35 +30,42 @@ function rowMarker(node: GraphNode): string {
   return marks ? `{${marks}} ` : "";
 }
 
-function expectedTreeLines(showing: Showing, depth: number): string[] {
+function expectedTreeLines(
+  showing: Showing,
+  depth: number,
+  projected: boolean
+): string[] {
   if (showing.node.relevance === "not_relevant") {
     return [];
   }
-  const identity = `${showing.name.length > 1 ? "base" : "id"}:${
-    showing.node.id
-  }`;
-  const flags = showing.cycle ? " flag:cycle" : "";
-  const text = showing.standsFor?.liveText ?? nodeText(showing.node);
+  const identity = `${projected ? "base" : "id"}:${showing.node.id}`;
+  const flags = closesCycle(showing) ? " flag:cycle" : "";
+  const text = standsForOf(showing)?.liveText ?? nodeText(showing.node);
   const line = `${"  ".repeat(depth)}${rowMarker(
     showing.node
   )}${text} <!-- ${identity}${flags} -->`;
   return [
     line,
-    ...showing.children.flatMap((child) => expectedTreeLines(child, depth + 1)),
+    ...projectedChildShowings(showing.target).flatMap(({ child }) =>
+      expectedTreeLines(child, depth + 1, true)
+    ),
+    ...showing.children.flatMap((child) =>
+      expectedTreeLines(child, depth + 1, projected)
+    ),
   ];
 }
 
 export function projectExpectedTree(roots: Showing[]): string {
   return roots
-    .flatMap((root) => expectedTreeLines(root, 0))
+    .flatMap((root) => expectedTreeLines(root, 0, false))
     .map((line) => `${line}\n`)
     .join("");
 }
 
-export function composeFixtureTree(
+export function composeFixtureShowings(
   files: { name: string; content: string }[],
   openName: string
-): string {
+): Showing[] {
   const parsed = files.map(({ name, content }) => ({
     name,
     ...parseToDocumentPreservingExplicitIds(LOCAL, content, {
@@ -74,10 +87,15 @@ export function composeFixtureTree(
   if (!open) {
     throw new Error(`Missing fixture file: ${openName}`);
   }
-  return projectExpectedTree(
-    open.document.topNodeShortIds.flatMap((topNodeShortId) => {
-      const resolved = lookupNode(graph, topNodeShortId, LOCAL);
-      return resolved ? [showingTreeForRoot(graph, resolved)] : [];
-    })
-  );
+  return open.document.topNodeShortIds.flatMap((topNodeShortId) => {
+    const resolved = lookupNode(graph, topNodeShortId, LOCAL);
+    return resolved ? [showingTreeForRoot(graph, resolved)] : [];
+  });
+}
+
+export function composeFixtureTree(
+  files: { name: string; content: string }[],
+  openName: string
+): string {
+  return projectExpectedTree(composeFixtureShowings(files, openName));
 }

@@ -43,7 +43,6 @@ import type { AddToParentTarget } from "./core/plan";
 import {
   GraphLookup,
   ResolvedNode,
-  childrenOf,
   getNodeInSource,
   graphLookupFromData,
   lookupNode,
@@ -60,8 +59,8 @@ export type Showing = {
   reached:
     | { kind: "root" }
     | { kind: "line"; childIndex: number }
-    | { kind: "projected"; target: ResolvedNode };
-  standsFor: Row["standsFor"];
+    | { kind: "target" };
+  target: Showing | undefined;
   cycle: boolean;
   children: Showing[];
 };
@@ -69,32 +68,6 @@ export type Showing = {
 type TreeTraversalOptions = {
   projectedRoot?: GraphNode;
 };
-
-function embedChain(
-  graph: GraphLookup,
-  node: GraphNode,
-  ref: NodeRef,
-  openTargets: ImmutableSet<ID>
-): { targets: ResolvedNode[]; cycle: boolean } {
-  const targetID = embeddedTarget(node);
-  if (targetID === undefined) {
-    return { targets: [], cycle: false };
-  }
-  if (openTargets.has(targetID)) {
-    return { targets: [], cycle: true };
-  }
-  const target = lookupNode(graph, targetID, ref.sourceId);
-  if (!target) {
-    return { targets: [], cycle: false };
-  }
-  const inner = embedChain(
-    graph,
-    target.node,
-    target.ref,
-    openTargets.add(targetID)
-  );
-  return { targets: [target, ...inner.targets], cycle: inner.cycle };
-}
 
 function buildShowing(
   graph: GraphLookup,
@@ -104,37 +77,23 @@ function buildShowing(
   openTargets: ImmutableSet<ID>
 ): Showing {
   const name = [...trail, resolved.node.id];
-  const { targets, cycle } = embedChain(
-    graph,
-    resolved.node,
-    resolved.ref,
-    openTargets
-  );
-  const terminal = targets[targets.length - 1];
-  const standsFor =
-    terminal && !cycle
-      ? { id: targets[0].ref.id, liveText: nodeText(terminal.node) }
+  const targetID = embeddedTarget(resolved.node);
+  const childTrail = targetID === undefined ? trail : name;
+  const cycle = targetID !== undefined && openTargets.has(targetID);
+  const resolvedTarget =
+    targetID !== undefined && !cycle
+      ? lookupNode(graph, targetID, resolved.ref.sourceId)
       : undefined;
-  const projected = targets.reduceRight<Showing[]>(
-    (acc, target, index) => [
-      ...acc,
-      ...childrenOf(graph, target)
-        .filter((child) => child.node.id !== EMPTY_NODE_ID)
-        .map((child) =>
-          buildShowing(
-            graph,
-            child,
-            { kind: "projected", target },
-            [...name, ...targets.slice(0, index).map((step) => step.ref.id)],
-            targets
-              .slice(0, index + 1)
-              .reduce((open, step) => open.add(step.ref.id), openTargets)
-          )
-        ),
-    ],
-    []
-  );
-  const lines = resolved.node.children
+  const target = resolvedTarget
+    ? buildShowing(
+        graph,
+        resolvedTarget,
+        { kind: "target" },
+        childTrail,
+        openTargets.add(resolvedTarget.ref.id)
+      )
+    : undefined;
+  const children = resolved.node.children
     .toArray()
     .flatMap((childID, childIndex) => {
       if (childID === EMPTY_NODE_ID) {
@@ -150,7 +109,7 @@ function buildShowing(
               graph,
               child,
               { kind: "line", childIndex },
-              trail,
+              childTrail,
               openTargets
             ),
           ]
@@ -161,10 +120,39 @@ function buildShowing(
     ref: resolved.ref,
     name,
     reached,
-    standsFor,
+    target,
     cycle,
-    children: [...projected, ...lines],
+    children,
   };
+}
+
+export function standsForOf(showing: Showing): Row["standsFor"] {
+  if (!showing.target) {
+    return undefined;
+  }
+  return {
+    id: showing.target.node.id,
+    liveText:
+      standsForOf(showing.target)?.liveText ?? nodeText(showing.target.node),
+  };
+}
+
+export function closesCycle(showing: Showing): boolean {
+  return (
+    showing.cycle || (showing.target ? closesCycle(showing.target) : false)
+  );
+}
+
+export function projectedChildShowings(
+  target: Showing | undefined
+): { owner: Showing; child: Showing }[] {
+  if (!target) {
+    return [];
+  }
+  return [
+    ...projectedChildShowings(target.target),
+    ...target.children.map((child) => ({ owner: target, child })),
+  ];
 }
 
 export function showingTreeForRoot(
@@ -388,7 +376,7 @@ function rootRowForShowing(
     undefined,
     false,
     undefined,
-    showing.standsFor
+    standsForOf(showing)
   );
   return options?.projectedRoot?.id === showing.node.id
     ? { ...row, materialize: { precededBy: [], root: true } }
@@ -925,35 +913,41 @@ function getIncomingGroupChildren(
   };
 }
 
-function rowFromShowing(
+function projectedRowFromShowing(
+  data: Data,
+  graph: GraphLookup,
+  parentRow: Row,
+  owner: Showing,
+  showing: Showing
+): Row {
+  const parentPath = addNodesToLastElement(
+    parentRow.viewPath,
+    parentRow.node.id
+  );
+  return createRow(
+    data,
+    graph,
+    appendNodeToPath(parentPath, showing.node.id),
+    showing.node,
+    showing.ref.sourceId,
+    parentRow,
+    owner.node,
+    owner.ref,
+    undefined,
+    false,
+    undefined,
+    standsForOf(showing)
+  );
+}
+
+function fileRowFromShowing(
   data: Data,
   graph: GraphLookup,
   parentRow: Row,
   showing: Showing
 ): Row | undefined {
-  const { reached } = showing;
-  if (reached.kind === "root") {
+  if (showing.reached.kind !== "line") {
     return undefined;
-  }
-  if (reached.kind === "projected") {
-    const parentPath = addNodesToLastElement(
-      parentRow.viewPath,
-      parentRow.node.id
-    );
-    return createRow(
-      data,
-      graph,
-      appendNodeToPath(parentPath, showing.node.id),
-      showing.node,
-      showing.ref.sourceId,
-      parentRow,
-      reached.target.node,
-      reached.target.ref,
-      undefined,
-      false,
-      undefined,
-      showing.standsFor
-    );
   }
   return createRow(
     data,
@@ -961,17 +955,17 @@ function rowFromShowing(
     addNodeToPathWithNodes(
       parentRow.viewPath,
       parentRow.node,
-      reached.childIndex
+      showing.reached.childIndex
     ),
     showing.node,
     showing.ref.sourceId,
     parentRow,
     parentRow.node,
     parentRow.ref,
-    reached.childIndex,
+    showing.reached.childIndex,
     false,
     undefined,
-    showing.standsFor
+    standsForOf(showing)
   );
 }
 
@@ -1008,15 +1002,18 @@ function convertChildShowings(
   activeFilters: NonNullable<Pane["typeFilters"]>
 ): { rows: List<Row>; showings: Map<string, Showing> } {
   const children = parentShowing ? parentShowing.children : [];
-  const projected = children.flatMap((showing) => {
-    if (
-      showing.reached.kind !== "projected" ||
-      !itemPassesFilters(showing.node, activeFilters)
-    ) {
+  const projected = projectedChildShowings(
+    parentShowing ? parentShowing.target : undefined
+  ).flatMap(({ owner, child }) => {
+    if (!itemPassesFilters(child.node, activeFilters)) {
       return [];
     }
-    const row = rowFromShowing(data, graph, parentRow, showing);
-    return row ? [{ row, showing }] : [];
+    return [
+      {
+        row: projectedRowFromShowing(data, graph, parentRow, owner, child),
+        showing: child,
+      },
+    ];
   });
   const byChildIndex = Map<number, Showing>(
     children.flatMap((showing): [number, Showing][] =>
@@ -1037,7 +1034,7 @@ function convertChildShowings(
         if (!showing || !itemPassesFilters(showing.node, activeFilters)) {
           return [];
         }
-        const row = rowFromShowing(data, graph, parentRow, showing);
+        const row = fileRowFromShowing(data, graph, parentRow, showing);
         return row ? [{ row, showing }] : [];
       }
     );
@@ -1054,9 +1051,7 @@ function convertChildShowings(
 
 function fileChildNodes(parentShowing: Showing | undefined): List<GraphNode> {
   return List(
-    (parentShowing ? parentShowing.children : [])
-      .filter((showing) => showing.reached.kind === "line")
-      .map((showing) => showing.node)
+    (parentShowing ? parentShowing.children : []).map((showing) => showing.node)
   );
 }
 
@@ -1199,16 +1194,29 @@ function rowAtPath(
             : undefined;
         return row ? { row, showing: undefined } : undefined;
       }
-      const children = found.showing ? found.showing.children : [];
-      const match =
-        children.find(
-          (showing) =>
-            showing.reached.kind === "line" && showing.node.id === segment
-        ) ?? children.find((showing) => showing.node.id === segment);
-      const row = match
-        ? rowFromShowing(data, graph, found.row, match)
-        : undefined;
-      return row ? { row, showing: match } : undefined;
+      const fileMatch = (found.showing ? found.showing.children : []).find(
+        (showing) => showing.node.id === segment
+      );
+      if (fileMatch) {
+        const row = fileRowFromShowing(data, graph, found.row, fileMatch);
+        return row ? { row, showing: fileMatch } : undefined;
+      }
+      const projectedMatch = projectedChildShowings(
+        found.showing ? found.showing.target : undefined
+      ).find(({ child }) => child.node.id === segment);
+      if (!projectedMatch) {
+        return undefined;
+      }
+      return {
+        row: projectedRowFromShowing(
+          data,
+          graph,
+          found.row,
+          projectedMatch.owner,
+          projectedMatch.child
+        ),
+        showing: projectedMatch.child,
+      };
     },
     {
       row: rootRowForShowing(data, graph, rootShowing, rootPath, options),

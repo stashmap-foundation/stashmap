@@ -1,6 +1,6 @@
 import { Set as ImmutableSet } from "immutable";
 import { EMPTY_NODE_ID } from "./core/connections";
-import { embeddedTarget, nodeText } from "./core/nodeSpans";
+import { embeddedTarget } from "./core/nodeSpans";
 import {
   GraphLookup,
   ResolvedNode,
@@ -90,13 +90,7 @@ export function presentedLineOf(showing: Showing): Showing {
 }
 
 export function standsForOf(showing: Showing): Row["standsFor"] {
-  if (!showing.target) {
-    return undefined;
-  }
-  return {
-    id: showing.target.node.id,
-    liveText: nodeText(presentedLineOf(showing.target).node),
-  };
+  return showing.target ? { id: showing.target.node.id } : undefined;
 }
 
 export function closesCycle(showing: Showing): boolean {

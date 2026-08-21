@@ -649,10 +649,10 @@ function interleaveProjectionRows(
           ? {
               ...row,
               reference: undefined,
-              standsFor: {
-                id: item.childId as ID,
-                liveText: entry ? icalEntryDisplayText(entry) : undefined,
-              },
+              standsFor: { id: item.childId as ID },
+              ...(entry
+                ? { presentedSpans: plainSpans(icalEntryDisplayText(entry)) }
+                : {}),
             }
           : row;
       return {
@@ -807,7 +807,7 @@ function getIncomingGroupChildren(
   };
 }
 
-function shownRow(
+function projectedRow(
   data: Data,
   graph: GraphLookup,
   parentRow: Row,
@@ -895,7 +895,7 @@ function convertShowingChildren(
     parentShowing ? parentShowing.target : undefined
   ).flatMap(({ source, line }) =>
     itemPassesFilters(line.node, activeFilters)
-      ? [{ row: shownRow(data, graph, parentRow, source, line), line }]
+      ? [{ row: projectedRow(data, graph, parentRow, source, line), line }]
       : []
   );
   const lineEntries = (parentShowing ? parentShowing.children : []).flatMap(

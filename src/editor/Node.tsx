@@ -314,9 +314,10 @@ function InlineLinkSpan({
   // An embed shows the target's live text: the row's own label is the
   // frozen file record, the display follows the source.
   const displayedText =
-    row.standsFor?.liveText !== undefined &&
+    row.standsFor !== undefined &&
+    row.presentedSpans !== undefined &&
     span.href === `#${row.standsFor.id}`
-      ? row.standsFor.liveText
+      ? spansText(row.presentedSpans)
       : span.text;
   const calendarContent =
     !isSearchResult &&

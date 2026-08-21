@@ -1,6 +1,6 @@
 import { CSSProperties } from "react";
 import { useIsViewingOtherUserContent, useRow } from "../rowModel";
-import { nodeText } from "../core/nodeSpans";
+import { nodeText, spansText } from "../core/nodeSpans";
 import { ENTITY_SCHEME_RE } from "../core/linkPath";
 import { TYPE_COLORS } from "../core/constants";
 import { isCalendarEntryId, isPastCalendarRowText } from "../core/ical";
@@ -57,7 +57,7 @@ export function useItemStyle(): ItemStyle {
     isCalendarEntryId(row.standsFor?.id ?? currentRow.id) &&
     currentRow.relevance === undefined &&
     isPastCalendarRowText(
-      row.standsFor?.liveText ?? nodeText(currentRow),
+      row.presentedSpans ? spansText(row.presentedSpans) : nodeText(currentRow),
       Date.now()
     );
 

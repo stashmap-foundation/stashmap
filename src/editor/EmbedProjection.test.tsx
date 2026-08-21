@@ -142,6 +142,117 @@ Source
   `);
 });
 
+test("the same source embedded twice folds independently", async () => {
+  const workspacePath = writeWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [First](#src) <!-- id:e1 embed="true" -->',
+      '- [Second](#src) <!-- id:e2 embed="true" -->',
+    ].join("\n"),
+    "source.md": [
+      "# Source <!-- id:src -->",
+      "",
+      "- Argument A <!-- id:a -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await expectTree(`
+Note
+  Source
+    Argument A
+    [I] Note ↩
+  Source
+    Argument A
+    [I] Note ↩
+  `);
+
+  await userEvent.click(screen.getAllByLabelText("collapse Source")[0]);
+
+  await expectTree(`
+Note
+  Source
+  Source
+    Argument A
+    [I] Note ↩
+  `);
+});
+
+test("incoming references reach a chain embed's footer", async () => {
+  const workspacePath = writeWorkspace({
+    "note.md": '# [Outer](#head) <!-- id:o embed="true" -->',
+    "source.md": [
+      '# [Head](#src) <!-- id:head embed="true" -->',
+      "",
+      "# Source <!-- id:src -->",
+      "",
+      "- Argument A <!-- id:a -->",
+    ].join("\n"),
+    "other.md": [
+      "# Other Doc <!-- id:oth -->",
+      "",
+      "- Points at [head](#head) <!-- id:p -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await expectTree(`
+Source
+  Argument A
+  [I] Other Doc / Points at head ↩
+  `);
+});
+
+test("the in-progress editor row appears below an embed", async () => {
+  const workspacePath = writeWorkspace({
+    "note.md": [
+      "# Note <!-- id:note -->",
+      "",
+      '- [Old Label](#src) <!-- id:emb embed="true" -->',
+      "  - My own note <!-- id:own -->",
+    ].join("\n"),
+    "source.md": [
+      "# Source <!-- id:src -->",
+      "",
+      "- Argument A <!-- id:a -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await userEvent.click(await screen.findByLabelText("edit My own note"));
+  await userEvent.keyboard("{Enter}");
+
+  await expectTree(`
+Note
+  Source
+    Argument A
+    My own note
+    [NEW NODE]
+  `);
+});
+
 test("Log entries are plain links and stay flat", async () => {
   const [alice] = setup([ALICE]);
   const { relayPool } = renderApp(alice());

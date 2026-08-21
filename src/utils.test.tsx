@@ -928,7 +928,7 @@ async function getTreeStructure(options?: TreeOptions): Promise<string> {
     const indent = "  ".repeat(indentLevel);
     const gutterPrefix = options?.showGutter && gutter ? `{${gutter}} ` : "";
     const visibleText = options?.composedOnly
-      ? text.replace(/[†↻]+$/u, "")
+      ? text.replace(/[†↻↗]+$/u, "")
       : text;
     return `${indent}${gutterPrefix}${visibleText}`;
   });

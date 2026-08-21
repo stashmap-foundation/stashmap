@@ -217,6 +217,9 @@ declare global {
       root?: true;
     };
     standsFor?: { id: ID; liveText?: string };
+    presentedSpans?: InlineSpan[];
+    cycle?: true;
+    dangling?: true;
     // Projected embed content: the target's rows rendered at a placement.
     // Readonly in this step — touches materialize diffs in a later one.
     projected?: true;

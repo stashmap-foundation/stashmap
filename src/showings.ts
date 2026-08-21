@@ -21,9 +21,53 @@ export type Showing = {
   children: Showing[];
 };
 
-function openedThrough(target: Showing | undefined): ID[] {
-  return target ? [target.node.id, ...openedThrough(target.target)] : [];
+/* eslint-disable functional/no-let, functional/immutable-data */
+function chainFrames(
+  graph: GraphLookup,
+  resolved: ResolvedNode,
+  reached: Showing["reached"],
+  trail: ID[],
+  openPath: ImmutableSet<ID>
+): {
+  resolved: ResolvedNode;
+  reached: Showing["reached"];
+  name: ID[];
+  path: ImmutableSet<ID>;
+  childTrail: ID[];
+  cycle: boolean;
+}[] {
+  const frames = [];
+  let current = { resolved, reached, trail, openPath };
+  for (;;) {
+    const name = [...current.trail, current.resolved.node.id];
+    const path = current.openPath.add(current.resolved.node.id);
+    const targetID = embeddedTarget(current.resolved.node);
+    const childTrail = targetID === undefined ? current.trail : name;
+    const cycle = targetID !== undefined && path.has(targetID);
+    frames.push({
+      resolved: current.resolved,
+      reached: current.reached,
+      name,
+      path,
+      childTrail,
+      cycle,
+    });
+    if (targetID === undefined || cycle) {
+      return frames;
+    }
+    const target = lookupNode(graph, targetID, current.resolved.ref.sourceId);
+    if (!target) {
+      return frames;
+    }
+    current = {
+      resolved: target,
+      reached: { kind: "target" },
+      trail: childTrail,
+      openPath: path,
+    };
+  }
 }
+/* eslint-enable functional/no-let, functional/immutable-data */
 
 function buildShowing(
   graph: GraphLookup,
@@ -32,50 +76,58 @@ function buildShowing(
   trail: ID[],
   openPath: ImmutableSet<ID>
 ): Showing {
-  const name = [...trail, resolved.node.id];
-  const path = openPath.add(resolved.node.id);
-  const targetID = embeddedTarget(resolved.node);
-  const childTrail = targetID === undefined ? trail : name;
-  const cycle = targetID !== undefined && path.has(targetID);
-  const resolvedTarget =
-    targetID !== undefined && !cycle
-      ? lookupNode(graph, targetID, resolved.ref.sourceId)
-      : undefined;
-  const target = resolvedTarget
-    ? buildShowing(graph, resolvedTarget, { kind: "target" }, childTrail, path)
-    : undefined;
-  const linePath = path.union(openedThrough(target));
-  const children = resolved.node.children
-    .toArray()
-    .flatMap((childID, childIndex) => {
-      if (childID === EMPTY_NODE_ID) {
-        return [];
-      }
-      const child = getNodeInSource(graph, {
-        sourceId: resolved.ref.sourceId,
-        id: childID,
+  const frames = chainFrames(graph, resolved, reached, trail, openPath);
+  const lineChildren = (
+    frame: typeof frames[number],
+    openedBelow: ID[]
+  ): Showing[] => {
+    const linePath = frame.path.union(openedBelow);
+    return frame.resolved.node.children
+      .toArray()
+      .flatMap((childID, childIndex) => {
+        if (childID === EMPTY_NODE_ID) {
+          return [];
+        }
+        const child = getNodeInSource(graph, {
+          sourceId: frame.resolved.ref.sourceId,
+          id: childID,
+        });
+        return child
+          ? [
+              buildShowing(
+                graph,
+                child,
+                { kind: "line", childIndex },
+                frame.childTrail,
+                linePath
+              ),
+            ]
+          : [];
       });
-      return child
-        ? [
-            buildShowing(
-              graph,
-              child,
-              { kind: "line", childIndex },
-              childTrail,
-              linePath
-            ),
-          ]
-        : [];
-    });
-  return {
-    node: resolved.node,
-    ref: resolved.ref,
-    name,
-    reached,
-    target,
-    cycle,
-    children,
   };
+  const frameShowing = (
+    frame: typeof frames[number],
+    target: Showing | undefined,
+    openedBelow: ID[]
+  ): Showing => ({
+    node: frame.resolved.node,
+    ref: frame.resolved.ref,
+    name: frame.name,
+    reached: frame.reached,
+    target,
+    cycle: frame.cycle,
+    children: lineChildren(frame, openedBelow),
+  });
+  const last = frames[frames.length - 1];
+  return frames.slice(0, -1).reduceRight(
+    (inner, frame, index) =>
+      frameShowing(
+        frame,
+        inner,
+        frames.slice(index + 1).map((below) => below.resolved.node.id)
+      ),
+    frameShowing(last, undefined, [])
+  );
 }
 
 export function showingTreeForRoot(
@@ -85,19 +137,32 @@ export function showingTreeForRoot(
   return buildShowing(graph, root, { kind: "root" }, [], ImmutableSet());
 }
 
+/* eslint-disable functional/no-let */
 export function presentedLineOf(showing: Showing): Showing {
-  return showing.target ? presentedLineOf(showing.target) : showing;
+  let line = showing;
+  while (line.target) {
+    line = line.target;
+  }
+  return line;
 }
+/* eslint-enable functional/no-let */
 
 export function standsForOf(showing: Showing): Row["standsFor"] {
   return showing.target ? { id: showing.target.node.id } : undefined;
 }
 
+/* eslint-disable functional/no-let */
 export function closesCycle(showing: Showing): boolean {
-  return (
-    showing.cycle || (showing.target ? closesCycle(showing.target) : false)
-  );
+  let line: Showing | undefined = showing;
+  while (line) {
+    if (line.cycle) {
+      return true;
+    }
+    line = line.target;
+  }
+  return false;
 }
+/* eslint-enable functional/no-let */
 
 export function leavesDangling(showing: Showing): boolean {
   const presented = presentedLineOf(showing);
@@ -108,14 +173,18 @@ export function leavesDangling(showing: Showing): boolean {
   );
 }
 
+/* eslint-disable functional/no-let, functional/immutable-data */
 export function linesShownThrough(
   target: Showing | undefined
 ): { source: Showing; line: Showing }[] {
-  if (!target) {
-    return [];
+  const chain = [];
+  let opened = target;
+  while (opened) {
+    chain.push(opened);
+    opened = opened.target;
   }
-  return [
-    ...linesShownThrough(target.target),
-    ...target.children.map((line) => ({ source: target, line })),
-  ];
+  return [...chain]
+    .reverse()
+    .flatMap((source) => source.children.map((line) => ({ source, line })));
 }
+/* eslint-enable functional/no-let, functional/immutable-data */

@@ -21,6 +21,10 @@ export type Showing = {
   children: Showing[];
 };
 
+function openedThrough(target: Showing | undefined): ID[] {
+  return target ? [target.node.id, ...openedThrough(target.target)] : [];
+}
+
 function buildShowing(
   graph: GraphLookup,
   resolved: ResolvedNode,
@@ -40,6 +44,7 @@ function buildShowing(
   const target = resolvedTarget
     ? buildShowing(graph, resolvedTarget, { kind: "target" }, childTrail, path)
     : undefined;
+  const linePath = path.union(openedThrough(target));
   const children = resolved.node.children
     .toArray()
     .flatMap((childID, childIndex) => {
@@ -57,7 +62,7 @@ function buildShowing(
               child,
               { kind: "line", childIndex },
               childTrail,
-              path
+              linePath
             ),
           ]
         : [];

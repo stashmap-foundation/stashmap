@@ -139,6 +139,66 @@ test("a self-embed closes the cycle on its own line", () => {
   expect(myself?.target).toBeUndefined();
 });
 
+test("a long embed chain composes every layer in order", () => {
+  const depth = 4000;
+  const chain = Array.from({ length: depth }, (_, index) =>
+    index === depth - 1
+      ? `# Terminal <!-- id:c${index} -->\n\n- Leaf <!-- id:leaf -->\n`
+      : `# [step](#c${
+          index + 1
+        }) <!-- id:c${index} embed="true" -->\n\n- note ${index} <!-- id:m${index} -->\n`
+  ).join("\n");
+  const tree = composeFixtureTree(
+    [
+      { name: "source.md", content: chain },
+      {
+        name: "diff.md",
+        content: '# [Outer](#c0) <!-- id:o0 embed="true" -->\n',
+      },
+    ],
+    "diff.md"
+  );
+  const expected = [
+    "Terminal <!-- id:o0 -->",
+    "  Leaf <!-- base:leaf -->",
+    ...Array.from({ length: depth - 1 }, (_, index) => {
+      const layer = depth - 2 - index;
+      return `  note ${layer} <!-- base:m${layer} -->`;
+    }),
+  ]
+    .map((line) => `${line}\n`)
+    .join("");
+  expect(tree).toBe(expected);
+});
+
+test("deep nesting composes line for line", () => {
+  const depth = 30;
+  const lines = Array.from(
+    { length: depth },
+    (_, index) => `${"  ".repeat(index)}- L${index} <!-- id:n${index} -->`
+  ).join("\n");
+  const tree = composeFixtureTree(
+    [
+      { name: "source.md", content: `# Deep <!-- id:root -->\n\n${lines}\n` },
+      {
+        name: "diff.md",
+        content: '# [Outer](#root) <!-- id:o0 embed="true" -->\n',
+      },
+    ],
+    "diff.md"
+  );
+  const expected = [
+    "Deep <!-- id:o0 -->",
+    ...Array.from(
+      { length: depth },
+      (_, index) => `${"  ".repeat(index + 1)}L${index} <!-- base:n${index} -->`
+    ),
+  ]
+    .map((line) => `${line}\n`)
+    .join("");
+  expect(tree).toBe(expected);
+});
+
 test("a cycle attaches to the embed line that reopens an open source", () => {
   const [root] = composeFixtureShowings(
     fixtureFiles("04-embed-cycle"),

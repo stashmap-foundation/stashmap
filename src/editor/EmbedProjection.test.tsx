@@ -113,6 +113,35 @@ Note
   `);
 });
 
+test("a line below an embed cannot reopen the source the embed shows", async () => {
+  const workspacePath = writeWorkspace({
+    "note.md": [
+      '# [Source](#src) <!-- id:emb embed="true" -->',
+      "",
+      '- [Source again](#src) <!-- id:again embed="true" -->',
+    ].join("\n"),
+    "source.md": [
+      "# Source <!-- id:src -->",
+      "",
+      "- Argument A <!-- id:a -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "note.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await expectTree(`
+Source
+  Argument A
+  Source again
+  `);
+});
+
 test("Log entries are plain links and stay flat", async () => {
   const [alice] = setup([ALICE]);
   const { relayPool } = renderApp(alice());

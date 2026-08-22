@@ -41,22 +41,20 @@ test.each(fixtures)(
   }
 );
 
-test("an embed chain keeps every line as a showing with its embed trail", () => {
+test("an embed chain mounts each finished source under its embed line", () => {
   const [root] = composeFixtureShowings(
     fixtureFiles("05-root-embed-chain"),
     "diff.md"
   );
-  expect(root.name).toEqual(["o0"]);
+  expect(root.node.id).toBe("o0");
   expect(root.target?.node.id).toBe("inner");
-  expect(root.target?.name).toEqual(["o0", "inner"]);
   expect(root.target?.target?.node.id).toBe("terminal");
-  expect(root.target?.target?.name).toEqual(["o0", "inner", "terminal"]);
-  expect(root.target?.target?.children.map((child) => child.name)).toEqual([
-    ["o0", "inner", "c"],
+  expect(root.target?.target?.children.map((child) => child.node.id)).toEqual([
+    "c",
   ]);
 });
 
-test("a user's own line below an embed carries the embed in its name", () => {
+test("a user's own line below an embed stays on the embed line, not in the source", () => {
   const [root] = composeFixtureShowings(
     [
       {
@@ -75,10 +73,8 @@ test("a user's own line below an embed carries the embed in its name", () => {
     ],
     "diff.md"
   );
-  expect(root.children.map((child) => child.name)).toEqual([["o0", "own"]]);
-  expect(root.target?.children.map((child) => child.name)).toEqual([
-    ["o0", "a"],
-  ]);
+  expect(root.children.map((child) => child.node.id)).toEqual(["own"]);
+  expect(root.target?.children.map((child) => child.node.id)).toEqual(["a"]);
 });
 
 test("expected.tree text is accessible display text", () => {

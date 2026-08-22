@@ -8,7 +8,9 @@ import { TemporaryViewProvider, useTemporaryView } from "./temporaryViewState";
 import {
   getDisplayTextForRow,
   getIndependentRows,
+  getPaneRootItemID,
   updateView,
+  type ViewPath,
 } from "../rowModel";
 import { useData } from "../DataContext";
 import { useBackend } from "../BackendContext";
@@ -90,7 +92,7 @@ import { planDeleteNode } from "../treeMutations";
 import { MobileActionBar } from "./MobileActionBar";
 import { nodeText } from "../core/nodeSpans";
 import { defaultEntitySurfaceTitle } from "../entityLabels";
-import { getTreeChildren } from "../treeTraversal";
+import { getNodesInDocument, getNodesInTree } from "../treeTraversal";
 
 function BreadcrumbItem({
   label,
@@ -874,33 +876,48 @@ function planSetSubtreeExpanded(
   row: Row,
   expanded: boolean
 ): Plan {
-  const updated = expanded
-    ? planExpandNode(plan, row.view, row.viewPath)
-    : planUpdateViews(
-        plan,
-        updateView(plan.views, row.viewPath, {
-          ...row.view,
-          expanded: false,
-        })
-      );
-  const currentData = { ...data, views: updated.views };
-  return getTreeChildren(
-    currentData,
-    row.viewPath,
-    pane.rootNodeId,
-    pane.sourceId,
-    pane.typeFilters
-  ).rows.reduce(
-    (next, child) =>
-      planSetSubtreeExpanded(
-        next,
-        { ...data, views: next.views },
-        pane,
-        child,
+  const paneIndex = row.viewPath[0];
+  const rootPath: ViewPath = [paneIndex, getPaneRootItemID(pane)];
+  const paneDocument = pane.documentId
+    ? getDocumentByIdOrFilePath(
+        data.documents,
+        data.documentByFilePath,
+        pane.sourceId,
+        pane.documentId
+      )
+    : undefined;
+  const allRows = paneDocument
+    ? getNodesInDocument(data, rootPath, paneDocument, pane.typeFilters, {
+        expandAll: true,
+      }).rows
+    : getNodesInTree(
+        data,
+        List<ViewPath>([rootPath]),
+        pane.rootNodeId,
+        pane.sourceId,
+        pane.typeFilters,
+        { expandAll: true }
+      ).rows;
+  const prefix = `${row.viewKey}:`;
+  return allRows
+    .filter(
+      (candidate) =>
+        candidate.viewKey === row.viewKey ||
+        candidate.viewKey.startsWith(prefix)
+    )
+    .reduce(
+      (next, candidate) =>
         expanded
-      ),
-    updated
-  );
+          ? planExpandNode(next, candidate.view, candidate.viewPath)
+          : planUpdateViews(
+              next,
+              updateView(next.views, candidate.viewPath, {
+                ...candidate.view,
+                expanded: false,
+              })
+            ),
+      plan
+    );
 }
 
 function usePaneKeyboardNavigation(paneIndex: number): {

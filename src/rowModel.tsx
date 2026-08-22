@@ -11,7 +11,7 @@ import {
   getRefTargetInfo,
 } from "./core/connections";
 import { isCanonicalId } from "./core/entityRecognition";
-import { nodeText } from "./core/nodeSpans";
+import { nodeText, spansText } from "./core/nodeSpans";
 import { EditorNavigationTarget } from "./editor/linkOperations";
 import { searchTargetID } from "./localSearch";
 
@@ -233,8 +233,8 @@ export function useCurrentEdge(): GraphNode {
 
 export function getDisplayTextForRow(row: Row): string {
   const { reference } = row;
-  if (row.standsFor?.liveText !== undefined) {
-    return row.standsFor.liveText;
+  if (row.standsFor !== undefined && row.presentedSpans !== undefined) {
+    return spansText(row.presentedSpans);
   }
   if (
     row.virtualType === undefined &&

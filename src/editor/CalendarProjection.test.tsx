@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import {
   ALICE,
   expectTree,
+  getPane,
   navigateToNodeViaSearch,
   openNodeInFullscreen,
   renderApp,
@@ -160,6 +161,41 @@ Salon
   expect(new Set(fetchedUrls)).toEqual(
     new Set(["https://scholarium.at/salon.ics"])
   );
+});
+
+test("a feed inside an embedded source still projects", async () => {
+  const [alice] = setup([ALICE]);
+  renderApp({ ...alice(), fetchCalendarFeed: () => Promise.resolve(FEED) });
+
+  await type("Salon{Enter}{Tab}https://scholarium.at/salon.ics{Escape}");
+  await userEvent.click(await screen.findByLabelText("Create new note"));
+  await type("Agenda{Escape}");
+
+  await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+  await navigateToNodeViaSearch(0, "Salon");
+  await openNodeInFullscreen(0, "Salon");
+  await navigateToNodeViaSearch(1, "Agenda");
+  await openNodeInFullscreen(1, "Agenda");
+
+  fireEvent.dragStart(getPane(0).getByRole("treeitem", { name: "Salon" }));
+  fireEvent.drop(getPane(1).getByRole("treeitem", { name: "Agenda" }));
+
+  await getPane(1).findByLabelText("expand Salon");
+  await userEvent.click(getPane(1).getByLabelText("expand Salon"));
+  await userEvent.click(
+    getPane(1).getByLabelText("expand https://scholarium.at/salon.ics")
+  );
+
+  await expectTree(`
+Salon
+  https://scholarium.at/salon.ics
+  [I] Agenda ↩
+Agenda
+  Salon
+    https://scholarium.at/salon.ics
+      14.07.2030 Sommerfest
+      ${dunbarText()}
+  `);
 });
 
 test("judging a projected entry materializes it with the judgment", async () => {

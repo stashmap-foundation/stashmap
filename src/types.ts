@@ -216,7 +216,10 @@ declare global {
       host?: Pick<Row, "node" | "parentRef" | "materialize">;
       root?: true;
     };
-    standsFor?: { id: ID; liveText?: string };
+    standsFor?: { id: ID };
+    presentedSpans?: InlineSpan[];
+    cycle?: true;
+    dangling?: true;
     // Projected embed content: the target's rows rendered at a placement.
     // Readonly in this step — touches materialize diffs in a later one.
     projected?: true;

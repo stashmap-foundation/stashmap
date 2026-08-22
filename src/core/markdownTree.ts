@@ -154,6 +154,55 @@ export function parseInlineSpans(text: string): InlineSpan[] {
   return extractSpans(inline.children);
 }
 
+function accessibleTokenTexts(
+  tokens: readonly Token[],
+  index: number,
+  struckDepth: number,
+  acc: string[]
+): string[] {
+  if (index >= tokens.length) {
+    return acc;
+  }
+  const token = tokens[index];
+  if (token.type === "link_open" && struckDepth > 0) {
+    const relativeClose = tokens
+      .slice(index + 1)
+      .findIndex((candidate) => candidate.type === "link_close");
+    const nextIndex =
+      relativeClose < 0 ? tokens.length : index + relativeClose + 2;
+    return accessibleTokenTexts(tokens, nextIndex, struckDepth, acc);
+  }
+  if (token.type === "s_open") {
+    return accessibleTokenTexts(tokens, index + 1, struckDepth + 1, acc);
+  }
+  if (token.type === "s_close") {
+    return accessibleTokenTexts(tokens, index + 1, struckDepth - 1, acc);
+  }
+  if (token.type.endsWith("_open") || token.type.endsWith("_close")) {
+    return accessibleTokenTexts(tokens, index + 1, struckDepth, acc);
+  }
+  if (token.type === "softbreak" || token.type === "hardbreak") {
+    return accessibleTokenTexts(tokens, index + 1, struckDepth, [...acc, " "]);
+  }
+  return accessibleTokenTexts(tokens, index + 1, struckDepth, [
+    ...acc,
+    token.content,
+  ]);
+}
+
+export function accessibleLineText(text: string): string {
+  const inline = markdown
+    .parseInline(text, {})
+    .find((token) => token.type === "inline");
+  if (!inline?.children) {
+    return text.trim();
+  }
+  return accessibleTokenTexts(inline.children, 0, 0, [])
+    .join("")
+    .replace(/\n/g, " ")
+    .trim();
+}
+
 function extractPrefixMarkers(text: string): {
   cleanText: string;
   relevance: Relevance;

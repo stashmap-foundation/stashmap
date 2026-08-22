@@ -1,0 +1,6 @@
+Source Doc <!-- id:o0 -->
+  {!} Argument A <!-- base:a -->
+  {!-} Argument B <!-- base:b -->
+  {x} Dropped <!-- base:d -->
+    Hidden child <!-- base:h -->
+  {+} Argument C <!-- base:c -->

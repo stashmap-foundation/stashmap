@@ -145,7 +145,6 @@ export function PaneTreeResultProvider({
     return getNodesInTree(
       data,
       List<ViewPath>([viewPath]),
-      List<ViewPath>(),
       pane.rootNodeId,
       pane.sourceId,
       pane.typeFilters,

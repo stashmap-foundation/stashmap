@@ -1,0 +1,4 @@
+Source Doc <!-- id:o0 -->
+  Argument A <!-- base:a -->
+  Again <!-- id:x flag:cycle -->
+    Kept below the loop <!-- id:k -->

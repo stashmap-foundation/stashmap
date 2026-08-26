@@ -65,6 +65,7 @@ Two things to notice about the shape:
 
 - **The diff is flat.** All my statements sit one level under the embed, whatever the source's tree looks like. Where a row *shows* is said by names: my note `q4` carries `parent="z2"`, so it renders under the seats row, and the dragged attractions row carries `after="z2" before="z3"` — the seats row above it, the station row below it. The statement line itself never nests or moves to mirror the source.
 - **The diff is sparse.** The station row and its child appear nowhere in my file — I made no statement about them, so they're simply omitted.
+- **The diff contains user intent** It's clear that this row is here, because the user marked its relevance or moved it (or both).
 
 What I see on screen is computed by laying my diff over their live document:
 

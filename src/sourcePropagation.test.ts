@@ -55,6 +55,7 @@ function indexedData(entries: ReadonlyArray<[PublicKey, GraphNode[]]>): Data {
     graphIndex,
     documents: Map(),
     documentByFilePath: Map(),
+    computedNodes: Map(),
     publishEventsStatus: {
       isLoading: false,
       unsignedEvents: List(),
@@ -154,7 +155,11 @@ test("incoming rows keep their source identity in the current source", () => {
     data,
     SOURCE_B,
     "incoming",
-    { ref: { sourceId: SOURCE_B, id: parentNode.id }, node: parentNode }
+    {
+      ref: { sourceId: SOURCE_B, id: parentNode.id },
+      node: parentNode,
+      origin: "authored",
+    }
   );
 
   expect(reference?.targetLabel).toBe("");

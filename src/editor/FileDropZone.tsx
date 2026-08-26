@@ -14,7 +14,7 @@ import {
 } from "../core/markdownTree";
 import { planInsertMarkdownTrees } from "../markdownPlan";
 import { linkSpan, nodeText, plainSpans, spansText } from "../core/nodeSpans";
-import { icalFeedLinkText, isBareIcalFeedUrl } from "../core/ical";
+import { bareFeedUrlIn, feedLinkSpans } from "../core/ical";
 import { entityIdForText } from "../core/entityRecognition";
 import { getWorkspaceNode } from "../core/knowledge";
 import { newGraphNode } from "../core/nodeFactory";
@@ -205,10 +205,10 @@ function entityLinkedTrees(
       : undefined;
     // A bare feed URL wraps into the link form so the name is free from
     // the start — text is yours, identity lives in the parentheses.
+    const feedUrl =
+      tree.uuid || entityId ? undefined : bareFeedUrlIn(tree.spans);
     const feedWrap =
-      !tree.uuid && !entityId && isBareIcalFeedUrl(text)
-        ? { spans: plainSpans(icalFeedLinkText(text.trim())) }
-        : undefined;
+      feedUrl !== undefined ? { spans: feedLinkSpans(feedUrl) } : undefined;
     return {
       ...tree,
       ...(entityId

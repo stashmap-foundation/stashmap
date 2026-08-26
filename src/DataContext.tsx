@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Map } from "immutable";
 import { LOCAL } from "./core/nodeRef";
 import { newDB } from "./core/knowledge";
@@ -10,20 +10,29 @@ import {
   useDocumentByFilePath,
 } from "./DocumentStore";
 import { mergeGraphIndexes } from "./graphIndex";
+import { loadedFeedUrls } from "./core/ical";
+import { useCalendarFeeds } from "./CalendarFeedContext";
 import type { Document as KnowstrDocument } from "./core/Document";
 
-export type DataContextProps = Data;
+export type DataContextProps = Omit<Data, "computedNodes">;
 
-const DataContext = React.createContext<DataContextProps | undefined>(
-  undefined
-);
+const DataContext = React.createContext<Data | undefined>(undefined);
 
-export function useData(): DataContextProps {
+export function useData(): Data {
   const context = React.useContext(DataContext);
   if (context === undefined) {
     throw new Error("DataContext not provided");
   }
   return context;
+}
+
+function CalendarFeedDiscovery(): null {
+  const { knowledgeDBs, graphIndex } = useData();
+  const { requestFeed } = useCalendarFeeds();
+  useEffect(() => {
+    loadedFeedUrls({ knowledgeDBs, graphIndex }).forEach(requestFeed);
+  }, [knowledgeDBs, graphIndex, requestFeed]);
+  return null;
 }
 
 export function DataContextProvider({
@@ -32,7 +41,13 @@ export function DataContextProvider({
 }: DataContextProps & {
   children: React.ReactNode;
 }): JSX.Element {
-  return <DataContext.Provider value={props}>{children}</DataContext.Provider>;
+  const { computedNodes } = useCalendarFeeds();
+  return (
+    <DataContext.Provider value={{ ...props, computedNodes }}>
+      <CalendarFeedDiscovery />
+      {children}
+    </DataContext.Provider>
+  );
 }
 
 function mergeDBNodesAndNodes(
@@ -112,6 +127,7 @@ export function MergeKnowledgeDB({
         pull: pull ?? data.pull,
       }}
     >
+      <CalendarFeedDiscovery />
       {children}
     </DataContext.Provider>
   );

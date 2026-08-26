@@ -1,9 +1,7 @@
 import { CSSProperties } from "react";
 import { useIsViewingOtherUserContent, useRow } from "../rowModel";
-import { nodeText, spansText } from "../core/nodeSpans";
 import { ENTITY_SCHEME_RE } from "../core/linkPath";
 import { TYPE_COLORS } from "../core/constants";
-import { isCalendarEntryId, isPastCalendarRowText } from "../core/ical";
 
 type ItemStyle = {
   cardStyle: CSSProperties;
@@ -48,18 +46,6 @@ export function useItemStyle(): ItemStyle {
   const row = useRow();
   const currentRow = row.node;
   const { virtualType } = row;
-  // Node-type rendering (like violet for entities): a calendar entry with
-  // a past date dims — derived from the row's own id and text, so file
-  // rows render correctly with no feed fetch. An explicit judgment
-  // un-dims: deliberate emphasis beats default de-emphasis.
-  const isPastCalendarRow =
-    !!currentRow &&
-    isCalendarEntryId(row.standsFor?.id ?? currentRow.id) &&
-    currentRow.relevance === undefined &&
-    isPastCalendarRowText(
-      row.presentedSpans ? spansText(row.presentedSpans) : nodeText(currentRow),
-      Date.now()
-    );
 
   if (isViewingOtherUserContent) {
     const relevance = currentRow?.relevance;
@@ -100,7 +86,6 @@ export function useItemStyle(): ItemStyle {
       ...getRelevanceTextStyle(normalizedRelevance),
       ...getArgumentTextStyle(argument),
       ...(isEntityNode ? { color: "var(--violet)" } : {}),
-      ...(isPastCalendarRow ? { opacity: 0.55 } : {}),
     },
     textClassName: "",
     relevance: normalizedRelevance,

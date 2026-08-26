@@ -1,38 +1,22 @@
 /* eslint-disable functional/no-let, functional/immutable-data */
+import { List, Map } from "immutable";
+import { allKnownNodes } from "./graphLookup";
 import { icalEntryId } from "./icalId";
-import { spansText } from "./nodeSpans";
 import { classifyLinkHref } from "./linkPath";
+import { plainSpans, spansText } from "./nodeSpans";
 
 // Write-time recognition only: a pasted or typed bare feed URL gets
 // wrapped into the typed feed link. Read paths never sniff URLs.
 const ICAL_URL_RE =
-  /(webcal:\/\/[^\s\]()]+|https?:\/\/[^\s\]()]+\.ics(\?[^\s\]()]*)?)/iu;
-
-const ICAL_FEED_LINK_RE = /^\[([^\]]*)\]\(feed:([^\s()]+)\)$/u;
+  /(webcal:\/\/[^\s\]()]+|https:\/\/[^\s\]()]+\.ics(\?[^\s\]()]*)?)/iu;
 
 export function isCalendarEntryId(id: string): boolean {
   return id.startsWith("ical:");
 }
 
-// The feed-as-link form: `[any name](feed:<url>)`. The scheme declares the
-// row a calendar-feed node; readers dispatch on it, never on the URL shape.
-export function icalFeedLinkPartsOf(
-  text: string
-): { label: string; url: string } | undefined {
-  const match = ICAL_FEED_LINK_RE.exec(text.trim());
-  if (!match) {
-    return undefined;
-  }
-  return { label: match[1], url: match[2] };
-}
-
-export function icalFeedUrlOf(text: string): string | undefined {
-  return icalFeedLinkPartsOf(text)?.url;
-}
-
-export function calendarFeedUrl(node: GraphNode): string | undefined {
-  if (node.spans.length !== 1) return undefined;
-  const span = node.spans[0];
+export function feedUrlInSpans(spans: InlineSpan[]): string | undefined {
+  if (spans.length !== 1) return undefined;
+  const span = spans[0];
   return span.kind === "link" && classifyLinkHref(span.href) === "feed"
     ? span.href.slice("feed:".length)
     : undefined;
@@ -42,39 +26,9 @@ export function calendarFeedUrl(node: GraphNode): string | undefined {
 // is a machine embed. A plain feed link keeps its calendar dress but
 // projects nothing.
 export function embeddedFeedUrl(node: GraphNode): string | undefined {
-  return node.extraAttrs?.embed === "true" ? calendarFeedUrl(node) : undefined;
-}
-
-export function calendarEntryTarget(
-  node: GraphNode | undefined
-): ID | undefined {
-  if (!node || node.spans.length !== 1) return undefined;
-  const span = node.spans[0];
-  return span.kind === "link" && classifyLinkHref(span.href) === "calendar"
-    ? span.href.slice(1)
+  return node.extraAttrs?.embed === "true"
+    ? feedUrlInSpans(node.spans)
     : undefined;
-}
-
-export function isCalendarEntryPlacement(
-  node: GraphNode,
-  parent: GraphNode | undefined
-): boolean {
-  return (
-    calendarEntryTarget(node) !== undefined &&
-    !!parent &&
-    !!calendarFeedUrl(parent)
-  );
-}
-
-export function calendarEntryEditedSpans(
-  node: GraphNode,
-  editedID: ID,
-  spans: InlineSpan[]
-): InlineSpan[] {
-  const target = calendarEntryTarget(node);
-  return target && isCalendarEntryId(editedID) && node.id !== editedID
-    ? [{ kind: "link", href: `#${target}`, text: spansText(spans) }]
-    : spans;
 }
 
 export function isBareIcalFeedUrl(text: string): boolean {
@@ -86,16 +40,64 @@ export function isBareIcalFeedUrl(text: string): boolean {
   return text.trim() === url;
 }
 
+export function bareFeedUrlIn(spans: InlineSpan[]): string | undefined {
+  if (spans.some((span) => span.kind !== "text")) {
+    return undefined;
+  }
+  const text = spansText(spans).trim();
+  return isBareIcalFeedUrl(text) ? text : undefined;
+}
+
+function isPrivateHost(hostname: string): boolean {
+  const host = hostname.replace(/^\[|\]$/gu, "").toLowerCase();
+  if (
+    host === "localhost" ||
+    host.endsWith(".localhost") ||
+    host === "0.0.0.0"
+  ) {
+    return true;
+  }
+  if (host.includes(":")) {
+    return host === "::1" || host.startsWith("fe80:") || /^f[cd]/u.test(host);
+  }
+  const v4 = host.match(/^(\d+)\.(\d+)\.\d+\.\d+$/u);
+  if (!v4) {
+    return false;
+  }
+  const [a, b] = [Number(v4[1]), Number(v4[2])];
+  return (
+    a === 127 ||
+    a === 10 ||
+    a === 0 ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168) ||
+    (a === 169 && b === 254)
+  );
+}
+
+export function assertFetchableFeedUrl(url: string): void {
+  const parsed = new URL(url.replace(/^webcal:\/\//u, "https://"));
+  if (parsed.protocol !== "https:") {
+    throw new Error(`refusing non-https feed: ${url}`);
+  }
+  if (parsed.username || parsed.password) {
+    throw new Error(`refusing feed url with credentials: ${url}`);
+  }
+  if (isPrivateHost(parsed.hostname)) {
+    throw new Error(`refusing private feed host: ${url}`);
+  }
+}
+
 export function calendarFeedHref(url: string): string {
-  return `feed:${url.trim().replace(/^webcal:\/\//iu, "https://")}`;
+  return `feed:${url
+    .trim()
+    .replace(/^webcal:\/\//iu, "https://")
+    .replace(/^https?:\/\//iu, (scheme) => scheme.toLowerCase())}`;
 }
 
-export function icalFeedLinkText(url: string, label?: string): string {
-  return `[${label ?? url}](${calendarFeedHref(url)})`;
-}
-
-export function displayTextOf(text: string): string {
-  return icalFeedLinkPartsOf(text)?.label ?? text;
+export function feedLinkSpans(url: string): InlineSpan[] {
+  const text = url.trim();
+  return [{ kind: "link", href: calendarFeedHref(text), text }];
 }
 
 // A projected calendar entry: the literal-VEVENT subset of the machine-feeds
@@ -236,7 +238,11 @@ export function parseIcalFeed(content: string): IcalEntry[] {
     } else if (name === "DTSTART") {
       current.dtstart = value.trim();
       current.allDay = nameAndParams.toUpperCase().includes("VALUE=DATE");
-    } else if (name === "RRULE" || name === "RDATE") {
+    } else if (
+      name === "RRULE" ||
+      name === "RDATE" ||
+      name === "RECURRENCE-ID"
+    ) {
       current.recurring = true;
     }
   });
@@ -260,86 +266,6 @@ export function parseIcalFeed(content: string): IcalEntry[] {
     .map(({ entry }) => entry);
 }
 
-export type CalendarMergeItem =
-  | { kind: "child"; childId: string }
-  | { kind: "projection"; entry: IcalEntry };
-
-function startOfDay(nowMs: number): number {
-  const now = new Date(nowMs);
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-}
-
-// Pastness is a fact about the node's type, never a judgment: calendar
-// entries render date-aware because of what they ARE (like entities render
-// violet), and the user's judgments stay human-only.
-export function isPastIcalEntry(entry: IcalEntry, nowMs: number): boolean {
-  if (entry.startMs === undefined) {
-    return false;
-  }
-  return entry.startMs < startOfDay(nowMs);
-}
-
-// Interleaves untouched projections with the calendar node's actual
-// children: your arrangement wins where you arranged (children keep
-// document order), the feed owns what you left alone (each untouched
-// projection rides after its nearest materialized feed predecessor;
-// projections before any materialized entry lead the list). With nothing
-// materialized this is pure feed order.
-// hidePastBefore: bare past entries (past AND not materialized) don't
-// project — the past stays in the feed; the file, when touched, stays
-// visible. Materialized entries always pass; they are file truth and they
-// anchor the projections that follow them.
-export function mergeProjectedEntries(
-  childIds: readonly string[],
-  entries: readonly IcalEntry[],
-  hidePastBefore?: number
-): CalendarMergeItem[] {
-  const childIdSet = new Set(childIds);
-  const projectable =
-    hidePastBefore === undefined
-      ? entries
-      : entries.filter(
-          (entry) =>
-            childIdSet.has(entry.id) || !isPastIcalEntry(entry, hidePastBefore)
-        );
-  const leading: IcalEntry[] = [];
-  const anchored = new Map<string, IcalEntry[]>();
-  let anchor: string | undefined;
-  projectable.forEach((entry) => {
-    if (childIdSet.has(entry.id)) {
-      anchor = entry.id;
-      return;
-    }
-    if (anchor === undefined) {
-      leading.push(entry);
-    } else {
-      anchored.set(anchor, [...(anchored.get(anchor) ?? []), entry]);
-    }
-  });
-  const items: CalendarMergeItem[] = leading.map((entry) => ({
-    kind: "projection",
-    entry,
-  }));
-  const entryIds = new Set(entries.map((entry) => entry.id));
-  // Anchored projections emit after the anchor's SEGMENT — the anchor
-  // child plus its consecutive non-entry children (notes dropped right
-  // after an entry stay right after it; the next projection follows the
-  // segment, still after its feed predecessor).
-  let pending: IcalEntry[] = [];
-  childIds.forEach((childId) => {
-    if (entryIds.has(childId) && pending.length > 0) {
-      pending.forEach((entry) => items.push({ kind: "projection", entry }));
-      pending = [];
-    }
-    items.push({ kind: "child", childId });
-    if (anchored.has(childId)) {
-      pending = [...pending, ...(anchored.get(childId) ?? [])];
-    }
-  });
-  pending.forEach((entry) => items.push({ kind: "projection", entry }));
-  return items;
-}
-
 function pad2(value: number): string {
   return String(value).padStart(2, "0");
 }
@@ -361,30 +287,60 @@ export function icalEntryDisplayText(entry: IcalEntry): string {
   return `${day}${time} ${entry.summary}`.trim();
 }
 
-const ICAL_ROW_DATE_RE = /^(\d{2})\.(\d{2})\.(\d{4})/u;
-
-export function isPastCalendarRowText(text: string, nowMs: number): boolean {
-  const match = text.match(ICAL_ROW_DATE_RE);
-  if (!match) {
-    return false;
-  }
-  const dateMs = new Date(
-    Number(match[3]),
-    Number(match[2]) - 1,
-    Number(match[1])
-  ).getTime();
-  return dateMs < startOfDay(nowMs);
+export function calendarIdOf(url: string): ID {
+  return `feed:${url}`;
 }
 
-// The count behind the feed row's past chip: bare past entries currently
-// hidden from projection.
-export function hiddenPastEntryCount(
-  childIds: readonly string[],
-  entries: readonly IcalEntry[],
-  nowMs: number
-): number {
-  const childIdSet = new Set(childIds);
-  return entries.filter(
-    (entry) => !childIdSet.has(entry.id) && isPastIcalEntry(entry, nowMs)
-  ).length;
+function calendarNode(url: string, entries: IcalEntry[]): GraphNode {
+  const id = calendarIdOf(url);
+  return {
+    children: List<ID>(entries.map((entry) => entry.id)),
+    id,
+    spans: [{ kind: "link", href: id, text: url }],
+    updated: 0,
+    root: id,
+    relevance: undefined,
+  };
+}
+
+function eventNode(calendarId: ID, entry: IcalEntry): GraphNode {
+  return {
+    children: List<ID>(),
+    id: entry.id,
+    spans: plainSpans(icalEntryDisplayText(entry)),
+    parent: calendarId,
+    updated: 0,
+    root: calendarId,
+    relevance: undefined,
+  };
+}
+
+export function computedNodesFromFeeds(
+  feeds: Map<string, IcalEntry[]>
+): Map<ID, GraphNode> {
+  return Map<ID, GraphNode>(
+    feeds
+      .entrySeq()
+      .toArray()
+      .flatMap(([url, entries]): [ID, GraphNode][] => [
+        [calendarIdOf(url), calendarNode(url, entries)],
+        ...entries.map((entry): [ID, GraphNode] => [
+          entry.id,
+          eventNode(calendarIdOf(url), entry),
+        ]),
+      ])
+  );
+}
+
+export function loadedFeedUrls(
+  data: Pick<Data, "knowledgeDBs" | "graphIndex">
+): string[] {
+  return [
+    ...new Set(
+      allKnownNodes(data).flatMap((node) => {
+        const url = embeddedFeedUrl(node);
+        return url ? [url] : [];
+      })
+    ),
+  ];
 }

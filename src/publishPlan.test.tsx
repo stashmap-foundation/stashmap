@@ -163,6 +163,38 @@ test("marker created under a parent becomes a link row, never a duplicate", () =
   ).toBeUndefined();
 });
 
+test("a bare feed url becomes a real feed link row on every write path", () => {
+  const { plan, rootId } = planWithEssay();
+  const parent = plan.knowledgeDBs.get(LOCAL)?.nodes.get(rootId);
+  if (!parent) {
+    throw new Error("parent missing");
+  }
+  const url = "https://x.org/salon.ics";
+  const pasted = planPasteMarkdownTrees(
+    plan,
+    parseTextToTrees(`Notes\n${url}`),
+    parent,
+    0
+  );
+  const [added] = planAddToParent(pasted, { text: ` ${url} ` }, rootId);
+  const feedRows = added.knowledgeDBs
+    .get(LOCAL)
+    ?.nodes.valueSeq()
+    .filter((node) =>
+      node.spans.some(
+        (span) => span.kind === "link" && span.href === `feed:${url}`
+      )
+    )
+    .toArray();
+  expect(feedRows?.length).toBe(2);
+  feedRows?.forEach((node) => {
+    expect(node.spans).toEqual([
+      { kind: "link", href: `feed:${url}`, text: url },
+    ]);
+    expect(node.extraAttrs?.embed).toBe("true");
+  });
+});
+
 test("link placements contribute real-world entities", () => {
   const { plan, docId, rootId } = planWithEssay();
   const parent = plan.knowledgeDBs.get(LOCAL)?.nodes.get(rootId);

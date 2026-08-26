@@ -2,7 +2,6 @@
 import { List, Set, Map } from "immutable";
 import { SEARCH_PREFIX } from "./constants";
 import { nodeText } from "./nodeSpans";
-import { displayTextOf } from "./ical";
 
 export const EMPTY_NODE_ID: ID = "";
 
@@ -161,8 +160,8 @@ export function nodePathLabel(
   return getNodeContext(knowledgeDBs, node, sourceId)
     .map((nodeID) => getNode(knowledgeDBs, nodeID, sourceId))
     .filter((pathNode): pathNode is GraphNode => pathNode !== undefined)
-    .map((pathNode) => displayTextOf(nodeText(pathNode)))
-    .push(displayTextOf(nodeText(node)))
+    .map((pathNode) => nodeText(pathNode))
+    .push(nodeText(node))
     .filter((label) => label !== "")
     .join(" / ");
 }

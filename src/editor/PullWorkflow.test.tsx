@@ -3,7 +3,7 @@ import os from "os";
 import path from "path";
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { BOB, expectTree, renderApp, setup } from "../utils.test";
+import { BOB, expectTree, renderApp, setup, type } from "../utils.test";
 import { renderAppTree } from "../appTestUtils.test";
 import {
   expectMarkdown,
@@ -283,6 +283,194 @@ Barcelona
   expect(
     relayPool.getEvents().filter((event) => event.pubkey === BOB.publicKey)
   ).toHaveLength(0);
+});
+
+test("a feed present only in a pulled document projects its entries", async () => {
+  const relayPool = mockRelayPool();
+  const url = "https://scholarium.at/salon.ics";
+  const alicePath = await workspaceWithDocument(
+    "salon.md",
+    [
+      "---",
+      "knowstr_doc_id: alice-salon",
+      "---",
+      "# Alice Salon <!-- id:alice-root -->",
+      "- [Barcelona](#wd:Q1492) <!-- id:alice-link -->",
+      `- [${url}](feed:${url}) <!-- id:alice-feed embed="true" -->`,
+      "",
+    ].join("\n")
+  );
+  const fetchCalendarFeed = jest.fn(() =>
+    Promise.resolve(
+      [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "BEGIN:VEVENT",
+        "UID:sommerfest@scholarium.at",
+        "DTSTART;VALUE=DATE:20300714",
+        "SUMMARY:Sommerfest",
+        "END:VEVENT",
+        "END:VCALENDAR",
+      ].join("\r\n")
+    )
+  );
+  const [bob] = setup([BOB], { relayPool });
+  renderApp({
+    ...bob(),
+    roomRelays: [RELAY_URL],
+    initialRoute: "/local/n/wd%3AQ1492?label=Barcelona",
+    fetchCalendarFeed,
+  });
+
+  await publishDepositFixture(
+    relayPool,
+    alicePath,
+    "salon.md",
+    "alice-salon",
+    "Alice Salon"
+  );
+
+  const incomingLink = await screen.findByRole("link", {
+    name: /Navigate to Alice Salon/u,
+  });
+  await userEvent.click(incomingLink);
+  await screen.findByText("READONLY");
+  await waitFor(() => expect(fetchCalendarFeed).toHaveBeenCalledWith(url));
+
+  await userEvent.click(await screen.findByLabelText(`expand ${url}`));
+  await screen.findByText("14.07.2030 Sommerfest");
+  expect(fetchCalendarFeed).toHaveBeenCalledWith(url);
+});
+
+test("a pulled authored node shadows its computed event on the entity surface", async () => {
+  const relayPool = mockRelayPool();
+  const url = "https://scholarium.at/salon.ics";
+  const alicePath = await workspaceWithDocument(
+    "salon.md",
+    [
+      "---",
+      "knowstr_doc_id: alice-salon",
+      "---",
+      "# Alice Salon <!-- id:alice-root -->",
+      "- [Barcelona](#wd:Q1492) <!-- id:alice-link -->",
+      "- Sommerfest planning <!-- id:ical:sommerfest@scholarium.at -->",
+      "",
+    ].join("\n")
+  );
+  const fetchCalendarFeed = jest.fn(() =>
+    Promise.resolve(
+      [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "BEGIN:VEVENT",
+        "UID:sommerfest@scholarium.at",
+        "DTSTART;VALUE=DATE:20300714",
+        "SUMMARY:Sommerfest",
+        "END:VEVENT",
+        "END:VCALENDAR",
+      ].join("\r\n")
+    )
+  );
+  const readText = jest.fn(() =>
+    Promise.resolve("[event](#ical:sommerfest@scholarium.at)")
+  );
+  // eslint-disable-next-line functional/immutable-data
+  Object.defineProperty(navigator, "clipboard", {
+    value: { readText },
+    writable: true,
+    configurable: true,
+  });
+  const [bob] = setup([BOB], { relayPool });
+  renderApp({
+    ...bob(),
+    roomRelays: [RELAY_URL],
+    initialRoute: "/local/n/wd%3AQ1492?label=Barcelona",
+    fetchCalendarFeed,
+  });
+
+  await publishDepositFixture(
+    relayPool,
+    alicePath,
+    "salon.md",
+    "alice-salon",
+    "Alice Salon"
+  );
+  await screen.findByRole("link", { name: /Navigate to Alice Salon/u });
+
+  await userEvent.click(screen.getByLabelText("Open new pane"));
+  await type("Mine{Enter}{Tab}https://scholarium.at/salon.ics{Escape}");
+  await waitFor(() => expect(fetchCalendarFeed).toHaveBeenCalledWith(url));
+  await userEvent.click(screen.getByRole("treeitem", { name: "Mine" }));
+  await userEvent.keyboard("{Meta>}v{/Meta}");
+  await userEvent.click(await screen.findByRole("link", { name: "event" }));
+
+  await screen.findByRole("textbox", { name: "edit Sommerfest planning" });
+  expect(screen.queryByText("14.07.2030 Sommerfest")).toBeNull();
+});
+
+test("a direct embed in a pulled document yields to the reader's authored node", async () => {
+  const relayPool = mockRelayPool();
+  const url = "https://scholarium.at/salon.ics";
+  const bobPath = await fixedWorkspaceWithDocument(
+    BOB,
+    "bob-notes.md",
+    [
+      "# Bob Notes <!-- id:bob-notes -->",
+      "- Sommerfest planning <!-- id:ical:sommerfest@scholarium.at -->",
+      "",
+    ].join("\n")
+  );
+  const alicePath = await workspaceWithDocument(
+    "salon.md",
+    [
+      "---",
+      "knowstr_doc_id: alice-salon",
+      "---",
+      "# Alice Salon <!-- id:alice-root -->",
+      "- [Barcelona](#wd:Q1492) <!-- id:alice-link -->",
+      `- [cal](feed:${url}) <!-- id:alice-feed embed="true" -->`,
+      '- [event](#ical:sommerfest@scholarium.at) <!-- id:alice-event embed="true" -->',
+      "",
+    ].join("\n")
+  );
+  const fetchCalendarFeed = jest.fn(() =>
+    Promise.resolve(
+      [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "BEGIN:VEVENT",
+        "UID:sommerfest@scholarium.at",
+        "DTSTART;VALUE=DATE:20300714",
+        "SUMMARY:Sommerfest",
+        "END:VEVENT",
+        "END:VCALENDAR",
+      ].join("\r\n")
+    )
+  );
+  await renderAppTree({
+    path: bobPath,
+    relayPool,
+    initialRoute: "/local/n/wd%3AQ1492?label=Barcelona",
+    fetchCalendarFeed,
+  });
+
+  await publishDepositFixture(
+    relayPool,
+    alicePath,
+    "salon.md",
+    "alice-salon",
+    "Alice Salon"
+  );
+
+  const incomingLink = await screen.findByRole("link", {
+    name: /Navigate to Alice Salon/u,
+  });
+  await userEvent.click(incomingLink);
+  await screen.findByText("READONLY");
+  await waitFor(() => expect(fetchCalendarFeed).toHaveBeenCalledWith(url));
+
+  expect(await screen.findAllByText("Sommerfest planning")).not.toHaveLength(0);
+  expect(screen.queryByText("14.07.2030 Sommerfest")).toBeNull();
 });
 
 test("accepting remote incoming on an unmaterialized entity keeps bidirectional arrow", async () => {

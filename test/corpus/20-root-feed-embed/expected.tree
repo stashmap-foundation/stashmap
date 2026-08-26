@@ -1,0 +1,4 @@
+https://example.org/salon.ics <!-- id:o0 -->
+  01.01.9999 Standup <!-- base:ical:standup@example.org -->
+  02.01.9999 Retro <!-- base:ical:retro@example.org -->
+  Note <!-- id:l1 -->

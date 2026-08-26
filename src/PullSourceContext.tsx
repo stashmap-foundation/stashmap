@@ -204,7 +204,6 @@ export function PullSourceProvider({
       documents={data.documents.merge(overlayDocuments)}
       documentByFilePath={data.documentByFilePath}
       publishEventsStatus={data.publishEventsStatus}
-      calendarFeeds={data.calendarFeeds}
       pull={pull}
       views={data.views}
       panes={data.panes}

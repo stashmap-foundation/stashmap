@@ -9,7 +9,7 @@ import {
   knowstrSave,
   write,
 } from "../testFixtures/workspace";
-import { findNewNodeEditor } from "../utils.test";
+import { findNewNodeEditor, placeCursorAtEnd } from "../utils.test";
 
 function wikidataResponse(payload: unknown): Response {
   return new Response(JSON.stringify(payload), { status: 200 });
@@ -122,15 +122,6 @@ async function chooseBarcelona(): Promise<void> {
       name: "Insert entity Barcelona wd:Q1492",
     })
   );
-}
-
-function placeCursorAtEnd(element: HTMLElement): void {
-  const range = document.createRange();
-  range.selectNodeContents(element);
-  range.collapse(false);
-  const selection = window.getSelection();
-  selection?.removeAllRanges();
-  selection?.addRange(range);
 }
 
 async function openNotesChildEditor(): Promise<HTMLElement> {

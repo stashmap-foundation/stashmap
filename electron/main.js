@@ -21,6 +21,7 @@ const {
 } = require("../dist/electronMain/recentWorkspaces");
 // eslint-disable-next-line import/no-unresolved
 const { convertInputToPrivateKey } = require("../dist/nostrKey");
+const { assertFetchableFeedUrl } = require("../dist/core/ical");
 // eslint-disable-next-line import/no-unresolved
 const {
   createWorkspaceRuntime,
@@ -283,20 +284,36 @@ function createWindow() {
 
 app.whenReady().then(() => {
   // Calendar feeds fetch in the main process: no CORS in Node, and the
-  // renderer never gets network powers beyond this one text fetch.
+  // renderer never gets network powers beyond this one text fetch. The
+  // url and every redirect hop must pass the shared feed-url validation.
   ipcMain.handle("net:fetch-text", async (_event, url) => {
-    const target = String(url).replace(/^webcal:\/\//u, "https://");
-    const parsed = new URL(target);
-    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
-      throw new Error("unsupported scheme");
+    const MAX_REDIRECTS = 5;
+    const MAX_BYTES = 2 * 1024 * 1024;
+    let target = String(url).replace(/^webcal:\/\//u, "https://");
+    for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
+      assertFetchableFeedUrl(target);
+      const response = await fetch(new URL(target), {
+        signal: AbortSignal.timeout(10000),
+        redirect: "manual",
+      });
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get("location");
+        if (!location) {
+          throw new Error(`status ${response.status}`);
+        }
+        target = new URL(location, target).toString();
+        continue;
+      }
+      if (!response.ok) {
+        throw new Error(`status ${response.status}`);
+      }
+      const body = await response.text();
+      if (body.length > MAX_BYTES) {
+        throw new Error("feed too large");
+      }
+      return body;
     }
-    const response = await fetch(parsed, {
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!response.ok) {
-      throw new Error(`status ${response.status}`);
-    }
-    return response.text();
+    throw new Error("too many redirects");
   });
   ipcMain.handle("workspace:load", async () => loadCurrentWorkspace());
   ipcMain.handle("workspace:pickFolder", async () => pickWorkspaceFolder());

@@ -3,6 +3,14 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 /* eslint-enable import/no-extraneous-dependencies */
 
+export function firePaste(element: HTMLElement, text: string): void {
+  const clipboardData = {
+    getData: () => text,
+  };
+  // eslint-disable-next-line testing-library/prefer-user-event
+  fireEvent.paste(element, { clipboardData });
+}
+
 export function getSelectedNodes(): string[] {
   return Array.from(
     document.querySelectorAll('.item[data-selected="true"]')

@@ -7,7 +7,6 @@ import {
 } from "./core/connections";
 import { getAllLinks } from "./core/nodeSpans";
 import { fileLinkIndexKey } from "./core/linkPath";
-import { isCalendarEntryPlacement } from "./core/ical";
 import { LOG_ROOT_ROLE } from "./core/systemRoots";
 import { findReciprocalLinkItem } from "./buildReferenceRow";
 import {
@@ -17,7 +16,7 @@ import {
   graphLookupFromData,
   linkSpeaker,
   lookupNodes,
-  parentOf,
+  resolveAuthoredFirst,
 } from "./core/graphLookup";
 import { nodeRefKey } from "./core/nodeRef";
 
@@ -194,16 +193,10 @@ export function getIncomingCrefsForNode(
   const firstCurrent = current.first();
   const target = (() => {
     if (currentNodeID) {
-      return getNodeInSource(graph, {
-        sourceId: itemsSourceId,
-        id: currentNodeID,
-      });
+      return resolveAuthoredFirst(graph, currentNodeID, itemsSourceId);
     }
     return firstCurrent
-      ? {
-          ref: { sourceId: itemsSourceId, id: firstCurrent.id },
-          node: firstCurrent,
-        }
+      ? getNodeInSource(graph, { sourceId: itemsSourceId, id: firstCurrent.id })
       : undefined;
   })();
 
@@ -235,10 +228,6 @@ export function getIncomingCrefsForNode(
     // A reference the view is currently looking through — its carrying
     // row sits on the active expansion path — never queues under itself.
     .filter((source) => !expansionPath.includes(source.node.id))
-    .filter(
-      (source) =>
-        !isCalendarEntryPlacement(source.node, parentOf(graph, source)?.node)
-    )
     .filter(
       (source) =>
         target === undefined ||

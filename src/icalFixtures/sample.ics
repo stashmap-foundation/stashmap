@@ -24,6 +24,12 @@ RRULE:FREQ=WEEKLY;COUNT=10
 SUMMARY:Recurring seminar (skipped in v1)
 END:VEVENT
 BEGIN:VEVENT
+UID:weekly@scholarium.at
+RECURRENCE-ID;TZID=Europe/Vienna:20260908T190000
+DTSTART;TZID=Europe/Vienna:20260908T200000
+SUMMARY:Moved instance (skipped in v1)
+END:VEVENT
+BEGIN:VEVENT
 UID:no start uid
 SUMMARY:Undated entry sorts last
 END:VEVENT

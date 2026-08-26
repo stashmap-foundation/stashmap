@@ -3,7 +3,13 @@ import { LOCAL } from "../core/nodeRef";
 import { parseToDocumentPreservingExplicitIds } from "../core/Document";
 import { accessibleLineText } from "../core/markdownTree";
 import { spansToMarkdown } from "../core/nodeSpans";
-import { GraphLookup, lookupNode } from "../core/graphLookup";
+import {
+  IcalEntry,
+  computedNodesFromFeeds,
+  embeddedFeedUrl,
+  parseIcalFeed,
+} from "../core/ical";
+import { graphLookupFromData, lookupNode } from "../core/graphLookup";
 import { createEmptyGraphIndex } from "../graphIndex";
 import { Showing, showingTreeForRoot } from "../showings";
 import { getNodesInTree } from "../treeTraversal";
@@ -53,32 +59,69 @@ function printRow(row: Row): string {
 function parseFixture(
   files: { name: string; content: string }[],
   openName: string
-): { nodes: Map<ID, GraphNode>; topNodeShortIds: string[] } {
-  const parsed = files.map(({ name, content }) => ({
-    name,
-    ...parseToDocumentPreservingExplicitIds(LOCAL, content, {
-      docIdFallback: `doc-${name}`,
-      updatedMsOverride: 0,
-    }),
-  }));
+): {
+  nodes: Map<ID, GraphNode>;
+  topNodeShortIds: string[];
+  calendarFeeds: Map<string, IcalEntry[]>;
+} {
+  const parsed = files
+    .filter(({ name }) => name.endsWith(".md"))
+    .map(({ name, content }) => ({
+      name,
+      ...parseToDocumentPreservingExplicitIds(LOCAL, content, {
+        docIdFallback: `doc-${name}`,
+        updatedMsOverride: 0,
+      }),
+    }));
   const open = parsed.find(({ name }) => name === openName);
   if (!open) {
     throw new Error(`Missing fixture file: ${openName}`);
   }
+  const nodes = parsed.reduce(
+    (acc, { nodes: fileNodes }) => acc.merge(fileNodes),
+    Map<ID, GraphNode>()
+  );
+  const feedFile = files.find(({ name }) => name.endsWith(".ics"));
+  const feedUrls = ImmutableSet(
+    nodes
+      .valueSeq()
+      .toArray()
+      .flatMap((node) => {
+        const url = embeddedFeedUrl(node);
+        return url ? [url] : [];
+      })
+  );
+  if (feedFile && feedUrls.size > 1) {
+    throw new Error(
+      "Fixture embeds several feed URLs but carries one feed.ics"
+    );
+  }
+  const calendarFeeds = feedFile
+    ? Map<string, IcalEntry[]>(
+        feedUrls
+          .toArray()
+          .map((url): [string, IcalEntry[]] => [
+            url,
+            parseIcalFeed(feedFile.content),
+          ])
+      )
+    : Map<string, IcalEntry[]>();
   return {
-    nodes: parsed.reduce(
-      (acc, { nodes: fileNodes }) => acc.merge(fileNodes),
-      Map<ID, GraphNode>()
-    ),
+    nodes,
     topNodeShortIds: open.document.topNodeShortIds,
+    calendarFeeds,
   };
 }
 
-function fixtureData(nodes: Map<ID, GraphNode>): Data {
+function fixtureData(
+  nodes: Map<ID, GraphNode>,
+  calendarFeeds: Map<string, IcalEntry[]>
+): Data {
   return {
     user: undefined,
     knowledgeDBs: Map<SourceId, KnowledgeData>([[LOCAL, { nodes }]]),
     graphIndex: createEmptyGraphIndex(),
+    computedNodes: computedNodesFromFeeds(calendarFeeds),
     documents: Map(),
     documentByFilePath: Map(),
     publishEventsStatus: {
@@ -122,13 +165,16 @@ function composeFixtureShowings(
   files: { name: string; content: string }[],
   openName: string
 ): Showing[] {
-  const { nodes, topNodeShortIds } = parseFixture(files, openName);
-  const graph: GraphLookup = {
+  const { nodes, topNodeShortIds, calendarFeeds } = parseFixture(
+    files,
+    openName
+  );
+  const graph = graphLookupFromData({
+    user: undefined,
     knowledgeDBs: Map<SourceId, KnowledgeData>([[LOCAL, { nodes }]]),
     graphIndex: createEmptyGraphIndex(),
-    localSourceId: LOCAL,
-    sourceOrder: [LOCAL],
-  };
+    computedNodes: computedNodesFromFeeds(calendarFeeds),
+  });
   return topNodeShortIds.flatMap((topNodeShortId) => {
     const resolved = lookupNode(graph, topNodeShortId, LOCAL);
     return resolved ? [showingTreeForRoot(graph, resolved)] : [];
@@ -148,9 +194,12 @@ export function composeFixtureTree(
   files: { name: string; content: string }[],
   openName: string
 ): string {
-  const { nodes, topNodeShortIds } = parseFixture(files, openName);
+  const { nodes, topNodeShortIds, calendarFeeds } = parseFixture(
+    files,
+    openName
+  );
   const { rows } = getNodesInTree(
-    fixtureData(nodes),
+    fixtureData(nodes, calendarFeeds),
     List<ViewPath>(topNodeShortIds.map((id): ViewPath => [0, id])),
     undefined,
     LOCAL,

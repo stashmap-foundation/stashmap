@@ -11,7 +11,6 @@ import {
 } from "../rowModel";
 import { useData } from "../DataContext";
 import { isEmptyNodeID } from "../core/connections";
-import { calendarEntryTarget } from "../core/ical";
 import { searchInsertTarget } from "../localSearch";
 import { NOTE_TYPE, Node } from "./Node";
 import { useDroppable, clearDropIndent } from "./DroppableContainer";
@@ -98,7 +97,6 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
           text: displayText,
           isCopyDrag: copyDrag || undefined,
           nodeId: dragNodeId,
-          targetId: calendarEntryTarget(row.node),
           insertTarget:
             row.materialize?.take ??
             (virtualType === "search"
@@ -206,21 +204,6 @@ export function ListItem({
     rows,
     paneIndex,
   });
-
-  // Action rows are buttons in row position: one interaction (click) —
-  // no drag, no drop, no keyboard row focus. As the first virtual row
-  // they carry the footer's dotted separator.
-  if (row.action) {
-    return (
-      <div
-        className={`visible-on-hover${
-          row.isFirstVirtual ? " first-virtual" : ""
-        }`}
-      >
-        <Node rows={rows} />
-      </div>
-    );
-  }
 
   if (!isReadonly && !isCopyDrag && !isEmptyNode) {
     drop(ref);

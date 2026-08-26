@@ -1,5 +1,4 @@
 import { List, Set } from "immutable";
-import { displayTextOf } from "./core/ical";
 import { nodeText } from "./core/nodeSpans";
 import { getDocumentForNode } from "./core/Document";
 import { isCanonicalId } from "./core/entityRecognition";
@@ -72,9 +71,9 @@ function buildReference(
   refId: ID,
   ref: ParsedRef
 ): NonNullable<Row["reference"]> {
-  const targetLabel = displayTextOf(nodeText(ref.node));
+  const targetLabel = nodeText(ref.node);
   const contextLabels = ref.contextNodes
-    .map((node) => displayTextOf(nodeText(node)))
+    .map((node) => nodeText(node))
     .toArray()
     .filter(
       (label, index, labels) =>

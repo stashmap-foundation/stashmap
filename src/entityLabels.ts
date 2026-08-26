@@ -1,8 +1,4 @@
-import {
-  IcalEntry,
-  icalEntryDisplayText,
-  isCalendarEntryId,
-} from "./core/ical";
+import { isCalendarEntryId } from "./core/ical";
 import { getDesktopBridge } from "./runtimeEnvironment";
 
 export type EntityPickerCandidate = {
@@ -191,18 +187,4 @@ export function retryAfterUntilMs(
 
 export function defaultEntitySurfaceTitle(id: string): string {
   return isCalendarEntryId(id) ? `Date ${id}` : `Entity ${id}`;
-}
-
-export function calendarEntryLabel(
-  id: string,
-  feeds: readonly (readonly IcalEntry[])[]
-): string | undefined {
-  const labels = unique(
-    feeds.flatMap((entries) =>
-      entries
-        .filter((entry) => entry.id === id)
-        .map((entry) => icalEntryDisplayText(entry))
-    )
-  );
-  return labels.length === 1 ? labels[0] : undefined;
 }

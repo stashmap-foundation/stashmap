@@ -1,4 +1,4 @@
-import { IcalEntry, parseIcalFeed } from "./core/ical";
+import { IcalEntry, assertFetchableFeedUrl, parseIcalFeed } from "./core/ical";
 import { getDesktopBridge } from "./runtimeEnvironment";
 
 export type CalendarFeedFetcher = (url: string) => Promise<string>;
@@ -37,24 +37,10 @@ export function defaultCalendarFeedFetcher(): CalendarFeedFetcher {
   };
 }
 
-const lastGood = new Map<string, IcalEntry[]>();
-
-// The projection read path: fetch, parse, remember the last good result.
-// Failure returns the stale projection when one exists — refresh never
-// loses data — and throws only when there is nothing to show at all.
 export async function fetchCalendarEntries(
   url: string,
   fetcher: CalendarFeedFetcher = defaultCalendarFeedFetcher()
 ): Promise<IcalEntry[]> {
-  try {
-    const entries = parseIcalFeed(await fetcher(url));
-    lastGood.set(url, entries);
-    return entries;
-  } catch (error) {
-    const stale = lastGood.get(url);
-    if (stale) {
-      return stale;
-    }
-    throw error;
-  }
+  assertFetchableFeedUrl(url);
+  return parseIcalFeed(await fetcher(url));
 }

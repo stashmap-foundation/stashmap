@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   ALICE,
@@ -12,6 +12,7 @@ import {
 import {
   clickRow,
   expectTargets,
+  firePaste,
   getSelectedNodes,
   modClick,
 } from "./Multiselect.testUtils";
@@ -195,14 +196,6 @@ describe("Copy to clipboard", () => {
     expect(mockWriteText).toHaveBeenCalledWith("A\n\tA1\n\t\tA1a\nB");
   });
 });
-
-function firePaste(element: HTMLElement, text: string): void {
-  const clipboardData = {
-    getData: () => text,
-  };
-  // eslint-disable-next-line testing-library/prefer-user-event
-  fireEvent.paste(element, { clipboardData });
-}
 
 describe("Paste in normal mode (Cmd+V)", () => {
   const mockReadText = jest.fn();

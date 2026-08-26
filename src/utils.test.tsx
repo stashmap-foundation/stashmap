@@ -31,7 +31,7 @@ import { Backend } from "./BackendContext";
 import { NostrBackendProvider } from "./infra/nostr/NostrBackendProvider";
 import { NostrDataProvider } from "./infra/nostr/NostrDataProvider";
 import { App } from "./App";
-import { DataContextProps } from "./DataContext";
+import { CalendarFeedProvider } from "./CalendarFeedContext";
 import {
   MockRelayPool,
   mockRelayPool,
@@ -241,7 +241,7 @@ export type UpdateState = () => TestAppState;
 
 type TestAppState = TestDataProps & TestApis;
 
-type TestDataProps = DataContextProps;
+type TestDataProps = Data;
 
 const DEFAULT_DATA_CONTEXT_PROPS: TestDataProps = {
   user: ALICE,
@@ -249,6 +249,7 @@ const DEFAULT_DATA_CONTEXT_PROPS: TestDataProps = {
   graphIndex: createEmptyGraphIndex(),
   documents: Map(),
   documentByFilePath: Map(),
+  computedNodes: Map(),
   publishEventsStatus: {
     isLoading: false,
     unsignedEvents: List<UnsignedEvent & EventAttachment>(),
@@ -299,7 +300,7 @@ export function setup(
 type ProviderComponent = React.ComponentType<{ children: React.ReactNode }>;
 
 type RenderApis = Partial<TestApis> &
-  Partial<DataContextProps> & {
+  Partial<TestDataProps> & {
     initialRoute?: string;
     user?: User;
     storageRelays?: Array<string>;
@@ -489,15 +490,17 @@ export function renderApis(
       >
         <BackendProviderComponent>
           <AuthProvider>
-            <DataProviderComponent>
-              <PaneIndexProvider index={0}>
-                <TestListViewportContext.Provider
-                  value={{ viewportHeight: 10000, itemHeight: 100 }}
-                >
-                  {children}
-                </TestListViewportContext.Provider>
-              </PaneIndexProvider>
-            </DataProviderComponent>
+            <CalendarFeedProvider>
+              <DataProviderComponent>
+                <PaneIndexProvider index={0}>
+                  <TestListViewportContext.Provider
+                    value={{ viewportHeight: 10000, itemHeight: 100 }}
+                  >
+                    {children}
+                  </TestListViewportContext.Provider>
+                </PaneIndexProvider>
+              </DataProviderComponent>
+            </CalendarFeedProvider>
           </AuthProvider>
         </BackendProviderComponent>
       </ApiProvider>
@@ -602,6 +605,15 @@ export function renderWithTestData(
  */
 export async function findNewNodeEditor(): Promise<HTMLElement> {
   return screen.findByRole("textbox", { name: "new node editor" });
+}
+
+export function placeCursorAtEnd(element: HTMLElement): void {
+  const range = document.createRange();
+  range.selectNodeContents(element);
+  range.collapse(false);
+  const selection = window.getSelection();
+  selection?.removeAllRanges();
+  selection?.addRange(range);
 }
 
 /**

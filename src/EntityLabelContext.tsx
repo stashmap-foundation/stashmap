@@ -1,14 +1,14 @@
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import { useApis } from "./Apis";
-import { useCalendarFeeds } from "./CalendarFeedContext";
 import { useData } from "./DataContext";
+import { isCalendarEntryId } from "./core/ical";
+import { graphLookupFromData, resolveAuthoredFirst } from "./core/graphLookup";
 import { isEntityId } from "./core/linkPath";
 import { LOCAL } from "./core/nodeRef";
-import { spansText } from "./core/nodeSpans";
+import { nodeText, spansText } from "./core/nodeSpans";
 import {
   EntityPickerCandidate,
   browserEntityLabelLanguages,
-  calendarEntryLabel,
   defaultEntityMetadataFetcher,
   entityLabelLanguageOrder,
   responsePayload,
@@ -130,7 +130,6 @@ export function EntityLabelProvider({
   children: React.ReactNode;
 }): JSX.Element {
   const { fetchEntityMetadata } = useApis();
-  const { feeds } = useCalendarFeeds();
   const data = useData();
   const [labels, setLabels] = useState(() => new Map<string, string>());
   const attempted = useRef(new Set<string>());
@@ -140,16 +139,22 @@ export function EntityLabelProvider({
     () => entityLabelLanguageOrder(browserEntityLabelLanguages()),
     []
   );
-  const calendarFeeds = useMemo(() => feeds.valueSeq().toArray(), [feeds]);
   const localEntityBase = useMemo(
     () => localEntityCandidateList(data.knowledgeDBs),
     [data.knowledgeDBs]
   );
 
+  const graph = useMemo(() => graphLookupFromData(data), [data]);
+
   const labelFor = useCallback(
-    (id: string): string | undefined =>
-      calendarEntryLabel(id, calendarFeeds) ?? labels.get(id),
-    [calendarFeeds, labels]
+    (id: string): string | undefined => {
+      if (isCalendarEntryId(id)) {
+        const entry = resolveAuthoredFirst(graph, id, LOCAL);
+        return entry ? nodeText(entry.node) : labels.get(id);
+      }
+      return labels.get(id);
+    },
+    [graph, labels]
   );
 
   const requestLabel = useCallback(

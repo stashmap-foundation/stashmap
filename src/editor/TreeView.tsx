@@ -13,8 +13,6 @@ import {
 } from "../rowModel";
 import { EMPTY_NODE_ID } from "../core/connections";
 import { useData } from "../DataContext";
-import { useCalendarFeeds } from "../CalendarFeedContext";
-import { calendarFeedUrl } from "../core/ical";
 import {
   useCurrentPane,
   usePaneIndex,
@@ -43,7 +41,7 @@ import {
   type TreeResult,
 } from "../treeTraversal";
 import { isCanonicalId } from "../core/entityRecognition";
-import { getNodeInSource, graphLookupFromData } from "../core/graphLookup";
+import { graphLookupFromData, resolveAuthoredFirst } from "../core/graphLookup";
 import { newGraphNode } from "../core/nodeFactory";
 import { nodeText, plainSpans } from "../core/nodeSpans";
 import { getDocumentByIdOrFilePath } from "../core/Document";
@@ -81,12 +79,7 @@ export function PaneTreeResultProvider({
 }: {
   children: React.ReactNode;
 }): JSX.Element {
-  const baseData = useData();
-  const { feeds: calendarFeeds, requestFeed } = useCalendarFeeds();
-  const data = useMemo(
-    () => ({ ...baseData, calendarFeeds }),
-    [baseData, calendarFeeds]
-  );
+  const data = useData();
   const pane = useCurrentPane();
   const { setPane } = useSplitPanes();
   const { replaceNextNavigation } = useNavigationState();
@@ -112,10 +105,15 @@ export function PaneTreeResultProvider({
     if (!canonicalRootId) {
       return undefined;
     }
-    return getNodeInSource(graphLookupFromData(data), {
-      sourceId: LOCAL,
-      id: canonicalRootId,
-    })?.node;
+    const resolved = resolveAuthoredFirst(
+      graphLookupFromData(data),
+      canonicalRootId,
+      LOCAL
+    );
+    return resolved &&
+      (resolved.origin === "computed" || resolved.ref.sourceId === LOCAL)
+      ? resolved.node
+      : undefined;
   }, [canonicalRootId, data]);
   const resolvedLabel = canonicalRootId ? labelFor(canonicalRootId) : undefined;
   const focusedCanonicalRoot =
@@ -203,17 +201,6 @@ export function PaneTreeResultProvider({
     resolvedLabel,
     setPane,
   ]);
-
-  // Fetch-on-render: any visible calendar-feed node requests its feed;
-  // the projection rows appear when the fetch resolves.
-  useEffect(() => {
-    treeResult.rows.forEach((row) => {
-      const feedUrl = calendarFeedUrl(row.node);
-      if (feedUrl) {
-        requestFeed(feedUrl);
-      }
-    });
-  }, [treeResult, requestFeed]);
 
   return (
     <PaneTreeResultContext.Provider value={treeResult}>

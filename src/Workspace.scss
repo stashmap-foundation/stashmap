@@ -441,34 +441,6 @@ body {
 
 
 // Expand/collapse toggle
-// The action row: a button in row position, obviously not content — the
-// wallet's "Register as Shareholder" element, shared instead of
-// reinvented. Dressed like the footer rows it lives among (italic,
-// muted, node-size text); button-ness reveals on hover.
-.action-row-btn {
-  background: transparent;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  height: var(--row-height, 22px);
-  display: flex;
-  align-items: center;
-  color: var(--base01);
-  font-style: italic;
-  font-size: inherit;
-  transition: color 150ms ease;
-
-  &:hover {
-    color: var(--blue);
-    text-decoration: underline;
-  }
-}
-
-.action-row-indicator {
-  color: var(--base01);
-  font-weight: bold;
-  font-family: monospace;
-}
 
 .expand-collapse-toggle {
   background: none;

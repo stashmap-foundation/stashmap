@@ -2,7 +2,6 @@ import { Map, OrderedMap, List, OrderedSet, Set } from "immutable";
 import { Event, EventTemplate, UnsignedEvent } from "nostr-tools";
 import { QueueStatus } from "./infra/nostr/cache/PublishQueue";
 import { Document as DocumentType } from "./core/Document";
-import { IcalEntry } from "./core/ical";
 import type { AddToParentTarget } from "./core/plan";
 
 declare global {
@@ -160,10 +159,7 @@ declare global {
     documents: Map<string, DocumentType>;
     documentByFilePath: Map<string, DocumentType>;
     publishEventsStatus: EventState;
-    // Fetched calendar feeds, keyed by feed URL — the read path of the
-    // machine-feeds law. Projections derive from these at row-build time
-    // and never enter knowledgeDBs.
-    calendarFeeds?: Map<string, IcalEntry[]>;
+    computedNodes: Map<ID, GraphNode>;
     pull?: PullOverlayData;
 
     views: Views;
@@ -225,9 +221,6 @@ declare global {
     projected?: true;
     isFirstVirtual: boolean;
     virtualType: "search" | "incoming" | undefined;
-    // The action row: a button in row position, obviously not content.
-    // One interaction (click); no gutter, no editor, no judgment, no drag.
-    action?: "toggle-past-entries";
     reference:
       | {
           id: ID;
@@ -244,9 +237,6 @@ declare global {
 
   type View = {
     expanded?: boolean;
-    // Calendar feed nodes: project bare past entries too (default: only
-    // upcoming entries project; file content always shows).
-    showPastEntries?: boolean;
     typeFilters?: Array<Relevance | "incoming" | "contains">;
   };
 

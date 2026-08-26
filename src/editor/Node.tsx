@@ -13,7 +13,6 @@ import {
   viewPathToString,
   useCurrentNode,
   useRow,
-  updateView,
   addNodesToLastElement,
 } from "../rowModel";
 import { isEditableNode } from "./temporaryViewState";
@@ -22,29 +21,15 @@ import {
   planBatchIndent,
   planBatchOutdent,
 } from "./batchOperations";
+import { isEmptyNodeID, computeEmptyNodeMetadata } from "../core/connections";
+import { isFileLinkHref, spansText, spansToMarkdown } from "../core/nodeSpans";
 import {
-  getNode,
-  isEmptyNodeID,
-  computeEmptyNodeMetadata,
-} from "../core/connections";
-import {
-  embeddedTarget,
-  isFileLinkHref,
-  spansText,
-  spansToMarkdown,
-} from "../core/nodeSpans";
-import { classifyLinkHref, externalLinkUrl } from "../core/linkPath";
-import {
-  calendarEntryTarget,
-  calendarFeedHref,
-  calendarFeedUrl,
-  displayTextOf,
-  hiddenPastEntryCount,
-  isBareIcalFeedUrl,
-  isCalendarEntryId,
-  isCalendarEntryPlacement,
-} from "../core/ical";
-import { useCalendarFeeds } from "../CalendarFeedContext";
+  classifyLinkHref,
+  externalLinkUrl,
+  isEntityId,
+} from "../core/linkPath";
+import { embedTargetOf } from "../showings";
+import { feedUrlInSpans, isCalendarEntryId } from "../core/ical";
 import { resolveDocumentTarget } from "../core/Document";
 import { inlineLinkToHref, isDeadLinkTarget } from "./linkOperations";
 import { IncomingPart, ReferenceDisplay } from "./referenceDisplay";
@@ -62,7 +47,6 @@ import {
   planSetEmptyNodePosition,
   planSaveNodeAndEnsureNodes,
   planExpandNode,
-  planUpdateViews,
   planRemoveEmptyNodePosition,
   planAddSpansToParent,
   planSetRowFocusIntent,
@@ -93,10 +77,7 @@ function getLevels(viewPath: ViewPath): number {
 
 function ExpandCollapseToggle(): JSX.Element | null {
   const row = useRow();
-  const rawDisplayText = useDisplayText();
-  // Feed-as-link rows read by their label; the raw text (with the URL)
-  // belongs to edit mode.
-  const displayText = displayTextOf(rawDisplayText);
+  const displayText = useDisplayText();
   const onToggleExpanded = useOnToggleExpanded();
   const isExpanded = useIsExpanded();
   const isEmptyNode = isEmptyNodeID(row.node.id);
@@ -127,61 +108,6 @@ function ExpandCollapseToggle(): JSX.Element | null {
       <span className={`triangle ${isExpanded ? "expanded" : "collapsed"}`}>
         {isExpanded ? "▼" : "▶"}
       </span>
-    </button>
-  );
-}
-
-// The action row's content: a button in row position, obviously not
-// content — the wallet's "Register as Shareholder" element, shared
-// instead of reinvented. The label is the action; it always says what a
-// click does. State lives on the action row's own view.
-function PastDatesActionRow(): JSX.Element {
-  const data = useData();
-  const row = useRow();
-  const { feeds } = useCalendarFeeds();
-  const { createPlan, executePlan } = usePlanner();
-  const feedUrl = row.parentNode ? calendarFeedUrl(row.parentNode) : undefined;
-  const entries = feedUrl ? feeds.get(feedUrl) : undefined;
-  const pastCount =
-    entries && row.parentNode
-      ? hiddenPastEntryCount(
-          row.parentNode.children
-            .toArray()
-            .map(
-              (childId) =>
-                calendarEntryTarget(
-                  getNode(data.knowledgeDBs, childId, row.sourceId)
-                ) ?? childId
-            ),
-          entries,
-          Date.now()
-        )
-      : 0;
-  const showPast = row.view.showPastEntries === true;
-  const label = showPast
-    ? "Hide past dates"
-    : `Show ${pastCount} past ${pastCount === 1 ? "date" : "dates"}`;
-  const onToggle = (): void => {
-    executePlan(
-      planUpdateViews(
-        createPlan(),
-        updateView(data.views, row.viewPath, {
-          ...row.view,
-          showPastEntries: !showPast,
-        })
-      )
-    );
-  };
-  return (
-    <button
-      type="button"
-      className="action-row-btn"
-      onClick={onToggle}
-      onMouseDown={preventEditorBlur}
-      aria-label={label}
-      aria-pressed={showPast}
-    >
-      {label}
     </button>
   );
 }
@@ -316,19 +242,14 @@ function InlineLinkSpan({
   const displayedText =
     row.standsFor !== undefined &&
     row.presentedSpans !== undefined &&
-    span.href === `#${row.standsFor.id}`
+    embedTargetOf(node) === row.standsFor.id
       ? spansText(row.presentedSpans)
       : span.text;
-  const calendarContent =
-    !isSearchResult &&
-    (calendarFeedUrl(node) !== undefined ||
-      (row.standsFor !== undefined && isCalendarEntryId(row.standsFor.id)));
-  const externalUrl = calendarContent ? undefined : externalLinkUrl(span.href);
+  const externalUrl = externalLinkUrl(span.href);
   const dead = isDeadLinkTarget(data, span.href, node, sourceId);
-  const internalHref =
-    dead || calendarContent
-      ? undefined
-      : inlineLinkToHref(data, span.href, node, sourceId, span.text);
+  const internalHref = dead
+    ? undefined
+    : inlineLinkToHref(data, span.href, node, sourceId, span.text);
   const href = externalUrl ?? internalHref;
   const style: React.CSSProperties = isSearchResult
     ? { fontStyle: "italic", textDecoration: "none" }
@@ -352,22 +273,6 @@ function InlineLinkSpan({
       †
     </sup>
   ) : null;
-  if (calendarContent) {
-    return (
-      <>
-        <span data-href={span.href} data-target={span.href}>
-          {displayedText}
-        </span>
-        {reciprocal && (
-          <IncomingPart
-            relevance={reciprocal.relevance}
-            argument={reciprocal.argument}
-            ariaHidden
-          />
-        )}
-      </>
-    );
-  }
   if (!href) {
     return (
       <>
@@ -408,9 +313,9 @@ function InlineLinkSpan({
           style={style}
           data-href={span.href}
           data-target={span.href}
-          aria-label={`${span.text} (opens externally)`}
+          aria-label={`${displayedText} (opens externally)`}
         >
-          {span.text}
+          {displayedText}
         </a>
         {externalPart}
       </>
@@ -508,9 +413,7 @@ function NodeContent(): JSX.Element {
     return <InlineSpans node={row.node} sourceId={row.sourceId} />;
   }
 
-  // Read display goes through the one display-text rule (feed links read
-  // by their label); raw text belongs to edit mode only.
-  return <span className="break-word">{displayTextOf(displayText)}</span>;
+  return <span className="break-word">{displayText}</span>;
 }
 
 function getPreviousSiblingFromRows(
@@ -542,7 +445,6 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
   const { textStyle } = useItemStyle();
   const { createPlan, executePlan } = usePlanner();
   const navigatePane = useNavigatePane();
-  const { feeds: calendarFeeds } = useCalendarFeeds();
   const currentNode = useCurrentNode();
   const prevSibling = getPreviousSiblingFromRows(rows, row);
   const parentPath = row.parentViewPath;
@@ -570,10 +472,6 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
     });
 
   const editorSpans = currentNode.spans;
-  const feedUrl = calendarFeedUrl(currentNode);
-  const calendarContent =
-    feedUrl !== undefined ||
-    isCalendarEntryPlacement(currentNode, parentNode ?? undefined);
   const reciprocals = reciprocalLinks(data, row.node, row.sourceId);
   const deadLinkIndexes = editorSpans.flatMap((span, index) =>
     span.kind === "link" &&
@@ -581,40 +479,20 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       ? [index]
       : []
   );
-  const externalLinkIndexes = calendarContent
-    ? []
-    : editorSpans.flatMap((span, index) =>
-        span.kind === "link" && externalLinkUrl(span.href) ? [index] : []
-      );
-  const calendarLinkIndexes = calendarContent ? [0] : [];
-  const persistedSpans = (spans: InlineSpan[]): InlineSpan[] => {
-    const text = spansText(spans).trim();
-    if (feedUrl && spans.every((span) => span.kind === "text")) {
-      return [{ kind: "link", href: calendarFeedHref(feedUrl), text }];
-    }
-    return isBareIcalFeedUrl(text)
-      ? [{ kind: "link", href: calendarFeedHref(text), text }]
-      : spans;
-  };
-
+  const externalLinkIndexes = editorSpans.flatMap((span, index) =>
+    span.kind === "link" && externalLinkUrl(span.href) ? [index] : []
+  );
   const handleSave = async (
     spans: InlineSpan[],
     submitted?: boolean
   ): Promise<void> => {
-    const nextSpans = persistedSpans(spans);
-    // Write gestures take first; read gestures read. A computed row's
-    // save materializes the row before the text lands — and an unchanged
-    // text writes nothing at all (blur/Escape must not take).
     const takeResult = ((): [Plan, GraphNode, ViewPath] | undefined => {
       if (!row.materialize) {
         return [createPlan(), currentNode, viewPath];
       }
-      // Enter is a write gesture (it opens a position below — the row
-      // materializes, per the machine-feeds law); plain blur/Escape with
-      // unchanged text reads only.
       if (
         !submitted &&
-        spansToMarkdown(nextSpans) === spansToMarkdown(row.node.spans)
+        spansToMarkdown(spans) === spansToMarkdown(row.node.spans)
       ) {
         return undefined;
       }
@@ -635,7 +513,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       node: savedNode,
     } = planSaveNodeAndEnsureNodes(
       materializedStart,
-      nextSpans,
+      spans,
       row.materialize ? row.node.id : takenNode.id,
       takenNode,
       takenViewPath,
@@ -732,7 +610,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
         executePlan(
           planAddSpansToParent(
             planWithExpand,
-            persistedSpans(spans),
+            spans,
             takenPrevSibling,
             undefined,
             undefined,
@@ -755,7 +633,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
     }
 
     const result = planBatchIndent(basePlan, [row], rows, {
-      spans: persistedSpans(spans),
+      spans,
       viewKey,
     });
     if (result) executePlan(result);
@@ -795,7 +673,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       executePlan(
         planAddSpansToParent(
           planWithoutEmpty,
-          persistedSpans(spans),
+          spans,
           parentRow.parentNode,
           parentNodeIndex + 1,
           undefined,
@@ -808,7 +686,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
     if (!isEditableNode(currentNode)) return;
 
     const result = planBatchOutdent(basePlan, [row], rows, {
-      spans: persistedSpans(spans),
+      spans,
       viewKey,
     });
     if (result) executePlan(result);
@@ -847,7 +725,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
   ): void => {
     const { plan: basePlan, node: savedNode } = planSaveNodeAndEnsureNodes(
       createPlan(),
-      persistedSpans(currentSpans),
+      currentSpans,
       row.node.id,
       currentNode,
       viewPath,
@@ -909,7 +787,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       (span) => span.kind === "link" && span.href === href
     )?.text;
     const targetHref = inlineLinkToHref(
-      { ...data, calendarFeeds },
+      data,
       href,
       row.node,
       row.sourceId,
@@ -926,7 +804,6 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
         reciprocalLinks={reciprocals}
         deadLinkIndexes={deadLinkIndexes}
         externalLinkIndexes={externalLinkIndexes}
-        calendarLinkIndexes={calendarLinkIndexes}
         style={textStyle}
         onSave={handleSave}
         onTab={handleTab}
@@ -976,15 +853,9 @@ function InteractiveNodeContent({ rows }: { rows: List<Row> }): JSX.Element {
     return <ErrorContent />;
   }
 
-  // A node-target embed row displays the target's live text; its stored
-  // label is a frozen machine record. Typing gets its meaning in 3.4b as
-  // the rewording gesture — until then the row's text is not editable.
-  // Calendar feed names and entity occurrence labels stay the user's
-  // wording and keep their editor.
-  const embedTargetID = embeddedTarget(row.node);
+  const embedTargetID = embedTargetOf(row.node);
   const displaysLiveTarget =
-    embedTargetID !== undefined &&
-    classifyLinkHref(`#${embedTargetID}`) === "node";
+    embedTargetID !== undefined && !isEntityId(embedTargetID);
 
   if (isEditableNode(currentNode) && !isReadonly && !displaysLiveTarget) {
     return <EditableContent rows={rows} />;
@@ -1063,7 +934,8 @@ export function Node({
   const currentNode = useCurrentNode();
   const calendarType = (() => {
     if (virtualType !== undefined) return undefined;
-    if (calendarFeedUrl(currentNode) !== undefined) return "Calendar";
+    const presented = row.presentedSpans ?? currentNode.spans;
+    if (feedUrlInSpans(presented) !== undefined) return "Calendar";
     return isCalendarEntryId(row.standsFor?.id ?? currentNode.id)
       ? "Date"
       : undefined;
@@ -1075,39 +947,6 @@ export function Node({
   const { hasChildren } = row;
 
   const contentClass = "";
-
-  if (row.action) {
-    // Footer-row dress: gutter mark, marker, node-size text — laid out by
-    // the ordinary row grid so it aligns by construction. The ellipsis is
-    // the honest glyph: content elided here.
-    return (
-      <NodeCard className={cls} cardBodyClassName={clsBody}>
-        <div className="indicator-gutter">
-          <span
-            className="action-row-indicator"
-            title="Hidden entries"
-            aria-hidden="true"
-          >
-            …
-          </span>
-        </div>
-        {levels > 0 && <Indent levels={levels} colorLevels={searchDepth} />}
-        <span
-          className="node-marker"
-          aria-hidden="true"
-          data-testid="node-marker"
-        />
-        <div className="w-100 node-content-wrapper">
-          <PastDatesActionRow />
-        </div>
-        <div className="right-menu">
-          <div className="relevance-slot" />
-          <div className="evidence-slot" />
-          <div className="action-slot" />
-        </div>
-      </NodeCard>
-    );
-  }
 
   return (
     <NodeCard

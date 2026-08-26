@@ -1,9 +1,11 @@
+import { Map } from "immutable";
 import { LOCAL } from "./nodeRef";
 import { isInternalLinkHref } from "./nodeSpans";
 
 export type ResolvedNode = {
   ref: NodeRef;
   node: GraphNode;
+  origin: "authored" | "computed";
 };
 
 export type GraphLookup = {
@@ -11,7 +13,21 @@ export type GraphLookup = {
   graphIndex: GraphIndex;
   localSourceId: SourceId;
   sourceOrder: readonly SourceId[];
+  computedNodes: Map<ID, GraphNode>;
 };
+
+export function allKnownNodes(
+  data: Pick<Data, "knowledgeDBs" | "graphIndex">
+): GraphNode[] {
+  const fromDBs = data.knowledgeDBs
+    .valueSeq()
+    .toArray()
+    .flatMap((db) => db.nodes.valueSeq().toArray());
+  const fromIndex = [...data.graphIndex.nodesBySource.values()].flatMap(
+    (nodes) => [...nodes.values()]
+  );
+  return [...fromDBs, ...fromIndex];
+}
 
 const UNSAFE_MARKDOWN_ID_RE = /\s|["'<>]|-->/u;
 
@@ -19,18 +35,19 @@ export function isSafeMarkdownNodeId(id: string): boolean {
   return id.length > 0 && id.trim() === id && !UNSAFE_MARKDOWN_ID_RE.test(id);
 }
 
-type GraphLookupData = Pick<Data, "user" | "knowledgeDBs" | "graphIndex">;
+type GraphLookupData = Pick<
+  Data,
+  "user" | "knowledgeDBs" | "graphIndex" | "computedNodes"
+>;
 
 function sourceOrderFromData(data: GraphLookupData): SourceId[] {
-  const preferred = [
-    LOCAL,
+  const others = [
     ...data.knowledgeDBs.keySeq().toArray(),
     ...data.graphIndex.nodesBySource.keys(),
-  ];
-  return preferred.reduce<SourceId[]>(
-    (acc, sourceId) => (acc.includes(sourceId) ? acc : [...acc, sourceId]),
-    []
-  );
+  ]
+    .filter((sourceId) => sourceId !== LOCAL)
+    .sort();
+  return [LOCAL, ...new Set(others)];
 }
 
 export function graphLookupFromData(data: GraphLookupData): GraphLookup {
@@ -39,6 +56,7 @@ export function graphLookupFromData(data: GraphLookupData): GraphLookup {
     graphIndex: data.graphIndex,
     localSourceId: LOCAL,
     sourceOrder: sourceOrderFromData(data),
+    computedNodes: data.computedNodes,
   };
 }
 
@@ -71,7 +89,9 @@ export function getNodeInSource(
 ): ResolvedNode | undefined {
   const node =
     getNodeFromKnowledgeDBs(graph, ref) ?? getNodeFromGraphIndex(graph, ref);
-  return node ? { ref: nodeRef(ref.sourceId, node), node } : undefined;
+  return node
+    ? { ref: nodeRef(ref.sourceId, node), node, origin: "authored" }
+    : undefined;
 }
 
 function sourceRank(graph: GraphLookup, sourceId: SourceId): number {
@@ -79,8 +99,16 @@ function sourceRank(graph: GraphLookup, sourceId: SourceId): number {
   return index >= 0 ? index : Number.MAX_SAFE_INTEGER;
 }
 
-function candidateSortKey(graph: GraphLookup, ref: NodeRef): string {
-  return `${sourceRank(graph, ref.sourceId)}:${ref.sourceId}:${ref.id}`;
+function compareCandidates(
+  graph: GraphLookup,
+  left: NodeRef,
+  right: NodeRef
+): number {
+  return (
+    sourceRank(graph, left.sourceId) - sourceRank(graph, right.sourceId) ||
+    left.sourceId.localeCompare(right.sourceId) ||
+    left.id.localeCompare(right.id)
+  );
 }
 
 function uniqueCandidates(candidates: readonly NodeRef[]): NodeRef[] {
@@ -99,7 +127,7 @@ function uniqueCandidates(candidates: readonly NodeRef[]): NodeRef[] {
 function sourceCandidatesForID(graph: GraphLookup, id: ID): NodeRef[] {
   const candidates = graph.graphIndex.sourceCandidatesById.get(id) ?? [];
   return [...uniqueCandidates(candidates)].sort((left, right) =>
-    candidateSortKey(graph, left).localeCompare(candidateSortKey(graph, right))
+    compareCandidates(graph, left, right)
   );
 }
 
@@ -127,16 +155,51 @@ export function lookupNode(
   return candidate ? getNodeInSource(graph, candidate) : undefined;
 }
 
+export function resolveAuthoredFirst(
+  graph: GraphLookup,
+  id: ID,
+  currentSourceId: SourceId
+): ResolvedNode | undefined {
+  const authored = lookupNode(graph, id, currentSourceId);
+  if (authored) {
+    return authored;
+  }
+  const node = graph.computedNodes.get(id);
+  if (!node) {
+    return undefined;
+  }
+  return (
+    lookupNode(graph, id, graph.localSourceId) ?? {
+      node,
+      ref: { sourceId: graph.localSourceId, id },
+      origin: "computed",
+    }
+  );
+}
+
+export function resolveChildOf(
+  graph: GraphLookup,
+  parent: ResolvedNode,
+  childID: ID
+): ResolvedNode | undefined {
+  return parent.origin === "computed"
+    ? resolveAuthoredFirst(graph, childID, parent.ref.sourceId)
+    : getNodeInSource(graph, { sourceId: parent.ref.sourceId, id: childID });
+}
+
 export function parentOf(
   graph: GraphLookup,
   node: ResolvedNode
 ): ResolvedNode | undefined {
-  return node.node.parent
-    ? getNodeInSource(graph, {
+  if (!node.node.parent) {
+    return undefined;
+  }
+  return node.origin === "computed"
+    ? resolveAuthoredFirst(graph, node.node.parent, node.ref.sourceId)
+    : getNodeInSource(graph, {
         sourceId: node.ref.sourceId,
         id: node.node.parent,
-      })
-    : undefined;
+      });
 }
 
 export function linkSpeaker(
@@ -156,9 +219,7 @@ export function childrenOf(
   node: ResolvedNode
 ): ResolvedNode[] {
   return node.node.children
-    .map((childID) =>
-      getNodeInSource(graph, { sourceId: node.ref.sourceId, id: childID })
-    )
+    .map((childID) => resolveChildOf(graph, node, childID))
     .filter((child): child is ResolvedNode => child !== undefined)
     .toArray();
 }

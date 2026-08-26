@@ -31,13 +31,6 @@ export function useRow(): Row {
   return row;
 }
 
-// A row is either file content or a proposal about file content. Node
-// types decide how a row RENDERS; only file rows BEHAVE — host overlays,
-// fetch feeds, offer row furniture like the past chip.
-export function isFileRow(row: Pick<Row, "virtualType">): boolean {
-  return row.virtualType === undefined;
-}
-
 export function getIndependentRows(rows: Row[]): Row[] {
   return rows.filter(
     (row) =>
@@ -149,7 +142,10 @@ export function getViewForNode(data: Data, path: ViewPath, nodeID: ID): View {
   );
 }
 
-export function buildPaneTarget(data: Data, row: Row): EditorNavigationTarget {
+export function buildPaneTarget(
+  data: Pick<Data, "knowledgeDBs">,
+  row: Row
+): EditorNavigationTarget {
   const targetID =
     row.virtualType === "search" ? searchTargetID(row.node) : row.reference?.id;
   const refInfo = targetID
@@ -266,10 +262,7 @@ export function updateView(views: Views, path: ViewPath, view: View): Views {
   const key = viewPathToString(path);
   const nodeID = getLast(path);
   const defaultView = getDefaultView(nodeID, isRoot(path));
-  const isDefault =
-    view.expanded === defaultView.expanded &&
-    !view.typeFilters &&
-    !view.showPastEntries;
+  const isDefault = view.expanded === defaultView.expanded && !view.typeFilters;
   if (isDefault) {
     return views.delete(key);
   }
@@ -359,6 +352,8 @@ export function updateViewPathsAfterPaneInsert(
   });
 }
 
-export function bulkUpdateViewPathsAfterAddNode(data: Data): Views {
+export function bulkUpdateViewPathsAfterAddNode(
+  data: Pick<Data, "views">
+): Views {
   return data.views;
 }

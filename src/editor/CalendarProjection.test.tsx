@@ -1,16 +1,27 @@
-import { cleanup, screen, fireEvent, within } from "@testing-library/react";
+import { cleanup, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { renderAppTree } from "../appTestUtils.test";
+import { LOCAL } from "../core/nodeRef";
+import { buildDocumentRouteUrl } from "../navigationUrl";
+import {
+  expectMarkdown,
+  knowstrInit,
+  knowstrSave,
+  write,
+} from "../testFixtures/workspace";
 import {
   ALICE,
   expectTree,
+  findNewNodeEditor,
   getPane,
   navigateToNodeViaSearch,
   openNodeInFullscreen,
+  placeCursorAtEnd,
   renderApp,
   setup,
   type,
 } from "../utils.test";
-import { clickRow } from "./Multiselect.testUtils";
+import { firePaste } from "./Multiselect.testUtils";
 
 const FEED = [
   "BEGIN:VCALENDAR",
@@ -47,7 +58,7 @@ function dunbarText(): string {
 
 afterEach(cleanup);
 
-test("bare Google calendar links render as calendar content", async () => {
+test("a feed line is a read-only row with a plain external link", async () => {
   const [alice] = setup([ALICE]);
   const fetchCalendarFeed = jest.fn(() => Promise.resolve(FEED));
   const url =
@@ -55,14 +66,13 @@ test("bare Google calendar links render as calendar content", async () => {
   renderApp({ ...alice(), fetchCalendarFeed });
 
   await type(`Salon{Enter}{Tab}${url}{Escape}`);
-  const editor = await screen.findByRole("textbox", {
-    name: `edit ${url}`,
+  const feed = await screen.findByRole("link", {
+    name: `${url} (opens externally)`,
   });
-  const feed = within(editor).getByText(url, { selector: "[data-href]" });
   expect(feed.getAttribute("data-href")).toBe(`feed:${url}`);
-  expect(feed.getAttribute("style")).toBeNull();
-  expect(within(editor).queryByRole("link")).toBeNull();
-  expect(within(editor).queryByText("↗")).toBeNull();
+  expect(feed.getAttribute("href")).toBe(url);
+  expect(screen.getByText("↗")).toBeDefined();
+  expect(screen.queryByRole("textbox", { name: `edit ${url}` })).toBeNull();
   expect(screen.getByTitle("Calendar").textContent).toBe("🗓︎");
   await userEvent.click(await screen.findByLabelText(`expand ${url}`));
 
@@ -71,7 +81,7 @@ test("bare Google calendar links render as calendar content", async () => {
   expect(fetchCalendarFeed).toHaveBeenCalledWith(url);
 });
 
-test("upcoming entries project; bare past entries live behind the action row", async () => {
+test("entries project in feed order, past entries included", async () => {
   const [alice] = setup([ALICE]);
   renderApp({
     ...alice(),
@@ -84,21 +94,29 @@ test("upcoming entries project; bare past entries live behind the action row", a
     await screen.findByLabelText("expand https://scholarium.at/salon.ics")
   );
 
-  // The past entry doesn't project; the action row in the footer
-  // announces and reveals it.
   await expectTree(
     `
 Salon
   https://scholarium.at/salon.ics
+    01.01.2020 Founding seminar
     14.07.2030 Sommerfest
     ${dunbarText()}
   `,
     { showGutter: true }
   );
+});
 
-  // The action row reveals the past — unjudged, no judgment gutter mark:
-  // pastness is node-type rendering, never a judgment.
-  await userEvent.click(await screen.findByLabelText("Show 1 past date"));
+test("bare feed urls wrap; the line shows its calendar named by the URL", async () => {
+  const [alice] = setup([ALICE]);
+  const fetchCalendarFeed = jest.fn(() => Promise.resolve(FEED));
+  renderApp({ ...alice(), fetchCalendarFeed });
+
+  await type("Salon{Enter}{Tab}webcal://scholarium.at/salon.ics{Escape}");
+
+  await userEvent.click(
+    await screen.findByLabelText("expand https://scholarium.at/salon.ics")
+  );
+
   await expectTree(
     `
 Salon
@@ -110,56 +128,86 @@ Salon
     { showGutter: true }
   );
 
-  // …and hides it again.
-  await userEvent.click(await screen.findByLabelText("Hide past dates"));
-  await expectTree(
-    `
-Salon
-  https://scholarium.at/salon.ics
-    14.07.2030 Sommerfest
-    ${dunbarText()}
-  `,
-    { showGutter: true }
+  const feed = screen.getByText("https://scholarium.at/salon.ics", {
+    selector: "[data-href]",
+  });
+  expect(feed.getAttribute("data-href")).toBe(
+    "feed:https://scholarium.at/salon.ics"
+  );
+  expect(screen.queryByText("webcal://scholarium.at/salon.ics")).toBeNull();
+
+  expect(fetchCalendarFeed).toHaveBeenCalledWith(
+    "https://scholarium.at/salon.ics"
+  );
+  expect(fetchCalendarFeed).not.toHaveBeenCalledWith(
+    "webcal://scholarium.at/salon.ics"
   );
 });
 
-test("bare feed urls wrap; the label renames without losing the feed", async () => {
+test("an http url stays an ordinary editable row and never fetches", async () => {
   const [alice] = setup([ALICE]);
-  const fetchedUrls: string[] = [];
-  renderApp({
-    ...alice(),
-    fetchCalendarFeed: (url: string) => {
-      // eslint-disable-next-line functional/immutable-data
-      fetchedUrls.push(url);
-      return Promise.resolve(FEED);
-    },
+  const fetchCalendarFeed = jest.fn(() => Promise.resolve(FEED));
+  renderApp({ ...alice(), fetchCalendarFeed });
+
+  await type("Salon{Enter}{Tab}http://scholarium.at/salon.ics{Escape}");
+
+  await screen.findByRole("textbox", {
+    name: "edit http://scholarium.at/salon.ics",
+  });
+  expect(fetchCalendarFeed).not.toHaveBeenCalled();
+});
+
+test("feed fetches are bounded to a few at a time", async () => {
+  const workspace = knowstrInit().path;
+  const urls = [1, 2, 3, 4, 5, 6].map((n) => `https://scholarium.at/f${n}.ics`);
+  write(
+    workspace,
+    "salon.md",
+    [
+      "# Salon <!-- id:salon -->",
+      "",
+      ...urls.map(
+        (url, i) => `- [${url}](feed:${url}) <!-- id:f${i} embed="true" -->`
+      ),
+      "",
+    ].join("\n")
+  );
+  await knowstrSave(workspace);
+  const resolvers = new Map<string, (feed: string) => void>();
+  const fetchCalendarFeed = jest.fn(
+    (url: string) =>
+      new Promise<string>((resolve) => {
+        resolvers.set(url, resolve);
+      })
+  );
+  await renderAppTree({
+    path: workspace,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "salon.md"),
+    fetchCalendarFeed,
   });
 
-  await type("Salon{Enter}{Tab}webcal://scholarium.at/salon.ics{Escape}");
+  await waitFor(() => expect(fetchCalendarFeed).toHaveBeenCalledTimes(4));
+  const first = resolvers.values().next();
+  if (first.done) {
+    throw new Error("Missing in-flight fetch");
+  }
+  first.value(FEED);
+  await waitFor(() => expect(fetchCalendarFeed).toHaveBeenCalledTimes(5));
+});
 
-  // The editor shows and edits the label only; the URL is structural.
-  const editor = await screen.findByLabelText(
-    "edit webcal://scholarium.at/salon.ics"
+test("an uppercase scheme projects like a lowercase one", async () => {
+  const [alice] = setup([ALICE]);
+  const fetchCalendarFeed = jest.fn(() => Promise.resolve(FEED));
+  renderApp({ ...alice(), fetchCalendarFeed });
+
+  await type("Salon{Enter}{Tab}HTTPS://scholarium.at/salon.ics{Escape}");
+
+  await userEvent.click(
+    await screen.findByLabelText("expand https://scholarium.at/salon.ics")
   );
-  await userEvent.click(editor);
-  await userEvent.keyboard("{Control>}a{/Control}Salon Termine{Escape}");
-
-  await userEvent.click(await screen.findByLabelText("expand Salon Termine"));
-
-  await expectTree(
-    `
-Salon
-  Salon Termine
-    14.07.2030 Sommerfest
-    ${dunbarText()}
-  `,
-    { showGutter: true }
-  );
-
-  // The fetch always used the clean URL — never a garbage span across
-  // the link form's halves.
-  expect(new Set(fetchedUrls)).toEqual(
-    new Set(["https://scholarium.at/salon.ics"])
+  await screen.findByText("14.07.2030 Sommerfest");
+  expect(fetchCalendarFeed).toHaveBeenCalledWith(
+    "https://scholarium.at/salon.ics"
   );
 });
 
@@ -193,148 +241,13 @@ Salon
 Agenda
   Salon
     https://scholarium.at/salon.ics
+      01.01.2020 Founding seminar
       14.07.2030 Sommerfest
       ${dunbarText()}
   `);
 });
 
-test("judging a projected entry materializes it with the judgment", async () => {
-  const [alice] = setup([ALICE]);
-  renderApp({
-    ...alice(),
-    fetchCalendarFeed: () => Promise.resolve(FEED),
-  });
-
-  await type("Salon{Enter}{Tab}https://scholarium.at/salon.ics{Escape}");
-  await userEvent.click(
-    await screen.findByLabelText("expand https://scholarium.at/salon.ics")
-  );
-
-  await clickRow("14.07.2030 Sommerfest");
-  await userEvent.keyboard("!");
-
-  // Materialized with the judgment; the projected siblings stay computed.
-  await expectTree(
-    `
-Salon
-  https://scholarium.at/salon.ics
-    {!} 14.07.2030 Sommerfest
-    ${dunbarText()}
-  `,
-    { showGutter: true }
-  );
-
-  // Survives a reload: the entry is real workspace content now (the
-  // expanded view state persists too, so no second expand click).
-  cleanup();
-  renderApp({ ...alice(), fetchCalendarFeed: () => Promise.resolve(FEED) });
-  await expectTree(
-    `
-Salon
-  https://scholarium.at/salon.ics
-    {!} 14.07.2030 Sommerfest
-    ${dunbarText()}
-  `,
-    { showGutter: true }
-  );
-});
-
-test("multiselect judgment materializes projected and spares untouched", async () => {
-  const [alice] = setup([ALICE]);
-  renderApp({
-    ...alice(),
-    fetchCalendarFeed: () => Promise.resolve(FEED),
-  });
-
-  await type("Salon{Enter}{Tab}https://scholarium.at/salon.ics{Escape}");
-  await userEvent.click(
-    await screen.findByLabelText("expand https://scholarium.at/salon.ics")
-  );
-
-  // Select the two upcoming entries (shift-j extends the selection down).
-  await clickRow("14.07.2030 Sommerfest");
-  await userEvent.keyboard("{Shift>}j{/Shift}");
-  await userEvent.keyboard("?");
-
-  await expectTree(
-    `
-Salon
-  https://scholarium.at/salon.ics
-    {?} 14.07.2030 Sommerfest
-    {?} ${dunbarText()}
-  `,
-    { showGutter: true }
-  );
-});
-
-test("writing under a projected entry materializes it with the note", async () => {
-  const [alice] = setup([ALICE]);
-  renderApp({
-    ...alice(),
-    fetchCalendarFeed: () => Promise.resolve(FEED),
-  });
-
-  await type("Salon{Enter}{Tab}https://scholarium.at/salon.ics{Escape}");
-  await userEvent.click(
-    await screen.findByLabelText("expand https://scholarium.at/salon.ics")
-  );
-
-  // Focus the projected entry's editor, Enter to open a position below,
-  // Tab to indent under it, write the note.
-  await userEvent.click(
-    await screen.findByLabelText("edit 14.07.2030 Sommerfest")
-  );
-  await userEvent.keyboard("{Enter}{Tab}Excerpts we are going to read{Escape}");
-
-  await expectTree(
-    `
-Salon
-  https://scholarium.at/salon.ics
-    14.07.2030 Sommerfest
-      Excerpts we are going to read
-    ${dunbarText()}
-  `,
-    { showGutter: true }
-  );
-
-  // Real content: survives reload.
-  cleanup();
-  renderApp({ ...alice(), fetchCalendarFeed: () => Promise.resolve(FEED) });
-  await expectTree(
-    `
-Salon
-  https://scholarium.at/salon.ics
-    14.07.2030 Sommerfest
-      Excerpts we are going to read
-    ${dunbarText()}
-  `,
-    { showGutter: true }
-  );
-});
-
-function dragTextOnto(sourceText: string, targetText: string): void {
-  // Dropping on a row's text element means "into that row as a child".
-  const source = screen.getAllByText(sourceText)[0];
-  const target = screen.getAllByText(targetText)[0];
-  fireEvent.dragStart(source);
-  fireEvent.dragOver(target);
-  fireEvent.drop(target);
-}
-
-async function altDragTextOnto(
-  sourceText: string,
-  targetText: string
-): Promise<void> {
-  const source = screen.getAllByText(sourceText)[0];
-  const target = screen.getAllByText(targetText)[0];
-  await userEvent.keyboard("{Alt>}");
-  fireEvent.dragStart(source);
-  fireEvent.dragOver(target, { altKey: true });
-  fireEvent.drop(target, { altKey: true });
-  await userEvent.keyboard("{/Alt}");
-}
-
-test("the same feed in two places: independent placements, notes stay local", async () => {
+test("the same feed in two places projects independently", async () => {
   const [alice] = setup([ALICE]);
   renderApp({
     ...alice(),
@@ -357,68 +270,18 @@ test("the same feed in two places: independent placements, notes stay local", as
   await expectTree(`
 Salon
   https://scholarium.at/salon.ics
+    01.01.2020 Founding seminar
     14.07.2030 Sommerfest
     ${dunbarText()}
   Studium
     https://scholarium.at/salon.ics
+      01.01.2020 Founding seminar
       14.07.2030 Sommerfest
       ${dunbarText()}
   `);
-
-  const editors = await screen.findAllByLabelText("edit 14.07.2030 Sommerfest");
-  editors.forEach((editor) => {
-    expect(within(editor).queryByRole("link")).toBeNull();
-  });
-  await userEvent.click(editors[0]);
-  await userEvent.keyboard("{Enter}{Tab}Meine Notiz{Escape}");
-  const editorsAfter = await screen.findAllByLabelText(
-    "edit 14.07.2030 Sommerfest"
-  );
-  await userEvent.click(editorsAfter[editorsAfter.length - 1]);
-  await userEvent.keyboard("{Enter}{Tab}Andere Notiz{Escape}");
-
-  const expected = `
-Salon
-  https://scholarium.at/salon.ics
-    14.07.2030 Sommerfest
-      Meine Notiz
-    ${dunbarText()}
-  Studium
-    https://scholarium.at/salon.ics
-      14.07.2030 Sommerfest
-        Andere Notiz
-      ${dunbarText()}
-  `;
-  await expectTree(expected);
-  const materializedEditors = await screen.findAllByLabelText(
-    "edit 14.07.2030 Sommerfest"
-  );
-  materializedEditors.forEach((editor) => {
-    expect(within(editor).queryByRole("link")).toBeNull();
-  });
-  const calendarPlacements = materializedEditors.flatMap((editor) => {
-    const placement = within(editor).queryByText("14.07.2030 Sommerfest", {
-      selector: "[data-href]",
-    });
-    return placement ? [placement] : [];
-  });
-  expect(calendarPlacements).toHaveLength(2);
-  calendarPlacements.forEach((placement) => {
-    expect(placement.getAttribute("style")).toBeNull();
-  });
-
-  cleanup();
-  renderApp({ ...alice(), fetchCalendarFeed: () => Promise.resolve(FEED) });
-  await expectTree(expected);
-  const reloadedEditors = await screen.findAllByLabelText(
-    "edit 14.07.2030 Sommerfest"
-  );
-  reloadedEditors.forEach((editor) => {
-    expect(within(editor).queryByRole("link")).toBeNull();
-  });
 });
 
-test("following a dangling entry link opens the entry surface", async () => {
+test("entries in your own document are read-only projections", async () => {
   const [alice] = setup([ALICE]);
   renderApp({
     ...alice(),
@@ -431,7 +294,463 @@ test("following a dangling entry link opens the entry surface", async () => {
   await userEvent.click(
     await screen.findByLabelText("expand https://scholarium.at/salon.ics")
   );
-  await altDragTextOnto(dunbarText(), "Notes");
+  await screen.findByText("14.07.2030 Sommerfest");
+
+  expect(
+    screen.queryByRole("textbox", { name: `edit ${dunbarText()}` })
+  ).toBeNull();
+
+  fireEvent.dragStart(screen.getByRole("treeitem", { name: dunbarText() }));
+  fireEvent.drop(screen.getByRole("treeitem", { name: "Notes" }));
+
+  await expectTree(`
+Salon
+  https://scholarium.at/salon.ics
+    01.01.2020 Founding seminar
+    14.07.2030 Sommerfest
+    ${dunbarText()}
+  Notes
+  `);
+});
+
+test("feed loading follows embeds in loaded documents, not drawn rows", async () => {
+  const workspace = knowstrInit().path;
+  write(
+    workspace,
+    "salon.md",
+    [
+      "# Salon <!-- id:salon -->",
+      "",
+      "- Deep <!-- id:deep -->",
+      "  - [https://example.org/hidden.ics](feed:https://example.org/hidden.ics)" +
+        ' <!-- id:f1 embed="true" -->',
+      "- [plain](feed:https://example.org/plain.ics) <!-- id:p1 -->",
+      "",
+    ].join("\n")
+  );
+  await knowstrSave(workspace);
+  const fetchCalendarFeed = jest.fn(() => Promise.resolve(FEED));
+  await renderAppTree({
+    path: workspace,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "salon.md"),
+    fetchCalendarFeed,
+  });
+
+  await screen.findByText("plain");
+  await waitFor(() =>
+    expect(fetchCalendarFeed).toHaveBeenCalledWith(
+      "https://example.org/hidden.ics"
+    )
+  );
+  expect(fetchCalendarFeed).not.toHaveBeenCalledWith(
+    "https://example.org/plain.ics"
+  );
+});
+
+test("a fresh session starts with a fresh feed store", async () => {
+  const fetchCalendarFeed = jest
+    .fn<Promise<string>, [string]>(() => Promise.reject(new Error("offline")))
+    .mockImplementationOnce(() => Promise.resolve(FEED));
+  renderApp({ user: undefined, fetchCalendarFeed });
+
+  await userEvent.click(await screen.findByLabelText("sign in"));
+  await userEvent.type(
+    await screen.findByPlaceholderText(
+      "nsec, private key or mnemonic (12 words)"
+    ),
+    "leader monkey parrot ring guide accident before fence cannon height naive bean{enter}"
+  );
+  await screen.findByLabelText("new node editor", undefined, { timeout: 5000 });
+  await type("Salon{Enter}{Tab}https://scholarium.at/salon.ics{Escape}");
+  await userEvent.click(
+    await screen.findByLabelText("expand https://scholarium.at/salon.ics")
+  );
+  await screen.findByText("14.07.2030 Sommerfest");
+  expect(fetchCalendarFeed).toHaveBeenCalledTimes(1);
+
+  fireEvent.click(screen.getByLabelText("open menu"));
+  fireEvent.click(await screen.findByLabelText("logout"));
+  await userEvent.click(await screen.findByLabelText("sign in"));
+  await userEvent.type(
+    await screen.findByPlaceholderText(
+      "nsec, private key or mnemonic (12 words)"
+    ),
+    "nsec10allq0gjx7fddtzef0ax00mdps9t2kmtrldkyjfs8l5xruwvh2dq0lhhkp{enter}"
+  );
+  await waitFor(() => expect(fetchCalendarFeed).toHaveBeenCalledTimes(2));
+  expect(screen.queryByText("14.07.2030 Sommerfest")).toBeNull();
+});
+
+test("feed snapshots do not cross filesystem workspace boundaries", async () => {
+  const feedDocument = [
+    "# Salon <!-- id:salon -->",
+    "",
+    "- [https://scholarium.at/salon.ics](feed:https://scholarium.at/salon.ics)" +
+      ' <!-- id:f1 embed="true" -->',
+    "",
+  ].join("\n");
+  const first = knowstrInit().path;
+  write(first, "salon.md", feedDocument);
+  await knowstrSave(first);
+  await renderAppTree({
+    path: first,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "salon.md"),
+    fetchCalendarFeed: () => Promise.resolve(FEED),
+  });
+  await userEvent.click(
+    await screen.findByLabelText("expand https://scholarium.at/salon.ics")
+  );
+  await screen.findByText("14.07.2030 Sommerfest");
+
+  cleanup();
+  const second = knowstrInit().path;
+  write(second, "salon.md", feedDocument);
+  await knowstrSave(second);
+  const offline = jest.fn<Promise<string>, [string]>(() =>
+    Promise.reject(new Error("offline"))
+  );
+  await renderAppTree({
+    path: second,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "salon.md"),
+    fetchCalendarFeed: offline,
+  });
+  await waitFor(() =>
+    expect(offline).toHaveBeenCalledWith("https://scholarium.at/salon.ics")
+  );
+  expect(
+    screen.queryByLabelText("expand https://scholarium.at/salon.ics")
+  ).toBeNull();
+  expect(screen.queryByText("14.07.2030 Sommerfest")).toBeNull();
+});
+
+test("a typed feed url persists a feed link with the embed attr", async () => {
+  const workspace = knowstrInit().path;
+  write(workspace, "salon.md", "# Salon <!-- id:salon -->\n");
+  await knowstrSave(workspace);
+  await renderAppTree({
+    path: workspace,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "salon.md"),
+    fetchCalendarFeed: () => Promise.resolve(FEED),
+  });
+
+  const rootEditor = await screen.findByRole("textbox", {
+    name: "edit Salon",
+  });
+  await userEvent.click(rootEditor);
+  placeCursorAtEnd(rootEditor);
+  await userEvent.keyboard("{Enter}");
+  await userEvent.type(
+    await findNewNodeEditor(),
+    "https://scholarium.at/salon.ics"
+  );
+  await userEvent.keyboard("{Escape}");
+
+  await expectMarkdown(
+    workspace,
+    "salon.md",
+    "# Salon <!-- id:... -->\n\n- [https://scholarium.at/salon.ics](feed:https://scholarium.at/salon.ics)" +
+      ' <!-- id:... embed="true" -->\n'
+  );
+});
+
+test("a bare feed url as a document root persists the feed link", async () => {
+  const { path } = await renderAppTree({
+    fetchCalendarFeed: () => Promise.resolve(FEED),
+  });
+  if (!path) {
+    throw new Error("expected renderAppTree to return a workspace path");
+  }
+  await findNewNodeEditor();
+
+  await type("https://scholarium.at/salon.ics{Escape}");
+
+  await expectMarkdown(
+    path,
+    "httpsscholariumatsalonics.md",
+    "- [https://scholarium.at/salon.ics](feed:https://scholarium.at/salon.ics)" +
+      ' <!-- id:... embed="true" -->\n'
+  );
+});
+
+test("a loaded event surface is read-only", async () => {
+  const [alice] = setup([ALICE]);
+  const readText = jest.fn(() =>
+    Promise.resolve(`[${dunbarText()}](#ical:dunbar@scholarium.at)`)
+  );
+  // eslint-disable-next-line functional/immutable-data
+  Object.defineProperty(navigator, "clipboard", {
+    value: { readText },
+    writable: true,
+    configurable: true,
+  });
+  renderApp({
+    ...alice(),
+    fetchCalendarFeed: () => Promise.resolve(FEED),
+  });
+
+  await type("Salon{Enter}{Tab}https://scholarium.at/salon.ics{Escape}");
+  await userEvent.click(
+    await screen.findByLabelText("expand https://scholarium.at/salon.ics")
+  );
+  await userEvent.click(screen.getByRole("treeitem", { name: "Salon" }));
+  await userEvent.keyboard("{Meta>}v{/Meta}");
+  await userEvent.click(
+    await screen.findByRole("link", { name: dunbarText() })
+  );
+
+  await expectTree(`
+${dunbarText()}
+  [I] Salon ↩
+  `);
+  expect(
+    screen.queryByRole("textbox", { name: `edit ${dunbarText()}` })
+  ).toBeNull();
+  expect(screen.queryByLabelText("new node editor")).toBeNull();
+  expect(screen.queryByLabelText(/^set .* to relevant$/u)).toBeNull();
+});
+
+test("judging a row mid-edit still mints the feed link", async () => {
+  const [alice] = setup([ALICE]);
+  const fetchCalendarFeed = jest.fn(() => Promise.resolve(FEED));
+  renderApp({ ...alice(), fetchCalendarFeed });
+
+  await type("Salon{Enter}{Tab}Notes{Escape}");
+  const editor = await screen.findByLabelText("edit Notes");
+  await userEvent.click(editor);
+  const editBox = await screen.findByRole("textbox", { name: "edit Notes" });
+  await userEvent.clear(editBox);
+  await userEvent.type(editBox, "https://scholarium.at/salon.ics");
+  fireEvent.click(screen.getByLabelText(/^set .* to relevant$/u));
+
+  await userEvent.click(
+    await screen.findByLabelText("expand https://scholarium.at/salon.ics")
+  );
+  await screen.findByText("14.07.2030 Sommerfest");
+  expect(fetchCalendarFeed).toHaveBeenCalledWith(
+    "https://scholarium.at/salon.ics"
+  );
+});
+
+test("a multiline-pasted bare feed url projects entries immediately", async () => {
+  const [alice] = setup([ALICE]);
+  const fetchCalendarFeed = jest.fn(() => Promise.resolve(FEED));
+  renderApp({ ...alice(), fetchCalendarFeed });
+  // eslint-disable-next-line functional/immutable-data
+  document.execCommand = jest.fn(() => true);
+
+  await type("Salon{Enter}{Tab}Notes{Escape}");
+  const editor = await screen.findByLabelText("edit Notes");
+  await userEvent.click(editor);
+  const editBox = await screen.findByRole("textbox", { name: "edit Notes" });
+  firePaste(editBox, "Notes\nhttps://scholarium.at/salon.ics");
+
+  await userEvent.click(
+    await screen.findByLabelText("expand https://scholarium.at/salon.ics")
+  );
+  await screen.findByText("14.07.2030 Sommerfest");
+  expect(fetchCalendarFeed).toHaveBeenCalledWith(
+    "https://scholarium.at/salon.ics"
+  );
+});
+
+test("indenting a link labeled like a feed url keeps its target", async () => {
+  const workspace = knowstrInit().path;
+  write(
+    workspace,
+    "salon.md",
+    [
+      "# Salon <!-- id:salon -->",
+      "",
+      "- Notes <!-- id:n1 -->",
+      "- [https://x.org/f.ics](https://mirror.example/page) <!-- id:l1 -->",
+      "",
+    ].join("\n")
+  );
+  await knowstrSave(workspace);
+  const fetchCalendarFeed = jest.fn(() => Promise.resolve(FEED));
+  await renderAppTree({
+    path: workspace,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "salon.md"),
+    fetchCalendarFeed,
+  });
+
+  const editor = await screen.findByRole("textbox", {
+    name: "edit https://x.org/f.ics",
+  });
+  await userEvent.click(editor);
+  placeCursorAtEnd(editor);
+  await userEvent.keyboard("{Tab}");
+
+  await expectMarkdown(
+    workspace,
+    "salon.md",
+    "# Salon <!-- id:... -->\n\n- Notes <!-- id:... -->\n" +
+      "  - [https://x.org/f.ics](https://mirror.example/page) <!-- id:... -->\n"
+  );
+  expect(fetchCalendarFeed).not.toHaveBeenCalled();
+});
+
+test("a pasted link labeled like a feed url keeps its target", async () => {
+  const [alice] = setup([ALICE]);
+  const fetchCalendarFeed = jest.fn(() => Promise.resolve(FEED));
+  renderApp({ ...alice(), fetchCalendarFeed });
+  // eslint-disable-next-line functional/immutable-data
+  document.execCommand = jest.fn(() => true);
+
+  await type("Salon{Enter}{Tab}Notes{Escape}");
+  const editor = await screen.findByLabelText("edit Notes");
+  await userEvent.click(editor);
+  const editBox = await screen.findByRole("textbox", { name: "edit Notes" });
+  firePaste(
+    editBox,
+    "Notes\n[https://x.org/f.ics](https://mirror.example/page)"
+  );
+
+  const link = await screen.findByRole("link", {
+    name: "https://x.org/f.ics (opens externally)",
+  });
+  expect(link.getAttribute("data-href")).toBe("https://mirror.example/page");
+  expect(fetchCalendarFeed).not.toHaveBeenCalled();
+});
+
+test("an explicit event embed shows the live event and keeps no editor", async () => {
+  const workspace = knowstrInit().path;
+  write(
+    workspace,
+    "salon.md",
+    [
+      "# Salon <!-- id:salon -->",
+      "",
+      "- [https://scholarium.at/salon.ics](feed:https://scholarium.at/salon.ics)" +
+        ' <!-- id:f1 embed="true" -->',
+      '- [Frozen label](#ical:dunbar@scholarium.at) <!-- id:l1 embed="true" -->',
+      "",
+    ].join("\n")
+  );
+  await knowstrSave(workspace);
+  await renderAppTree({
+    path: workspace,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "salon.md"),
+    fetchCalendarFeed: () => Promise.resolve(FEED),
+  });
+
+  await screen.findByText(dunbarText());
+  expect(screen.queryByText("Frozen label")).toBeNull();
+  expect(
+    screen.queryByRole("textbox", { name: "edit Frozen label" })
+  ).toBeNull();
+  expect(
+    screen.queryByRole("textbox", { name: `edit ${dunbarText()}` })
+  ).toBeNull();
+});
+
+test("a direct feed embed carries the calendar icon", async () => {
+  const workspace = knowstrInit().path;
+  write(
+    workspace,
+    "salon.md",
+    [
+      "# Salon <!-- id:salon -->",
+      "",
+      "- [https://scholarium.at/salon.ics](feed:https://scholarium.at/salon.ics)" +
+        ' <!-- id:f1 embed="true" -->',
+      "",
+    ].join("\n")
+  );
+  write(
+    workspace,
+    "agenda.md",
+    [
+      "# Agenda <!-- id:agenda -->",
+      "",
+      '- [Salon feed](#f1) <!-- id:a1 embed="true" -->',
+      "",
+    ].join("\n")
+  );
+  await knowstrSave(workspace);
+  await renderAppTree({
+    path: workspace,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "agenda.md"),
+    fetchCalendarFeed: () => Promise.resolve(FEED),
+  });
+
+  await screen.findByText("https://scholarium.at/salon.ics");
+  expect(screen.getByTitle("Calendar").textContent).toBe("🗓︎");
+});
+
+test("two feeds load side by side and resolve their own events", async () => {
+  const secondFeed = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "BEGIN:VEVENT",
+    "UID:retreat@example.org",
+    "DTSTART;VALUE=DATE:20301224",
+    "SUMMARY:Winter retreat",
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ].join("\r\n");
+  const workspace = knowstrInit().path;
+  write(
+    workspace,
+    "salon.md",
+    [
+      "# Salon <!-- id:salon -->",
+      "",
+      "- [https://scholarium.at/salon.ics](feed:https://scholarium.at/salon.ics)" +
+        ' <!-- id:f1 embed="true" -->',
+      "- [https://example.org/retreats.ics](feed:https://example.org/retreats.ics)" +
+        ' <!-- id:f2 embed="true" -->',
+      '- [Retreat](#ical:retreat@example.org) <!-- id:l1 embed="true" -->',
+      "",
+    ].join("\n")
+  );
+  await knowstrSave(workspace);
+  const fetchCalendarFeed = jest.fn((url: string) =>
+    Promise.resolve(
+      url === "https://example.org/retreats.ics" ? secondFeed : FEED
+    )
+  );
+  await renderAppTree({
+    path: workspace,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "salon.md"),
+    fetchCalendarFeed,
+  });
+
+  await userEvent.click(
+    await screen.findByLabelText("expand https://scholarium.at/salon.ics")
+  );
+  await screen.findByText("14.07.2030 Sommerfest");
+  await screen.findByText("24.12.2030 Winter retreat");
+  expect(fetchCalendarFeed).toHaveBeenCalledWith(
+    "https://scholarium.at/salon.ics"
+  );
+  expect(fetchCalendarFeed).toHaveBeenCalledWith(
+    "https://example.org/retreats.ics"
+  );
+});
+
+test("following a dangling entry link opens the entry surface", async () => {
+  const [alice] = setup([ALICE]);
+  const readText = jest.fn(() =>
+    Promise.resolve(`[${dunbarText()}](#ical:dunbar@scholarium.at)`)
+  );
+  // eslint-disable-next-line functional/immutable-data
+  Object.defineProperty(navigator, "clipboard", {
+    value: { readText },
+    writable: true,
+    configurable: true,
+  });
+  renderApp({
+    ...alice(),
+    fetchCalendarFeed: () => Promise.resolve(FEED),
+  });
+
+  await type("Salon{Enter}{Tab}https://scholarium.at/salon.ics{Escape}");
+  await userEvent.click(
+    await screen.findByLabelText("expand https://scholarium.at/salon.ics")
+  );
+  await userEvent.click(screen.getByRole("treeitem", { name: "Salon" }));
+  await userEvent.keyboard("{Meta>}v{/Meta}");
 
   await userEvent.click(
     await screen.findByRole("link", { name: dunbarText() })
@@ -443,357 +762,4 @@ ${dunbarText()}
   expect(new URLSearchParams(window.location.search).get("label")).toBe(
     dunbarText()
   );
-});
-
-test("cross-pane drag of an entry lays down a link row, never a copy", async () => {
-  const [alice] = setup([ALICE]);
-  renderApp({
-    ...alice(),
-    fetchCalendarFeed: () => Promise.resolve(FEED),
-  });
-
-  await type(
-    "Salon{Enter}{Tab}https://scholarium.at/salon.ics{Enter}{Shift>}{Tab}{/Shift}Notes{Escape}"
-  );
-  await userEvent.click(
-    await screen.findByLabelText("expand https://scholarium.at/salon.ics")
-  );
-  await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
-  await navigateToNodeViaSearch(1, "Notes");
-  await openNodeInFullscreen(1, "Notes");
-
-  const source = screen.getAllByText(dunbarText())[0];
-  const notesItems = screen.getAllByRole("treeitem", { name: "Notes" });
-  const target = notesItems[notesItems.length - 1];
-  fireEvent.dragStart(source);
-  fireEvent.dragOver(target);
-  fireEvent.drop(target);
-
-  await expectTree(`
-Salon
-  https://scholarium.at/salon.ics
-    14.07.2030 Sommerfest
-    ${dunbarText()}
-  Notes
-Notes
-  ${dunbarText()}
-  `);
-});
-
-test("judging a backlink under a projected entry takes the entry first", async () => {
-  const [alice] = setup([ALICE]);
-  renderApp({
-    ...alice(),
-    fetchCalendarFeed: () => Promise.resolve(FEED),
-  });
-
-  await type(
-    "Salon{Enter}{Tab}https://scholarium.at/salon.ics{Enter}{Shift>}{Tab}{/Shift}Was ist cool{Escape}"
-  );
-  await userEvent.click(
-    await screen.findByLabelText("expand https://scholarium.at/salon.ics")
-  );
-  await altDragTextOnto("14.07.2030 Sommerfest", "Was ist cool");
-  await userEvent.click(
-    await screen.findByLabelText("expand 14.07.2030 Sommerfest")
-  );
-
-  await clickRow("Salon ↩");
-  await userEvent.keyboard("!");
-  const [expandEntry] = await screen.findAllByLabelText(
-    /(?:expand|collapse) 14\.07\.2030 Sommerfest/u
-  );
-  if (expandEntry.getAttribute("aria-label")?.startsWith("expand")) {
-    await userEvent.click(expandEntry);
-  }
-
-  await expectTree(
-    `
-Salon
-  https://scholarium.at/salon.ics
-    14.07.2030 Sommerfest
-      {!} Salon
-      [I] Salon ↩
-    ${dunbarText()}
-  Was ist cool
-  14.07.2030 Sommerfest
-  [I] Salon / https://scholarium.at/salon.ics / 14.07.2030 Sommerfest !↩
-  `,
-    { showGutter: true }
-  );
-
-  cleanup();
-  renderApp({ ...alice(), fetchCalendarFeed: () => Promise.resolve(FEED) });
-  await expectTree(
-    `
-Salon
-  https://scholarium.at/salon.ics
-    14.07.2030 Sommerfest
-      {!} Salon
-      [I] Salon ↩
-    ${dunbarText()}
-  Was ist cool
-  14.07.2030 Sommerfest
-  [I] Salon / https://scholarium.at/salon.ics / 14.07.2030 Sommerfest !↩
-  `,
-    { showGutter: true }
-  );
-});
-
-test("a placed entry keeps its backlinks", async () => {
-  const [alice] = setup([ALICE]);
-  renderApp({
-    ...alice(),
-    fetchCalendarFeed: () => Promise.resolve(FEED),
-  });
-
-  await type(
-    "Salon{Enter}{Tab}https://scholarium.at/salon.ics{Enter}{Shift>}{Tab}{/Shift}Was ist cool{Escape}"
-  );
-  await userEvent.click(
-    await screen.findByLabelText("expand https://scholarium.at/salon.ics")
-  );
-  await userEvent.click(
-    await screen.findByLabelText("edit 14.07.2030 Sommerfest")
-  );
-  await userEvent.keyboard("{Enter}{Tab}Meine Notiz{Escape}");
-
-  await altDragTextOnto("14.07.2030 Sommerfest", "Was ist cool");
-  await altDragTextOnto(dunbarText(), "Was ist cool");
-
-  await userEvent.click(await screen.findByLabelText(`expand ${dunbarText()}`));
-
-  await expectTree(`
-Salon
-  https://scholarium.at/salon.ics
-    14.07.2030 Sommerfest
-    ${dunbarText()}
-      [I] Salon ↩
-  Was ist cool
-  ${dunbarText()}
-  14.07.2030 Sommerfest
-    Meine Notiz
-  `);
-});
-
-test("alt-drag references an entry: clean label, canonical target, dangling allowed", async () => {
-  const [alice] = setup([ALICE]);
-  renderApp({
-    ...alice(),
-    fetchCalendarFeed: () => Promise.resolve(FEED),
-  });
-
-  await type(
-    "Salon{Enter}{Tab}https://scholarium.at/salon.ics{Enter}Notes{Escape}"
-  );
-  const editor = await screen.findByLabelText(
-    "edit https://scholarium.at/salon.ics"
-  );
-  await userEvent.click(editor);
-  await userEvent.keyboard("{Control>}a{/Control}Kalender Studium{Escape}");
-  await userEvent.click(
-    await screen.findByLabelText("expand Kalender Studium")
-  );
-
-  await expectTree(`
-Salon
-  Kalender Studium
-    14.07.2030 Sommerfest
-    ${dunbarText()}
-  Notes
-  `);
-
-  await altDragTextOnto(dunbarText(), "Notes");
-
-  await expectTree(`
-Salon
-  Kalender Studium
-    14.07.2030 Sommerfest
-    ${dunbarText()}
-  Notes
-  ${dunbarText()}
-  `);
-
-  cleanup();
-  renderApp({ ...alice(), fetchCalendarFeed: () => Promise.resolve(FEED) });
-  await expectTree(`
-Salon
-  Kalender Studium
-    14.07.2030 Sommerfest
-    ${dunbarText()}
-  Notes
-  ${dunbarText()}
-  `);
-  expect(screen.queryByText(/deleted/)).toBeNull();
-});
-
-test("dnd both ways: projections drag as themselves and accept drops", async () => {
-  const [alice] = setup([ALICE]);
-  renderApp({
-    ...alice(),
-    fetchCalendarFeed: () => Promise.resolve(FEED),
-  });
-
-  await type(
-    "Salon{Enter}{Tab}https://scholarium.at/salon.ics{Enter}Notes{Escape}"
-  );
-  await userEvent.click(
-    await screen.findByLabelText("expand https://scholarium.at/salon.ics")
-  );
-
-  // Drop a real row after a projected entry (drop-on-text inserts as a
-  // sibling): the anchor entry materializes and the note keeps its slot;
-  // the next projection follows the segment.
-  dragTextOnto("Notes", "14.07.2030 Sommerfest");
-  await expectTree(
-    `
-Salon
-  https://scholarium.at/salon.ics
-    14.07.2030 Sommerfest
-    Notes
-    ${dunbarText()}
-  `,
-    { showGutter: true }
-  );
-
-  // Drag a still-projected entry to resort it: a within-calendar
-  // reorder materializes the whole displayed sequence; the dragged
-  // entry lands at the drop position with no duplicate.
-  dragTextOnto(dunbarText(), "14.07.2030 Sommerfest");
-  await expectTree(
-    `
-Salon
-  https://scholarium.at/salon.ics
-    14.07.2030 Sommerfest
-    ${dunbarText()}
-    Notes
-  `,
-    { showGutter: true }
-  );
-});
-
-test("a touched past entry is file content: always visible, revealed or not", async () => {
-  const [alice] = setup([ALICE]);
-  renderApp({
-    ...alice(),
-    fetchCalendarFeed: () => Promise.resolve(FEED),
-  });
-
-  await type("Salon{Enter}{Tab}https://scholarium.at/salon.ics{Escape}");
-  await userEvent.click(
-    await screen.findByLabelText("expand https://scholarium.at/salon.ics")
-  );
-
-  // Reveal the past, write under the entry — it materializes.
-  await userEvent.click(await screen.findByLabelText("Show 1 past date"));
-  await userEvent.click(
-    await screen.findByLabelText("edit 01.01.2020 Founding seminar")
-  );
-  await userEvent.keyboard("{Enter}{Tab}Excerpts we are going to read{Escape}");
-
-  // The touched entry is file content now — and with nothing left
-  // hidden, the action row is gone entirely.
-  const expected = `
-Salon
-  https://scholarium.at/salon.ics
-    01.01.2020 Founding seminar
-      Excerpts we are going to read
-    14.07.2030 Sommerfest
-    ${dunbarText()}
-  `;
-  await expectTree(expected, { showGutter: true });
-  expect(screen.queryByLabelText("Hide past dates")).toBeNull();
-
-  // An explicit judgment renders as any judgment does.
-  await clickRow("01.01.2020 Founding seminar");
-  await userEvent.keyboard("!");
-  await expectTree(
-    `
-Salon
-  https://scholarium.at/salon.ics
-    {!} 01.01.2020 Founding seminar
-      Excerpts we are going to read
-    14.07.2030 Sommerfest
-    ${dunbarText()}
-  `,
-    { showGutter: true }
-  );
-});
-
-test("reorder materializes only the displayed sequence — hidden past stays a projection", async () => {
-  const [alice] = setup([ALICE]);
-  renderApp({
-    ...alice(),
-    fetchCalendarFeed: () => Promise.resolve(FEED),
-  });
-
-  await type("Salon{Enter}{Tab}https://scholarium.at/salon.ics{Escape}");
-  await userEvent.click(
-    await screen.findByLabelText("expand https://scholarium.at/salon.ics")
-  );
-
-  // Resort the two upcoming entries with the past hidden.
-  dragTextOnto(dunbarText(), "14.07.2030 Sommerfest");
-
-  const reordered = `
-Salon
-  https://scholarium.at/salon.ics
-    14.07.2030 Sommerfest
-    ${dunbarText()}
-  `;
-  await expectTree(reordered, { showGutter: true });
-
-  // The order is file content: it survives a reload.
-  cleanup();
-  renderApp({ ...alice(), fetchCalendarFeed: () => Promise.resolve(FEED) });
-  await expectTree(reordered, { showGutter: true });
-
-  // The hidden past entry never materialized: it still lives behind
-  // the action row, projection-only.
-  await userEvent.click(await screen.findByLabelText("Show 1 past date"));
-  await expectTree(
-    `
-Salon
-  https://scholarium.at/salon.ics
-    01.01.2020 Founding seminar
-    14.07.2030 Sommerfest
-    ${dunbarText()}
-  `,
-    { showGutter: true }
-  );
-  await userEvent.click(await screen.findByLabelText("Hide past dates"));
-  await expectTree(reordered, { showGutter: true });
-});
-
-test("past entries render dimmed by type, judged rows full strength", async () => {
-  const [alice] = setup([ALICE]);
-  renderApp({
-    ...alice(),
-    fetchCalendarFeed: () => Promise.resolve(FEED),
-  });
-
-  await type("Salon{Enter}{Tab}https://scholarium.at/salon.ics{Escape}");
-  await userEvent.click(
-    await screen.findByLabelText("expand https://scholarium.at/salon.ics")
-  );
-  await userEvent.click(await screen.findByLabelText("Show 1 past date"));
-
-  // Style assertions need the wrapping styled span — DOM traversal is the
-  // point here.
-  /* eslint-disable testing-library/no-node-access */
-  const pastText = screen.getAllByText("01.01.2020 Founding seminar")[0];
-  const pastRow = pastText.closest('[data-row-focusable="true"]');
-  if (!(pastRow instanceof HTMLElement)) throw new Error("Missing past row");
-  const pastIcon = within(pastRow).getByTitle("Date");
-  expect(pastIcon.textContent).toBe("📅︎");
-  expect(pastIcon.closest("span[style*='opacity']")).not.toBeNull();
-  const upcomingText = screen.getAllByText("14.07.2030 Sommerfest")[0];
-  expect(upcomingText.closest("span[style*='opacity']")).toBeNull();
-
-  // Deliberate emphasis beats default de-emphasis.
-  await clickRow("01.01.2020 Founding seminar");
-  await userEvent.keyboard("!");
-  const judged = screen.getAllByText("01.01.2020 Founding seminar")[0];
-  expect(judged.closest("span[style*='opacity']")).toBeNull();
-  /* eslint-enable testing-library/no-node-access */
 });

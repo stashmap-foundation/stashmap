@@ -168,16 +168,13 @@ function styleAttribute(style: CSSProperties): string {
 export function createEditableLinkMark(
   span: Extract<InlineSpan, { kind: "link" }>,
   dead: boolean,
-  external: boolean,
-  interactive: boolean
+  external: boolean
 ): HTMLSpanElement {
   const mark = document.createElement("span");
   mark.setAttribute("data-href", span.href);
   mark.setAttribute("data-target", span.href);
-  if (interactive) {
-    mark.setAttribute("role", "link");
-    mark.setAttribute("class", "inline-link");
-  }
+  mark.setAttribute("role", "link");
+  mark.setAttribute("class", "inline-link");
   if (dead) {
     mark.setAttribute("data-link-dead", "true");
     mark.setAttribute("aria-disabled", "true");
@@ -185,9 +182,7 @@ export function createEditableLinkMark(
   } else if (external) {
     mark.setAttribute("aria-label", `${span.text} (opens externally)`);
   }
-  const style = styleAttribute(
-    interactive ? linkStyleForHref(span.href, dead) : {}
-  );
+  const style = styleAttribute(linkStyleForHref(span.href, dead));
   if (style) mark.setAttribute("style", style);
   mark.replaceChildren(document.createTextNode(span.text));
   return mark;
@@ -199,8 +194,7 @@ function nodeForEditableSpan(span: InlineSpan): Node {
     : createEditableLinkMark(
         span,
         false,
-        externalLinkUrl(span.href) !== undefined,
-        true
+        externalLinkUrl(span.href) !== undefined
       );
 }
 

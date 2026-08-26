@@ -91,9 +91,16 @@ test.each(compositionFixtures)(
       pathModule.join(workspacePath, "diff.md")
     );
 
+    const feedPath = pathModule.join(fixturePath, "feed.ics");
     await renderAppTree({
       path: workspacePath,
       initialRoute: buildDocumentRouteUrl(LOCAL, "diff.md"),
+      ...(fs.existsSync(feedPath)
+        ? {
+            fetchCalendarFeed: () =>
+              Promise.resolve(fs.readFileSync(feedPath, "utf8")),
+          }
+        : {}),
     });
     const [root] = await screen.findAllByRole("treeitem");
     await userEvent.click(root);

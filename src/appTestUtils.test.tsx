@@ -17,7 +17,6 @@ import { navigateToNodeViaSearch, renderWithTestData } from "./utils.test";
 import { SplitPaneLayout } from "./editor/SplitPaneLayout";
 import { RelaysWrapper } from "./editor/Relays";
 import { PaneHistoryProvider } from "./PaneHistoryContext";
-import { CalendarFeedProvider } from "./CalendarFeedContext";
 import { EntityLabelProvider } from "./EntityLabelContext";
 import { DND } from "./dnd";
 
@@ -54,6 +53,7 @@ type AppRenderOptions = {
    */
   empty?: boolean;
   fetchEntityMetadata?: (url: string) => Promise<Response>;
+  fetchCalendarFeed?: (url: string) => Promise<string>;
   publisher?: WritePublisher;
 };
 
@@ -81,15 +81,13 @@ export async function renderAppTree(
         <Route
           path="*"
           element={
-            <CalendarFeedProvider>
-              <EntityLabelProvider>
-                <DND>
-                  <PaneHistoryProvider>
-                    <SplitPaneLayout />
-                  </PaneHistoryProvider>
-                </DND>
-              </EntityLabelProvider>
-            </CalendarFeedProvider>
+            <EntityLabelProvider>
+              <DND>
+                <PaneHistoryProvider>
+                  <SplitPaneLayout />
+                </PaneHistoryProvider>
+              </DND>
+            </EntityLabelProvider>
           }
         />
       </Routes>
@@ -111,6 +109,7 @@ export async function renderAppTree(
       DataProvider: FilesystemDataProvider,
       initialRoute: options.initialRoute,
       fetchEntityMetadata: options.fetchEntityMetadata,
+      fetchCalendarFeed: options.fetchCalendarFeed,
     }
   );
 

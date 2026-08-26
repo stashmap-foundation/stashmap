@@ -64,7 +64,7 @@ import {
 import {
   getNodeInSource,
   graphLookupFromData,
-  lookupNode,
+  resolveAuthoredFirst,
 } from "../core/graphLookup";
 import {
   documentDisplayName,
@@ -249,7 +249,7 @@ function Breadcrumbs(): JSX.Element {
   const paneHistory = usePaneHistory();
   const graph = graphLookupFromData(data);
   const rootNode = pane.rootNodeId
-    ? lookupNode(graph, pane.rootNodeId, pane.sourceId)?.node
+    ? resolveAuthoredFirst(graph, pane.rootNodeId, pane.sourceId)?.node
     : undefined;
   const paneDocument = pane.documentId
     ? getDocumentByIdOrFilePath(
@@ -485,7 +485,8 @@ function SecretLinkButton(): JSX.Element | null {
   }
   const graph = graphLookupFromData(data);
   const rootNode = currentPane.rootNodeId
-    ? lookupNode(graph, currentPane.rootNodeId, currentPane.sourceId)?.node
+    ? resolveAuthoredFirst(graph, currentPane.rootNodeId, currentPane.sourceId)
+        ?.node
     : undefined;
   const docId =
     currentPane.documentId ??
@@ -565,7 +566,7 @@ function CurrentNodeName(): JSX.Element {
     : undefined;
   const graph = graphLookupFromData(data);
   const rootNode = pane.rootNodeId
-    ? lookupNode(graph, pane.rootNodeId, pane.sourceId)?.node
+    ? resolveAuthoredFirst(graph, pane.rootNodeId, pane.sourceId)?.node
     : undefined;
   const displayName = (() => {
     if (document) {

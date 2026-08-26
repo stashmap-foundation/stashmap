@@ -48,7 +48,6 @@ type MiniEditorProps = {
   reciprocalLinks: ReciprocalLink[];
   deadLinkIndexes: number[];
   externalLinkIndexes: number[];
-  calendarLinkIndexes: number[];
   onSave: (spans: InlineSpan[], submitted?: boolean) => void;
   style?: React.CSSProperties;
   onClose?: () => void;
@@ -240,7 +239,6 @@ export function MiniEditor({
   reciprocalLinks,
   deadLinkIndexes,
   externalLinkIndexes,
-  calendarLinkIndexes,
   onSave,
   style,
   onClose,
@@ -361,12 +359,7 @@ export function MiniEditor({
         }
         const dead = deadLinkIndexes.includes(index);
         const external = externalLinkIndexes.includes(index);
-        const mark = createEditableLinkMark(
-          span,
-          dead,
-          external,
-          !calendarLinkIndexes.includes(index)
-        );
+        const mark = createEditableLinkMark(span, dead, external);
         const externalFurniture = external ? [createExternalFurniture()] : [];
         const deadFurniture = dead ? [createDeadFurniture()] : [];
         const reciprocal = reciprocalLinks.find(
@@ -413,7 +406,6 @@ export function MiniEditor({
     initialSpans,
     deadLinkIndexes.join(","),
     externalLinkIndexes.join(","),
-    calendarLinkIndexes.join(","),
     reciprocalLinks
       .map(
         ({ spanIndex, relevance, argument }) =>

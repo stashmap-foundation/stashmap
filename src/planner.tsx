@@ -41,7 +41,7 @@ import {
   bulkUpdateViewPathsAfterAddNode,
 } from "./rowModel";
 import { plainSpans, spansText, spansToMarkdown } from "./core/nodeSpans";
-import { calendarEntryEditedSpans } from "./core/ical";
+import { bareFeedUrlIn, feedLinkSpans } from "./core/ical";
 import { classifyLinkHref } from "./core/linkPath";
 import { LOCAL } from "./core/nodeRef";
 import { entityIdForText } from "./core/entityRecognition";
@@ -86,28 +86,34 @@ function isStandaloneEmbedLink(spans: InlineSpan[]): boolean {
   return soleEmbedLinkHref(spans) !== undefined;
 }
 
+function firstPartySpans(spans: InlineSpan[]): InlineSpan[] {
+  const url = bareFeedUrlIn(spans);
+  return url !== undefined ? feedLinkSpans(url) : spans;
+}
+
 export function planUpdateNodeSpans(
   plan: Plan,
   nodeID: ID,
   spans: InlineSpan[]
 ): Plan {
+  const nextSpans = firstPartySpans(spans);
   const currentNode = getWorkspaceNode(plan.knowledgeDBs, nodeID);
   if (
     !currentNode ||
-    spansToMarkdown(currentNode.spans) === spansToMarkdown(spans)
+    spansToMarkdown(currentNode.spans) === spansToMarkdown(nextSpans)
   ) {
     return plan;
   }
   // The embed attr is written when a sole link is created or retargeted —
   // a first-party gesture. Touching the label of an existing plain block
   // link (the Log's form) never converts it into an embed.
-  const nextEmbedHref = soleEmbedLinkHref(spans);
+  const nextEmbedHref = soleEmbedLinkHref(nextSpans);
   const stampEmbed =
     nextEmbedHref !== undefined &&
     nextEmbedHref !== soleEmbedLinkHref(currentNode.spans);
   return planUpsertNodes(plan, {
     ...currentNode,
-    spans,
+    spans: nextSpans,
     ...(stampEmbed && {
       extraAttrs: { ...currentNode.extraAttrs, embed: "true" },
     }),
@@ -403,9 +409,10 @@ type SaveNodeResult = {
 
 export function planCreateNoteAtRoot(
   plan: Plan,
-  spans: InlineSpan[],
+  rawSpans: InlineSpan[],
   paneIndex: number
 ): SaveNodeResult {
+  const spans = firstPartySpans(rawSpans);
   const text = spansText(spans);
   // Mint or link, root case: recognized entity text as a new document's
   // root mints the entity node — idempotently. If the entity already has
@@ -526,14 +533,12 @@ export function planSaveNodeAndEnsureNodes(
     return { plan, viewPath, node: currentNode };
   }
 
-  const nextSpans = calendarEntryEditedSpans(currentNode, nodeID, spans);
-
-  if (spansToMarkdown(nextSpans) === spansToMarkdown(currentNode.spans)) {
+  if (spansToMarkdown(spans) === spansToMarkdown(currentNode.spans)) {
     return { plan, viewPath, node: currentNode };
   }
 
   return {
-    plan: planUpdateNodeSpans(plan, currentNode.id, nextSpans),
+    plan: planUpdateNodeSpans(plan, currentNode.id, spans),
     viewPath,
     node: currentNode,
   };

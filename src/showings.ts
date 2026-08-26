@@ -1,11 +1,12 @@
 import { Set as ImmutableSet } from "immutable";
 import { EMPTY_NODE_ID } from "./core/connections";
 import { embeddedTarget } from "./core/nodeSpans";
+import { calendarIdOf, embeddedFeedUrl } from "./core/ical";
 import {
   GraphLookup,
   ResolvedNode,
-  getNodeInSource,
-  lookupNode,
+  resolveAuthoredFirst,
+  resolveChildOf,
 } from "./core/graphLookup";
 
 export type Showing = {
@@ -19,6 +20,13 @@ export type Showing = {
   cycle: boolean;
   children: Showing[];
 };
+
+export function embedTargetOf(node: GraphNode): ID | undefined {
+  const url = embeddedFeedUrl(node);
+  return (
+    embeddedTarget(node) ?? (url !== undefined ? calendarIdOf(url) : undefined)
+  );
+}
 
 /* eslint-disable functional/no-let, functional/immutable-data */
 function sourceChain(
@@ -39,13 +47,13 @@ function sourceChain(
   let open = openPath;
   for (;;) {
     open = open.add(current.resolved.node.id);
-    const targetID = embeddedTarget(current.resolved.node);
+    const targetID = embedTargetOf(current.resolved.node);
     const cycle = targetID !== undefined && open.has(targetID);
     links.push({ ...current, cycle });
     const target =
       targetID === undefined || cycle
         ? undefined
-        : lookupNode(graph, targetID, current.resolved.ref.sourceId);
+        : resolveAuthoredFirst(graph, targetID, current.resolved.ref.sourceId);
     if (!target) {
       return { links, open };
     }
@@ -66,10 +74,7 @@ function buildShowing(
       if (childID === EMPTY_NODE_ID) {
         return [];
       }
-      const child = getNodeInSource(graph, {
-        sourceId: parent.ref.sourceId,
-        id: childID,
-      });
+      const child = resolveChildOf(graph, parent, childID);
       return child
         ? [buildShowing(graph, child, { kind: "line", childIndex }, open)]
         : [];
@@ -128,7 +133,7 @@ export function closesCycle(showing: Showing): boolean {
 export function leavesDangling(showing: Showing): boolean {
   const presented = presentedLineOf(showing);
   return (
-    embeddedTarget(presented.node) !== undefined &&
+    embedTargetOf(presented.node) !== undefined &&
     presented.target === undefined &&
     !presented.cycle
   );

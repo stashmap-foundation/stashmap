@@ -7,15 +7,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { icalEntryId } from "./core/icalId";
-import {
-  IcalEntry,
-  icalFeedLinkPartsOf,
-  icalFeedLinkText,
-  icalFeedUrlOf,
-  isBareIcalFeedUrl,
-  mergeProjectedEntries,
-  parseIcalFeed,
-} from "./core/ical";
+import { feedLinkSpans, isBareIcalFeedUrl, parseIcalFeed } from "./core/ical";
 
 type IdCase = {
   name: string;
@@ -99,94 +91,32 @@ describe("parseIcalFeed conformance", () => {
   });
 });
 
-describe("icalFeedUrlOf", () => {
-  test("recognizes only the typed feed link form", () => {
-    expect(icalFeedUrlOf("[Kalender](feed:https://x.org/salon.ics)")).toEqual(
-      "https://x.org/salon.ics"
-    );
-    expect(icalFeedUrlOf("Termine https://x.org/salon.ics")).toBeUndefined();
-    expect(icalFeedUrlOf("https://x.org/salon.ics")).toBeUndefined();
-    expect(icalFeedUrlOf("webcal://x.org/feed")).toBeUndefined();
-    expect(icalFeedUrlOf("just text")).toBeUndefined();
-  });
-});
-
-describe("mergeProjectedEntries", () => {
-  const entry = (id: string): IcalEntry => ({
-    id,
-    uid: id,
-    summary: id,
-    allDay: false,
-  });
-
-  test("nothing materialized: pure feed order", () => {
-    expect(mergeProjectedEntries([], [entry("a"), entry("b")])).toEqual([
-      { kind: "projection", entry: entry("a") },
-      { kind: "projection", entry: entry("b") },
-    ]);
-  });
-
-  test("materialized rows keep document order, projections ride anchors", () => {
-    // Feed order a,b,c — the user materialized b and moved a plain note in.
-    const items = mergeProjectedEntries(
-      ["note", "b"],
-      [entry("a"), entry("b"), entry("c")]
-    );
-    expect(items).toEqual([
-      { kind: "projection", entry: entry("a") },
-      { kind: "child", childId: "note" },
-      { kind: "child", childId: "b" },
-      { kind: "projection", entry: entry("c") },
-    ]);
-  });
-
-  test("a note after an entry keeps its slot; projections follow the segment", () => {
-    // children: [a, note]; feed: a, b — b anchors to a but emits after
-    // a's segment (the note), not between them.
-    const items = mergeProjectedEntries(
-      ["a", "note"],
-      [entry("a"), entry("b")]
-    );
-    expect(items).toEqual([
-      { kind: "child", childId: "a" },
-      { kind: "child", childId: "note" },
-      { kind: "projection", entry: entry("b") },
-    ]);
-  });
-
-  test("reordered materialized entries win over feed order", () => {
-    // Feed a,b — user materialized both and swapped them.
-    const items = mergeProjectedEntries(
-      ["b", "a"],
-      [entry("a"), entry("b"), entry("c")]
-    );
-    expect(items).toEqual([
-      { kind: "child", childId: "b" },
-      { kind: "projection", entry: entry("c") },
-      { kind: "child", childId: "a" },
-    ]);
-  });
-});
-
 describe("feed-as-link form", () => {
-  test("parses label and url; text is yours, identity in the parentheses", () => {
-    expect(
-      icalFeedLinkPartsOf("[Salon Kalender](feed:https://x.org/salon.ics)")
-    ).toEqual({ label: "Salon Kalender", url: "https://x.org/salon.ics" });
-    expect(
-      icalFeedLinkPartsOf("[Kalender](https://x.org/salon.ics)")
-    ).toBeUndefined();
-    expect(icalFeedLinkPartsOf("https://x.org/salon.ics")).toBeUndefined();
-    expect(icalFeedLinkPartsOf("[note](#u1)")).toBeUndefined();
-  });
-
   test("bare feed urls wrap into the typed form; mixed text does not", () => {
     expect(isBareIcalFeedUrl("https://x.org/salon.ics")).toBe(true);
     expect(isBareIcalFeedUrl("  webcal://x.org/f.ics ")).toBe(true);
     expect(isBareIcalFeedUrl("Termine https://x.org/salon.ics")).toBe(false);
     expect(isBareIcalFeedUrl("[x](feed:https://x.org/f.ics)")).toBe(false);
-    expect(icalFeedLinkText("https://x.org/f.ics")).toEqual(
-      "[https://x.org/f.ics](feed:https://x.org/f.ics)"
-    );
+    expect(feedLinkSpans("https://x.org/f.ics")).toEqual([
+      {
+        kind: "link",
+        href: "feed:https://x.org/f.ics",
+        text: "https://x.org/f.ics",
+      },
+    ]);
+    expect(feedLinkSpans(" webcal://x.org/f.ics ")).toEqual([
+      {
+        kind: "link",
+        href: "feed:https://x.org/f.ics",
+        text: "webcal://x.org/f.ics",
+      },
+    ]);
+    expect(feedLinkSpans("HTTPS://x.org/f.ics")).toEqual([
+      {
+        kind: "link",
+        href: "feed:https://x.org/f.ics",
+        text: "HTTPS://x.org/f.ics",
+      },
+    ]);
   });
 });

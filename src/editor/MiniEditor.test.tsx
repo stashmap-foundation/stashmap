@@ -23,7 +23,6 @@ describe("MiniEditor", () => {
         reciprocalLinks={[]}
         deadLinkIndexes={[]}
         externalLinkIndexes={[]}
-        calendarLinkIndexes={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -46,7 +45,6 @@ describe("MiniEditor", () => {
         reciprocalLinks={[]}
         deadLinkIndexes={[]}
         externalLinkIndexes={[]}
-        calendarLinkIndexes={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -65,7 +63,6 @@ describe("MiniEditor", () => {
         reciprocalLinks={[]}
         deadLinkIndexes={[]}
         externalLinkIndexes={[]}
-        calendarLinkIndexes={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -86,7 +83,6 @@ describe("MiniEditor", () => {
         reciprocalLinks={[]}
         deadLinkIndexes={[]}
         externalLinkIndexes={[]}
-        calendarLinkIndexes={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -107,7 +103,6 @@ describe("MiniEditor", () => {
         reciprocalLinks={[]}
         deadLinkIndexes={[]}
         externalLinkIndexes={[]}
-        calendarLinkIndexes={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -130,7 +125,6 @@ describe("MiniEditor", () => {
         reciprocalLinks={[]}
         deadLinkIndexes={[]}
         externalLinkIndexes={[]}
-        calendarLinkIndexes={[]}
         onSave={onSave}
         onClose={onClose}
         onShiftTab={onShiftTab}
@@ -153,7 +147,6 @@ describe("MiniEditor", () => {
         reciprocalLinks={[]}
         deadLinkIndexes={[]}
         externalLinkIndexes={[]}
-        calendarLinkIndexes={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -169,7 +162,6 @@ describe("MiniEditor", () => {
         reciprocalLinks={[]}
         deadLinkIndexes={[]}
         externalLinkIndexes={[]}
-        calendarLinkIndexes={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -189,7 +181,6 @@ describe("MiniEditor", () => {
         reciprocalLinks={[]}
         deadLinkIndexes={[]}
         externalLinkIndexes={[]}
-        calendarLinkIndexes={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -200,7 +191,6 @@ describe("MiniEditor", () => {
         reciprocalLinks={[]}
         deadLinkIndexes={[]}
         externalLinkIndexes={[]}
-        calendarLinkIndexes={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -226,7 +216,6 @@ describe("MiniEditor", () => {
         ]}
         deadLinkIndexes={[]}
         externalLinkIndexes={[]}
-        calendarLinkIndexes={[]}
         onSave={onSave}
         autoFocus={false}
       />
@@ -255,7 +244,6 @@ describe("MiniEditor", () => {
         reciprocalLinks={[]}
         deadLinkIndexes={[]}
         externalLinkIndexes={[]}
-        calendarLinkIndexes={[]}
         onSave={onSave}
         autoFocus={false}
       />

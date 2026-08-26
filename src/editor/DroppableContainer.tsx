@@ -4,7 +4,6 @@ import { ConnectDropTarget, DropTargetMonitor, useDrop } from "react-dnd";
 import { NativeTypes } from "react-dnd-html5-backend";
 import { dnd, getDropDestinationFromRows } from "../dnd";
 import { planMaterializeComputedRow } from "../core/plan";
-import { calendarFeedUrl } from "../core/ical";
 import { getWorkspaceNode } from "../core/knowledge";
 import {
   Plan,
@@ -30,7 +29,6 @@ type DragItemType = {
   sourcePaneIndex: number;
   isCopyDrag?: boolean;
   nodeId?: ID;
-  targetId?: ID;
   insertTarget?: AddToParentTarget;
 };
 
@@ -370,7 +368,7 @@ export function useDroppable({
             undefined,
             []
           );
-          if (!dropDestination) {
+          if (!dropDestination || dropDestination.parentRow.projected) {
             return;
           }
 
@@ -404,45 +402,20 @@ export function useDroppable({
       if (!dropDestination) {
         return item;
       }
-      // Arranging something relative to a computed row touches it. A
-      // reorder WITHIN a source-ordered projection materializes the
-      // entire displayed sequence first (document order becomes
-      // authoritative — idea.md, Ordered projections); otherwise only
-      // the anchor row the drop lands after materializes.
-      const dragRows = dragItem.draggedRows.length
-        ? dragItem.draggedRows
-        : [dragItem.row];
       const parentId = dropDestination.parentRow.node.id;
-      const isProjectionReorder =
-        calendarFeedUrl(dropDestination.parentRow.node) !== undefined &&
-        dragRows.some((dragged) => dragged.parentRef?.id === parentId);
       const [plan, dropIndex] = ((): [Plan, number] => {
         const base = createPlan();
-        const withSequence = isProjectionReorder
-          ? rows
-              .filter(
-                (displayRow) =>
-                  displayRow.parentRef?.id === parentId &&
-                  displayRow.materialize !== undefined
-              )
-              .reduce(
-                (accPlan: Plan, displayRow) =>
-                  planMaterializeComputedRow(accPlan, displayRow)[0],
-                base
-              )
-          : base;
         const { anchorRow } = dropDestination;
-        if (!anchorRow?.materialize && !isProjectionReorder) {
-          return [withSequence, dropDestination.insertAtIndex];
+        if (!anchorRow?.materialize) {
+          return [base, dropDestination.insertAtIndex];
         }
-        const anchored = anchorRow
-          ? planMaterializeComputedRow(withSequence, anchorRow)
-          : undefined;
-        const planWithAnchor = anchored ? anchored[0] : withSequence;
-        const anchorNode = anchored?.[1];
+        const anchored = planMaterializeComputedRow(base, anchorRow);
+        const planWithAnchor = anchored[0];
+        const anchorNode = anchored[1];
         const parent = getWorkspaceNode(planWithAnchor.knowledgeDBs, parentId);
-        const anchorIndex =
-          parent && anchorNode ? parent.children.indexOf(anchorNode.id) : -1;
+        const anchorIndex = parent
+          ? parent.children.indexOf(anchorNode.id)
+          : -1;
         return [
           planWithAnchor,
           anchorIndex >= 0 ? anchorIndex + 1 : dropDestination.insertAtIndex,

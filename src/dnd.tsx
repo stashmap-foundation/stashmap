@@ -6,7 +6,6 @@ import { nip19 } from "nostr-tools";
 import { LOCAL } from "./core/nodeRef";
 import { moveNodes, createRefTarget, getNode } from "./core/connections";
 import { nodeText } from "./core/nodeSpans";
-import { calendarEntryTarget } from "./core/ical";
 import { getIndependentRows, updateViewPathsAfterMoveNodes } from "./rowModel";
 import { getDocumentForNode } from "./core/Document";
 import {
@@ -32,7 +31,6 @@ type DragSource = {
   text?: string;
   isCopyDrag?: boolean;
   nodeId?: ID;
-  targetId?: ID;
   insertTarget?: AddToParentTarget;
 };
 
@@ -342,11 +340,10 @@ export function dnd(
   if (!sourcePane || !targetPane) {
     return plan;
   }
-  const sourceDocumentNode = sourceDrag.row.node;
   const sourceDocument = getDocumentForNode(
     plan.knowledgeDBs,
     plan.documents,
-    sourceDocumentNode,
+    sourceDrag.row.node,
     sourceDrag.row.sourceId
   );
   const targetSourceId = targetParentRow.materialize
@@ -366,7 +363,7 @@ export function dnd(
   const isDocumentTopLevelSource =
     sourceDocument !== undefined &&
     sourceDocument.sourceId === sourceDrag.row.sourceId &&
-    sourceDocument.topNodeShortIds.includes(sourceDocumentNode.id);
+    sourceDocument.topNodeShortIds.includes(sourceDrag.row.node.id);
 
   if (isDocumentTopLevelSource && isSameDocument && !sourceDrag.isCopyDrag) {
     return plan;
@@ -388,10 +385,6 @@ export function dnd(
     sourceRow: Row,
     insertAt: number
   ): Plan => {
-    // A computed row with a materialization recipe drags as itself: it
-    // materializes at the drop position (mint-or-link decides whether
-    // that means the node or a link row to its home elsewhere). Already
-    // materialized (a projection-reorder pre-step ran): ordinary move.
     if (sourceRow.materialize) {
       const [materializedPlan, materializedNode, materializedNow] =
         planMaterializeComputedRow(accPlan, sourceRow, undefined, {
@@ -434,10 +427,7 @@ export function dnd(
     }
     return planAddToParent(
       accPlan,
-      createRefTarget(
-        calendarEntryTarget(sourceRow.node) ?? sourceRow.node.id,
-        nodeText(sourceRow.node)
-      ),
+      createRefTarget(sourceRow.node.id, nodeText(sourceRow.node)),
       targetParentNode.id,
       insertAt
     )[0];
@@ -513,10 +503,7 @@ export function dnd(
     : planExpandNode(plan, targetParentRow.view, targetParentRow.viewPath);
 
   const toReferenceTarget = (sourceRow: Row): AddToParentTarget =>
-    createRefTarget(
-      calendarEntryTarget(sourceRow.node) ?? sourceRow.node.id,
-      nodeText(sourceRow.node)
-    );
+    createRefTarget(sourceRow.node.id, nodeText(sourceRow.node));
 
   return independentRows.reduce((accPlan: Plan, sourceRow, idx) => {
     const sourceNode = sourceRow.node;
@@ -532,9 +519,7 @@ export function dnd(
     const insertTarget =
       sourceRow.materialize?.take ??
       (isPrimarySource ? sourceDrag.insertTarget : undefined);
-    const dragTargetID = isPrimarySource
-      ? sourceDrag.targetId || sourceDrag.nodeId
-      : undefined;
+    const dragTargetID = isPrimarySource ? sourceDrag.nodeId : undefined;
     if (insertTarget) {
       return planAddToParent(
         planWithSource,

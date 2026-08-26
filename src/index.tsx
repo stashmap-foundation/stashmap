@@ -8,6 +8,7 @@ import "./assets/fonts/nostr/css/nostr.css";
 import "./Workspace.scss";
 import "./App.css";
 import { App } from "./App";
+import { CalendarFeedProvider } from "./CalendarFeedContext";
 import { AuthProvider } from "./AuthProvider";
 import { FilesystemBackendProvider } from "./infra/filesystem/FilesystemBackendProvider";
 import { FilesystemDataProvider } from "./infra/filesystem/FilesystemDataProvider";
@@ -44,11 +45,13 @@ function bootstrap(): void {
         <NostrProvider apis={{ fileStore: createFileStore() }}>
           <FilesystemBackendProvider ipc={ipc}>
             <AuthProvider>
-              <FilesystemAppRoot>
-                <FilesystemDataProvider>
-                  <App />
-                </FilesystemDataProvider>
-              </FilesystemAppRoot>
+              <CalendarFeedProvider>
+                <FilesystemAppRoot>
+                  <FilesystemDataProvider>
+                    <App />
+                  </FilesystemDataProvider>
+                </FilesystemAppRoot>
+              </CalendarFeedProvider>
             </AuthProvider>
           </FilesystemBackendProvider>
         </NostrProvider>
@@ -61,9 +64,11 @@ function bootstrap(): void {
       <NostrProvider apis={{ fileStore: createFileStore() }}>
         <NostrBackendDbProvider>
           <AuthProvider>
-            <NostrDataProvider>
-              <App />
-            </NostrDataProvider>
+            <CalendarFeedProvider>
+              <NostrDataProvider>
+                <App />
+              </NostrDataProvider>
+            </CalendarFeedProvider>
           </AuthProvider>
         </NostrBackendDbProvider>
       </NostrProvider>

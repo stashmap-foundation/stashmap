@@ -1,0 +1,5 @@
+Doc <!-- id:root -->
+  Source <!-- id:p1 -->
+    Topic <!-- base:x -->
+      Detail <!-- base:xd -->
+  Topic again <!-- id:p2 -->

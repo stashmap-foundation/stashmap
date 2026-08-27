@@ -469,6 +469,7 @@ test("a direct embed in a pulled document yields to the reader's authored node",
   await screen.findByText("READONLY");
   await waitFor(() => expect(fetchCalendarFeed).toHaveBeenCalledWith(url));
 
+  await userEvent.click(await screen.findByLabelText(`expand ${url}`));
   expect(await screen.findAllByText("Sommerfest planning")).not.toHaveLength(0);
   expect(screen.queryByText("14.07.2030 Sommerfest")).toBeNull();
 });

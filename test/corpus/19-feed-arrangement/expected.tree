@@ -4,4 +4,5 @@ Salon <!-- id:o0 -->
     01.01.9999 Standup <!-- base:ical:standup@example.org -->
     02.01.9999 Retro <!-- base:ical:retro@example.org -->
     01.01.2020 Founding <!-- base:m1 -->
+    Standup frozen <!-- base:m2 -->
     Meine Notiz <!-- base:n1 -->

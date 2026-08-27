@@ -32,6 +32,7 @@ import { embedTargetOf } from "../showings";
 import { feedUrlInSpans, isCalendarEntryId } from "../core/ical";
 import { resolveDocumentTarget } from "../core/Document";
 import { inlineLinkToHref, isDeadLinkTarget } from "./linkOperations";
+import { buildNodeRouteUrl } from "../navigationUrl";
 import { IncomingPart, ReferenceDisplay } from "./referenceDisplay";
 import { MiniEditor, ReciprocalLink, preventEditorBlur } from "./AddNode";
 import { EditorTextProvider } from "./EditorTextContext";
@@ -222,6 +223,24 @@ function reciprocalLinks(
   }, initial).links;
 }
 
+function demotedRowRootHref(row: Row, href: string): string | undefined {
+  const targetID = embedTargetOf(row.node);
+  const demoted =
+    targetID !== undefined &&
+    href === `#${targetID}` &&
+    row.virtualType === undefined &&
+    row.presentedSpans !== undefined &&
+    row.standsFor === undefined &&
+    !row.cycle &&
+    !row.dangling;
+  return demoted
+    ? buildNodeRouteUrl(row.node.id, row.sourceId, {
+        scrollToId: undefined,
+        fallbackLabel: undefined,
+      })
+    : undefined;
+}
+
 function InlineLinkSpan({
   span,
   node,
@@ -249,7 +268,8 @@ function InlineLinkSpan({
   const dead = isDeadLinkTarget(data, span.href, node, sourceId);
   const internalHref = dead
     ? undefined
-    : inlineLinkToHref(data, span.href, node, sourceId, span.text);
+    : demotedRowRootHref(row, span.href) ??
+      inlineLinkToHref(data, span.href, node, sourceId, span.text);
   const href = externalUrl ?? internalHref;
   const style: React.CSSProperties = isSearchResult
     ? { fontStyle: "italic", textDecoration: "none" }
@@ -786,13 +806,9 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
     const fallbackLabel = spans.find(
       (span) => span.kind === "link" && span.href === href
     )?.text;
-    const targetHref = inlineLinkToHref(
-      data,
-      href,
-      row.node,
-      row.sourceId,
-      fallbackLabel
-    );
+    const targetHref =
+      demotedRowRootHref(row, href) ??
+      inlineLinkToHref(data, href, row.node, row.sourceId, fallbackLabel);
     if (targetHref) navigatePane(targetHref);
   };
 

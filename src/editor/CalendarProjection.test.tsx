@@ -247,7 +247,7 @@ Agenda
   `);
 });
 
-test("the same feed in two places projects independently", async () => {
+test("the same feed in two places shows once; the second placement is a link", async () => {
   const [alice] = setup([ALICE]);
   renderApp({
     ...alice(),
@@ -257,14 +257,8 @@ test("the same feed in two places projects independently", async () => {
   await type(
     "Salon{Enter}{Tab}https://scholarium.at/salon.ics{Enter}{Shift>}{Tab}{/Shift}Studium{Enter}{Tab}https://scholarium.at/salon.ics{Escape}"
   );
-  const expands = await screen.findAllByLabelText(
-    "expand https://scholarium.at/salon.ics"
-  );
-  await userEvent.click(expands[0]);
   await userEvent.click(
-    (
-      await screen.findAllByLabelText("expand https://scholarium.at/salon.ics")
-    )[0]
+    await screen.findByLabelText("expand https://scholarium.at/salon.ics")
   );
 
   await expectTree(`
@@ -274,10 +268,7 @@ Salon
     14.07.2030 Sommerfest
     ${dunbarText()}
   Studium
-    https://scholarium.at/salon.ics
-      01.01.2020 Founding seminar
-      14.07.2030 Sommerfest
-      ${dunbarText()}
+    https://scholarium.at/salon.ics↗
   `);
 });
 

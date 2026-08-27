@@ -221,6 +221,7 @@ test("a feed line mounts its calendar as a computed source, diff at the end", ()
       "        ical:retro@example.org",
       "      m1",
       "        >ical:founding@example.org",
+      "      m2",
       "      n1",
       "",
     ].join("\n")
@@ -253,7 +254,6 @@ test("a loaded feed never shadows an authored node with the same id", () => {
       "  f1",
       "    >feed:https://example.org/cal.ics",
       "      ical:dunbar@example.org",
-      "        d1",
       "      ical:other@example.org",
       "",
     ].join("\n")

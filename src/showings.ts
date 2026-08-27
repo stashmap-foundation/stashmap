@@ -18,6 +18,7 @@ export type Showing = {
     | { kind: "target" };
   target: Showing | undefined;
   cycle: boolean;
+  demoted: boolean;
   children: Showing[];
 };
 
@@ -29,58 +30,224 @@ export function embedTargetOf(node: GraphNode): ID | undefined {
 }
 
 /* eslint-disable functional/no-let, functional/immutable-data */
+function placedTargets(graph: GraphLookup, root: ResolvedNode): Set<ID> {
+  const targets = new Set<ID>();
+  const visited = new Set<ID>();
+  const stack = [root];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (current && !visited.has(current.node.id)) {
+      visited.add(current.node.id);
+      const targetID = embedTargetOf(current.node);
+      if (targetID !== undefined) {
+        targets.add(targetID);
+        const target = resolveAuthoredFirst(
+          graph,
+          targetID,
+          current.ref.sourceId
+        );
+        if (target) {
+          stack.push(target);
+        }
+      }
+      current.node.children.forEach((childID) => {
+        if (childID === EMPTY_NODE_ID) {
+          return;
+        }
+        const child = resolveChildOf(graph, current, childID);
+        if (child) {
+          stack.push(child);
+        }
+      });
+    }
+  }
+  return targets;
+}
+
+function diffClaims(
+  graph: GraphLookup,
+  parents: readonly ResolvedNode[]
+): Set<ID> {
+  const claims = new Set<ID>();
+  const visited = new Set<ID>();
+  const stack = parents.flatMap((parent) =>
+    parent.node.children.toArray().flatMap((childID) => {
+      const child =
+        childID === EMPTY_NODE_ID
+          ? undefined
+          : resolveChildOf(graph, parent, childID);
+      return child ? [child] : [];
+    })
+  );
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (current && !visited.has(current.node.id)) {
+      visited.add(current.node.id);
+      const targetID = embedTargetOf(current.node);
+      if (targetID !== undefined) {
+        claims.add(targetID);
+      }
+      current.node.children.forEach((childID) => {
+        if (childID === EMPTY_NODE_ID) {
+          return;
+        }
+        const child = resolveChildOf(graph, current, childID);
+        if (child) {
+          stack.push(child);
+        }
+      });
+    }
+  }
+  return claims;
+}
+
 function sourceChain(
   graph: GraphLookup,
   resolved: ResolvedNode,
   reached: Showing["reached"],
-  openPath: ImmutableSet<ID>
+  openPath: ImmutableSet<ID>,
+  shown: ImmutableSet<ID>
 ): {
   links: {
     resolved: ResolvedNode;
     reached: Showing["reached"];
     cycle: boolean;
+    demoted: boolean;
   }[];
   open: ImmutableSet<ID>;
+  seen: ImmutableSet<ID>;
 } {
   const links = [];
   let current = { resolved, reached };
   let open = openPath;
+  let seen = shown;
   for (;;) {
     open = open.add(current.resolved.node.id);
+    seen = seen.add(current.resolved.node.id);
     const targetID = embedTargetOf(current.resolved.node);
     const cycle = targetID !== undefined && open.has(targetID);
-    links.push({ ...current, cycle });
+    const demoted = targetID !== undefined && !cycle && seen.has(targetID);
+    links.push({ ...current, cycle, demoted });
     const target =
-      targetID === undefined || cycle
+      targetID === undefined || cycle || demoted
         ? undefined
         : resolveAuthoredFirst(graph, targetID, current.resolved.ref.sourceId);
     if (!target) {
-      return { links, open };
+      return { links, open, seen };
     }
     current = { resolved: target, reached: { kind: "target" } };
   }
 }
 /* eslint-enable functional/no-let, functional/immutable-data */
 
+type Built = { showing: Showing; seen: ImmutableSet<ID> };
+
+function demotedLine(
+  resolved: ResolvedNode,
+  reached: Showing["reached"],
+  seen: ImmutableSet<ID>
+): Built {
+  return {
+    showing: {
+      node: resolved.node,
+      ref: resolved.ref,
+      reached,
+      target: undefined,
+      cycle: false,
+      demoted: true,
+      children: [],
+    },
+    seen,
+  };
+}
+
 function buildShowing(
   graph: GraphLookup,
   resolved: ResolvedNode,
   reached: Showing["reached"],
-  openPath: ImmutableSet<ID>
-): Showing {
-  const { links, open } = sourceChain(graph, resolved, reached, openPath);
-  const lineShowings = (parent: ResolvedNode): Showing[] =>
-    parent.node.children.toArray().flatMap((childID, childIndex) => {
-      if (childID === EMPTY_NODE_ID) {
-        return [];
-      }
-      const child = resolveChildOf(graph, parent, childID);
-      return child
-        ? [buildShowing(graph, child, { kind: "line", childIndex }, open)]
-        : [];
-    });
+  openPath: ImmutableSet<ID>,
+  shown: ImmutableSet<ID>,
+  claims: Set<ID>,
+  placed: Set<ID>,
+  projected: boolean
+): Built {
+  if (reached.kind === "line" && shown.has(resolved.node.id)) {
+    return demotedLine(resolved, reached, shown);
+  }
+  if (reached.kind === "line" && projected && claims.has(resolved.node.id)) {
+    return demotedLine(resolved, reached, shown);
+  }
+  if (
+    reached.kind === "line" &&
+    resolved.origin === "computed" &&
+    placed.has(resolved.node.id)
+  ) {
+    return demotedLine(resolved, reached, shown);
+  }
+  const { links, open, seen } = sourceChain(
+    graph,
+    resolved,
+    reached,
+    openPath,
+    shown
+  );
+  const chainClaims = diffClaims(
+    graph,
+    links.slice(0, -1).map((link) => link.resolved)
+  );
+  const activeClaims =
+    chainClaims.size > 0 ? new Set([...claims, ...chainClaims]) : claims;
+  const lineShowings = (
+    parent: ResolvedNode,
+    parentProjected: boolean,
+    seenBefore: ImmutableSet<ID>
+  ): { children: Showing[]; seen: ImmutableSet<ID> } =>
+    parent.node.children.toArray().reduce<{
+      children: Showing[];
+      seen: ImmutableSet<ID>;
+    }>(
+      (acc, childID, childIndex) => {
+        if (childID === EMPTY_NODE_ID) {
+          return acc;
+        }
+        const child = resolveChildOf(graph, parent, childID);
+        if (!child) {
+          return acc;
+        }
+        const built = buildShowing(
+          graph,
+          child,
+          { kind: "line", childIndex },
+          open,
+          acc.seen,
+          activeClaims,
+          placed,
+          parentProjected
+        );
+        return {
+          children: [...acc.children, built.showing],
+          seen: built.seen,
+        };
+      },
+      { children: [], seen: seenBefore }
+    );
+  const builtByLink = [...links].reverse().reduce<{
+    childrenByLink: Showing[][];
+    seen: ImmutableSet<ID>;
+  }>(
+    (acc, link) => {
+      const linkProjected = link.reached.kind === "target" ? true : projected;
+      const built = lineShowings(link.resolved, linkProjected, acc.seen);
+      return {
+        childrenByLink: [built.children, ...acc.childrenByLink],
+        seen: built.seen,
+      };
+    },
+    { childrenByLink: [], seen }
+  );
   const mount = (
     link: typeof links[number],
+    index: number,
     target: Showing | undefined
   ): Showing => ({
     node: link.resolved.node,
@@ -88,19 +255,33 @@ function buildShowing(
     reached: link.reached,
     target,
     cycle: link.cycle,
-    children: lineShowings(link.resolved),
+    demoted: link.demoted,
+    children: builtByLink.childrenByLink[index],
   });
-  const last = links[links.length - 1];
-  return links
+  const last = links.length - 1;
+  const showing = links
     .slice(0, -1)
-    .reduceRight((inner, link) => mount(link, inner), mount(last, undefined));
+    .reduceRight(
+      (inner, link, index) => mount(link, index, inner),
+      mount(links[last], last, undefined)
+    );
+  return { showing, seen: builtByLink.seen };
 }
 
 export function showingTreeForRoot(
   graph: GraphLookup,
   root: ResolvedNode
 ): Showing {
-  return buildShowing(graph, root, { kind: "root" }, ImmutableSet());
+  return buildShowing(
+    graph,
+    root,
+    { kind: "root" },
+    ImmutableSet(),
+    ImmutableSet(),
+    new Set(),
+    placedTargets(graph, root),
+    false
+  ).showing;
 }
 
 /* eslint-disable functional/no-let */
@@ -135,7 +316,8 @@ export function leavesDangling(showing: Showing): boolean {
   return (
     embedTargetOf(presented.node) !== undefined &&
     presented.target === undefined &&
-    !presented.cycle
+    !presented.cycle &&
+    !presented.demoted
   );
 }
 

@@ -1,7 +1,13 @@
 import fs from "fs";
 import os from "os";
 import pathModule from "path";
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { nip19 } from "nostr-tools";
 import {
@@ -142,7 +148,7 @@ Source
   `);
 });
 
-test("the same source embedded twice folds independently", async () => {
+test("the second placement of a source is a childless link", async () => {
   const workspacePath = writeWorkspace({
     "note.md": [
       "# Note <!-- id:note -->",
@@ -170,19 +176,15 @@ Note
   Source
     Argument A
     [I] Note ↩
-  Source
-    Argument A
-    [I] Note ↩
+  Second
   `);
 
-  await userEvent.click(screen.getAllByLabelText("collapse Source")[0]);
+  await userEvent.click(screen.getByLabelText("collapse Source"));
 
   await expectTree(`
 Note
   Source
-  Source
-    Argument A
-    [I] Note ↩
+  Second
   `);
 });
 
@@ -457,6 +459,155 @@ Mine
     expect(bobDoc).toContain(`doc: ${aliceDocId}`);
     expect(bobDoc.match(/author: /gu)).toHaveLength(1);
   });
+});
+
+const CONTEXT_FILES = {
+  "shared.md": ["# Shared <!-- id:sh -->", "", "- Insight <!-- id:i1 -->"].join(
+    "\n"
+  ),
+  "b.md": [
+    "# B <!-- id:b -->",
+    "",
+    '- [Shared](#sh) <!-- id:bs embed="true" -->',
+  ].join("\n"),
+  "c.md": [
+    "# C <!-- id:c -->",
+    "",
+    '- [Shared](#sh) <!-- id:cs embed="true" -->',
+  ].join("\n"),
+};
+
+test("which copy shows whole depends on the composed view", async () => {
+  const workspacePath = writeWorkspace({
+    ...CONTEXT_FILES,
+    "a.md": [
+      "# A <!-- id:a -->",
+      "",
+      '- [B](#b) <!-- id:ab embed="true" -->',
+      '- [C](#c) <!-- id:ac embed="true" -->',
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "c.md"),
+  });
+  const [cRoot] = await screen.findAllByRole("treeitem");
+  await userEvent.click(cRoot);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await expectTree(`
+C
+  Shared
+    Insight
+    [I] B ↩
+  [I] A ↩
+  `);
+
+  cleanup();
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "a.md"),
+  });
+  const [aRoot] = await screen.findAllByRole("treeitem");
+  await userEvent.click(aRoot);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await expectTree(`
+A
+  B
+    Shared
+      Insight
+      [I] C ↩
+  C
+    Shared
+  `);
+});
+
+test("opening a demoted link shows its target whole with that placement's diff", async () => {
+  const workspacePath = writeWorkspace({
+    ...CONTEXT_FILES,
+    "c.md": [
+      "# C <!-- id:c -->",
+      "",
+      '- [Shared](#sh) <!-- id:cs embed="true" -->',
+      "  - My note <!-- id:cn -->",
+    ].join("\n"),
+    "a.md": [
+      "# A <!-- id:a -->",
+      "",
+      '- [B](#b) <!-- id:ab embed="true" -->',
+      '- [C](#c) <!-- id:ac embed="true" -->',
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "a.md"),
+  });
+  const [aRoot] = await screen.findAllByRole("treeitem");
+  await userEvent.click(aRoot);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+  await screen.findByRole("treeitem", { name: "C" });
+
+  await expectTree(`
+A
+  B
+    Shared
+      Insight
+      [I] C ↩
+  C
+    Shared
+      My note
+  `);
+
+  const demoted = screen
+    .getAllByRole("treeitem", { name: "Shared" })
+    .flatMap((item) =>
+      within(item).queryAllByRole("link", { name: "Navigate to Shared" })
+    )
+    .at(-1);
+  if (!demoted) {
+    throw new Error("Missing demoted link");
+  }
+  await userEvent.click(demoted);
+
+  await expectTree(`
+Shared
+  Insight
+  My note
+  [I] B ↩
+  `);
+});
+
+test("reordering the routes flips which copy shows whole", async () => {
+  const reordered = writeWorkspace({
+    ...CONTEXT_FILES,
+    "a.md": [
+      "# A <!-- id:a -->",
+      "",
+      '- [C](#c) <!-- id:ac embed="true" -->',
+      '- [B](#b) <!-- id:ab embed="true" -->',
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: reordered,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "a.md"),
+  });
+  const [aRoot] = await screen.findAllByRole("treeitem");
+  await userEvent.click(aRoot);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await expectTree(`
+A
+  C
+    Shared
+      Insight
+      [I] B ↩
+  B
+    Shared
+  `);
 });
 
 test("mutual embeds keep the reciprocal arrow and terminate composition", async () => {

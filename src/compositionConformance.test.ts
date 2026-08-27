@@ -228,6 +228,38 @@ test("a feed line mounts its calendar as a computed source, diff at the end", ()
   );
 });
 
+test("a late-loading calendar changes the picture only through the rebuild", () => {
+  const files = fixtureFiles("19-feed-arrangement");
+  const withoutFeed = files.filter((file) => file.name !== "feed.ics");
+  const before = [
+    "o0",
+    "  >salon",
+    "    f1",
+    "      m1",
+    "      m2",
+    "      n1",
+    "",
+  ].join("\n");
+  const after = [
+    "o0",
+    "  >salon",
+    "    f1",
+    "      >feed:https://example.org/salon.ics",
+    "        ical:founding@example.org",
+    "        ical:standup@example.org",
+    "        ical:retro@example.org",
+    "      m1",
+    "        >ical:founding@example.org",
+    "      m2",
+    "      n1",
+    "",
+  ].join("\n");
+  expect(composeFixtureShowingTree(withoutFeed, "diff.md")).toBe(before);
+  expect(composeFixtureShowingTree(files, "diff.md")).toBe(after);
+  expect(composeFixtureShowingTree(withoutFeed, "diff.md")).toBe(before);
+  expect(composeFixtureShowingTree(files, "diff.md")).toBe(after);
+});
+
 test("a placement beside a feed yields to the feed's occurrence", () => {
   expect(
     composeFixtureShowingTree(

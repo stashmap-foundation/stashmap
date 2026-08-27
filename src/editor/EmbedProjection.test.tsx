@@ -581,22 +581,45 @@ Shared
 });
 
 test("reordering the routes flips which copy shows whole", async () => {
-  const reordered = writeWorkspace({
+  const workspacePath = writeWorkspace({
     ...CONTEXT_FILES,
     "a.md": [
       "# A <!-- id:a -->",
       "",
-      '- [C](#c) <!-- id:ac embed="true" -->',
       '- [B](#b) <!-- id:ab embed="true" -->',
+      '- [C](#c) <!-- id:ac embed="true" -->',
     ].join("\n"),
   });
 
   await renderAppTree({
-    path: reordered,
+    path: workspacePath,
     initialRoute: buildDocumentRouteUrl(LOCAL, "a.md"),
   });
   const [aRoot] = await screen.findAllByRole("treeitem");
   await userEvent.click(aRoot);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await expectTree(`
+A
+  B
+    Shared
+      Insight
+      [I] C ↩
+  C
+    Shared
+  `);
+
+  fs.writeFileSync(
+    pathModule.join(workspacePath, "a.md"),
+    [
+      "# A <!-- id:a -->",
+      "",
+      '- [C](#c) <!-- id:ac embed="true" -->',
+      '- [B](#b) <!-- id:ab embed="true" -->',
+    ].join("\n")
+  );
+
+  await screen.findByRole("treeitem", { name: "A" });
   await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
 
   await expectTree(`

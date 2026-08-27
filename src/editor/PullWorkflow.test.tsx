@@ -417,6 +417,7 @@ test("a direct embed in a pulled document yields to the reader's authored node",
     [
       "# Bob Notes <!-- id:bob-notes -->",
       "- Sommerfest planning <!-- id:ical:sommerfest@scholarium.at -->",
+      "  - Bob detail <!-- id:bob-detail -->",
       "",
     ].join("\n")
   );
@@ -470,7 +471,20 @@ test("a direct embed in a pulled document yields to the reader's authored node",
   await waitFor(() => expect(fetchCalendarFeed).toHaveBeenCalledWith(url));
 
   await userEvent.click(await screen.findByLabelText(`expand ${url}`));
-  expect(await screen.findAllByText("Sommerfest planning")).not.toHaveLength(0);
+  await userEvent.click(
+    await screen.findByLabelText("expand Sommerfest planning")
+  );
+
+  await expectTree(`
+[O] Alice Salon
+  [O] Barcelona
+  [O] ${url}
+    Sommerfest planning
+      Bob detail
+      [OI] Alice Salon ↩
+  [O] event
+  `);
+  expect(screen.queryByLabelText("expand event")).toBeNull();
   expect(screen.queryByText("14.07.2030 Sommerfest")).toBeNull();
 });
 

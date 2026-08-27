@@ -29,44 +29,38 @@ export function embedTargetOf(node: GraphNode): ID | undefined {
   );
 }
 
-/* eslint-disable functional/no-let, functional/immutable-data */
+function claimsBelow(
+  graph: GraphLookup,
+  parent: ResolvedNode,
+  walk: { seen: ImmutableSet<ID>; claims: ImmutableSet<ID> }
+): { seen: ImmutableSet<ID>; claims: ImmutableSet<ID> } {
+  return parent.node.children.toArray().reduce((acc, childID) => {
+    if (childID === EMPTY_NODE_ID) {
+      return acc;
+    }
+    const child = resolveChildOf(graph, parent, childID);
+    if (!child || acc.seen.has(child.node.id)) {
+      return acc;
+    }
+    const targetID = embedTargetOf(child.node);
+    return claimsBelow(graph, child, {
+      seen: acc.seen.add(child.node.id),
+      claims: targetID !== undefined ? acc.claims.add(targetID) : acc.claims,
+    });
+  }, walk);
+}
+
 function diffClaims(
   graph: GraphLookup,
   parents: readonly ResolvedNode[]
-): Set<ID> {
-  const claims = new Set<ID>();
-  const visited = new Set<ID>();
-  const stack = parents.flatMap((parent) =>
-    parent.node.children.toArray().flatMap((childID) => {
-      const child =
-        childID === EMPTY_NODE_ID
-          ? undefined
-          : resolveChildOf(graph, parent, childID);
-      return child ? [child] : [];
-    })
-  );
-  while (stack.length > 0) {
-    const current = stack.pop();
-    if (current && !visited.has(current.node.id)) {
-      visited.add(current.node.id);
-      const targetID = embedTargetOf(current.node);
-      if (targetID !== undefined) {
-        claims.add(targetID);
-      }
-      current.node.children.forEach((childID) => {
-        if (childID === EMPTY_NODE_ID) {
-          return;
-        }
-        const child = resolveChildOf(graph, current, childID);
-        if (child) {
-          stack.push(child);
-        }
-      });
-    }
-  }
-  return claims;
+): ImmutableSet<ID> {
+  return parents.reduce(
+    (walk, parent) => claimsBelow(graph, parent, walk),
+    { seen: ImmutableSet<ID>(), claims: ImmutableSet<ID>() }
+  ).claims;
 }
 
+/* eslint-disable functional/no-let, functional/immutable-data */
 function sourceChain(
   graph: GraphLookup,
   resolved: ResolvedNode,
@@ -133,7 +127,7 @@ function buildShowing(
   reached: Showing["reached"],
   openPath: ImmutableSet<ID>,
   shown: ImmutableSet<ID>,
-  claims: Set<ID>,
+  claims: ImmutableSet<ID>,
   projected: boolean
 ): Built {
   if (reached.kind === "line" && shown.has(resolved.node.id)) {
@@ -153,8 +147,7 @@ function buildShowing(
     graph,
     links.slice(0, -1).map((link) => link.resolved)
   );
-  const activeClaims =
-    chainClaims.size > 0 ? new Set([...claims, ...chainClaims]) : claims;
+  const activeClaims = claims.union(chainClaims);
   const lineShowings = (
     parent: ResolvedNode,
     parentProjected: boolean,
@@ -235,7 +228,7 @@ export function showingTreeForRoot(
     { kind: "root" },
     ImmutableSet(),
     ImmutableSet(),
-    new Set(),
+    ImmutableSet(),
     false
   ).showing;
 }

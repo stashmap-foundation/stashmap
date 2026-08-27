@@ -228,6 +228,25 @@ test("a feed line mounts its calendar as a computed source, diff at the end", ()
   );
 });
 
+test("a placement beside a feed yields to the feed's occurrence", () => {
+  expect(
+    composeFixtureShowingTree(
+      fixtureFiles("27-event-direct-and-feed"),
+      "diff.md"
+    )
+  ).toBe(
+    [
+      "o0",
+      "  >salon",
+      "    f1",
+      "      >feed:https://example.org/salon.ics",
+      "        ical:standup@example.org",
+      "    l1",
+      "",
+    ].join("\n")
+  );
+});
+
 test("a loaded feed never shadows an authored node with the same id", () => {
   const tree = composeFixtureShowingTree(
     [

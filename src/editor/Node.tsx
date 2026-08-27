@@ -225,15 +225,7 @@ function reciprocalLinks(
 
 function demotedRowRootHref(row: Row, href: string): string | undefined {
   const targetID = embedTargetOf(row.node);
-  const demoted =
-    targetID !== undefined &&
-    href === `#${targetID}` &&
-    row.virtualType === undefined &&
-    row.presentedSpans !== undefined &&
-    row.standsFor === undefined &&
-    !row.cycle &&
-    !row.dangling;
-  return demoted
+  return row.demoted && targetID !== undefined && href === `#${targetID}`
     ? buildNodeRouteUrl(row.node.id, row.sourceId, {
         scrollToId: undefined,
         fallbackLabel: undefined,

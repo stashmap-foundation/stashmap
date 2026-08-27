@@ -1,4 +1,4 @@
 Salon <!-- id:o0 -->
   https://example.org/salon.ics <!-- base:f1 -->
     01.01.9999 Standup <!-- base:ical:standup@example.org -->
-  01.01.9999 Standup <!-- base:l1 -->
+  My standup <!-- base:l1 -->

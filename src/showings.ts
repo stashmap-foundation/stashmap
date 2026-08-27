@@ -30,40 +30,6 @@ export function embedTargetOf(node: GraphNode): ID | undefined {
 }
 
 /* eslint-disable functional/no-let, functional/immutable-data */
-function placedTargets(graph: GraphLookup, root: ResolvedNode): Set<ID> {
-  const targets = new Set<ID>();
-  const visited = new Set<ID>();
-  const stack = [root];
-  while (stack.length > 0) {
-    const current = stack.pop();
-    if (current && !visited.has(current.node.id)) {
-      visited.add(current.node.id);
-      const targetID = embedTargetOf(current.node);
-      if (targetID !== undefined) {
-        targets.add(targetID);
-        const target = resolveAuthoredFirst(
-          graph,
-          targetID,
-          current.ref.sourceId
-        );
-        if (target) {
-          stack.push(target);
-        }
-      }
-      current.node.children.forEach((childID) => {
-        if (childID === EMPTY_NODE_ID) {
-          return;
-        }
-        const child = resolveChildOf(graph, current, childID);
-        if (child) {
-          stack.push(child);
-        }
-      });
-    }
-  }
-  return targets;
-}
-
 function diffClaims(
   graph: GraphLookup,
   parents: readonly ResolvedNode[]
@@ -168,20 +134,12 @@ function buildShowing(
   openPath: ImmutableSet<ID>,
   shown: ImmutableSet<ID>,
   claims: Set<ID>,
-  placed: Set<ID>,
   projected: boolean
 ): Built {
   if (reached.kind === "line" && shown.has(resolved.node.id)) {
     return demotedLine(resolved, reached, shown);
   }
   if (reached.kind === "line" && projected && claims.has(resolved.node.id)) {
-    return demotedLine(resolved, reached, shown);
-  }
-  if (
-    reached.kind === "line" &&
-    resolved.origin === "computed" &&
-    placed.has(resolved.node.id)
-  ) {
     return demotedLine(resolved, reached, shown);
   }
   const { links, open, seen } = sourceChain(
@@ -221,7 +179,6 @@ function buildShowing(
           open,
           acc.seen,
           activeClaims,
-          placed,
           parentProjected
         );
         return {
@@ -279,7 +236,6 @@ export function showingTreeForRoot(
     ImmutableSet(),
     ImmutableSet(),
     new Set(),
-    placedTargets(graph, root),
     false
   ).showing;
 }

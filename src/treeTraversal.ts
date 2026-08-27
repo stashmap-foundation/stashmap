@@ -166,6 +166,7 @@ function createShowingRow(
     presentedSpans: presentedLineOf(showing).node.spans,
     ...(closesCycle(showing) && { cycle: true }),
     ...(leavesDangling(showing) && { dangling: true }),
+    ...(presentedLineOf(showing).demoted && { demoted: true }),
   };
 }
 

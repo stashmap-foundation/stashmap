@@ -612,9 +612,9 @@ test("an explicit event embed shows the live event and keeps no editor", async (
     [
       "# Salon <!-- id:salon -->",
       "",
+      '- [Frozen label](#ical:dunbar@scholarium.at) <!-- id:l1 embed="true" -->',
       "- [https://scholarium.at/salon.ics](feed:https://scholarium.at/salon.ics)" +
         ' <!-- id:f1 embed="true" -->',
-      '- [Frozen label](#ical:dunbar@scholarium.at) <!-- id:l1 embed="true" -->',
       "",
     ].join("\n")
   );
@@ -687,11 +687,11 @@ test("two feeds load side by side and resolve their own events", async () => {
     [
       "# Salon <!-- id:salon -->",
       "",
+      '- [Retreat](#ical:retreat@example.org) <!-- id:l1 embed="true" -->',
       "- [https://scholarium.at/salon.ics](feed:https://scholarium.at/salon.ics)" +
         ' <!-- id:f1 embed="true" -->',
       "- [https://example.org/retreats.ics](feed:https://example.org/retreats.ics)" +
         ' <!-- id:f2 embed="true" -->',
-      '- [Retreat](#ical:retreat@example.org) <!-- id:l1 embed="true" -->',
       "",
     ].join("\n")
   );

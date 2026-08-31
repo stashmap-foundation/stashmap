@@ -50,7 +50,7 @@ function printRow(row: Row): string {
   const identity = `${row.projected ? "base" : "id"}:${row.node.id}`;
   const flags = `${row.cycle ? " flag:cycle" : ""}${
     row.dangling ? " flag:dangling" : ""
-  }`;
+  }${row.lapsed ? " flag:lapsed" : ""}`;
   return `${indent}${rowMarker(
     row.node
   )}${text} <!-- ${identity}${flags} -->\n`;
@@ -151,7 +151,7 @@ function printShowing(
 ): string {
   const line = `${"  ".repeat(indent)}${mounted ? ">" : ""}${showing.node.id}${
     showing.cycle ? " cycle" : ""
-  }${showing.demoted ? " demoted" : ""}\n`;
+  }${showing.demoted ? " demoted" : ""}${showing.lapsed ? " lapsed" : ""}\n`;
   const target = showing.target
     ? printShowing(showing.target, indent + 1, true)
     : "";

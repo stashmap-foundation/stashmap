@@ -217,6 +217,7 @@ declare global {
     cycle?: true;
     dangling?: true;
     demoted?: true;
+    lapsed?: true;
     // Projected embed content: the target's rows rendered at a placement.
     // Readonly in this step — touches materialize diffs in a later one.
     projected?: true;

@@ -388,6 +388,55 @@ function stageLadder(
   }
 }
 
+function detachOwnLine(
+  plan: Plan,
+  context: MoveContext,
+  node: GraphNode
+): boolean {
+  const oldParent =
+    node.parent !== undefined
+      ? currentNodeOf(plan, context.updates, node.parent)
+      : undefined;
+  if (!oldParent) {
+    return false;
+  }
+  stageNode(context.updates, {
+    ...oldParent,
+    children: oldParent.children.filter((childId) => childId !== node.id),
+  });
+  return true;
+}
+
+function attachOwnLine(
+  plan: Plan,
+  context: MoveContext,
+  nodeId: ID,
+  parentId: ID,
+  anchor: { after: ID | undefined } | "end"
+): boolean {
+  const parent = currentNodeOf(plan, context.updates, parentId);
+  const node = currentNodeOf(plan, context.updates, nodeId);
+  if (!parent || !node) {
+    return false;
+  }
+  const insertAt = ((): number => {
+    if (anchor === "end") {
+      return parent.children.size;
+    }
+    const at =
+      anchor.after !== undefined ? parent.children.indexOf(anchor.after) : -1;
+    return at >= 0 ? at + 1 : 0;
+  })();
+  stageNode(context.updates, {
+    ...parent,
+    children: parent.children.insert(insertAt, nodeId),
+  });
+  if (node.parent !== parentId) {
+    stageNode(context.updates, { ...node, parent: parentId });
+  }
+  return true;
+}
+
 function moveGrabbedProjected(
   plan: Plan,
   context: MoveContext,
@@ -421,11 +470,7 @@ function moveGrabbedProjected(
     },
   };
   stageNode(context.updates, statementNode);
-  stageNode(context.updates, {
-    ...embedNode,
-    children: embedNode.children.push(statementNode.id),
-  });
-  return true;
+  return attachOwnLine(plan, context, statementNode.id, hostEmbed.id, "end");
 }
 
 function previousOwnSiblingId(
@@ -450,35 +495,12 @@ function moveOwnLine(
 ): boolean {
   const { row } = context.entries[index];
   const node = currentNodeOf(plan, context.updates, row.node.id);
-  const oldParentId = node?.parent;
-  if (!node || oldParentId === undefined) {
+  if (!node || !detachOwnLine(plan, context, node)) {
     return false;
   }
-  const oldParent = currentNodeOf(plan, context.updates, oldParentId);
-  if (!oldParent) {
-    return false;
-  }
-  stageNode(context.updates, {
-    ...oldParent,
-    children: oldParent.children.filter((childId) => childId !== node.id),
+  return attachOwnLine(plan, context, node.id, newParentId, {
+    after: previousOwnSiblingId(context, index),
   });
-  const newParent = currentNodeOf(plan, context.updates, newParentId);
-  if (!newParent) {
-    return false;
-  }
-  const previousId = previousOwnSiblingId(context, index);
-  const anchorIndex =
-    previousId !== undefined ? newParent.children.indexOf(previousId) : -1;
-  const insertAt = anchorIndex >= 0 ? anchorIndex + 1 : 0;
-  stageNode(context.updates, {
-    ...newParent,
-    children: newParent.children.insert(insertAt, node.id),
-  });
-  const moved = currentNodeOf(plan, context.updates, node.id);
-  if (moved && moved.parent !== newParentId) {
-    stageNode(context.updates, { ...moved, parent: newParentId });
-  }
-  return true;
 }
 
 function moveGrabbedHome(
@@ -498,47 +520,21 @@ function moveGrabbedHome(
   if (!governing || governing.dangling) {
     return false;
   }
-  const governingNode = currentNodeOf(plan, context.updates, governing.node.id);
   const { row } = context.entries[index];
   const node = currentNodeOf(plan, context.updates, row.node.id);
-  const oldParentId = node?.parent;
-  if (!governingNode || !node || oldParentId === undefined) {
+  if (!node || !detachOwnLine(plan, context, node)) {
     return false;
   }
-  const oldParent = currentNodeOf(plan, context.updates, oldParentId);
-  if (!oldParent) {
+  if (!attachOwnLine(plan, context, node.id, governing.node.id, "end")) {
     return false;
   }
-  stageNode(context.updates, {
-    ...oldParent,
-    children: oldParent.children.filter((childId) => childId !== node.id),
-  });
-  const governingAfterRemove = currentNodeOf(
-    plan,
-    context.updates,
-    governing.node.id
-  );
-  if (!governingAfterRemove) {
-    return false;
-  }
-  stageNode(context.updates, {
-    ...governingAfterRemove,
-    children: governingAfterRemove.children.push(node.id),
-  });
   const moved = currentNodeOf(plan, context.updates, node.id);
   if (moved) {
     stageLadder(
       context.updates,
-      { ...moved, parent: governing.node.id },
+      moved,
       ladderOf(context.links, index, governing.node.id)
     );
-    const staged = context.updates.get(node.id);
-    if (!staged || staged.parent !== governing.node.id) {
-      stageNode(context.updates, {
-        ...(staged ?? moved),
-        parent: governing.node.id,
-      });
-    }
   }
   return true;
 }

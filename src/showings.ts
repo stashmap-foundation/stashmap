@@ -382,22 +382,6 @@ function buildShowing(
     );
 }
 
-/* eslint-disable functional/no-let, functional/immutable-data */
-export function linesShownThrough(
-  target: Showing | undefined
-): { source: Showing; line: Showing }[] {
-  const chain = [];
-  let opened = target;
-  while (opened) {
-    chain.push(opened);
-    opened = opened.target;
-  }
-  return [...chain]
-    .reverse()
-    .flatMap((source) => source.children.map((line) => ({ source, line })));
-}
-/* eslint-enable functional/no-let, functional/immutable-data */
-
 export function chainLinksOf(showing: Showing): Showing[] {
   /* eslint-disable functional/no-let, functional/immutable-data */
   const links = [];
@@ -408,6 +392,17 @@ export function chainLinksOf(showing: Showing): Showing[] {
   }
   return links;
   /* eslint-enable functional/no-let, functional/immutable-data */
+}
+
+export function linesShownThrough(
+  target: Showing | undefined
+): { source: Showing; line: Showing }[] {
+  if (!target) {
+    return [];
+  }
+  return [...chainLinksOf(target)]
+    .reverse()
+    .flatMap((source) => source.children.map((line) => ({ source, line })));
 }
 
 export function buildShowingTree(

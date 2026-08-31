@@ -9,19 +9,18 @@ import {
   positionNamesOf,
 } from "./showings";
 
-function rowListsOf(showing: Showing): { owner: Showing; rows: Showing[] }[] {
-  return [...chainLinksOf(showing)]
-    .reverse()
-    .map((link) => ({ owner: link, rows: link.children }));
+function rowsUnder(showing: Showing): Showing[] {
+  return [
+    ...linesShownThrough(showing.target).map(({ line }) => line),
+    ...showing.children,
+  ];
 }
 
 function eachRow(showing: Showing, visit: (row: Showing) => void): void {
-  rowListsOf(showing).forEach(({ rows }) =>
-    rows.forEach((row) => {
-      visit(row);
-      eachRow(row, visit);
-    })
-  );
+  rowsUnder(showing).forEach((row) => {
+    visit(row);
+    eachRow(row, visit);
+  });
 }
 
 function statementScope(
@@ -79,7 +78,7 @@ function findOccurrence(scope: Showing, id: ID): Showing | undefined {
       if (answersTo(row, id) && !row.demoted && !row.cycle && !row.statement) {
         return row;
       }
-      return search(rowListsOf(row).flatMap((list) => list.rows));
+      return search(rowsUnder(row));
     }, undefined);
   return search(linesShownThrough(scope.target).map(({ line }) => line));
 }

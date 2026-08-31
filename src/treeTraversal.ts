@@ -38,9 +38,9 @@ import {
   leavesDangling,
   linesShownThrough,
   presentedLineOf,
-  showingTreeForRoot,
   standsForOf,
 } from "./showings";
+import { showingTreeForRoot } from "./settling";
 
 export type TreeResult = {
   rows: List<Row>;

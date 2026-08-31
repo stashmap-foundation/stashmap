@@ -231,7 +231,7 @@ function blockEndAt(rows: Row[], start: number): number {
   return relative < 0 ? rows.length : start + 1 + relative;
 }
 
-function originEmbedRowOf(rows: Row[], index: number): Row | undefined {
+function hostEmbedRowOf(rows: Row[], index: number): Row | undefined {
   const walk = (at: number, depth: number): Row | undefined => {
     if (at < 0) {
       return undefined;
@@ -652,7 +652,7 @@ export function planMoveRows(
       hostEmbeds.set(row, membership);
       return false;
     }
-    const origin = originEmbedRowOf(rows, start);
+    const origin = hostEmbedRowOf(rows, start);
     if (!origin || origin.dangling) {
       return true;
     }

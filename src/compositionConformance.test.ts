@@ -10,7 +10,7 @@ import {
   resolveAuthoredFirst,
 } from "./core/graphLookup";
 import { addNodesToGraphIndex, createEmptyGraphIndex } from "./graphIndex";
-import { showingTreeForRoot } from "./showings";
+import { showingTreeForRoot } from "./settling";
 import {
   composeFixtureShowingTree,
   composeFixtureTree,

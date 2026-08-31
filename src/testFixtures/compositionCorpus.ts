@@ -11,7 +11,8 @@ import {
 } from "../core/ical";
 import { graphLookupFromData, lookupNode } from "../core/graphLookup";
 import { createEmptyGraphIndex } from "../graphIndex";
-import { Showing, showingTreeForRoot } from "../showings";
+import { Showing } from "../showings";
+import { showingTreeForRoot } from "../settling";
 import { getNodesInTree } from "../treeTraversal";
 import type { ViewPath } from "../rowModel";
 

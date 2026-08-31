@@ -1,5 +1,11 @@
 import { List } from "immutable";
 import { getNode, isEmptyNodeID, isSearchId } from "./core/connections";
+import { LOCAL } from "./core/nodeRef";
+import {
+  GraphLookup,
+  graphLookupFromData,
+  resolveAuthoredFirst,
+} from "./core/graphLookup";
 import { getWorkspaceNode } from "./core/knowledge";
 import { planRemoveNodeItemById } from "./dataPlanner";
 import { getDocumentByIdOrFilePath } from "./core/Document";
@@ -354,6 +360,7 @@ function withLadderAttrs(
 type MoveContext = {
   entries: SplicedEntry[];
   links: ScreenLinks;
+  graph: GraphLookup;
   updates: Map<ID, GraphNode>;
 };
 
@@ -385,10 +392,10 @@ function moveGrabbedProjected(
   plan: Plan,
   context: MoveContext,
   index: number,
-  originEmbed: Row
+  hostEmbed: GraphNode
 ): boolean {
   const { row } = context.entries[index];
-  const ladder = ladderOf(context.links, index, originEmbed.node.id);
+  const ladder = ladderOf(context.links, index, hostEmbed.id);
   if (row.spokenFor !== undefined) {
     const statement = currentNodeOf(plan, context.updates, row.spokenFor);
     if (!statement) {
@@ -397,7 +404,7 @@ function moveGrabbedProjected(
     stageLadder(context.updates, statement, ladder);
     return true;
   }
-  const embedNode = currentNodeOf(plan, context.updates, originEmbed.node.id);
+  const embedNode = currentNodeOf(plan, context.updates, hostEmbed.id);
   if (!embedNode) {
     return false;
   }
@@ -536,6 +543,14 @@ function moveGrabbedHome(
   return true;
 }
 
+function embedResolves(graph: GraphLookup, embedNode: GraphNode): boolean {
+  const targetId = embedTargetOf(embedNode);
+  return (
+    targetId !== undefined &&
+    resolveAuthoredFirst(graph, targetId, LOCAL) !== undefined
+  );
+}
+
 function repairPositionedEntry(
   plan: Plan,
   context: MoveContext,
@@ -544,14 +559,6 @@ function repairPositionedEntry(
 ): void {
   const { row } = context.entries[index];
   if (grabbedRoots.has(row) || row.lapsed) {
-    return;
-  }
-  const ancestorEmbed = screenAncestorEmbed(
-    context.links,
-    context.entries,
-    index
-  );
-  if (ancestorEmbed?.dangling) {
     return;
   }
   if (!row.projected) {
@@ -565,6 +572,9 @@ function repairPositionedEntry(
       return;
     }
     const membership = fileMembershipNode(plan, node);
+    if (membership && !embedResolves(context.graph, membership)) {
+      return;
+    }
     stageLadder(
       context.updates,
       node,
@@ -580,10 +590,13 @@ function repairPositionedEntry(
     return;
   }
   const membership = fileMembershipNode(plan, statement);
+  if (!membership || !embedResolves(context.graph, membership)) {
+    return;
+  }
   stageLadder(
     context.updates,
     statement,
-    ladderOf(context.links, index, membership?.id)
+    ladderOf(context.links, index, membership.id)
   );
 }
 
@@ -617,22 +630,33 @@ export function planMoveRows(
   if (blocks.length === 0) {
     return plan;
   }
-  const origins = new Map<Row, Row>();
+  const graph = graphLookupFromData(data);
+  const hostEmbeds = new Map<Row, GraphNode>();
   const refused = blocks.some(({ start }) => {
     const row = rows[start];
     if (row.parentRef === undefined) {
       return true;
     }
-    if (row.projected) {
-      if (row.demoted || row.cycle) {
-        return true;
-      }
-      const origin = originEmbedRowOf(rows, start);
-      if (!origin || origin.dangling) {
-        return true;
-      }
-      origins.set(row, origin);
+    if (!row.projected) {
+      return false;
     }
+    if (row.demoted || row.cycle) {
+      return true;
+    }
+    if (row.spokenFor !== undefined) {
+      const statement = getWorkspaceNode(plan.knowledgeDBs, row.spokenFor);
+      const membership = statement && fileMembershipNode(plan, statement);
+      if (!membership || !embedResolves(graph, membership)) {
+        return true;
+      }
+      hostEmbeds.set(row, membership);
+      return false;
+    }
+    const origin = originEmbedRowOf(rows, start);
+    if (!origin || origin.dangling) {
+      return true;
+    }
+    hostEmbeds.set(row, origin.node);
     return false;
   });
   if (refused) {
@@ -670,6 +694,7 @@ export function planMoveRows(
   const context: MoveContext = {
     entries,
     links,
+    graph,
     updates: new Map<ID, GraphNode>(),
   };
   const grabbedRoots = new Set(blocks.map(({ start }) => rows[start]));
@@ -679,10 +704,8 @@ export function planMoveRows(
       return false;
     }
     if (row.projected) {
-      const origin = origins.get(row);
-      return origin
-        ? moveGrabbedProjected(plan, context, index, origin)
-        : false;
+      const host = hostEmbeds.get(row);
+      return host ? moveGrabbedProjected(plan, context, index, host) : false;
     }
     const membership = fileMembershipNode(plan, row.node);
     if (membership !== undefined) {

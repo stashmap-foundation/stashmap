@@ -1094,3 +1094,107 @@ Doc
     );
   });
 });
+
+test("re-dragging a moved row keeps the statement below its original embed", async () => {
+  const { path } = knowstrInit();
+  write(
+    path,
+    "source.md",
+    [
+      "# First <!-- id:f -->",
+      "",
+      "- Alpha <!-- id:a -->",
+      "- Beta <!-- id:b -->",
+      "",
+      "# Second <!-- id:g2 -->",
+      "",
+      "- Gamma <!-- id:c -->",
+      "- Delta <!-- id:d -->",
+      "",
+    ].join("\n")
+  );
+  write(
+    path,
+    "diff.md",
+    [
+      "# Doc <!-- id:root -->",
+      "",
+      '- [First](#f) <!-- id:e1 embed="true" -->',
+      '- [Second](#g2) <!-- id:e2 embed="true" -->',
+      "",
+    ].join("\n")
+  );
+  await openDocumentExpanded(path, "diff.md");
+
+  dragRowOnto("Alpha", "Gamma");
+  await expectTree(`
+Doc
+  First
+    Beta
+  Second
+    Gamma
+    Alpha
+    Delta
+`);
+
+  dragRowOnto("Alpha", "Delta");
+
+  await expectTree(`
+Doc
+  First
+    Beta
+  Second
+    Gamma
+    Delta
+    Alpha
+`);
+  await waitFor(() => {
+    expect(fs.readFileSync(`${path}/diff.md`, "utf8")).toMatch(
+      /- \[Alpha\]\(#a\) <!-- id:\S+ embed="true" after="d" parent="e2" -->/u
+    );
+  });
+});
+
+test("a row moved out of an unresolved source keeps its line byte-identical", async () => {
+  const { path } = knowstrInit();
+  const outLine = '  - Out <!-- id:out after="one" -->';
+  write(
+    path,
+    "doc.md",
+    [
+      "# Doc <!-- id:root -->",
+      "",
+      '- [Ghost](#nowhere) <!-- id:e1 embed="true" -->',
+      outLine,
+      "- One <!-- id:one -->",
+      "- Two <!-- id:two -->",
+      "",
+    ].join("\n")
+  );
+  await openDocumentExpanded(path, "doc.md");
+  await expectTree(`
+Doc
+  Ghost†
+  One
+  Out
+  Two
+`);
+
+  dragRowOnto("One", "Two");
+
+  await expectTree(`
+Doc
+  Ghost†
+  Two
+  One
+  Out
+`);
+  await waitFor(() => {
+    const content = fs.readFileSync(`${path}/doc.md`, "utf8");
+    const lines = content.split("\n");
+    expect(lines.indexOf("- One <!-- id:one -->")).toBeGreaterThan(
+      lines.indexOf("- Two <!-- id:two -->")
+    );
+    expect(content).toContain(outLine);
+  });
+});

@@ -24,6 +24,7 @@ export type Showing = {
   inProjection: boolean;
   statement: boolean;
   names: PositionName[];
+  spokenFor: ID | undefined;
   lapsed: boolean;
   children: Showing[];
 };
@@ -246,6 +247,7 @@ function demotedLine(
       inProjection,
       statement: false,
       names: positionNamesOf(resolved.node),
+      spokenFor: undefined,
       lapsed: false,
       children: [],
     },
@@ -357,6 +359,7 @@ function buildShowing(
         inProjection: linkInProjection,
         statement: link.statement,
         names: link.statement ? [] : positionNamesOf(link.resolved.node),
+        spokenFor: undefined,
         lapsed: false,
         children: lines.children,
       },
@@ -480,10 +483,12 @@ function rebuildWithoutStatements(
     const adopted = (effects.extraChildrenFor.get(link) ?? []).map((child) =>
       rebuildWithoutStatements(child, effects)
     );
+    const aliasIds = effects.aliasIdsFor.get(link) ?? [];
     const rebuilt: Showing = {
       ...link,
       target: inner?.showing,
       names: [...(effects.namesFor.get(link) ?? []), ...link.names],
+      spokenFor: aliasIds[0] ?? link.spokenFor,
       children: [...kept, ...adopted].map((child) => child.showing),
     };
     return {

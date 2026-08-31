@@ -4,19 +4,17 @@ import { DndProvider, useDragLayer, XYCoord } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { nip19 } from "nostr-tools";
 import { LOCAL } from "./core/nodeRef";
-import { moveNodes, createRefTarget, getNode } from "./core/connections";
+import { createRefTarget, getNode, isEmptyNodeID } from "./core/connections";
 import { nodeText } from "./core/nodeSpans";
-import { getIndependentRows, updateViewPathsAfterMoveNodes } from "./rowModel";
+import { getIndependentRows } from "./rowModel";
 import { getDocumentForNode } from "./core/Document";
 import {
   Plan,
-  planUpdateViews,
   planExpandNode,
   planAddToParent,
-  planUpsertNodes,
   AddToParentTarget,
 } from "./planner";
-import { planMoveNode } from "./treeMutations";
+import { planMoveRows } from "./treeMutations";
 import {
   planMaterializeComputedRow,
   planRecordKnowstrSource,
@@ -310,6 +308,104 @@ export function getDropDestinationFromRows(
   return getDropBeforeParentDestination(rows, dropBefore);
 }
 
+function panesShowSameView(
+  source: Pane | undefined,
+  target: Pane | undefined
+): boolean {
+  if (!source || !target || source.sourceId !== target.sourceId) {
+    return false;
+  }
+  if (source.documentId !== undefined || target.documentId !== undefined) {
+    return source.documentId === target.documentId;
+  }
+  return (
+    source.rootNodeId !== undefined && source.rootNodeId === target.rootNodeId
+  );
+}
+
+function nextMoveAnchor(
+  rows: List<Row>,
+  startIndex: number,
+  sources: Row[]
+): Row | undefined {
+  return rows
+    .slice(startIndex)
+    .find(
+      (row) =>
+        !isDraggedOccurrence(row, sources) &&
+        row.virtualType === undefined &&
+        !isEmptyNodeID(row.node.id)
+    );
+}
+
+function moveIndent(
+  rows: List<Row>,
+  targetRow: Row,
+  insertBefore: Row | undefined,
+  targetDepth: number | undefined
+): number {
+  const fallback = ((): number => {
+    if (insertBefore === undefined) {
+      return targetRow.parentRef === undefined
+        ? targetRow.depth + 1
+        : targetRow.depth;
+    }
+    return targetRow.depth > insertBefore.depth
+      ? targetRow.depth
+      : insertBefore.depth;
+  })();
+  const minDepth = insertBefore ? insertBefore.depth : getRootDepth(rows) + 1;
+  const maxDepth = targetRow.depth + 1;
+  return Math.max(minDepth, Math.min(maxDepth, targetDepth ?? fallback));
+}
+
+function remapPaneKey(viewKey: string, paneIndex: number): string {
+  return viewKey.replace(/^p\d+:/u, `p${paneIndex}:`);
+}
+
+// The move gesture hands the writer exactly three things: the grabbed
+// rows, the row to insert before, and the indent.
+export function moveWithinView(
+  basePlan: Plan,
+  data: Data,
+  targetPaneIndex: number,
+  sourceDrag: DragSource,
+  rows: List<Row>,
+  targetRow: Row,
+  targetDepth: number | undefined
+): Plan | undefined {
+  const sources = sourceDrag.draggedRows.length
+    ? sourceDrag.draggedRows
+    : [sourceDrag.row];
+  const independent = getIndependentRows(sources);
+  const sameView =
+    sourceDrag.sourcePaneIndex === targetPaneIndex ||
+    panesShowSameView(
+      data.panes[sourceDrag.sourcePaneIndex],
+      data.panes[targetPaneIndex]
+    );
+  if (
+    !sameView ||
+    sourceDrag.isCopyDrag ||
+    sourceDrag.insertTarget !== undefined ||
+    independent.some(
+      (row) => row.virtualType !== undefined || row.materialize !== undefined
+    )
+  ) {
+    return undefined;
+  }
+  const insertBefore = nextMoveAnchor(rows, targetRow.index + 1, sources);
+  const indent = moveIndent(rows, targetRow, insertBefore, targetDepth);
+  return planMoveRows(
+    basePlan,
+    data,
+    targetPaneIndex,
+    independent.map((row) => remapPaneKey(row.viewKey, targetPaneIndex)),
+    insertBefore?.viewKey,
+    indent
+  );
+}
+
 export function dnd(
   basePlan: Plan,
   sourceDrag: DragSource,
@@ -367,135 +463,6 @@ export function dnd(
 
   if (isDocumentTopLevelSource && isSameDocument && !sourceDrag.isCopyDrag) {
     return plan;
-  }
-
-  const sourceParentRef = sourceDrag.row.parentRef;
-  const allSourcesSameParent =
-    sourceParentRef !== undefined &&
-    independentRows.every((row) => refsEqual(row.parentRef, sourceParentRef));
-  const targetParentRef = { sourceId: targetSourceId, id: targetParentNode.id };
-  const sameNode =
-    allSourcesSameParent && refsEqual(sourceParentRef, targetParentRef);
-
-  const skipMoveLogic = sourceDrag.isCopyDrag;
-  const reorder = isSameDocument && !skipMoveLogic && sameNode;
-
-  const addProjectedSourceAsReference = (
-    accPlan: Plan,
-    sourceRow: Row,
-    insertAt: number
-  ): Plan => {
-    if (sourceRow.materialize) {
-      const [materializedPlan, materializedNode, materializedNow] =
-        planMaterializeComputedRow(accPlan, sourceRow, undefined, {
-          parentID: targetParentNode.id,
-          insertIndex: insertAt,
-        });
-      if (materializedNow || !sourceRow.parentRef) {
-        return materializedPlan;
-      }
-      // Same-parent: an in-place reorder (planMoveNode is add-then-
-      // disconnect and not same-parent-safe). Cross-parent: a move.
-      if (sourceRow.parentRef.id === targetParentNode.id) {
-        const parentNode = getCurrentPlanNode(
-          materializedPlan,
-          targetParentNode
-        );
-        const fromIndex = parentNode.children.indexOf(materializedNode.id);
-        if (fromIndex < 0) {
-          return materializedPlan;
-        }
-        const reordered = planUpsertNodes(
-          materializedPlan,
-          moveNodes(parentNode, [fromIndex], insertAt)
-        );
-        return planUpdateViews(
-          reordered,
-          updateViewPathsAfterMoveNodes(reordered)
-        );
-      }
-      return planMoveNode(
-        materializedPlan,
-        materializedNode.id,
-        materializedNode.id,
-        sourceRow.parentRef.id,
-        sourceRow.viewPath,
-        targetParentNode.id,
-        targetParentRow.viewPath,
-        insertAt
-      );
-    }
-    return planAddToParent(
-      accPlan,
-      createRefTarget(sourceRow.node.id, nodeText(sourceRow.node)),
-      targetParentNode.id,
-      insertAt
-    )[0];
-  };
-
-  if (reorder) {
-    const realRows = independentRows.filter(
-      (row) => row.childIndex !== undefined
-    );
-    const virtualRows = independentRows.filter(
-      (row) => row.childIndex === undefined
-    );
-    const sourceIndices = realRows.flatMap((row) =>
-      row.childIndex === undefined ? [] : [row.childIndex]
-    );
-    const targetNode = getCurrentPlanNode(plan, targetParentNode);
-    const updatedNodesPlan = planUpsertNodes(
-      plan,
-      moveNodes(targetNode, sourceIndices, dropIndex)
-    );
-    const updatedViews = updateViewPathsAfterMoveNodes(updatedNodesPlan);
-    const reorderedPlan = planUpdateViews(updatedNodesPlan, updatedViews);
-    return virtualRows.reduce((accPlan: Plan, sourceRow, idx) => {
-      const insertAt = dropIndex + sourceIndices.length + idx;
-      return addProjectedSourceAsReference(accPlan, sourceRow, insertAt);
-    }, reorderedPlan);
-  }
-
-  const sameDocumentMove = isSameDocument && !skipMoveLogic && !sameNode;
-
-  if (sameDocumentMove) {
-    const isDropIntoOwnDescendant = independentRows.some(
-      (row) =>
-        targetParentRow.viewKey === row.viewKey ||
-        targetParentRow.viewKey.startsWith(`${row.viewKey}:`)
-    );
-    if (isDropIntoOwnDescendant) {
-      return plan;
-    }
-    const realRows = independentRows.filter(
-      (row) => row.childIndex !== undefined
-    );
-    const virtualRows = independentRows.filter(
-      (row) => row.childIndex === undefined
-    );
-    const moveBasePlan = targetParentRow.view.expanded
-      ? plan
-      : planExpandNode(plan, targetParentRow.view, targetParentRow.viewPath);
-    const movedPlan = realRows.reduce((accPlan: Plan, sourceRow, idx) => {
-      if (!sourceRow.parentNode) {
-        return accPlan;
-      }
-      const insertAt = dropIndex + idx;
-      return planMoveNode(
-        accPlan,
-        sourceRow.node.id,
-        sourceRow.node.id,
-        sourceRow.parentNode.id,
-        sourceRow.viewPath,
-        targetParentNode.id,
-        targetParentRow.viewPath,
-        insertAt
-      );
-    }, moveBasePlan);
-    return virtualRows.reduce((accPlan: Plan, sourceRow, idx) => {
-      const insertAt = dropIndex + realRows.length + idx;
-      return addProjectedSourceAsReference(accPlan, sourceRow, insertAt);
-    }, movedPlan);
   }
 
   const expandedPlan = targetParentRow.view.expanded

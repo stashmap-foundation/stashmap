@@ -272,7 +272,7 @@ Salon
   `);
 });
 
-test("entries in your own document are read-only projections", async () => {
+test("entries stay read-only but dragging one writes a move statement", async () => {
   const [alice] = setup([ALICE]);
   renderApp({
     ...alice(),
@@ -299,9 +299,13 @@ Salon
   https://scholarium.at/salon.ics
     01.01.2020 Founding seminar
     14.07.2030 Sommerfest
-    ${dunbarText()}
   Notes
+  ${dunbarText()}
   `);
+
+  expect(
+    screen.queryByRole("textbox", { name: `edit ${dunbarText()}` })
+  ).toBeNull();
 });
 
 test("feed loading follows embeds in loaded documents, not drawn rows", async () => {

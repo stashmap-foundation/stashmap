@@ -98,6 +98,10 @@ function convertViewPathToString(viewContext: ViewPath): string {
 // TODO: delete this export
 export const viewPathToString = convertViewPathToString;
 
+export function childViewKey(parentKey: string, nodeID: ID): string {
+  return `${parentKey}:${encodePathID(nodeID)}`;
+}
+
 export function isRoot(viewPath: ViewPath): boolean {
   return viewPath.length === 2;
 }

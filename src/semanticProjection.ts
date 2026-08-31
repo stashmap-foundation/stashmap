@@ -19,6 +19,7 @@ import {
   resolveAuthoredFirst,
 } from "./core/graphLookup";
 import { nodeRefKey } from "./core/nodeRef";
+import { embedTargetOf, isMoveStatement } from "./showings";
 
 type ReferencedByRef = {
   nodeID: ID;
@@ -228,6 +229,13 @@ export function getIncomingCrefsForNode(
     // A reference the view is currently looking through — its carrying
     // row sits on the active expansion path — never queues under itself.
     .filter((source) => !expansionPath.includes(source.node.id))
+    .filter(
+      (source) =>
+        !(
+          isMoveStatement(source.node) &&
+          embedTargetOf(source.node) === currentNodeID
+        )
+    )
     .filter(
       (source) =>
         target === undefined ||

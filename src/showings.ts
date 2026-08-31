@@ -44,7 +44,7 @@ function positionNamesOf(node: GraphNode): PositionName[] {
   );
 }
 
-function isMoveStatement(node: GraphNode): boolean {
+export function isMoveStatement(node: GraphNode): boolean {
   return embedTargetOf(node) !== undefined && positionNamesOf(node).length > 0;
 }
 
@@ -564,9 +564,13 @@ function readNames(root: Showing, aliases: Map<ID, Showing>): Showing {
     if (copied.has(row)) {
       return;
     }
-    (lists.get(row)?.before ?? []).forEach((early) => unfold(entries, early));
-    entries.push(emitRow(row));
-    (lists.get(row)?.after ?? []).forEach((late) => unfold(entries, late));
+    // Copied before its lists unfold — a circle of names would otherwise unfold forever.
+    const draft = emitRow(row);
+    const befores: Draft["entries"] = [];
+    (lists.get(row)?.before ?? []).forEach((early) => unfold(befores, early));
+    const afters: Draft["entries"] = [];
+    (lists.get(row)?.after ?? []).forEach((late) => unfold(afters, late));
+    entries.push(...befores, draft, ...afters);
   }
   const rootDraft = emitRow(root);
   const sweepDraft = (draft: Draft): void => {

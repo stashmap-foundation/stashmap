@@ -733,6 +733,57 @@ A
   `);
 });
 
+test("a hand-written move statement moves the row and rides when its name dies", async () => {
+  const workspacePath = writeWorkspace({
+    "source.md": [
+      "# Source <!-- id:s -->",
+      "",
+      "- Alpha <!-- id:a -->",
+      "- Beta <!-- id:b -->",
+      "- Gamma <!-- id:g -->",
+    ].join("\n"),
+    "diff.md": [
+      '# [Source](#s) <!-- id:o0 embed="true" -->',
+      "",
+      '- [Gamma](#g) <!-- id:m1 embed="true" after="a" before="b" -->',
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "diff.md"),
+  });
+  const [diffRoot] = await screen.findAllByRole("treeitem");
+  await userEvent.click(diffRoot);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await expectTree(`
+Source
+  Alpha
+  Gamma
+  Beta
+  `);
+
+  fs.writeFileSync(
+    pathModule.join(workspacePath, "source.md"),
+    [
+      "# Source <!-- id:s -->",
+      "",
+      "- Beta <!-- id:b -->",
+      "- Gamma <!-- id:g -->",
+    ].join("\n")
+  );
+
+  await screen.findByRole("treeitem", { name: "Source" });
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await expectTree(`
+Source
+  Gamma
+  Beta
+  `);
+});
+
 test("mutual embeds keep the reciprocal arrow and terminate composition", async () => {
   const [alice] = setup([ALICE]);
   renderApp(alice());

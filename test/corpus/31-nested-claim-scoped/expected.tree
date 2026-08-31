@@ -1,0 +1,6 @@
+Source <!-- id:o0 -->
+  Topic <!-- base:x -->
+    Detail <!-- base:xd -->
+  Inner <!-- id:p1 -->
+    Thing <!-- base:y -->
+    My topic <!-- id:p2 -->

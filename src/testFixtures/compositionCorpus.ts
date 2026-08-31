@@ -151,7 +151,7 @@ function printShowing(
 ): string {
   const line = `${"  ".repeat(indent)}${mounted ? ">" : ""}${showing.node.id}${
     showing.cycle ? " cycle" : ""
-  }\n`;
+  }${showing.demoted ? " demoted" : ""}\n`;
   const target = showing.target
     ? printShowing(showing.target, indent + 1, true)
     : "";

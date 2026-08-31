@@ -32,20 +32,26 @@ export function embedTargetOf(node: GraphNode): ID | undefined {
 function claimsBelow(
   graph: GraphLookup,
   parent: ResolvedNode,
-  walk: { seen: ImmutableSet<ID>; claims: ImmutableSet<ID> }
-): { seen: ImmutableSet<ID>; claims: ImmutableSet<ID> } {
+  walk: { visited: ImmutableSet<ID>; claims: ImmutableSet<ID> }
+): { visited: ImmutableSet<ID>; claims: ImmutableSet<ID> } {
   return parent.node.children.toArray().reduce((acc, childID) => {
     if (childID === EMPTY_NODE_ID) {
       return acc;
     }
     const child = resolveChildOf(graph, parent, childID);
-    if (!child || acc.seen.has(child.node.id)) {
+    if (!child || acc.visited.has(child.node.id)) {
       return acc;
     }
     const targetID = embedTargetOf(child.node);
+    if (targetID !== undefined) {
+      return {
+        visited: acc.visited.add(child.node.id),
+        claims: acc.claims.add(targetID),
+      };
+    }
     return claimsBelow(graph, child, {
-      seen: acc.seen.add(child.node.id),
-      claims: targetID !== undefined ? acc.claims.add(targetID) : acc.claims,
+      visited: acc.visited.add(child.node.id),
+      claims: acc.claims,
     });
   }, walk);
 }
@@ -54,10 +60,19 @@ function diffClaims(
   graph: GraphLookup,
   parents: readonly ResolvedNode[]
 ): ImmutableSet<ID> {
-  return parents.reduce(
-    (walk, parent) => claimsBelow(graph, parent, walk),
-    { seen: ImmutableSet<ID>(), claims: ImmutableSet<ID>() }
-  ).claims;
+  return parents.reduce((walk, parent) => claimsBelow(graph, parent, walk), {
+    visited: ImmutableSet<ID>(),
+    claims: ImmutableSet<ID>(),
+  }).claims;
+}
+
+function priorShowing(
+  id: ID,
+  ancestors: ImmutableSet<ID>,
+  winners: ImmutableSet<ID>
+): { cycle: boolean; demoted: boolean } {
+  const cycle = ancestors.has(id);
+  return { cycle, demoted: !cycle && winners.has(id) };
 }
 
 /* eslint-disable functional/no-let, functional/immutable-data */
@@ -65,8 +80,8 @@ function sourceChain(
   graph: GraphLookup,
   resolved: ResolvedNode,
   reached: Showing["reached"],
-  openPath: ImmutableSet<ID>,
-  shown: ImmutableSet<ID>
+  ancestorsBefore: ImmutableSet<ID>,
+  winnersBefore: ImmutableSet<ID>
 ): {
   links: {
     resolved: ResolvedNode;
@@ -74,39 +89,39 @@ function sourceChain(
     cycle: boolean;
     demoted: boolean;
   }[];
-  open: ImmutableSet<ID>;
-  seen: ImmutableSet<ID>;
+  ancestors: ImmutableSet<ID>;
+  winners: ImmutableSet<ID>;
 } {
   const links = [];
   let current = { resolved, reached };
-  let open = openPath;
-  let seen = shown;
+  let ancestors = ancestorsBefore;
+  let winners = winnersBefore;
   for (;;) {
-    open = open.add(current.resolved.node.id);
-    seen = seen.add(current.resolved.node.id);
+    ancestors = ancestors.add(current.resolved.node.id);
+    winners = winners.add(current.resolved.node.id);
     const targetID = embedTargetOf(current.resolved.node);
-    const cycle = targetID !== undefined && open.has(targetID);
-    const demoted = targetID !== undefined && !cycle && seen.has(targetID);
-    links.push({ ...current, cycle, demoted });
+    const prior =
+      targetID !== undefined
+        ? priorShowing(targetID, ancestors, winners)
+        : { cycle: false, demoted: false };
+    links.push({ ...current, ...prior });
     const target =
-      targetID === undefined || cycle || demoted
+      targetID === undefined || prior.cycle || prior.demoted
         ? undefined
         : resolveAuthoredFirst(graph, targetID, current.resolved.ref.sourceId);
     if (!target) {
-      return { links, open, seen };
+      return { links, ancestors, winners };
     }
     current = { resolved: target, reached: { kind: "target" } };
   }
 }
 /* eslint-enable functional/no-let, functional/immutable-data */
 
-type Built = { showing: Showing; seen: ImmutableSet<ID> };
-
 function demotedLine(
   resolved: ResolvedNode,
   reached: Showing["reached"],
-  seen: ImmutableSet<ID>
-): Built {
+  winners: ImmutableSet<ID>
+): { showing: Showing; winners: ImmutableSet<ID> } {
   return {
     showing: {
       node: resolved.node,
@@ -117,7 +132,7 @@ function demotedLine(
       demoted: true,
       children: [],
     },
-    seen,
+    winners,
   };
 }
 
@@ -125,97 +140,86 @@ function buildShowing(
   graph: GraphLookup,
   resolved: ResolvedNode,
   reached: Showing["reached"],
-  openPath: ImmutableSet<ID>,
-  shown: ImmutableSet<ID>,
+  ancestors: ImmutableSet<ID>,
+  winners: ImmutableSet<ID>,
   claims: ImmutableSet<ID>,
-  projected: boolean
-): Built {
-  if (reached.kind === "line" && shown.has(resolved.node.id)) {
-    return demotedLine(resolved, reached, shown);
+  inProjection: boolean
+): { showing: Showing; winners: ImmutableSet<ID> } {
+  if (reached.kind === "line") {
+    const prior = priorShowing(resolved.node.id, ancestors, winners);
+    const claimed = inProjection && claims.has(resolved.node.id);
+    if (prior.cycle || prior.demoted || claimed) {
+      return demotedLine(resolved, reached, winners);
+    }
   }
-  if (reached.kind === "line" && projected && claims.has(resolved.node.id)) {
-    return demotedLine(resolved, reached, shown);
-  }
-  const { links, open, seen } = sourceChain(
-    graph,
-    resolved,
-    reached,
-    openPath,
-    shown
+  const chain = sourceChain(graph, resolved, reached, ancestors, winners);
+  const activeClaims = claims.union(
+    diffClaims(
+      graph,
+      chain.links.slice(0, -1).map((link) => link.resolved)
+    )
   );
-  const chainClaims = diffClaims(
-    graph,
-    links.slice(0, -1).map((link) => link.resolved)
-  );
-  const activeClaims = claims.union(chainClaims);
+  /* eslint-disable functional/no-let, functional/immutable-data */
   const lineShowings = (
     parent: ResolvedNode,
-    parentProjected: boolean,
-    seenBefore: ImmutableSet<ID>
-  ): { children: Showing[]; seen: ImmutableSet<ID> } =>
-    parent.node.children.toArray().reduce<{
-      children: Showing[];
-      seen: ImmutableSet<ID>;
-    }>(
-      (acc, childID, childIndex) => {
-        if (childID === EMPTY_NODE_ID) {
-          return acc;
-        }
-        const child = resolveChildOf(graph, parent, childID);
-        if (!child) {
-          return acc;
-        }
-        const built = buildShowing(
-          graph,
-          child,
-          { kind: "line", childIndex },
-          open,
-          acc.seen,
-          activeClaims,
-          parentProjected
-        );
-        return {
-          children: [...acc.children, built.showing],
-          seen: built.seen,
-        };
-      },
-      { children: [], seen: seenBefore }
+    linesInProjection: boolean,
+    winnersBefore: ImmutableSet<ID>
+  ): { children: Showing[]; winners: ImmutableSet<ID> } => {
+    // Mutable accumulation: an immutable append copies the array per child, O(n²) on wide trees.
+    const children: Showing[] = [];
+    let childWinners = winnersBefore;
+    parent.node.children.toArray().forEach((childID, childIndex) => {
+      if (childID === EMPTY_NODE_ID) {
+        return;
+      }
+      const child = resolveChildOf(graph, parent, childID);
+      if (!child) {
+        return;
+      }
+      const built = buildShowing(
+        graph,
+        child,
+        { kind: "line", childIndex },
+        chain.ancestors,
+        childWinners,
+        activeClaims,
+        linesInProjection
+      );
+      children.push(built.showing);
+      childWinners = built.winners;
+    });
+    return { children, winners: childWinners };
+  };
+  /* eslint-enable functional/no-let, functional/immutable-data */
+  const mountLink = (
+    link: typeof chain.links[number],
+    target: Showing | undefined,
+    winnersBefore: ImmutableSet<ID>
+  ): { showing: Showing; winners: ImmutableSet<ID> } => {
+    const lines = lineShowings(
+      link.resolved,
+      link.reached.kind === "target" ? true : inProjection,
+      winnersBefore
     );
-  const builtByLink = [...links].reverse().reduce<{
-    childrenByLink: Showing[][];
-    seen: ImmutableSet<ID>;
-  }>(
-    (acc, link) => {
-      const linkProjected = link.reached.kind === "target" ? true : projected;
-      const built = lineShowings(link.resolved, linkProjected, acc.seen);
-      return {
-        childrenByLink: [built.children, ...acc.childrenByLink],
-        seen: built.seen,
-      };
-    },
-    { childrenByLink: [], seen }
-  );
-  const mount = (
-    link: typeof links[number],
-    index: number,
-    target: Showing | undefined
-  ): Showing => ({
-    node: link.resolved.node,
-    ref: link.resolved.ref,
-    reached: link.reached,
-    target,
-    cycle: link.cycle,
-    demoted: link.demoted,
-    children: builtByLink.childrenByLink[index],
-  });
-  const last = links.length - 1;
-  const showing = links
+    return {
+      showing: {
+        node: link.resolved.node,
+        ref: link.resolved.ref,
+        reached: link.reached,
+        target,
+        cycle: link.cycle,
+        demoted: link.demoted,
+        children: lines.children,
+      },
+      winners: lines.winners,
+    };
+  };
+  return chain.links
     .slice(0, -1)
     .reduceRight(
-      (inner, link, index) => mount(link, index, inner),
-      mount(links[last], last, undefined)
+      (inner, link) => mountLink(link, inner.showing, inner.winners),
+      mountLink(chain.links[chain.links.length - 1], undefined, chain.winners)
     );
-  return { showing, seen: builtByLink.seen };
 }
 
 export function showingTreeForRoot(

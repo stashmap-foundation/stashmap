@@ -57,7 +57,11 @@ import { parsedLinesToTrees, planPasteMarkdownTrees } from "./FileDropZone";
 import { planDisconnectFromParent } from "../treeMutations";
 import { useNodeIsLoading } from "../LoadingStatus";
 import { NodeCard } from "../commons/Ui";
-import { usePaneIndex, useNavigatePane } from "../SplitPanesContext";
+import {
+  usePaneIndex,
+  useNavigatePane,
+  useCurrentPane,
+} from "../SplitPanesContext";
 import { RightMenu } from "./RightMenu";
 import { useItemStyle } from "./useItemStyle";
 import {
@@ -223,14 +227,32 @@ function reciprocalLinks(
   }, initial).links;
 }
 
-function demotedRowRootHref(row: Row, href: string): string | undefined {
+function priorRowRootHref(
+  data: Data,
+  pane: Pane,
+  row: Row,
+  href: string
+): string | undefined {
   const targetID = embedTargetOf(row.node);
-  return row.demoted && targetID !== undefined && href === `#${targetID}`
-    ? buildNodeRouteUrl(row.node.id, row.sourceId, {
-        scrollToId: undefined,
-        fallbackLabel: undefined,
-      })
-    : undefined;
+  if (
+    (!row.demoted && !row.cycle) ||
+    targetID === undefined ||
+    href !== `#${targetID}`
+  ) {
+    return undefined;
+  }
+  const url = buildNodeRouteUrl(
+    row.node.id,
+    row.sourceId,
+    { scrollToId: undefined, fallbackLabel: undefined },
+    data.pull?.coordinatesBySourceId.get(row.sourceId) ??
+      (row.sourceId === pane.sourceId ? pane.routeCoordinate : undefined)
+  );
+  return pane.storageKey !== undefined &&
+    row.sourceId === pane.sourceId &&
+    url.startsWith("/storage/")
+    ? `${url}#key=${encodeURIComponent(pane.storageKey)}`
+    : url;
 }
 
 function InlineLinkSpan({
@@ -246,6 +268,7 @@ function InlineLinkSpan({
 }): JSX.Element {
   const data = useData();
   const navigatePane = useNavigatePane();
+  const pane = useCurrentPane();
   const row = useRow();
   const isSearchResult = row.virtualType === "search";
   // An embed shows the target's live text: the row's own label is the
@@ -260,7 +283,7 @@ function InlineLinkSpan({
   const dead = isDeadLinkTarget(data, span.href, node, sourceId);
   const internalHref = dead
     ? undefined
-    : demotedRowRootHref(row, span.href) ??
+    : priorRowRootHref(data, pane, row, span.href) ??
       inlineLinkToHref(data, span.href, node, sourceId, span.text);
   const href = externalUrl ?? internalHref;
   const style: React.CSSProperties = isSearchResult
@@ -457,6 +480,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
   const { textStyle } = useItemStyle();
   const { createPlan, executePlan } = usePlanner();
   const navigatePane = useNavigatePane();
+  const pane = useCurrentPane();
   const currentNode = useCurrentNode();
   const prevSibling = getPreviousSiblingFromRows(rows, row);
   const parentPath = row.parentViewPath;
@@ -799,7 +823,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       (span) => span.kind === "link" && span.href === href
     )?.text;
     const targetHref =
-      demotedRowRootHref(row, href) ??
+      priorRowRootHref(data, pane, row, href) ??
       inlineLinkToHref(data, href, row.node, row.sourceId, fallbackLabel);
     if (targetHref) navigatePane(targetHref);
   };

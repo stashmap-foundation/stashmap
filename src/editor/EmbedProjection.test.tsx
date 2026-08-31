@@ -580,6 +580,106 @@ Shared
   `);
 });
 
+test("opening a cycle link shows its target whole with that placement's diff", async () => {
+  const workspacePath = writeWorkspace({
+    "a.md": [
+      "# A <!-- id:a -->",
+      "",
+      '- [B](#b) <!-- id:ab embed="true" -->',
+    ].join("\n"),
+    "b.md": [
+      "# B <!-- id:b -->",
+      "",
+      '- [Back to A](#a) <!-- id:x embed="true" -->',
+      "  - Kept below the loop <!-- id:k -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "a.md"),
+  });
+  const [aRoot] = await screen.findAllByRole("treeitem");
+  await userEvent.click(aRoot);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await expectTree(`
+A
+  B↩
+    Back to A↩
+      Kept below the loop
+  `);
+
+  await userEvent.click(
+    await screen.findByRole("link", { name: "Navigate to Back to A" })
+  );
+
+  const [drilledRoot] = await screen.findAllByRole("treeitem");
+  await userEvent.click(drilledRoot);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await expectTree(`
+A↩
+  B↩
+    Back to A↩
+  Kept below the loop
+  `);
+});
+
+test("each demoted placement drills down to its own diff", async () => {
+  const files = {
+    "source.md": [
+      "# Source <!-- id:s -->",
+      "",
+      "- Argument A <!-- id:sa -->",
+    ].join("\n"),
+    "doc.md": [
+      "# Doc <!-- id:doc -->",
+      "",
+      '- [Winner](#s) <!-- id:p1 embed="true" -->',
+      '- [Second](#s) <!-- id:p2 embed="true" -->',
+      "  - Note two <!-- id:n2 -->",
+      '- [Third](#s) <!-- id:p3 embed="true" -->',
+      "  - Note three <!-- id:n3 -->",
+    ].join("\n"),
+  };
+
+  await renderAppTree({
+    path: writeWorkspace(files),
+    initialRoute: buildDocumentRouteUrl(LOCAL, "doc.md"),
+  });
+  const [docRoot] = await screen.findAllByRole("treeitem");
+  await userEvent.click(docRoot);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+  await userEvent.click(
+    await screen.findByRole("link", { name: "Navigate to Second" })
+  );
+  await expectTree(`
+Source
+  Argument A
+  Note two
+  [I] Doc ↩
+  `);
+
+  cleanup();
+  await renderAppTree({
+    path: writeWorkspace(files),
+    initialRoute: buildDocumentRouteUrl(LOCAL, "doc.md"),
+  });
+  const [secondDocRoot] = await screen.findAllByRole("treeitem");
+  await userEvent.click(secondDocRoot);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+  await userEvent.click(
+    await screen.findByRole("link", { name: "Navigate to Third" })
+  );
+  await expectTree(`
+Source
+  Argument A
+  Note three
+  [I] Doc ↩
+  `);
+});
+
 test("reordering the routes flips which copy shows whole", async () => {
   const workspacePath = writeWorkspace({
     ...CONTEXT_FILES,

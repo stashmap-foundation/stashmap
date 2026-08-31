@@ -216,7 +216,7 @@ test("a feed line mounts its calendar as a computed source, diff at the end", ()
       "  >salon",
       "    f1",
       "      >feed:https://example.org/salon.ics",
-      "        ical:founding@example.org",
+      "        ical:founding@example.org demoted",
       "        ical:standup@example.org",
       "        ical:retro@example.org",
       "      m1",
@@ -245,7 +245,7 @@ test("a late-loading calendar changes the picture only through the rebuild", () 
     "  >salon",
     "    f1",
     "      >feed:https://example.org/salon.ics",
-    "        ical:founding@example.org",
+    "        ical:founding@example.org demoted",
     "        ical:standup@example.org",
     "        ical:retro@example.org",
     "      m1",
@@ -273,7 +273,7 @@ test("a placement beside a feed yields to the feed's occurrence", () => {
       "    f1",
       "      >feed:https://example.org/salon.ics",
       "        ical:standup@example.org",
-      "    l1",
+      "    l1 demoted",
       "",
     ].join("\n")
   );
@@ -304,7 +304,7 @@ test("a loaded feed never shadows an authored node with the same id", () => {
       "    d1",
       "  f1",
       "    >feed:https://example.org/cal.ics",
-      "      ical:dunbar@example.org",
+      "      ical:dunbar@example.org demoted",
       "      ical:other@example.org",
       "",
     ].join("\n")
@@ -399,6 +399,28 @@ test("a mounted line stays projected when a placement child shares its id", () =
       "",
     ].join("\n")
   );
+});
+
+test("a plain duplicate line is demoted without carrying a link", () => {
+  const tree = composeFixtureShowingTree(
+    [
+      {
+        name: "source.md",
+        content: "# Source <!-- id:s -->\n\n- Twin <!-- id:b -->\n",
+      },
+      {
+        name: "diff.md",
+        content: [
+          '# [Source](#s) <!-- id:o0 embed="true" -->',
+          "",
+          "- Twin <!-- id:b -->",
+          "",
+        ].join("\n"),
+      },
+    ],
+    "diff.md"
+  );
+  expect(tree).toBe(["o0", "  >s", "    b", "  b demoted", ""].join("\n"));
 });
 
 test("an empty calendar mounts with no entries", () => {

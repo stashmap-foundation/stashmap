@@ -1066,6 +1066,73 @@ test("deposit routes render Loading until the exact source arrives", async () =>
   `);
 });
 
+test("a demoted link in a pulled document drills down on the exact route", async () => {
+  const relayPool = mockRelayPool();
+  const alicePath = await workspaceWithDocument(
+    "dup.md",
+    [
+      "---",
+      "knowstr_doc_id: dup-doc",
+      "---",
+      "# Alice Doc <!-- id:dup-root -->",
+      "- Shared <!-- id:shared -->",
+      "  - Insight <!-- id:shared-i -->",
+      '- [Again](#shared) <!-- id:dup-second embed="true" -->',
+      "",
+    ].join("\n")
+  );
+  const coordinate: RouteCoordinate = {
+    eventKind: KIND_KNOWLEDGE_DEPOSIT,
+    pubkey: profilePubkey(alicePath),
+    dTag: "dup-doc",
+    relays: [RELAY_URL],
+  };
+  const [bob] = setup([BOB], { relayPool });
+  renderApp({
+    ...bob(),
+    roomRelays: ["wss://ambient-room.example/"],
+    initialRoute: buildCoordinateRouteUrl(
+      "deposit",
+      coordinate,
+      undefined,
+      undefined
+    ),
+  });
+  await publishDepositFixture(
+    relayPool,
+    alicePath,
+    "dup.md",
+    "dup-doc",
+    "Alice Doc"
+  );
+  const [depositRoot] = await screen.findAllByRole("treeitem");
+  await userEvent.click(depositRoot);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+  await expectTree(`
+[O] Alice Doc
+  [O] Shared
+    [O] Insight
+    [OI] Alice Doc ↩
+  [O] Again
+  `);
+
+  await userEvent.click(
+    await screen.findByRole("link", { name: /Navigate to Again/u })
+  );
+  await waitFor(() => {
+    expect(window.location.pathname + window.location.search).toBe(
+      buildCoordinateRouteUrl("deposit", coordinate, "dup-second", undefined)
+    );
+  });
+  const [drilledRoot] = await screen.findAllByRole("treeitem");
+  await userEvent.click(drilledRoot);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+  await expectTree(`
+[O] Shared
+  [O] Insight
+  `);
+});
+
 afterEach(() => {
   cleanup();
 });

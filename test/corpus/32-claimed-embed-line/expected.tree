@@ -1,0 +1,5 @@
+Source <!-- id:o0 -->
+  Inner <!-- base:st -->
+  Other <!-- base:b -->
+  Inner <!-- id:p1 -->
+    Thing <!-- base:y -->

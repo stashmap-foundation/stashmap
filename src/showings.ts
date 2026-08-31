@@ -24,7 +24,7 @@ export type Showing = {
   inProjection: boolean;
   statement: boolean;
   names: PositionName[];
-  spokenFor: ID | undefined;
+  spokenBy: ID[];
   lapsed: boolean;
   children: Showing[];
 };
@@ -247,7 +247,7 @@ function demotedLine(
       inProjection,
       statement: false,
       names: positionNamesOf(resolved.node),
-      spokenFor: undefined,
+      spokenBy: [],
       lapsed: false,
       children: [],
     },
@@ -348,21 +348,28 @@ function buildShowing(
       linkDiffTarget(link),
       winnersBefore
     );
+    const assembled: Showing = {
+      node: link.resolved.node,
+      ref: link.resolved.ref,
+      reached: link.reached,
+      target,
+      cycle: link.cycle,
+      demoted: link.demoted,
+      inProjection: linkInProjection,
+      statement: link.statement,
+      names: link.statement ? [] : positionNamesOf(link.resolved.node),
+      spokenBy: [],
+      lapsed: false,
+      children: lines.children,
+    };
+    // A mounted source finishes before the embedding document's diff
+    // applies: its statements and names settle the moment it mounts.
     return {
-      showing: {
-        node: link.resolved.node,
-        ref: link.resolved.ref,
-        reached: link.reached,
-        target,
-        cycle: link.cycle,
-        demoted: link.demoted,
-        inProjection: linkInProjection,
-        statement: link.statement,
-        names: link.statement ? [] : positionNamesOf(link.resolved.node),
-        spokenFor: undefined,
-        lapsed: false,
-        children: lines.children,
-      },
+      showing:
+        link.reached.kind === "target"
+          ? // eslint-disable-next-line @typescript-eslint/no-use-before-define
+            settleLayer(assembled)
+          : assembled,
       winners: lines.winners,
     };
   };
@@ -430,22 +437,37 @@ function statementScope(
   return owner.reached.kind === "line" ? ownerScope : undefined;
 }
 
-function collectStatements(
-  showing: Showing,
+// A layer is one document's contribution: its own lines reached through
+// children edges alone. Mounted sources below it settled when they mounted.
+function collectLayerStatements(
+  owner: Showing,
   scope: Showing | undefined,
   out: { statement: Showing; scope: Showing | undefined }[]
 ): void {
   /* eslint-disable functional/immutable-data */
-  rowListsOf(showing).forEach(({ owner, rows }) => {
-    const rowScope = statementScope(owner, scope);
-    rows.forEach((row) => {
-      if (row.statement) {
-        out.push({ statement: row, scope: rowScope });
-      }
-      collectStatements(row, rowScope, out);
-    });
+  const rowScope = statementScope(owner, scope);
+  owner.children.forEach((row) => {
+    if (row.statement) {
+      out.push({ statement: row, scope: rowScope });
+    }
+    collectLayerStatements(row, rowScope, out);
   });
   /* eslint-enable functional/immutable-data */
+}
+
+function layerNamedRows(owner: Showing, out: Showing[]): void {
+  /* eslint-disable functional/immutable-data */
+  owner.children.forEach((row) => {
+    if (!row.statement && row.names.length > 0) {
+      out.push(row);
+    }
+    layerNamedRows(row, out);
+  });
+  /* eslint-enable functional/immutable-data */
+}
+
+function answersTo(row: Showing, id: ID): boolean {
+  return row.node.id === id || row.spokenBy.includes(id);
 }
 
 function findOccurrence(scope: Showing, id: ID): Showing | undefined {
@@ -454,7 +476,7 @@ function findOccurrence(scope: Showing, id: ID): Showing | undefined {
       if (found) {
         return found;
       }
-      if (row.node.id === id && !row.demoted && !row.cycle && !row.statement) {
+      if (answersTo(row, id) && !row.demoted && !row.cycle && !row.statement) {
         return row;
       }
       return search(rowListsOf(row).flatMap((list) => list.rows));
@@ -471,35 +493,37 @@ type StatementEffects = {
 
 function rebuildWithoutStatements(
   showing: Showing,
-  effects: StatementEffects
-): { showing: Showing; aliases: [ID, Showing][] } {
+  effects: StatementEffects,
+  adopted: boolean
+): { showing: Showing; candidates: Showing[] } {
   const rebuildLink = (
     link: Showing,
-    inner: { showing: Showing; aliases: [ID, Showing][] } | undefined
-  ): { showing: Showing; aliases: [ID, Showing][] } => {
+    inner: { showing: Showing; candidates: Showing[] } | undefined
+  ): { showing: Showing; candidates: Showing[] } => {
     const kept = link.children
       .filter((child) => !effects.applied.has(child))
-      .map((child) => rebuildWithoutStatements(child, effects));
-    const adopted = (effects.extraChildrenFor.get(link) ?? []).map((child) =>
-      rebuildWithoutStatements(child, effects)
+      .map((child) => rebuildWithoutStatements(child, effects, adopted));
+    const taken = (effects.extraChildrenFor.get(link) ?? []).map((child) =>
+      rebuildWithoutStatements(child, effects, true)
     );
     const aliasIds = effects.aliasIdsFor.get(link) ?? [];
+    const names = [...(effects.namesFor.get(link) ?? []), ...link.names];
     const rebuilt: Showing = {
       ...link,
       target: inner?.showing,
-      names: [...(effects.namesFor.get(link) ?? []), ...link.names],
-      spokenFor: aliasIds[0] ?? link.spokenFor,
-      children: [...kept, ...adopted].map((child) => child.showing),
+      names,
+      spokenBy: [...aliasIds, ...link.spokenBy],
+      children: [...kept, ...taken].map((child) => child.showing),
     };
+    const moved =
+      effects.namesFor.has(link) ||
+      (adopted && !link.statement && names.length > 0);
     return {
       showing: rebuilt,
-      aliases: [
-        ...(effects.aliasIdsFor.get(link) ?? []).map((id): [ID, Showing] => [
-          id,
-          rebuilt,
-        ]),
-        ...(inner?.aliases ?? []),
-        ...[...kept, ...adopted].flatMap((child) => child.aliases),
+      candidates: [
+        ...(moved ? [rebuilt] : []),
+        ...(inner?.candidates ?? []),
+        ...[...kept, ...taken].flatMap((child) => child.candidates),
       ],
     };
   };
@@ -511,15 +535,10 @@ function rebuildWithoutStatements(
   );
 }
 
-function applyMoveStatements(root: Showing): {
-  showing: Showing;
-  aliases: Map<ID, Showing>;
-} {
-  const collected: { statement: Showing; scope: Showing | undefined }[] = [];
-  collectStatements(root, undefined, collected);
-  if (collected.length === 0) {
-    return { showing: root, aliases: new Map<ID, Showing>() };
-  }
+function applyLayerStatements(
+  layer: Showing,
+  collected: { statement: Showing; scope: Showing | undefined }[]
+): { showing: Showing; candidates: Showing[] } {
   const decisions = collected.map(({ statement, scope }) => {
     const targetId = embedTargetOf(statement.node);
     return {
@@ -537,8 +556,8 @@ function applyMoveStatements(root: Showing): {
     extraChildrenFor: new Map<Showing, Showing[]>(),
     aliasIdsFor: new Map<Showing, ID[]>(),
   };
-  // Applied back to front so an outer statement's names take priority over an
-  // inner one's while statements of one diff keep their file order.
+  // Applied back to front so statements of one diff keep their file order
+  // while a later statement's names take priority.
   decisions.reduceRight<undefined>((ignored, { statement, target }) => {
     if (!target) {
       return ignored;
@@ -560,10 +579,9 @@ function applyMoveStatements(root: Showing): {
   }, undefined);
   /* eslint-enable functional/immutable-data */
   if (effects.applied.size === 0) {
-    return { showing: root, aliases: new Map<ID, Showing>() };
+    return { showing: layer, candidates: [] };
   }
-  const rebuilt = rebuildWithoutStatements(root, effects);
-  return { showing: rebuilt.showing, aliases: new Map(rebuilt.aliases) };
+  return rebuildWithoutStatements(layer, effects, false);
 }
 
 type Draft = {
@@ -575,13 +593,15 @@ type Draft = {
 /* eslint-disable functional/no-let, functional/immutable-data, @typescript-eslint/no-use-before-define */
 // The bookmark walk builds the new tree in place: an immutable append would
 // copy every children array per inserted row, O(n²) on wide trees.
-function readNames(root: Showing, aliases: Map<ID, Showing>): Showing {
+function readNames(root: Showing, candidates: Set<Showing>): Showing {
   const index = new Map<ID, Showing>();
   index.set(root.node.id, root);
   eachRow(root, (row) => {
-    if (!index.has(row.node.id)) {
-      index.set(row.node.id, row);
-    }
+    [row.node.id, ...row.spokenBy].forEach((id) => {
+      if (!index.has(id)) {
+        index.set(id, row);
+      }
+    });
   });
   const lists = new Map<
     Showing,
@@ -590,13 +610,13 @@ function readNames(root: Showing, aliases: Map<ID, Showing>): Showing {
   const lapsedRows = new Set<Showing>();
   const noted = new Set<Showing>();
   eachRow(root, (row) => {
-    if (row.names.length === 0) {
+    if (row.names.length === 0 || !candidates.has(row)) {
       return;
     }
     const found = row.names
       .map((name) => ({
         name,
-        anchor: aliases.get(name.id) ?? index.get(name.id),
+        anchor: index.get(name.id),
       }))
       .find(({ anchor }) => anchor !== undefined && anchor !== row);
     if (!found || found.anchor === undefined) {
@@ -721,6 +741,22 @@ function readNames(root: Showing, aliases: Map<ID, Showing>): Showing {
 }
 /* eslint-enable functional/no-let, functional/immutable-data, @typescript-eslint/no-use-before-define */
 
+function settleLayer(layer: Showing): Showing {
+  const collected: { statement: Showing; scope: Showing | undefined }[] = [];
+  collectLayerStatements(layer, undefined, collected);
+  const staged =
+    collected.length > 0
+      ? applyLayerStatements(layer, collected)
+      : { showing: layer, candidates: [] };
+  const ownNamed: Showing[] = [];
+  layerNamedRows(staged.showing, ownNamed);
+  const candidates = new Set([...staged.candidates, ...ownNamed]);
+  if (candidates.size === 0) {
+    return staged.showing;
+  }
+  return readNames(staged.showing, candidates);
+}
+
 export function showingTreeForRoot(
   graph: GraphLookup,
   root: ResolvedNode
@@ -735,8 +771,7 @@ export function showingTreeForRoot(
     false,
     undefined
   ).showing;
-  const staged = applyMoveStatements(built);
-  return readNames(staged.showing, staged.aliases);
+  return settleLayer(built);
 }
 
 /* eslint-disable functional/no-let */

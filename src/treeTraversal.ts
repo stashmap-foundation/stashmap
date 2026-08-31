@@ -169,7 +169,7 @@ function createShowingRow(
     ...(presentedLineOf(showing).demoted && { demoted: true }),
     ...(showing.lapsed && { lapsed: true }),
     ...(showing.names.length > 0 && { positioned: true }),
-    ...(showing.spokenFor !== undefined && { spokenFor: showing.spokenFor }),
+    ...(showing.spokenBy.length > 0 && { spokenFor: showing.spokenBy[0] }),
   };
 }
 

@@ -48,9 +48,79 @@ export function isMoveStatement(node: GraphNode): boolean {
   return embedTargetOf(node) !== undefined && positionNamesOf(node).length > 0;
 }
 
+/* eslint-disable functional/no-let, functional/immutable-data */
+function reachContains(
+  graph: GraphLookup,
+  fromId: ID,
+  targetId: ID,
+  sourceId: SourceId
+): boolean {
+  if (fromId === targetId) {
+    return true;
+  }
+  const visited = new Set<ID>();
+  const stack: ResolvedNode[] = [];
+  const pushResolved = (resolved: ResolvedNode | undefined): void => {
+    if (resolved && !visited.has(resolved.node.id)) {
+      visited.add(resolved.node.id);
+      stack.push(resolved);
+    }
+  };
+  pushResolved(resolveAuthoredFirst(graph, fromId, sourceId));
+  for (;;) {
+    const current = stack.pop();
+    if (!current) {
+      return false;
+    }
+    if (current.node.id === targetId) {
+      return true;
+    }
+    const opened = embedTargetOf(current.node);
+    if (opened === targetId) {
+      return true;
+    }
+    if (opened !== undefined) {
+      pushResolved(resolveAuthoredFirst(graph, opened, current.ref.sourceId));
+    }
+    const found = current.node.children.toArray().some((childID) => {
+      if (childID === EMPTY_NODE_ID) {
+        return false;
+      }
+      if (childID === targetId) {
+        return true;
+      }
+      pushResolved(resolveChildOf(graph, current, childID));
+      return false;
+    });
+    if (found) {
+      return true;
+    }
+  }
+}
+/* eslint-enable functional/no-let, functional/immutable-data */
+
+function classifyPositioned(
+  graph: GraphLookup,
+  line: ResolvedNode,
+  diffTarget: ID
+): "move" | "own" | "add" {
+  const targetId = embedTargetOf(line.node);
+  if (targetId === undefined) {
+    return "add";
+  }
+  if (reachContains(graph, diffTarget, targetId, line.ref.sourceId)) {
+    return "move";
+  }
+  const resolved = resolveAuthoredFirst(graph, targetId, line.ref.sourceId);
+  return resolved !== undefined && resolved.node.root === line.node.root
+    ? "own"
+    : "add";
+}
+
 function claimsBelow(
   graph: GraphLookup,
   parent: ResolvedNode,
+  diffTarget: ID,
   walk: { visited: ImmutableSet<ID>; claims: ImmutableSet<ID> }
 ): { visited: ImmutableSet<ID>; claims: ImmutableSet<ID> } {
   return parent.node.children.toArray().reduce((acc, childID) => {
@@ -62,13 +132,17 @@ function claimsBelow(
       return acc;
     }
     const targetID = embedTargetOf(child.node);
-    if (targetID !== undefined && !isMoveStatement(child.node)) {
+    const placement =
+      targetID !== undefined &&
+      (!isMoveStatement(child.node) ||
+        classifyPositioned(graph, child, diffTarget) === "add");
+    if (placement && targetID !== undefined) {
       return {
         visited: acc.visited.add(child.node.id),
         claims: acc.claims.add(targetID),
       };
     }
-    return claimsBelow(graph, child, {
+    return claimsBelow(graph, child, diffTarget, {
       visited: acc.visited.add(child.node.id),
       claims: acc.claims,
     });
@@ -79,10 +153,18 @@ function diffClaims(
   graph: GraphLookup,
   parents: readonly ResolvedNode[]
 ): ImmutableSet<ID> {
-  return parents.reduce((walk, parent) => claimsBelow(graph, parent, walk), {
-    visited: ImmutableSet<ID>(),
-    claims: ImmutableSet<ID>(),
-  }).claims;
+  return parents.reduce(
+    (walk, parent) => {
+      const diffTarget = embedTargetOf(parent.node);
+      return diffTarget === undefined
+        ? walk
+        : claimsBelow(graph, parent, diffTarget, walk);
+    },
+    {
+      visited: ImmutableSet<ID>(),
+      claims: ImmutableSet<ID>(),
+    }
+  ).claims;
 }
 
 function priorShowing(
@@ -179,7 +261,7 @@ function buildShowing(
   winners: ImmutableSet<ID>,
   claims: ImmutableSet<ID>,
   inProjection: boolean,
-  inDiff: boolean
+  diffTarget: ID | undefined
 ): { showing: Showing; winners: ImmutableSet<ID> } {
   if (reached.kind === "line") {
     const prior = priorShowing(resolved.node.id, ancestors, winners);
@@ -189,7 +271,10 @@ function buildShowing(
     }
   }
   const statement =
-    reached.kind === "line" && inDiff && isMoveStatement(resolved.node);
+    reached.kind === "line" &&
+    diffTarget !== undefined &&
+    isMoveStatement(resolved.node) &&
+    classifyPositioned(graph, resolved, diffTarget) !== "add";
   const chain = sourceChain(
     graph,
     resolved,
@@ -208,7 +293,7 @@ function buildShowing(
   const lineShowings = (
     parent: ResolvedNode,
     linesInProjection: boolean,
-    linesInDiff: boolean,
+    linesDiffTarget: ID | undefined,
     winnersBefore: ImmutableSet<ID>
   ): { children: Showing[]; winners: ImmutableSet<ID> } => {
     // Mutable accumulation: an immutable append copies the array per child, O(n²) on wide trees.
@@ -230,7 +315,7 @@ function buildShowing(
         childWinners,
         activeClaims,
         linesInProjection,
-        linesInDiff
+        linesDiffTarget
       );
       children.push(built.showing);
       childWinners = built.winners;
@@ -238,14 +323,15 @@ function buildShowing(
     return { children, winners: childWinners };
   };
   /* eslint-enable functional/no-let, functional/immutable-data */
-  const linkDiff = (link: typeof chain.links[number]): boolean => {
+  const linkDiffTarget = (link: typeof chain.links[number]): ID | undefined => {
     if (link.statement) {
-      return inDiff;
+      return diffTarget;
     }
-    if (embedTargetOf(link.resolved.node) !== undefined) {
-      return true;
+    const opened = embedTargetOf(link.resolved.node);
+    if (opened !== undefined) {
+      return opened;
     }
-    return link.reached.kind === "target" ? false : inDiff;
+    return link.reached.kind === "target" ? undefined : diffTarget;
   };
   const mountLink = (
     link: typeof chain.links[number],
@@ -257,7 +343,7 @@ function buildShowing(
     const lines = lineShowings(
       link.resolved,
       linkInProjection,
-      linkDiff(link),
+      linkDiffTarget(link),
       winnersBefore
     );
     return {
@@ -642,7 +728,7 @@ export function showingTreeForRoot(
     ImmutableSet(),
     ImmutableSet(),
     false,
-    false
+    undefined
   ).showing;
   const staged = applyMoveStatements(built);
   return readNames(staged.showing, staged.aliases);

@@ -713,6 +713,40 @@ test("an applied statement's own lines follow onto the target", () => {
   );
 });
 
+test("a positioned line whose row left the source re-finds it in its new home", () => {
+  const tree = composeFixtureShowingTree(
+    [
+      {
+        name: "source.md",
+        content: [
+          "# Source <!-- id:s -->",
+          "",
+          "- Alpha <!-- id:a -->",
+          "- Beta <!-- id:b -->",
+          "",
+          "# Elsewhere <!-- id:e -->",
+          "",
+          "- Moved here <!-- id:z -->",
+          "",
+        ].join("\n"),
+      },
+      {
+        name: "diff.md",
+        content: [
+          '# [Source](#s) <!-- id:o0 embed="true" -->',
+          "",
+          '- [Moved here](#z) <!-- id:d1 embed="true" after="a" -->',
+          "",
+        ].join("\n"),
+      },
+    ],
+    "diff.md"
+  );
+  expect(tree).toBe(
+    ["o0", "  >s", "    a", "    d1", "      >z", "    b", ""].join("\n")
+  );
+});
+
 test("a moved row takes its subtree along", () => {
   const tree = composeFixtureShowingTree(
     [

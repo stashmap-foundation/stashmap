@@ -26,13 +26,14 @@ Two more gestures:
 
 The first is a **rewording**: my words show instead of theirs, but the crossed-out link keeps the connection.
 
-The second is a **move**. When I drag a row, the file records the names of its new neighbors — a ladder of up to three:
+The second is a **move**. When I drag a row, the file records exactly one anchor — the row it now sits behind, or the parent it now leads:
 
 ```markdown
-- A moved row <!-- id:a4 after="s5" before="s8" parent="s2" -->
+- A moved row <!-- id:a4 after="s5" -->
+- A row moved to the front <!-- id:a5 parent="s2" -->
 ```
 
-`after=` names the row above it, `before=` the row below, `parent=` the row it sits under. The row shows up at the first name that still exists. The idea: position is claimed relative to *rows*, never as "third from the top". So when the author reorders their document, my row travels with its named neighbors; if a named row disappears, the next name in the ladder takes over. Rows I never dragged carry no names and simply follow the source order.
+`after=` names the row above it; `parent=` names the row whose children it now leads. Never both — a second name could contradict the first. The idea: position is claimed relative to *rows*, never as "third from the top". So when the author reorders their document, my row travels with its named row — even when that row is itself a moved one, so resorting a whole list is a chain of `after=` claims. If the named row disappears, my row parks visibly where it is written until I drag it again. If several rows claim the same anchor, the order of their lines in my file decides. Rows I never dragged carry no names and simply follow the source order.
 
 ## The diff idea
 
@@ -56,14 +57,14 @@ My file, complete: I mark two rows, dismiss one, drag the attractions row up abo
 - [Zagreb venue brief](#z1) <!-- id:q2 embed="true" -->
   - (!) [The venue seats thirty people](#z2) <!-- id:q3 embed="true" -->
   - Enough for the whole Salon <!-- id:q4 parent="z2" -->
-  - (~) [Nearby tourist attractions](#z6) <!-- id:q5 embed="true" after="z2" before="z3" -->
+  - (~) [Nearby tourist attractions](#z6) <!-- id:q5 embed="true" after="z2" -->
   - (x) [Local tax incentives](#z5) <!-- id:q6 embed="true" -->
   - We still need a hotel recommendation <!-- id:q7 -->
 ```
 
 Two things to notice about the shape:
 
-- **The diff is flat.** All my statements sit one level under the embed, whatever the source's tree looks like. Where a row *shows* is said by names: my note `q4` carries `parent="z2"`, so it renders under the seats row, and the dragged attractions row carries `after="z2" before="z3"` — the seats row above it, the station row below it. The statement line itself never nests or moves to mirror the source.
+- **The diff is flat.** All my statements sit one level under the embed, whatever the source's tree looks like. Where a row *shows* is said by its anchor: my note `q4` carries `parent="z2"`, so it renders under the seats row, and the dragged attractions row carries `after="z2"` — the seats row is now the row above it. The statement line itself never nests or moves to mirror the source.
 - **The diff is sparse.** The station row and its child appear nowhere in my file — I made no statement about them, so they're simply omitted.
 - **The diff contains user intent** It's clear that this row is here, because the user marked its relevance or moved it (or both).
 
@@ -74,7 +75,7 @@ Should we meet in Zagreb?
 └─ Zagreb venue brief
    ├─ (!) The venue seats thirty people
    │      └─ Enough for the whole Salon          ← my note, placed by parent="z2"
-   ├─ (~) Nearby tourist attractions             ← moved up by after="z2" before="z3"
+   ├─ (~) Nearby tourist attractions             ← moved up by after="z2"
    ├─ The station is fifteen minutes away        ← untouched, flows in from the source
    │      └─ Direct train from the airport
    └─ We still need a hotel recommendation       ← my addition

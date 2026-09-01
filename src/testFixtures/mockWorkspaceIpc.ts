@@ -85,10 +85,6 @@ export function mockWorkspaceIpc(
             privateKey: readProfilePrivateKey(loaded.profile),
           })
         ) ?? Promise.resolve(null),
-    ready: async () => {
-      await getRuntime()?.ready();
-      logMockWorkspaceDebug("ready", { current: state.current });
-    },
     pickFolder: () => {
       if (state.pickerQueue.length === 0) {
         throw new Error(

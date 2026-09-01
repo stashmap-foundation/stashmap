@@ -31,7 +31,6 @@ export type WorkspaceIpc = {
     writes: ReadonlyArray<WorkspaceWriteRequest>,
     deletedPaths?: ReadonlyArray<string>
   ) => Promise<{ changed_paths: string[]; removed_paths: string[] }>;
-  ready?: () => Promise<void>;
   subscribeFsEvents: (handler: FsEventHandler) => () => void;
 };
 
@@ -72,9 +71,6 @@ export function FilesystemBackendProvider({
     ipc.load().then((data) => {
       if (!controller.signal.aborted) {
         setState({ status: "loaded", data });
-      }
-      if (data && ipc.ready) {
-        ipc.ready().catch(() => undefined);
       }
     });
     return () => controller.abort();

@@ -22,7 +22,6 @@ export type WorkspaceRuntimeLoaded = {
 
 export type WorkspaceRuntime = {
   load: () => Promise<WorkspaceRuntimeLoaded>;
-  ready: () => Promise<void>;
   save: (
     writes: ReadonlyArray<WorkspaceWriteRequest>,
     deletedPaths?: ReadonlyArray<string>
@@ -100,12 +99,12 @@ export function createWorkspaceRuntime(workspaceDir: string): WorkspaceRuntime {
     handlers.forEach((handler) => handler(event));
   };
 
-  const ensureWatcher = (): void => {
-    if (state.watcher) {
-      return;
+  const ensureWatcher = (): Promise<WorkspaceWatcher> => {
+    if (!state.watcher) {
+      // eslint-disable-next-line functional/immutable-data
+      state.watcher = watchWorkspace(workspaceDir, emit);
     }
-    // eslint-disable-next-line functional/immutable-data
-    state.watcher = watchWorkspace(workspaceDir, emit);
+    return state.watcher;
   };
 
   const recordSaveEchoes = (
@@ -130,20 +129,13 @@ export function createWorkspaceRuntime(workspaceDir: string): WorkspaceRuntime {
   return {
     load: async () => {
       const profile = loadCliProfile({ cwd: workspaceDir });
+      const watcher = await ensureWatcher();
+      await watcher.ready;
+      logWorkspaceRuntimeDebug("ready", { workspaceDir });
       const files = await loadWorkspaceFiles({
         workspaceDir: profile.workspaceDir,
       });
-      ensureWatcher();
       return { profile, files: [...files] };
-    },
-    ready: async () => {
-      ensureWatcher();
-      if (!state.watcher) {
-        return;
-      }
-      const instance = await state.watcher;
-      await instance.ready;
-      logWorkspaceRuntimeDebug("ready", { workspaceDir });
     },
     save: async (documents, deletedPaths = []) => {
       const profile = loadCliProfile({ cwd: workspaceDir });

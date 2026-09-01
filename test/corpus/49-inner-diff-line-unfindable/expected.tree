@@ -1,0 +1,6 @@
+Mid <!-- id:o0 -->
+  Alpha <!-- base:ma -->
+  Inner <!-- base:e2 -->
+    One <!-- base:i1 -->
+    Mid note <!-- base:mn -->
+  Mid note <!-- id:rs flag:dangling -->

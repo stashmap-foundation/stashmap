@@ -2,25 +2,10 @@ import React from "react";
 import { List } from "immutable";
 import { DndProvider, useDragLayer, XYCoord } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
-import { nip19 } from "nostr-tools";
-import { LOCAL } from "./core/nodeRef";
-import { createRefTarget, getNode, isEmptyNodeID } from "./core/connections";
-import { nodeText } from "./core/nodeSpans";
+import { isEmptyNodeID } from "./core/connections";
 import { getIndependentRows } from "./rowModel";
-import { getDocumentForNode } from "./core/Document";
-import {
-  Plan,
-  planExpandNode,
-  planAddToParent,
-  AddToParentTarget,
-} from "./planner";
-import { planMoveRows } from "./treeMutations";
-import {
-  planMaterializeComputedRow,
-  planRecordKnowstrSource,
-} from "./core/plan";
-import { sourceCoordinate } from "./navigationUrl";
-import { decodePublicKeyInputSync } from "./infra/nostr/publicKeys";
+import { Plan, AddToParentTarget } from "./planner";
+import { planAddRows, planMoveRows } from "./treeMutations";
 
 type DragSource = {
   row: Row;
@@ -42,59 +27,6 @@ function refsEqual(
     left.sourceId === right.sourceId &&
     left.id === right.id
   );
-}
-
-function getCurrentPlanNode(plan: Plan, node: GraphNode): GraphNode {
-  return getNode(plan.knowledgeDBs, node.id, LOCAL) ?? node;
-}
-
-function addFallbackLinkText(
-  target: AddToParentTarget,
-  text: string | undefined
-): AddToParentTarget {
-  if (typeof target === "string" || !("targetID" in target)) {
-    return target;
-  }
-  if (target.linkText || !text) {
-    return target;
-  }
-  return createRefTarget(target.targetID, text);
-}
-
-// Dragging a row from another user's document records that document in
-// knowstr_sources of ours — the one moment the source is known for
-// certain, so foreign ids resolve on a future fetch.
-function planRecordForeignSource(
-  plan: Plan,
-  sourcePane: Pane | undefined,
-  sourceRow: Row,
-  targetNode: GraphNode
-): Plan {
-  if (sourceRow.sourceId === LOCAL) {
-    return plan;
-  }
-  const coordinate =
-    sourcePane?.routeCoordinate ?? sourceCoordinate(sourceRow.sourceId);
-  const pubkey =
-    coordinate?.pubkey ?? decodePublicKeyInputSync(sourceRow.sourceId);
-  if (!pubkey) {
-    return plan;
-  }
-  const sourceDocument = getDocumentForNode(
-    plan.knowledgeDBs,
-    plan.documents,
-    sourceRow.node,
-    sourceRow.sourceId
-  );
-  const doc = sourceDocument?.docId ?? coordinate?.dTag;
-  if (!doc) {
-    return plan;
-  }
-  return planRecordKnowstrSource(plan, targetNode, {
-    author: nip19.npubEncode(pubkey),
-    doc,
-    relays: coordinate?.relays ?? [],
-  });
 }
 
 function isDraggedOccurrence(row: Row, sources: Row[]): boolean {
@@ -359,12 +291,6 @@ function moveIndent(
   return Math.max(minDepth, Math.min(maxDepth, targetDepth ?? fallback));
 }
 
-function remapPaneKey(viewKey: string, paneIndex: number): string {
-  return viewKey.replace(/^p\d+:/u, `p${paneIndex}:`);
-}
-
-// The move gesture hands the writer exactly three things: the grabbed
-// rows, the row to insert before, and the indent.
 export function moveWithinView(
   basePlan: Plan,
   data: Data,
@@ -373,7 +299,7 @@ export function moveWithinView(
   rows: List<Row>,
   targetRow: Row,
   targetDepth: number | undefined
-): Plan | undefined {
+): { plan: Plan | undefined } | undefined {
   const sources = sourceDrag.draggedRows.length
     ? sourceDrag.draggedRows
     : [sourceDrag.row];
@@ -396,14 +322,16 @@ export function moveWithinView(
   }
   const insertBefore = nextMoveAnchor(rows, targetRow.index + 1, sources);
   const indent = moveIndent(rows, targetRow, insertBefore, targetDepth);
-  return planMoveRows(
-    basePlan,
-    data,
-    targetPaneIndex,
-    independent.map((row) => remapPaneKey(row.viewKey, targetPaneIndex)),
-    insertBefore?.viewKey,
-    indent
-  );
+  return {
+    plan: planMoveRows(
+      basePlan,
+      data,
+      targetPaneIndex,
+      independent,
+      insertBefore,
+      indent
+    ),
+  };
 }
 
 export function dnd(
@@ -413,109 +341,13 @@ export function dnd(
   targetParentRow: Row,
   dropIndex: number
 ): Plan {
-  const source = sourceDrag.row.viewKey;
-  const sources = sourceDrag.draggedRows.length
-    ? sourceDrag.draggedRows
-    : [sourceDrag.row];
-  const independentRows = getIndependentRows(sources);
-  // Projected embed content is readonly: nothing drops into it, and its
-  // rows don't drag out yet — materializing from an embed is later work.
-  if (
-    targetParentRow.projected ||
-    independentRows.some((row) => row.projected)
-  ) {
-    return basePlan;
-  }
-  const [plan, targetParentNode] = planMaterializeComputedRow(
+  return planAddRows(
     basePlan,
-    targetParentRow
+    sourceDrag,
+    targetPaneIndex,
+    targetParentRow,
+    dropIndex
   );
-
-  const sourcePane = plan.panes[sourceDrag.sourcePaneIndex];
-  const targetPane = plan.panes[targetPaneIndex];
-  if (!sourcePane || !targetPane) {
-    return plan;
-  }
-  const sourceDocument = getDocumentForNode(
-    plan.knowledgeDBs,
-    plan.documents,
-    sourceDrag.row.node,
-    sourceDrag.row.sourceId
-  );
-  const targetSourceId = targetParentRow.materialize
-    ? LOCAL
-    : targetParentRow.sourceId;
-  const targetDocument = getDocumentForNode(
-    plan.knowledgeDBs,
-    plan.documents,
-    targetParentNode,
-    targetSourceId
-  );
-  const isSameDocument =
-    sourceDocument !== undefined &&
-    targetDocument !== undefined &&
-    sourceDocument.sourceId === targetDocument.sourceId &&
-    sourceDocument.docId === targetDocument.docId;
-  const isDocumentTopLevelSource =
-    sourceDocument !== undefined &&
-    sourceDocument.sourceId === sourceDrag.row.sourceId &&
-    sourceDocument.topNodeShortIds.includes(sourceDrag.row.node.id);
-
-  if (isDocumentTopLevelSource && isSameDocument && !sourceDrag.isCopyDrag) {
-    return plan;
-  }
-
-  const expandedPlan = targetParentRow.view.expanded
-    ? plan
-    : planExpandNode(plan, targetParentRow.view, targetParentRow.viewPath);
-
-  const toReferenceTarget = (sourceRow: Row): AddToParentTarget =>
-    createRefTarget(sourceRow.node.id, nodeText(sourceRow.node));
-
-  return independentRows.reduce((accPlan: Plan, sourceRow, idx) => {
-    const sourceNode = sourceRow.node;
-    const sourceEdgeRelevance = sourceNode.relevance;
-    const sourceEdgeArgument = sourceNode.argument;
-    const insertAt = dropIndex + idx;
-    const isPrimarySource = sourceRow.viewKey === source;
-    const targetNode = getCurrentPlanNode(accPlan, targetParentNode);
-    const planWithSource =
-      targetSourceId === LOCAL
-        ? planRecordForeignSource(accPlan, sourcePane, sourceRow, targetNode)
-        : accPlan;
-    const insertTarget =
-      sourceRow.materialize?.take ??
-      (isPrimarySource ? sourceDrag.insertTarget : undefined);
-    const dragTargetID = isPrimarySource ? sourceDrag.nodeId : undefined;
-    if (insertTarget) {
-      return planAddToParent(
-        planWithSource,
-        addFallbackLinkText(insertTarget, sourceDrag.text),
-        targetNode.id,
-        insertAt,
-        sourceEdgeRelevance,
-        sourceEdgeArgument
-      )[0];
-    }
-    if (dragTargetID) {
-      return planAddToParent(
-        planWithSource,
-        createRefTarget(dragTargetID, nodeText(sourceNode)),
-        targetNode.id,
-        insertAt,
-        sourceEdgeRelevance,
-        sourceEdgeArgument
-      )[0];
-    }
-    return planAddToParent(
-      planWithSource,
-      toReferenceTarget(sourceRow),
-      targetNode.id,
-      insertAt,
-      sourceEdgeRelevance,
-      sourceEdgeArgument
-    )[0];
-  }, expandedPlan);
 }
 
 function CustomDragLayer(): JSX.Element | null {

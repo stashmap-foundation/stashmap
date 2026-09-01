@@ -771,6 +771,17 @@ Doc
       /\n {2}- \[Gamma\]\(#g\) <!-- id:\S+ embed="true" after="n1" parent="root" -->/u
     );
   });
+
+  cleanup();
+  await openDocumentExpanded(path, "diff.md");
+  await expectTree(`
+Doc
+  Source
+    Alpha
+    Beta
+  Notes
+  Gamma
+`);
 });
 
 test("dragging a projected row into another embed keeps its line under the original", async () => {
@@ -821,6 +832,116 @@ Doc
       /- \[First\]\(#f\) <!-- id:e1 embed="true" -->\n {2}- \[Alpha\]\(#a\) <!-- id:\S+ embed="true" after="c" before="d" parent="e2" -->/u
     );
   });
+
+  cleanup();
+  await openDocumentExpanded(path, "diff.md");
+  await expectTree(`
+Doc
+  First
+    Beta
+  Second
+    Gamma
+    Alpha
+    Delta
+`);
+});
+
+test("a second drag to the embed's first position keeps both moved rows", async () => {
+  const { path } = knowstrInit();
+  write(
+    path,
+    "art.md",
+    [
+      "# Art <!-- id:art -->",
+      "",
+      "- Spain <!-- id:sp -->",
+      "- Austria <!-- id:at -->",
+      '  - [Buildings](#bd) <!-- id:ei embed="true" -->',
+      "",
+    ].join("\n")
+  );
+  write(
+    path,
+    "buildings.md",
+    [
+      "# Buildings <!-- id:bd -->",
+      "",
+      "- Secession <!-- id:se -->",
+      "- Otto <!-- id:ow -->",
+      "- Loos Haus <!-- id:lh -->",
+      "",
+    ].join("\n")
+  );
+  write(
+    path,
+    "diff.md",
+    [
+      "# Doc <!-- id:root -->",
+      "",
+      '- [Art](#art) <!-- id:e1 embed="true" -->',
+      "",
+    ].join("\n")
+  );
+  await openDocumentExpanded(path, "diff.md");
+  await expectTree(`
+Doc
+  Art
+    Spain
+    Austria
+      Buildings
+        Secession
+        Otto
+        Loos Haus
+`);
+
+  dragRowOnto("Secession", "Art");
+
+  await expectTree(`
+Doc
+  Art
+    Secession
+    Spain
+    Austria
+      Buildings
+        Otto
+        Loos Haus
+`);
+
+  await waitFor(() => {
+    expect(fs.readFileSync(`${path}/diff.md`, "utf8")).toMatch(
+      /\[Secession\]\(#se\)/u
+    );
+  });
+  dragRowOnto("Loos Haus", "Art");
+
+  await waitFor(() => {
+    expect(fs.readFileSync(`${path}/diff.md`, "utf8")).toMatch(
+      /\[Loos Haus\]\(#lh\)/u
+    );
+  });
+  await expectTree(`
+Doc
+  Art
+    Loos Haus
+    Secession
+    Spain
+    Austria
+      Buildings
+        Otto
+`);
+
+  cleanup();
+  await openDocumentExpanded(path, "diff.md");
+  await expectTree(`
+Doc
+  Art
+    Loos Haus
+    Secession
+    Spain
+    Austria
+      Buildings
+        Otto
+`);
 });
 
 test("dragging a home row reorders the file without writing names", async () => {
@@ -861,6 +982,60 @@ Doc
   expect(fs.readFileSync(`${path}/doc.md`, "utf8")).not.toMatch(
     /after=|before=|parent=/u
   );
+
+  cleanup();
+  await openDocumentExpanded(path, "doc.md");
+  await expectTree(`
+Doc
+  Spain
+  Italy
+  France
+`);
+});
+
+test("dragging a home row into an embed moves the line under it", async () => {
+  const { path } = knowstrInit();
+  write(path, "source.md", MOVE_SOURCE);
+  write(
+    path,
+    "diff.md",
+    [
+      "# Doc <!-- id:root -->",
+      "",
+      '- [Source](#s) <!-- id:e1 embed="true" -->',
+      "- My summary <!-- id:sum -->",
+      "",
+    ].join("\n")
+  );
+  await openDocumentExpanded(path, "diff.md");
+
+  dragRowOnto("My summary", "Alpha");
+
+  await expectTree(`
+Doc
+  Source
+    Alpha
+    My summary
+    Beta
+    Gamma
+`);
+  await waitFor(() => {
+    expect(fs.readFileSync(`${path}/diff.md`, "utf8")).toMatch(
+      /- \[Source\]\(#s\) <!-- id:e1 embed="true" -->\n {2}- My summary <!-- id:sum after="a" before="b" -->/u
+    );
+  });
+  expect(fs.readFileSync(`${path}/source.md`, "utf8")).toBe(MOVE_SOURCE);
+
+  cleanup();
+  await openDocumentExpanded(path, "diff.md");
+  await expectTree(`
+Doc
+  Source
+    Alpha
+    My summary
+    Beta
+    Gamma
+`);
 });
 
 test("dragging your own diff line rewrites only its names", async () => {
@@ -892,6 +1067,16 @@ Source
       /\n- My note <!-- id:n1 after="a" before="b" -->\n/u
     );
   });
+
+  cleanup();
+  await openDocumentExpanded(path, "diff.md");
+  await expectTree(`
+Source
+  Alpha
+  My note
+  Beta
+  Gamma
+`);
 });
 
 test("moving a row repairs a neighbor's stale name", async () => {
@@ -933,6 +1118,16 @@ Source
     );
     expect(content).toMatch(/- My note <!-- id:n1 after="a" before="g" -->/u);
   });
+
+  cleanup();
+  await openDocumentExpanded(path, "diff.md");
+  await expectTree(`
+Source
+  Alpha
+  My note
+  Gamma
+  Beta
+`);
 });
 
 test("rows under an unresolved source keep their attrs byte-identical", async () => {
@@ -969,6 +1164,16 @@ Doc
       '- [Ghost](#nowhere) <!-- id:e1 embed="true" -->'
     );
   });
+
+  cleanup();
+  await openDocumentExpanded(path, "doc.md");
+  await expectTree(`
+Doc
+  Ghost
+    Stale
+  Two
+  One
+`);
 });
 
 test("a parked row survives unrelated writes untouched", async () => {
@@ -1003,6 +1208,102 @@ Source
     expect(content).toContain(parkedLine);
     expect(content).toMatch(/- My note <!-- id:n1 after="a" before="b" -->/u);
   });
+
+  cleanup();
+  await openDocumentExpanded(path, "diff.md");
+  await expectTree(`
+Source
+  Alpha
+  My note
+  Beta
+  Gamma
+  Parked
+`);
+});
+
+test("an unrelated move leaves a dangling statement's names byte-identical", async () => {
+  const { path } = knowstrInit();
+  const statementLine =
+    '  - [Topic](#x) <!-- id:m1 embed="true" after="gx" -->';
+  write(
+    path,
+    "source.md",
+    [
+      "# First <!-- id:f -->",
+      "",
+      "- Topic <!-- id:x -->",
+      "",
+      "# Second <!-- id:g -->",
+      "",
+      '- [Topic](#x) <!-- id:gx embed="true" -->',
+      "- Other <!-- id:go -->",
+      "",
+    ].join("\n")
+  );
+  write(
+    path,
+    "diff.md",
+    [
+      "# Doc <!-- id:root -->",
+      "",
+      '- [First](#f) <!-- id:e1 embed="true" -->',
+      '- [Second](#g) <!-- id:e2 embed="true" -->',
+      statementLine,
+      "- Home one <!-- id:h1 -->",
+      "- Home two <!-- id:h2 -->",
+      "",
+    ].join("\n")
+  );
+  await openDocumentExpanded(path, "diff.md");
+  await expectTree(`
+Doc
+  First
+    Topic
+      [I] Second ↩
+  Second
+    Topic
+    Other
+    Topic
+  Home one
+  Home two
+`);
+
+  dragRowOnto("Home one", "Home two");
+
+  await expectTree(`
+Doc
+  First
+    Topic
+      [I] Second ↩
+  Second
+    Topic
+    Other
+    Topic
+  Home two
+  Home one
+`);
+  await waitFor(() => {
+    const content = fs.readFileSync(`${path}/diff.md`, "utf8");
+    expect(content).toMatch(
+      /- Home two <!-- id:h2 -->\n- Home one <!-- id:h1 -->/u
+    );
+    expect(content).toContain(statementLine);
+  });
+
+  cleanup();
+  await openDocumentExpanded(path, "diff.md");
+  await expectTree(`
+Doc
+  First
+    Topic
+      [I] Second ↩
+  Second
+    Topic
+    Other
+    Topic
+  Home two
+  Home one
+`);
 });
 
 test("dragging a demoted link row moves the placement with its notes", async () => {
@@ -1054,6 +1355,94 @@ Doc
     expect(endIndex).toBeGreaterThan(-1);
     expect(secondIndex).toBeGreaterThan(endIndex);
   });
+
+  cleanup();
+  await openDocumentExpanded(path, "doc.md");
+  await expectTree(`
+Doc
+  Source
+    Alpha
+    Beta
+    Gamma
+    [I] Doc ↩
+  End
+  Second
+    My note
+`);
+});
+
+test("dragging a dead link inside an embed writes a move statement for its line", async () => {
+  const { path } = knowstrInit();
+  write(
+    path,
+    "source.md",
+    [
+      "# First <!-- id:f -->",
+      "",
+      "- Topic <!-- id:x -->",
+      "",
+      "# Second <!-- id:g -->",
+      "",
+      '- [Topic](#x) <!-- id:gx embed="true" -->',
+      "- Other <!-- id:go -->",
+      "",
+    ].join("\n")
+  );
+  write(
+    path,
+    "diff.md",
+    [
+      "# Doc <!-- id:root -->",
+      "",
+      '- [First](#f) <!-- id:e1 embed="true" -->',
+      '- [Second](#g) <!-- id:e2 embed="true" -->',
+      "",
+    ].join("\n")
+  );
+  await openDocumentExpanded(path, "diff.md");
+  await expectTree(`
+Doc
+  First
+    Topic
+      [I] Second ↩
+  Second
+    Topic
+    Other
+`);
+
+  const topics = screen.getAllByRole("treeitem", { name: "Topic" });
+  fireEvent.dragStart(topics[1]);
+  fireEvent.drop(screen.getByRole("treeitem", { name: "Other" }));
+
+  await expectTree(`
+Doc
+  First
+    Topic
+      [I] Second ↩
+  Second
+    Other
+    Topic
+`);
+  await waitFor(() => {
+    expect(fs.readFileSync(`${path}/diff.md`, "utf8")).toMatch(
+      /- \[Second\]\(#g\) <!-- id:e2 embed="true" -->\n {2}- \[Topic\]\(#gx\) <!-- id:\S+ embed="true" after="go" -->/u
+    );
+  });
+  expect(fs.readFileSync(`${path}/source.md`, "utf8")).toContain(
+    '- [Topic](#x) <!-- id:gx embed="true" -->'
+  );
+
+  cleanup();
+  await openDocumentExpanded(path, "diff.md");
+  await expectTree(`
+Doc
+  First
+    Topic
+      [I] Second ↩
+  Second
+    Other
+    Topic
+`);
 });
 
 test("non-adjacent grabbed rows land as one block, each with its own ladder", async () => {
@@ -1093,6 +1482,17 @@ Doc
       /- \[Gamma\]\(#g\) <!-- id:\S+ embed="true" after="a" parent="root" -->/u
     );
   });
+
+  cleanup();
+  await openDocumentExpanded(path, "diff.md");
+  await expectTree(`
+Doc
+  Source
+    Beta
+  Notes
+  Alpha
+  Gamma
+`);
 });
 
 test("re-dragging a moved row keeps the statement below its original embed", async () => {
@@ -1153,6 +1553,18 @@ Doc
       /- \[Alpha\]\(#a\) <!-- id:\S+ embed="true" after="d" parent="e2" -->/u
     );
   });
+
+  cleanup();
+  await openDocumentExpanded(path, "diff.md");
+  await expectTree(`
+Doc
+  First
+    Beta
+  Second
+    Gamma
+    Delta
+    Alpha
+`);
 });
 
 test("a row moved out of an unresolved source keeps its line byte-identical", async () => {
@@ -1197,4 +1609,157 @@ Doc
     );
     expect(content).toContain(outLine);
   });
+
+  cleanup();
+  await openDocumentExpanded(path, "doc.md");
+  await expectTree(`
+Doc
+  Ghost†
+  Two
+  One
+  Out
+`);
+});
+
+test("dragging a row shown through an outer placement writes only the outer document", async () => {
+  const { path } = knowstrInit();
+  const innerContent = [
+    "# Inner <!-- id:inner -->",
+    "",
+    "- One <!-- id:i1 -->",
+    "- Two <!-- id:i2 -->",
+    "",
+  ].join("\n");
+  const midContent = [
+    "# Mid <!-- id:mid -->",
+    "",
+    '- [Inner](#inner) <!-- id:e2 embed="true" -->',
+    '  - [Two](#i2) <!-- id:ms embed="true" before="i1" -->',
+    "",
+  ].join("\n");
+  write(path, "inner.md", innerContent);
+  write(path, "mid.md", midContent);
+  write(path, "outer.md", '# [Mid](#mid) <!-- id:o0 embed="true" -->\n');
+  await openDocumentExpanded(path, "outer.md");
+  await expectTree(`
+Mid
+  Inner
+    Two
+    One
+`);
+
+  dragRowOnto("Two", "One");
+
+  await expectTree(`
+Mid
+  Inner
+    One
+    Two
+`);
+  await waitFor(() => {
+    expect(fs.readFileSync(`${path}/outer.md`, "utf8")).toMatch(
+      /- \[Two\]\(#i2\) <!-- id:\S+ embed="true" after="i1" parent="e2" -->/u
+    );
+  });
+  expect(fs.readFileSync(`${path}/mid.md`, "utf8")).toBe(midContent);
+  expect(fs.readFileSync(`${path}/inner.md`, "utf8")).toBe(innerContent);
+
+  cleanup();
+  await openDocumentExpanded(path, "outer.md");
+  await expectTree(`
+Mid
+  Inner
+    One
+    Two
+`);
+});
+
+test("a home move anchors past positioned diff rows that live in another line", async () => {
+  const { path } = knowstrInit();
+  write(path, "source.md", "# Source <!-- id:s -->\n\n- Alpha <!-- id:a -->\n");
+  write(
+    path,
+    "doc.md",
+    [
+      "# Doc <!-- id:root -->",
+      "",
+      '- [Source](#s) <!-- id:e1 embed="true" -->',
+      '  - My note <!-- id:n1 after="one" -->',
+      "- One <!-- id:one -->",
+      "- Two <!-- id:two -->",
+      "",
+    ].join("\n")
+  );
+  await openDocumentExpanded(path, "doc.md");
+  await expectTree(`
+Doc
+  Source
+    Alpha
+  One
+  My note
+  Two
+`);
+
+  dragRowOnto("One", "My note");
+
+  await expectTree(`
+Doc
+  Source
+    Alpha
+  My note
+  One
+  Two
+`);
+  await waitFor(() => {
+    const content = fs.readFileSync(`${path}/doc.md`, "utf8");
+    const lines = content.split("\n");
+    const embedAt = lines.findIndex((line) => line.includes("id:e1"));
+    const oneAt = lines.findIndex((line) => line.includes("id:one"));
+    const twoAt = lines.findIndex((line) => line.includes("id:two"));
+    expect(oneAt).toBeGreaterThan(embedAt);
+    expect(twoAt).toBeGreaterThan(oneAt);
+  });
+
+  cleanup();
+  await openDocumentExpanded(path, "doc.md");
+  await expectTree(`
+Doc
+  Source
+    Alpha
+  My note
+  One
+  Two
+`);
+});
+
+test("dragging a top-level root of a multi-root document is refused", async () => {
+  const { path } = knowstrInit();
+  const content = [
+    "# First <!-- id:f -->",
+    "",
+    "- Alpha <!-- id:a -->",
+    "",
+    "# Second <!-- id:g -->",
+    "",
+    "- Beta <!-- id:b -->",
+    "",
+  ].join("\n");
+  write(path, "doc.md", content);
+  await openDocumentExpanded(path, "doc.md");
+  await expectTree(`
+First
+  Alpha
+Second
+  Beta
+`);
+
+  dragRowOnto("Second", "Alpha");
+
+  await expectTree(`
+First
+  Alpha
+Second
+  Beta
+`);
+  expect(fs.readFileSync(`${path}/doc.md`, "utf8")).toBe(content);
 });

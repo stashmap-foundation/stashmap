@@ -616,7 +616,7 @@ test("a move statement disappears into its target", () => {
   ).toBe(["o0", "  >s", "    a", "    g", "    b", ""].join("\n"));
 });
 
-test("a statement targeting another diff line dangles in any line order", () => {
+test("a line embedding a row of its own document is a positioned placement", () => {
   const sourceFile = {
     name: "source.md",
     content: "# Source <!-- id:s -->\n\n- Alpha <!-- id:a -->\n",
@@ -628,7 +628,7 @@ test("a statement targeting another diff line dangles in any line order", () => 
     '- [My note](#n1) <!-- id:m1 embed="true" after="a" -->',
     "",
   ].join("\n");
-  const statementFirst = [
+  const placementFirst = [
     '# [Source](#s) <!-- id:o0 embed="true" -->',
     "",
     '- [My note](#n1) <!-- id:m1 embed="true" after="a" -->',
@@ -640,13 +640,17 @@ test("a statement targeting another diff line dangles in any line order", () => 
       [sourceFile, { name: "diff.md", content: noteFirst }],
       "diff.md"
     )
-  ).toBe(["o0", "  >s", "    a", "  n1", "  m1", ""].join("\n"));
+  ).toBe(["o0", "  >s", "    a", "    m1 demoted", "  n1", ""].join("\n"));
   expect(
     composeFixtureShowingTree(
-      [sourceFile, { name: "diff.md", content: statementFirst }],
+      [sourceFile, { name: "diff.md", content: placementFirst }],
       "diff.md"
     )
-  ).toBe(["o0", "  >s", "    a", "  m1", "  n1", ""].join("\n"));
+  ).toBe(
+    ["o0", "  >s", "    a", "    m1", "      >n1", "  n1 demoted", ""].join(
+      "\n"
+    )
+  );
 });
 
 test("a name naming the applied statement finds the moved row", () => {
@@ -786,6 +790,67 @@ test("the first row of a name circle parks lapsed and the rest unfold around it"
   expect(
     composeFixtureShowingTree(fixtureFiles("37-name-circle"), "diff.md")
   ).toBe(["o0", "  >s", "    a", "  n2", "  n1 lapsed", ""].join("\n"));
+});
+
+test("a name matching two visible occurrences parks flagged ambiguous-anchor", () => {
+  const tree = composeFixtureTree(
+    [
+      {
+        name: "source.md",
+        content: "# Source <!-- id:s -->\n\n- Topic <!-- id:x -->\n",
+      },
+      {
+        name: "diff.md",
+        content: [
+          '# [Source](#s) <!-- id:o0 embed="true" -->',
+          "",
+          "- Topic <!-- id:x -->",
+          '- Note <!-- id:n1 after="x" -->',
+          "",
+        ].join("\n"),
+      },
+    ],
+    "diff.md"
+  );
+  expect(tree).toBe(
+    [
+      "Source <!-- id:o0 -->",
+      "  Topic <!-- base:x -->",
+      "  Topic <!-- id:x -->",
+      "  Note <!-- id:n1 flag:ambiguous-anchor -->",
+      "",
+    ].join("\n")
+  );
+});
+
+test("an applied statement nested under an applied statement disappears too", () => {
+  const tree = composeFixtureShowingTree(
+    [
+      {
+        name: "source.md",
+        content: [
+          "# Source <!-- id:s -->",
+          "",
+          "- Alpha <!-- id:a -->",
+          "- Beta <!-- id:b -->",
+          "- Gamma <!-- id:g -->",
+          "",
+        ].join("\n"),
+      },
+      {
+        name: "diff.md",
+        content: [
+          '# [Source](#s) <!-- id:o0 embed="true" -->',
+          "",
+          '- [Gamma](#g) <!-- id:m1 embed="true" after="a" -->',
+          '  - [Beta](#b) <!-- id:m2 embed="true" after="g" -->',
+          "",
+        ].join("\n"),
+      },
+    ],
+    "diff.md"
+  );
+  expect(tree).toBe(["o0", "  >s", "    a", "    g", "    b", ""].join("\n"));
 });
 
 test("a cycle attaches to the embed line that reopens an open source", () => {

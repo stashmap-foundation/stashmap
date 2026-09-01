@@ -19,7 +19,7 @@ import {
   resolveAuthoredFirst,
 } from "./core/graphLookup";
 import { nodeRefKey } from "./core/nodeRef";
-import { embedTargetOf, isPositionedEmbedLine } from "./showings";
+import { embedTargetOf, isStatementShapedLine } from "./showings";
 
 type ReferencedByRef = {
   nodeID: ID;
@@ -232,8 +232,8 @@ export function getIncomingCrefsForNode(
     .filter(
       (source) =>
         !(
-          isPositionedEmbedLine(source.node) &&
-          embedTargetOf(source.node) === currentNodeID
+          embedTargetOf(source.node) === currentNodeID &&
+          isStatementShapedLine(graph, source)
         )
     )
     .filter(

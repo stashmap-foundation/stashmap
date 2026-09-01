@@ -49,9 +49,9 @@ function printRow(row: Row): string {
     spansToMarkdown(row.presentedSpans ?? row.node.spans)
   );
   const identity = `${row.projected ? "base" : "id"}:${row.node.id}`;
-  const flags = `${row.cycle ? " flag:cycle" : ""}${
-    row.dangling ? " flag:dangling" : ""
-  }${row.lapsed ? " flag:lapsed" : ""}`;
+  const flags = `${row.ambiguous ? " flag:ambiguous-anchor" : ""}${
+    row.cycle ? " flag:cycle" : ""
+  }${row.dangling ? " flag:dangling" : ""}${row.lapsed ? " flag:lapsed" : ""}`;
   return `${indent}${rowMarker(
     row.node
   )}${text} <!-- ${identity}${flags} -->\n`;

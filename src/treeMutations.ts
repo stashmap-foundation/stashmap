@@ -1,5 +1,11 @@
-import { List } from "immutable";
-import { getNode, isEmptyNodeID, isSearchId } from "./core/connections";
+import { List, Map as ImmutableMap, Set as ImmutableSet } from "immutable";
+import { nip19 } from "nostr-tools";
+import {
+  createRefTarget,
+  getNode,
+  isEmptyNodeID,
+  isSearchId,
+} from "./core/connections";
 import { LOCAL } from "./core/nodeRef";
 import {
   GraphLookup,
@@ -8,12 +14,14 @@ import {
 } from "./core/graphLookup";
 import { getWorkspaceNode } from "./core/knowledge";
 import { planRemoveNodeItemById } from "./dataPlanner";
-import { getDocumentByIdOrFilePath } from "./core/Document";
+import { getDocumentByIdOrFilePath, getDocumentForNode } from "./core/Document";
 import { linkSpan, nodeText } from "./core/nodeSpans";
 import {
   ViewPath,
+  getIndependentRows,
   updateViewPathsAfterDisconnect,
   addNodeToPathWithNodes,
+  addNodesToLastElement,
   viewPathToString,
   childViewKey,
   copyViewsWithNewPrefix,
@@ -21,8 +29,15 @@ import {
   newGraphNode,
 } from "./rowModel";
 import { embedTargetOf } from "./showings";
+import {
+  planMaterializeComputedRow,
+  planRecordKnowstrSource,
+} from "./core/plan";
+import { sourceCoordinate } from "./navigationUrl";
+import { decodePublicKeyInputSync } from "./infra/nostr/publicKeys";
 import { getNodesInDocument, getNodesInTree } from "./treeTraversal";
 import {
+  AddToParentTarget,
   Plan,
   planAddToParent,
   planDeleteNodes,
@@ -99,7 +114,7 @@ export function planDeleteNode(
   return resetInvalidPanes(planAfterDelete, paneIndex);
 }
 
-export function planMoveNode(
+function planMoveNode(
   plan: Plan,
   sourceNodeID: ID,
   sourceChildID: ID,
@@ -179,6 +194,64 @@ export function planMoveNode(
   );
 }
 
+export function planMoveRowsIntoMaterializedRow(
+  plan: Plan,
+  sortedRows: Row[],
+  prevSibling: Row
+): { plan: Plan; remappedKeys: { fromKey: string; toKey: string }[] } {
+  const [planMaterialized, takenPrevSibling] = planMaterializeComputedRow(
+    plan,
+    prevSibling
+  );
+  const takenViewPath = addNodesToLastElement(
+    prevSibling.viewPath,
+    takenPrevSibling.id
+  );
+  const currentTaken = (current: Plan): GraphNode =>
+    getNode(current.knowledgeDBs, takenPrevSibling.id, LOCAL) ??
+    takenPrevSibling;
+  return sortedRows.reduce<{
+    plan: Plan;
+    remappedKeys: { fromKey: string; toKey: string }[];
+  }>(
+    (state, row) => {
+      if (!row.parentNode) {
+        return state;
+      }
+      const targetBefore = currentTaken(state.plan);
+      const insertAt = targetBefore.children.size;
+      const moved = planMoveNode(
+        state.plan,
+        row.node.id,
+        row.node.id,
+        row.parentNode.id,
+        row.viewPath,
+        targetBefore.id,
+        takenViewPath,
+        insertAt
+      );
+      const targetAfter = currentTaken(moved);
+      const movedViewPath =
+        insertAt < targetAfter.children.size
+          ? addNodeToPathWithNodes(takenViewPath, targetAfter, insertAt)
+          : undefined;
+      return {
+        plan: moved,
+        remappedKeys: movedViewPath
+          ? [
+              ...state.remappedKeys,
+              { fromKey: row.viewKey, toKey: viewPathToString(movedViewPath) },
+            ]
+          : state.remappedKeys,
+      };
+    },
+    {
+      plan: planExpandNode(planMaterialized, prevSibling.view, takenViewPath),
+      remappedKeys: [],
+    }
+  );
+}
+
 const WRITER_FILTERS: Pane["typeFilters"] = [
   "relevant",
   "maybe_relevant",
@@ -220,7 +293,11 @@ function writerRows(data: Data, paneIndex: number): Row[] {
         WRITER_FILTERS,
         { expandAll: true }
       );
-  return rows.toArray().filter((row) => !isEmptyNodeID(row.node.id));
+  return rows
+    .toArray()
+    .filter(
+      (row) => !isEmptyNodeID(row.node.id) && row.virtualType === undefined
+    );
 }
 
 function blockEndAt(rows: Row[], start: number): number {
@@ -231,27 +308,13 @@ function blockEndAt(rows: Row[], start: number): number {
   return relative < 0 ? rows.length : start + 1 + relative;
 }
 
-function hostEmbedRowOf(rows: Row[], index: number): Row | undefined {
-  const walk = (at: number, depth: number): Row | undefined => {
-    if (at < 0) {
-      return undefined;
-    }
-    const candidate = rows[at];
-    if (candidate.depth >= depth) {
-      return walk(at - 1, depth);
-    }
-    return candidate.projected ? walk(at - 1, candidate.depth) : candidate;
-  };
-  return walk(index - 1, rows[index].depth);
-}
-
 function fileMembershipNode(
   plan: Plan,
   node: GraphNode
 ): GraphNode | undefined {
   const walk = (
     currentID: ID | undefined,
-    visited: Set<ID>
+    visited: ImmutableSet<ID>
   ): GraphNode | undefined => {
     if (currentID === undefined || visited.has(currentID)) {
       return undefined;
@@ -265,9 +328,10 @@ function fileMembershipNode(
     }
     return walk(current.parent, visited.add(currentID));
   };
-  return walk(node.parent, new Set<ID>());
+  return walk(node.parent, ImmutableSet<ID>());
 }
 
+// Planned style exception: one linear pass beats the no-mutation lint.
 /* eslint-disable functional/no-let, functional/immutable-data */
 function screenLinksOf(entries: SplicedEntry[]): ScreenLinks {
   const parent: (SplicedEntry | undefined)[] = [];
@@ -283,10 +347,10 @@ function screenLinksOf(entries: SplicedEntry[]): ScreenLinks {
       stack.pop();
     }
     const parentIndex = stack.length > 0 ? stack[stack.length - 1] : -1;
-    parent[index] = parentIndex >= 0 ? entries[parentIndex] : undefined;
     const previous = lastChildOf.get(parentIndex);
-    prevSibling[index] = previous !== undefined ? entries[previous] : undefined;
-    nextSibling[index] = undefined;
+    parent.push(parentIndex >= 0 ? entries[parentIndex] : undefined);
+    prevSibling.push(previous !== undefined ? entries[previous] : undefined);
+    nextSibling.push(undefined);
     if (previous !== undefined) {
       nextSibling[previous] = entry;
     }
@@ -296,25 +360,6 @@ function screenLinksOf(entries: SplicedEntry[]): ScreenLinks {
   return { parent, prevSibling, nextSibling };
 }
 /* eslint-enable functional/no-let, functional/immutable-data */
-
-function screenAncestorEmbed(
-  links: ScreenLinks,
-  entries: SplicedEntry[],
-  index: number
-): Row | undefined {
-  const parentEntry = links.parent[index];
-  if (!parentEntry) {
-    return undefined;
-  }
-  const parentIndex = entries.indexOf(parentEntry);
-  if (
-    !parentEntry.row.projected &&
-    embedTargetOf(parentEntry.row.node) !== undefined
-  ) {
-    return parentEntry.row;
-  }
-  return screenAncestorEmbed(links, entries, parentIndex);
-}
 
 function ladderOf(
   links: ScreenLinks,
@@ -357,67 +402,54 @@ function withLadderAttrs(
   };
 }
 
-type MoveContext = {
-  entries: SplicedEntry[];
-  links: ScreenLinks;
-  graph: GraphLookup;
-  updates: Map<ID, GraphNode>;
-};
+type Updates = ImmutableMap<ID, GraphNode>;
 
-/* eslint-disable functional/immutable-data */
 function currentNodeOf(
   plan: Plan,
-  updates: Map<ID, GraphNode>,
+  updates: Updates,
   id: ID
 ): GraphNode | undefined {
   return updates.get(id) ?? getWorkspaceNode(plan.knowledgeDBs, id);
 }
 
-function stageNode(updates: Map<ID, GraphNode>, node: GraphNode): void {
-  updates.set(node.id, node);
-}
-
-function stageLadder(
-  updates: Map<ID, GraphNode>,
+function withLadder(
+  updates: Updates,
   node: GraphNode,
   ladder: { after?: ID; before?: ID; parent?: ID }
-): void {
+): Updates {
   const updated = withLadderAttrs(node, ladder);
-  if (updated) {
-    stageNode(updates, updated);
-  }
+  return updated ? updates.set(updated.id, updated) : updates;
 }
 
-function detachOwnLine(
+function detachLine(
   plan: Plan,
-  context: MoveContext,
+  updates: Updates,
   node: GraphNode
-): boolean {
+): Updates | undefined {
   const oldParent =
     node.parent !== undefined
-      ? currentNodeOf(plan, context.updates, node.parent)
+      ? currentNodeOf(plan, updates, node.parent)
       : undefined;
   if (!oldParent) {
-    return false;
+    return undefined;
   }
-  stageNode(context.updates, {
+  return updates.set(oldParent.id, {
     ...oldParent,
     children: oldParent.children.filter((childId) => childId !== node.id),
   });
-  return true;
 }
 
-function attachOwnLine(
+function attachLine(
   plan: Plan,
-  context: MoveContext,
+  updates: Updates,
   nodeId: ID,
   parentId: ID,
   anchor: { after: ID | undefined } | "end"
-): boolean {
-  const parent = currentNodeOf(plan, context.updates, parentId);
-  const node = currentNodeOf(plan, context.updates, nodeId);
+): Updates | undefined {
+  const parent = currentNodeOf(plan, updates, parentId);
+  const node = currentNodeOf(plan, updates, nodeId);
   if (!parent || !node) {
-    return false;
+    return undefined;
   }
   const insertAt = ((): number => {
     if (anchor === "end") {
@@ -427,116 +459,13 @@ function attachOwnLine(
       anchor.after !== undefined ? parent.children.indexOf(anchor.after) : -1;
     return at >= 0 ? at + 1 : 0;
   })();
-  stageNode(context.updates, {
+  const withParent = updates.set(parentId, {
     ...parent,
     children: parent.children.insert(insertAt, nodeId),
   });
-  if (node.parent !== parentId) {
-    stageNode(context.updates, { ...node, parent: parentId });
-  }
-  return true;
-}
-
-function moveGrabbedProjected(
-  plan: Plan,
-  context: MoveContext,
-  index: number,
-  hostEmbed: GraphNode
-): boolean {
-  const { row } = context.entries[index];
-  const ladder = ladderOf(context.links, index, hostEmbed.id);
-  if (row.spokenFor !== undefined) {
-    const statement = currentNodeOf(plan, context.updates, row.spokenFor);
-    if (!statement) {
-      return false;
-    }
-    stageLadder(context.updates, statement, ladder);
-    return true;
-  }
-  const embedNode = currentNodeOf(plan, context.updates, hostEmbed.id);
-  if (!embedNode) {
-    return false;
-  }
-  const statementNode: GraphNode = {
-    ...newGraphNode([linkSpan(row.node.id, nodeText(row.node))], {
-      root: embedNode.root,
-      parent: embedNode.id,
-    }),
-    extraAttrs: {
-      embed: "true",
-      ...(ladder.after !== undefined && { after: ladder.after }),
-      ...(ladder.before !== undefined && { before: ladder.before }),
-      ...(ladder.parent !== undefined && { parent: ladder.parent }),
-    },
-  };
-  stageNode(context.updates, statementNode);
-  return attachOwnLine(plan, context, statementNode.id, hostEmbed.id, "end");
-}
-
-function previousOwnSiblingId(
-  context: MoveContext,
-  index: number
-): ID | undefined {
-  const previous = context.links.prevSibling[index];
-  if (!previous) {
-    return undefined;
-  }
-  if (!previous.row.projected) {
-    return previous.row.node.id;
-  }
-  return previousOwnSiblingId(context, context.entries.indexOf(previous));
-}
-
-function moveOwnLine(
-  plan: Plan,
-  context: MoveContext,
-  index: number,
-  newParentId: ID
-): boolean {
-  const { row } = context.entries[index];
-  const node = currentNodeOf(plan, context.updates, row.node.id);
-  if (!node || !detachOwnLine(plan, context, node)) {
-    return false;
-  }
-  return attachOwnLine(plan, context, node.id, newParentId, {
-    after: previousOwnSiblingId(context, index),
-  });
-}
-
-function moveGrabbedHome(
-  plan: Plan,
-  context: MoveContext,
-  index: number
-): boolean {
-  const parentEntry = context.links.parent[index];
-  if (!parentEntry) {
-    return false;
-  }
-  const parentRow = parentEntry.row;
-  if (!parentRow.projected && embedTargetOf(parentRow.node) === undefined) {
-    return moveOwnLine(plan, context, index, parentRow.node.id);
-  }
-  const governing = screenAncestorEmbed(context.links, context.entries, index);
-  if (!governing || governing.dangling) {
-    return false;
-  }
-  const { row } = context.entries[index];
-  const node = currentNodeOf(plan, context.updates, row.node.id);
-  if (!node || !detachOwnLine(plan, context, node)) {
-    return false;
-  }
-  if (!attachOwnLine(plan, context, node.id, governing.node.id, "end")) {
-    return false;
-  }
-  const moved = currentNodeOf(plan, context.updates, node.id);
-  if (moved) {
-    stageLadder(
-      context.updates,
-      moved,
-      ladderOf(context.links, index, governing.node.id)
-    );
-  }
-  return true;
+  return node.parent !== parentId
+    ? withParent.set(nodeId, { ...node, parent: parentId })
+    : withParent;
 }
 
 function embedResolves(graph: GraphLookup, embedNode: GraphNode): boolean {
@@ -547,72 +476,242 @@ function embedResolves(graph: GraphLookup, embedNode: GraphNode): boolean {
   );
 }
 
-function repairPositionedEntry(
-  plan: Plan,
+type MoveContext = {
+  plan: Plan;
+  graph: GraphLookup;
+  entries: SplicedEntry[];
+  links: ScreenLinks;
+};
+
+function physicalAnchorId(context: MoveContext, index: number): ID | undefined {
+  const previous = context.links.prevSibling[index];
+  if (!previous) {
+    return undefined;
+  }
+  const { row } = previous;
+  if (
+    !row.projected &&
+    row.positioned !== true &&
+    fileMembershipNode(context.plan, row.node) === undefined
+  ) {
+    return row.node.id;
+  }
+  return physicalAnchorId(context, context.entries.indexOf(previous));
+}
+
+function moveProjectedRow(
   context: MoveContext,
-  index: number,
-  grabbedRoots: Set<Row>
-): void {
+  updates: Updates,
+  index: number
+): Updates | undefined {
   const { row } = context.entries[index];
-  if (grabbedRoots.has(row) || row.lapsed) {
-    return;
+  if (row.embeddedIn === undefined) {
+    return undefined;
+  }
+  const ladder = ladderOf(context.links, index, row.embeddedIn);
+  if (row.spokenFor !== undefined) {
+    const statement = currentNodeOf(context.plan, updates, row.spokenFor);
+    if (!statement) {
+      return undefined;
+    }
+    const membership = fileMembershipNode(context.plan, statement);
+    if (!membership || !embedResolves(context.graph, membership)) {
+      return undefined;
+    }
+    return withLadder(updates, statement, ladder);
+  }
+  const host = currentNodeOf(context.plan, updates, row.embeddedIn);
+  if (!host || !embedResolves(context.graph, host)) {
+    return undefined;
+  }
+  const statementNode: GraphNode = {
+    ...newGraphNode([linkSpan(row.node.id, nodeText(row.node))], {
+      root: host.root,
+      parent: host.id,
+    }),
+    extraAttrs: {
+      embed: "true",
+      ...(ladder.after !== undefined && { after: ladder.after }),
+      ...(ladder.before !== undefined && { before: ladder.before }),
+      ...(ladder.parent !== undefined && { parent: ladder.parent }),
+    },
+  };
+  return attachLine(
+    context.plan,
+    updates.set(statementNode.id, statementNode),
+    statementNode.id,
+    host.id,
+    "end"
+  );
+}
+
+function moveOwnLineRow(
+  context: MoveContext,
+  updates: Updates,
+  index: number
+): Updates | undefined {
+  const { row } = context.entries[index];
+  const node = currentNodeOf(context.plan, updates, row.node.id);
+  if (!node) {
+    return undefined;
+  }
+  const membership = fileMembershipNode(context.plan, node);
+  if (membership && !embedResolves(context.graph, membership)) {
+    return undefined;
+  }
+  return withLadder(
+    updates,
+    node,
+    ladderOf(context.links, index, membership?.id)
+  );
+}
+
+function governingHostId(context: MoveContext, parentRow: Row): ID | undefined {
+  if (parentRow.projected) {
+    return parentRow.embeddedIn;
+  }
+  if (embedTargetOf(parentRow.node) !== undefined) {
+    return parentRow.node.id;
+  }
+  return fileMembershipNode(context.plan, parentRow.node)?.id;
+}
+
+function moveHomeRow(
+  context: MoveContext,
+  updates: Updates,
+  index: number
+): Updates | undefined {
+  const parentEntry = context.links.parent[index];
+  if (!parentEntry) {
+    return undefined;
+  }
+  const node = currentNodeOf(
+    context.plan,
+    updates,
+    context.entries[index].row.node.id
+  );
+  if (!node) {
+    return undefined;
+  }
+  const hostId = governingHostId(context, parentEntry.row);
+  if (hostId === undefined) {
+    const detached = detachLine(context.plan, updates, node);
+    return detached
+      ? attachLine(context.plan, detached, node.id, parentEntry.row.node.id, {
+          after: physicalAnchorId(context, index),
+        })
+      : undefined;
+  }
+  const host = currentNodeOf(context.plan, updates, hostId);
+  if (!host || !embedResolves(context.graph, host)) {
+    return undefined;
+  }
+  const detached = detachLine(context.plan, updates, node);
+  if (!detached) {
+    return undefined;
+  }
+  const attached = attachLine(context.plan, detached, node.id, host.id, "end");
+  if (!attached) {
+    return undefined;
+  }
+  const moved = currentNodeOf(context.plan, attached, node.id);
+  return moved
+    ? withLadder(attached, moved, ladderOf(context.links, index, host.id))
+    : attached;
+}
+
+function moveGrabbedRow(
+  context: MoveContext,
+  updates: Updates,
+  index: number
+): Updates | undefined {
+  const { row } = context.entries[index];
+  if (row.projected) {
+    return moveProjectedRow(context, updates, index);
+  }
+  const membership = fileMembershipNode(context.plan, row.node);
+  if (membership !== undefined || row.positioned === true) {
+    return moveOwnLineRow(context, updates, index);
+  }
+  return moveHomeRow(context, updates, index);
+}
+
+function hasPositionNames(node: GraphNode): boolean {
+  return Object.keys(node.extraAttrs ?? {}).some((key) =>
+    POSITION_KEYS.includes(key)
+  );
+}
+
+function repairEntry(
+  context: MoveContext,
+  updates: Updates,
+  index: number,
+  grabbedRoots: ImmutableSet<Row>
+): Updates {
+  const { row } = context.entries[index];
+  if (
+    grabbedRoots.has(row) ||
+    row.lapsed ||
+    row.ambiguous ||
+    row.positioned !== true
+  ) {
+    return updates;
   }
   if (!row.projected) {
-    const node = currentNodeOf(plan, context.updates, row.node.id);
-    if (
-      !node ||
-      !Object.keys(node.extraAttrs ?? {}).some((key) =>
-        POSITION_KEYS.includes(key)
-      )
-    ) {
-      return;
+    const node = currentNodeOf(context.plan, updates, row.node.id);
+    if (!node || !hasPositionNames(node)) {
+      return updates;
     }
-    const membership = fileMembershipNode(plan, node);
+    const membership = fileMembershipNode(context.plan, node);
     if (membership && !embedResolves(context.graph, membership)) {
-      return;
+      return updates;
     }
-    stageLadder(
-      context.updates,
+    return withLadder(
+      updates,
       node,
       ladderOf(context.links, index, membership?.id)
     );
-    return;
   }
-  if (row.spokenFor === undefined || row.positioned !== true) {
-    return;
+  if (row.spokenFor === undefined) {
+    return updates;
   }
-  const statement = currentNodeOf(plan, context.updates, row.spokenFor);
+  const statement = currentNodeOf(context.plan, updates, row.spokenFor);
   if (!statement) {
-    return;
+    return updates;
   }
-  const membership = fileMembershipNode(plan, statement);
+  const membership = fileMembershipNode(context.plan, statement);
   if (!membership || !embedResolves(context.graph, membership)) {
-    return;
+    return updates;
   }
-  stageLadder(
-    context.updates,
+  return withLadder(
+    updates,
     statement,
     ladderOf(context.links, index, membership.id)
   );
+}
+
+function remapPaneKey(viewKey: string, paneIndex: number): string {
+  return viewKey.replace(/^p\d+:/u, `p${paneIndex}:`);
 }
 
 export function planMoveRows(
   plan: Plan,
   data: Data,
   paneIndex: number,
-  grabbedKeys: string[],
-  insertBeforeKey: string | undefined,
+  grabbed: Row[],
+  insertBefore: Row | undefined,
   indent: number
-): Plan {
+): Plan | undefined {
   const rows = writerRows(data, paneIndex);
   const indexOfKey = new Map(rows.map((row, i) => [row.viewKey, i] as const));
-  const requested = grabbedKeys.map((key) => indexOfKey.get(key));
-  if (requested.some((index) => index === undefined)) {
-    return plan;
+  const requested = grabbed.flatMap((row) => {
+    const at = indexOfKey.get(remapPaneKey(row.viewKey, paneIndex));
+    return at === undefined ? [] : [at];
+  });
+  if (requested.length < grabbed.length) {
+    return undefined;
   }
-  const sorted = requested
-    .flatMap((index) => (index === undefined ? [] : [index]))
-    .sort((left, right) => left - right);
+  const sorted = ImmutableSet(requested).sort().toArray();
   const blocks = sorted.reduce<{ start: number; end: number }[]>(
     (acc, start) => {
       const last = acc[acc.length - 1];
@@ -624,52 +723,28 @@ export function planMoveRows(
     []
   );
   if (blocks.length === 0) {
-    return plan;
+    return undefined;
   }
-  const graph = graphLookupFromData(data);
-  const hostEmbeds = new Map<Row, GraphNode>();
-  const refused = blocks.some(({ start }) => {
-    const row = rows[start];
-    if (row.parentRef === undefined) {
-      return true;
-    }
-    if (!row.projected) {
-      return false;
-    }
-    if (row.demoted || row.cycle) {
-      return true;
-    }
-    if (row.spokenFor !== undefined) {
-      const statement = getWorkspaceNode(plan.knowledgeDBs, row.spokenFor);
-      const membership = statement && fileMembershipNode(plan, statement);
-      if (!membership || !embedResolves(graph, membership)) {
-        return true;
-      }
-      hostEmbeds.set(row, membership);
-      return false;
-    }
-    const origin = hostEmbedRowOf(rows, start);
-    if (!origin || origin.dangling) {
-      return true;
-    }
-    hostEmbeds.set(row, origin.node);
-    return false;
-  });
+  const refused = blocks.some(
+    ({ start }) => rows[start].parentRef === undefined
+  );
   if (refused) {
-    return plan;
+    return undefined;
   }
-  const inBlocks = new Set<number>(
+  const inBlocks = ImmutableSet(
     blocks.flatMap(({ start, end }) =>
       Array.from({ length: end - start }, (ignored, offset) => start + offset)
     )
   );
   const remaining = rows.filter((ignored, index) => !inBlocks.has(index));
   const insertAt =
-    insertBeforeKey === undefined
+    insertBefore === undefined
       ? remaining.length
-      : remaining.findIndex((row) => row.viewKey === insertBeforeKey);
+      : remaining.findIndex(
+          (row) => row.viewKey === remapPaneKey(insertBefore.viewKey, paneIndex)
+        );
   if (insertAt < 0) {
-    return plan;
+    return undefined;
   }
   const grabbedEntries = blocks.flatMap(({ start, end }) => {
     const delta = indent - rows[start].depth;
@@ -686,51 +761,37 @@ export function planMoveRows(
       .slice(insertAt)
       .map((row): SplicedEntry => ({ row, depth: row.depth })),
   ];
-  const links = screenLinksOf(entries);
   const context: MoveContext = {
+    plan,
+    graph: graphLookupFromData(data),
     entries,
-    links,
-    graph,
-    updates: new Map<ID, GraphNode>(),
+    links: screenLinksOf(entries),
   };
-  const grabbedRoots = new Set(blocks.map(({ start }) => rows[start]));
-  const applied = [...grabbedRoots].every((row) => {
-    const index = entries.findIndex((entry) => entry.row === row);
-    if (index < 0) {
-      return false;
-    }
-    if (row.projected) {
-      const host = hostEmbeds.get(row);
-      return host ? moveGrabbedProjected(plan, context, index, host) : false;
-    }
-    const membership = fileMembershipNode(plan, row.node);
-    if (membership !== undefined) {
-      const node = currentNodeOf(plan, context.updates, row.node.id);
-      if (!node) {
-        return false;
-      }
-      stageLadder(
-        context.updates,
-        node,
-        ladderOf(context.links, index, membership.id)
-      );
-      return true;
-    }
-    return moveGrabbedHome(plan, context, index);
-  });
-  if (!applied) {
-    return plan;
+  const grabbedRows = ImmutableSet(blocks.map(({ start }) => rows[start]));
+  const rootIndexes = entries.flatMap((entry, index) =>
+    grabbedRows.has(entry.row) ? [index] : []
+  );
+  const staged = rootIndexes.reduce<Updates | undefined>(
+    (updates, index) =>
+      updates === undefined
+        ? undefined
+        : moveGrabbedRow(context, updates, index),
+    ImmutableMap<ID, GraphNode>()
+  );
+  if (staged === undefined) {
+    return undefined;
   }
-  entries.forEach((ignored, index) =>
-    repairPositionedEntry(plan, context, index, grabbedRoots)
+  const repaired = context.entries.reduce(
+    (updates, ignored, index) =>
+      repairEntry(context, updates, index, grabbedRows),
+    staged
   );
-  const written = [...context.updates.values()].reduce(
-    (acc, node) => planUpsertNodes(acc, node),
-    plan
-  );
-  return [...grabbedRoots].reduce((acc, row) => {
-    const index = entries.findIndex((entry) => entry.row === row);
-    const parentEntry = links.parent[index];
+  const written = repaired
+    .valueSeq()
+    .reduce((acc, node) => planUpsertNodes(acc, node), plan);
+  return rootIndexes.reduce((acc, index) => {
+    const { row } = entries[index];
+    const parentEntry = context.links.parent[index];
     if (!parentEntry) {
       return acc;
     }
@@ -749,4 +810,174 @@ export function planMoveRows(
     );
   }, written);
 }
-/* eslint-enable functional/immutable-data */
+
+function getCurrentWorkspaceNode(plan: Plan, node: GraphNode): GraphNode {
+  return getNode(plan.knowledgeDBs, node.id, LOCAL) ?? node;
+}
+
+function addFallbackLinkText(
+  target: AddToParentTarget,
+  text: string | undefined
+): AddToParentTarget {
+  if (typeof target === "string" || !("targetID" in target)) {
+    return target;
+  }
+  if (target.linkText || !text) {
+    return target;
+  }
+  return createRefTarget(target.targetID, text);
+}
+
+// Dragging a row from another user's document records that document in
+// knowstr_sources of ours — the one moment the source is known for
+// certain, so foreign ids resolve on a future fetch.
+function planRecordForeignSource(
+  plan: Plan,
+  sourcePane: Pane | undefined,
+  sourceRow: Row,
+  targetNode: GraphNode
+): Plan {
+  if (sourceRow.sourceId === LOCAL) {
+    return plan;
+  }
+  const coordinate =
+    sourcePane?.routeCoordinate ?? sourceCoordinate(sourceRow.sourceId);
+  const pubkey =
+    coordinate?.pubkey ?? decodePublicKeyInputSync(sourceRow.sourceId);
+  if (!pubkey) {
+    return plan;
+  }
+  const sourceDocument = getDocumentForNode(
+    plan.knowledgeDBs,
+    plan.documents,
+    sourceRow.node,
+    sourceRow.sourceId
+  );
+  const doc = sourceDocument?.docId ?? coordinate?.dTag;
+  if (!doc) {
+    return plan;
+  }
+  return planRecordKnowstrSource(plan, targetNode, {
+    author: nip19.npubEncode(pubkey),
+    doc,
+    relays: coordinate?.relays ?? [],
+  });
+}
+
+export function planAddRows(
+  basePlan: Plan,
+  sourceDrag: {
+    row: Row;
+    draggedRows: Row[];
+    sourcePaneIndex: number;
+    text?: string;
+    isCopyDrag?: boolean;
+    nodeId?: ID;
+    insertTarget?: AddToParentTarget;
+  },
+  targetPaneIndex: number,
+  targetParentRow: Row,
+  dropIndex: number
+): Plan {
+  const source = sourceDrag.row.viewKey;
+  const sources = sourceDrag.draggedRows.length
+    ? sourceDrag.draggedRows
+    : [sourceDrag.row];
+  const independentRows = getIndependentRows(sources);
+  if (
+    targetParentRow.projected ||
+    independentRows.some((row) => row.projected)
+  ) {
+    return basePlan;
+  }
+  const [plan, targetParentNode] = planMaterializeComputedRow(
+    basePlan,
+    targetParentRow
+  );
+
+  const sourcePane = plan.panes[sourceDrag.sourcePaneIndex];
+  const targetPane = plan.panes[targetPaneIndex];
+  if (!sourcePane || !targetPane) {
+    return plan;
+  }
+  const sourceDocument = getDocumentForNode(
+    plan.knowledgeDBs,
+    plan.documents,
+    sourceDrag.row.node,
+    sourceDrag.row.sourceId
+  );
+  const targetSourceId = targetParentRow.materialize
+    ? LOCAL
+    : targetParentRow.sourceId;
+  const targetDocument = getDocumentForNode(
+    plan.knowledgeDBs,
+    plan.documents,
+    targetParentNode,
+    targetSourceId
+  );
+  const isSameDocument =
+    sourceDocument !== undefined &&
+    targetDocument !== undefined &&
+    sourceDocument.sourceId === targetDocument.sourceId &&
+    sourceDocument.docId === targetDocument.docId;
+  const isDocumentTopLevelSource =
+    sourceDocument !== undefined &&
+    sourceDocument.sourceId === sourceDrag.row.sourceId &&
+    sourceDocument.topNodeShortIds.includes(sourceDrag.row.node.id);
+
+  if (isDocumentTopLevelSource && isSameDocument && !sourceDrag.isCopyDrag) {
+    return plan;
+  }
+
+  const expandedPlan = targetParentRow.view.expanded
+    ? plan
+    : planExpandNode(plan, targetParentRow.view, targetParentRow.viewPath);
+
+  const toReferenceTarget = (sourceRow: Row): AddToParentTarget =>
+    createRefTarget(sourceRow.node.id, nodeText(sourceRow.node));
+
+  return independentRows.reduce((accPlan: Plan, sourceRow, idx) => {
+    const sourceNode = sourceRow.node;
+    const sourceEdgeRelevance = sourceNode.relevance;
+    const sourceEdgeArgument = sourceNode.argument;
+    const insertAt = dropIndex + idx;
+    const isPrimarySource = sourceRow.viewKey === source;
+    const targetNode = getCurrentWorkspaceNode(accPlan, targetParentNode);
+    const planWithSource =
+      targetSourceId === LOCAL
+        ? planRecordForeignSource(accPlan, sourcePane, sourceRow, targetNode)
+        : accPlan;
+    const insertTarget =
+      sourceRow.materialize?.take ??
+      (isPrimarySource ? sourceDrag.insertTarget : undefined);
+    const dragTargetID = isPrimarySource ? sourceDrag.nodeId : undefined;
+    if (insertTarget) {
+      return planAddToParent(
+        planWithSource,
+        addFallbackLinkText(insertTarget, sourceDrag.text),
+        targetNode.id,
+        insertAt,
+        sourceEdgeRelevance,
+        sourceEdgeArgument
+      )[0];
+    }
+    if (dragTargetID) {
+      return planAddToParent(
+        planWithSource,
+        createRefTarget(dragTargetID, nodeText(sourceNode)),
+        targetNode.id,
+        insertAt,
+        sourceEdgeRelevance,
+        sourceEdgeArgument
+      )[0];
+    }
+    return planAddToParent(
+      planWithSource,
+      toReferenceTarget(sourceRow),
+      targetNode.id,
+      insertAt,
+      sourceEdgeRelevance,
+      sourceEdgeArgument
+    )[0];
+  }, expandedPlan);
+}

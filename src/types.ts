@@ -218,8 +218,10 @@ declare global {
     dangling?: true;
     demoted?: true;
     lapsed?: true;
+    ambiguous?: true;
     positioned?: true;
     spokenFor?: ID;
+    embeddedIn?: ID;
     // Projected embed content: the target's rows rendered at a placement.
     // Readonly in this step — touches materialize diffs in a later one.
     projected?: true;

@@ -153,6 +153,20 @@ function searchVirtualType(input: RowPlacement): Row["virtualType"] {
     : undefined;
 }
 
+function hostEmbedOf(input: RowPlacement, showing: Showing): ID | undefined {
+  if (showing.spokenUnder !== undefined) {
+    return showing.spokenUnder;
+  }
+  const { parentRow } = input;
+  if (!parentRow) {
+    return undefined;
+  }
+  if (!parentRow.projected && embedTargetOf(parentRow.node) !== undefined) {
+    return parentRow.node.id;
+  }
+  return parentRow.embeddedIn;
+}
+
 function createShowingRow(
   data: Data,
   input: RowPlacement,
@@ -160,16 +174,19 @@ function createShowingRow(
 ): Row {
   const row = baseRow(data, input, searchVirtualType(input));
   const standsFor = standsForOf(showing);
+  const embeddedIn = hostEmbedOf(input, showing);
   return {
     ...row,
     ...(standsFor && { standsFor }),
+    ...(embeddedIn !== undefined && { embeddedIn }),
     presentedSpans: presentedLineOf(showing).node.spans,
     ...(closesCycle(showing) && { cycle: true }),
     ...(leavesDangling(showing) && { dangling: true }),
     ...(presentedLineOf(showing).demoted && { demoted: true }),
     ...(showing.lapsed && { lapsed: true }),
+    ...(showing.ambiguous && { ambiguous: true }),
     ...(showing.names.length > 0 && { positioned: true }),
-    ...(showing.spokenBy.length > 0 && { spokenFor: showing.spokenBy[0] }),
+    ...(showing.spokenFor !== undefined && { spokenFor: showing.spokenFor }),
   };
 }
 
@@ -731,9 +748,16 @@ function convertShowingChildren(
   parentShowing: Showing | undefined,
   activeFilters: NonNullable<Pane["typeFilters"]>
 ): List<{ row: Row; showing: Showing | undefined }> {
-  const shown = linesShownThrough(
+  const shownLines = linesShownThrough(
     parentShowing ? parentShowing.target : undefined
-  ).flatMap(({ source, line }) =>
+  );
+  const lineEntries = (parentShowing ? parentShowing.children : []).flatMap(
+    (line) =>
+      line.reached.kind === "line"
+        ? [{ childIndex: line.reached.childIndex, line }]
+        : []
+  );
+  const shown = shownLines.flatMap(({ source, line }) =>
     itemPassesFilters(line.node, activeFilters)
       ? [
           {
@@ -744,12 +768,6 @@ function convertShowingChildren(
           },
         ]
       : []
-  );
-  const lineEntries = (parentShowing ? parentShowing.children : []).flatMap(
-    (line) =>
-      line.reached.kind === "line"
-        ? [{ childIndex: line.reached.childIndex, line }]
-        : []
   );
   const emptyRows = (
     childIndexes: number[]

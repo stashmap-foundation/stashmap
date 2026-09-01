@@ -405,14 +405,16 @@ export function useDroppable({
         targetDepth
       );
       if (moved) {
-        executePlan(
-          planSetTemporarySelectionState(moved, {
-            baseSelection: OrderedSet<string>(),
-            shiftSelection: OrderedSet<string>(),
-            anchor,
-          })
-        );
-        (document.activeElement as HTMLElement | null)?.blur();
+        if (moved.plan) {
+          executePlan(
+            planSetTemporarySelectionState(moved.plan, {
+              baseSelection: OrderedSet<string>(),
+              shiftSelection: OrderedSet<string>(),
+              anchor,
+            })
+          );
+          (document.activeElement as HTMLElement | null)?.blur();
+        }
         return dragItem;
       }
       const dropDestination = getDropDestinationFromRows(

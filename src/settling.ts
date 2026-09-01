@@ -1,8 +1,14 @@
+import {
+  List as ImmutableList,
+  Map as ImmutableMap,
+  Set as ImmutableSet,
+} from "immutable";
 import { GraphLookup, ResolvedNode } from "./core/graphLookup";
 import {
   PositionName,
   Showing,
   buildShowingTree,
+  carriesMarker,
   chainLinksOf,
   embedTargetOf,
   linesShownThrough,
@@ -14,13 +20,6 @@ function rowsUnder(showing: Showing): Showing[] {
     ...linesShownThrough(showing.target).map(({ line }) => line),
     ...showing.children,
   ];
-}
-
-function eachRow(showing: Showing, visit: (row: Showing) => void): void {
-  rowsUnder(showing).forEach((row) => {
-    visit(row);
-    eachRow(row, visit);
-  });
 }
 
 function statementScope(
@@ -36,335 +35,381 @@ function statementScope(
   return owner.reached.kind === "line" ? ownerScope : undefined;
 }
 
-// A layer is one document's contribution: its own lines reached through
-// children edges alone. Mounted sources below it settled when they mounted.
-function collectLayerStatements(
+function layerStatements(
   owner: Showing,
-  scope: Showing | undefined,
-  out: { statement: Showing; scope: Showing | undefined }[]
-): void {
-  /* eslint-disable functional/immutable-data */
+  scope: Showing | undefined
+): { statement: Showing; scope: Showing | undefined }[] {
   const rowScope = statementScope(owner, scope);
-  owner.children.forEach((row) => {
-    if (row.statement) {
-      out.push({ statement: row, scope: rowScope });
-    }
-    collectLayerStatements(row, rowScope, out);
-  });
-  /* eslint-enable functional/immutable-data */
+  return owner.children.flatMap((row) => [
+    ...(row.statement && !carriesMarker(row.node)
+      ? [{ statement: row, scope: rowScope }]
+      : []),
+    ...layerStatements(row, rowScope),
+  ]);
 }
 
-function layerNamedRows(owner: Showing, out: Showing[]): void {
-  /* eslint-disable functional/immutable-data */
-  owner.children.forEach((row) => {
-    if (!row.statement && row.names.length > 0) {
-      out.push(row);
-    }
-    layerNamedRows(row, out);
-  });
-  /* eslint-enable functional/immutable-data */
+function layerNamedRows(owner: Showing): Showing[] {
+  return owner.children.flatMap((row) => [
+    ...(!row.statement && row.names.length > 0 ? [row] : []),
+    ...layerNamedRows(row),
+  ]);
 }
 
-function answersTo(row: Showing, id: ID): boolean {
-  return row.node.id === id || row.spokenBy.includes(id);
+function sourceRowsUnder(showing: Showing): Showing[] {
+  return [
+    ...linesShownThrough(showing.target).map(({ line }) => line),
+    ...(embedTargetOf(showing.node) === undefined ? showing.children : []),
+  ];
 }
 
 function findOccurrence(scope: Showing, id: ID): Showing | undefined {
+  const answers = (row: Showing): boolean =>
+    chainLinksOf(row).some((link) => link.node.id === id);
   const search = (rows: Showing[]): Showing | undefined =>
     rows.reduce<Showing | undefined>((found, row) => {
       if (found) {
         return found;
       }
-      if (answersTo(row, id) && !row.demoted && !row.cycle && !row.statement) {
+      if (answers(row) && !row.statement) {
         return row;
       }
-      return search(rowsUnder(row));
+      return search(sourceRowsUnder(row));
     }, undefined);
   return search(linesShownThrough(scope.target).map(({ line }) => line));
 }
 
-type StatementEffects = {
-  applied: Set<Showing>;
-  namesFor: Map<Showing, PositionName[]>;
-  extraChildrenFor: Map<Showing, Showing[]>;
-  aliasIdsFor: Map<Showing, ID[]>;
+type Spoken = {
+  names: PositionName[];
+  answersTo: ID[];
+  children: Showing[];
+  spokenFor: ID;
+  spokenUnder: ID | undefined;
 };
 
-function rebuildWithoutStatements(
+function decideStatements(
+  collected: { statement: Showing; scope: Showing | undefined }[]
+): { applied: ImmutableSet<Showing>; targets: ImmutableMap<Showing, Spoken> } {
+  return collected.reduce<{
+    applied: ImmutableSet<Showing>;
+    targets: ImmutableMap<Showing, Spoken>;
+  }>(
+    (decisions, { statement, scope }) => {
+      const targetId = embedTargetOf(statement.node);
+      const target =
+        scope !== undefined && targetId !== undefined
+          ? findOccurrence(scope, targetId)
+          : undefined;
+      if (!target) {
+        return decisions;
+      }
+      const spoken = decisions.targets.get(target);
+      return {
+        applied: decisions.applied.add(statement),
+        targets: decisions.targets.set(target, {
+          names: [...(spoken?.names ?? []), ...positionNamesOf(statement.node)],
+          answersTo: [...(spoken?.answersTo ?? []), statement.node.id],
+          children: [...(spoken?.children ?? []), ...statement.children],
+          spokenFor: spoken?.spokenFor ?? statement.node.id,
+          spokenUnder: spoken?.spokenUnder ?? scope?.node.id,
+        }),
+      };
+    },
+    {
+      applied: ImmutableSet<Showing>(),
+      targets: ImmutableMap<Showing, Spoken>(),
+    }
+  );
+}
+
+function applyDecisions(
   showing: Showing,
-  effects: StatementEffects,
-  adopted: boolean
+  decisions: {
+    applied: ImmutableSet<Showing>;
+    targets: ImmutableMap<Showing, Spoken>;
+  },
+  insideMoved: boolean
 ): { showing: Showing; candidates: Showing[] } {
+  const rebuiltRows = (
+    rows: Showing[],
+    moved: boolean
+  ): { rows: Showing[]; candidates: Showing[] } =>
+    rows.reduce<{ rows: Showing[]; candidates: Showing[] }>(
+      (acc, row) => {
+        if (decisions.applied.has(row)) {
+          return acc;
+        }
+        const rebuilt = applyDecisions(row, decisions, moved);
+        return {
+          rows: [...acc.rows, rebuilt.showing],
+          candidates: [...acc.candidates, ...rebuilt.candidates],
+        };
+      },
+      { rows: [], candidates: [] }
+    );
   const rebuildLink = (
     link: Showing,
     inner: { showing: Showing; candidates: Showing[] } | undefined
   ): { showing: Showing; candidates: Showing[] } => {
-    const kept = link.children
-      .filter((child) => !effects.applied.has(child))
-      .map((child) => rebuildWithoutStatements(child, effects, adopted));
-    const taken = (effects.extraChildrenFor.get(link) ?? []).map((child) =>
-      rebuildWithoutStatements(child, effects, true)
-    );
-    const aliasIds = effects.aliasIdsFor.get(link) ?? [];
-    const names = [...(effects.namesFor.get(link) ?? []), ...link.names];
+    const spoken = decisions.targets.get(link);
+    const kept = rebuiltRows(link.children, insideMoved);
+    const fromStatements = rebuiltRows(spoken?.children ?? [], true);
+    const names = [...(spoken?.names ?? []), ...link.names];
     const rebuilt: Showing = {
       ...link,
       target: inner?.showing,
       names,
-      spokenBy: [...aliasIds, ...link.spokenBy],
-      children: [...kept, ...taken].map((child) => child.showing),
+      answersTo: [...(spoken?.answersTo ?? []), ...link.answersTo],
+      spokenFor: spoken?.spokenFor ?? link.spokenFor,
+      spokenUnder: spoken?.spokenUnder ?? link.spokenUnder,
+      children: [...kept.rows, ...fromStatements.rows],
     };
-    const moved =
-      effects.namesFor.has(link) ||
-      (adopted && !link.statement && names.length > 0);
+    const candidate =
+      spoken !== undefined ||
+      (insideMoved && !link.statement && names.length > 0);
     return {
       showing: rebuilt,
       candidates: [
-        ...(moved ? [rebuilt] : []),
+        ...(candidate ? [rebuilt] : []),
         ...(inner?.candidates ?? []),
-        ...[...kept, ...taken].flatMap((child) => child.candidates),
+        ...kept.candidates,
+        ...fromStatements.candidates,
       ],
     };
   };
-  const links = [...chainLinksOf(showing)].reverse();
-  const [terminal, ...outer] = links;
+  const [terminal, ...outer] = [...chainLinksOf(showing)].reverse();
   return outer.reduce(
     (inner, link) => rebuildLink(link, inner),
     rebuildLink(terminal, undefined)
   );
 }
 
-function applyLayerStatements(
-  layer: Showing,
-  collected: { statement: Showing; scope: Showing | undefined }[]
-): { showing: Showing; candidates: Showing[] } {
-  const decisions = collected.map(({ statement, scope }) => {
-    const targetId = embedTargetOf(statement.node);
-    return {
-      statement,
-      target:
-        scope !== undefined && targetId !== undefined
-          ? findOccurrence(scope, targetId)
-          : undefined,
-    };
-  });
-  /* eslint-disable functional/immutable-data */
-  const effects: StatementEffects = {
-    applied: new Set<Showing>(),
-    namesFor: new Map<Showing, PositionName[]>(),
-    extraChildrenFor: new Map<Showing, Showing[]>(),
-    aliasIdsFor: new Map<Showing, ID[]>(),
-  };
-  // Applied back to front so statements of one diff keep their file order
-  // while a later statement's names take priority.
-  decisions.reduceRight<undefined>((ignored, { statement, target }) => {
-    if (!target) {
-      return ignored;
-    }
-    effects.applied.add(statement);
-    effects.namesFor.set(target, [
-      ...positionNamesOf(statement.node),
-      ...(effects.namesFor.get(target) ?? []),
-    ]);
-    effects.aliasIdsFor.set(target, [
-      statement.node.id,
-      ...(effects.aliasIdsFor.get(target) ?? []),
-    ]);
-    effects.extraChildrenFor.set(target, [
-      ...statement.children,
-      ...(effects.extraChildrenFor.get(target) ?? []),
-    ]);
-    return ignored;
-  }, undefined);
-  /* eslint-enable functional/immutable-data */
-  if (effects.applied.size === 0) {
-    return { showing: layer, candidates: [] };
-  }
-  return rebuildWithoutStatements(layer, effects, false);
-}
+type ReverseLists = { before: Showing[]; after: Showing[]; child: Showing[] };
 
-type Draft = {
-  original: Showing;
-  target: Draft | undefined;
-  children: (Draft | { bookmark: Showing })[];
+type Anchors = {
+  listsOf: ImmutableMap<Showing, ReverseLists>;
+  anchored: ImmutableSet<Showing>;
+  lapsed: ImmutableSet<Showing>;
+  ambiguous: ImmutableSet<Showing>;
 };
 
-/* eslint-disable functional/no-let, functional/immutable-data, @typescript-eslint/no-use-before-define */
-// The bookmark walk builds the new tree in place: an immutable append would
-// copy every children array per inserted row, O(n²) on wide trees.
-function readNames(root: Showing, candidates: Set<Showing>): Showing {
-  const index = new Map<ID, Showing>();
-  index.set(root.node.id, root);
-  eachRow(root, (row) => {
-    [row.node.id, ...row.spokenBy].forEach((id) => {
-      if (!index.has(id)) {
-        index.set(id, row);
-      }
-    });
-  });
-  const lists = new Map<
-    Showing,
-    { before: Showing[]; after: Showing[]; child: Showing[] }
-  >();
-  const lapsedRows = new Set<Showing>();
-  const noted = new Set<Showing>();
-  eachRow(root, (row) => {
-    if (row.names.length === 0 || !candidates.has(row)) {
-      return;
-    }
-    const found = row.names
-      .map((name) => ({
-        name,
-        anchor: index.get(name.id),
-      }))
-      .find(({ anchor }) => anchor !== undefined && anchor !== row);
-    if (!found || found.anchor === undefined) {
-      lapsedRows.add(row);
-      return;
-    }
-    const entry = lists.get(found.anchor) ?? {
-      before: [],
-      after: [],
-      child: [],
-    };
-    const listOf = (kind: PositionName["kind"]): Showing[] => {
-      if (kind === "after") {
-        return entry.after;
-      }
-      return kind === "before" ? entry.before : entry.child;
-    };
-    listOf(found.name.kind).push(row);
-    lists.set(found.anchor, entry);
-    noted.add(row);
-  });
-  if (noted.size === 0 && lapsedRows.size === 0) {
-    return root;
-  }
-  const copied = new Map<Showing, Draft>();
-  const copyOrBookmark = (children: Draft["children"], row: Showing): void => {
-    if (noted.has(row)) {
-      children.push({ bookmark: row });
-      return;
-    }
-    unfold(children, row);
-  };
-  const copyChain = (link: Showing | undefined): Draft | undefined => {
-    if (!link) {
-      return undefined;
-    }
-    return [...chainLinksOf(link)]
-      .reverse()
-      .reduce<Draft | undefined>((inner, chainLink) => {
-        const draft: Draft = {
-          original: chainLink,
-          target: inner,
-          children: [],
-        };
-        chainLink.children.forEach((child) =>
-          copyOrBookmark(draft.children, child)
-        );
-        return draft;
-      }, undefined);
-  };
-  const copyRow = (row: Showing): Draft => {
-    const draft: Draft = { original: row, target: undefined, children: [] };
-    copied.set(row, draft);
-    draft.target = copyChain(row.target);
-    row.children.forEach((child) => copyOrBookmark(draft.children, child));
-    (lists.get(row)?.child ?? []).forEach((child) =>
-      unfold(draft.children, child)
+function readAnchors(root: Showing, candidates: Showing[]): Anchors {
+  const admit = (
+    found: ImmutableMap<ID, Showing[]>,
+    row: Showing
+  ): ImmutableMap<ID, Showing[]> =>
+    rowsUnder(row).reduce(
+      (map, under) => admit(map, under),
+      [row.node.id, ...row.answersTo].reduce(
+        (map, id) => map.set(id, [...(map.get(id) ?? []), row]),
+        found
+      )
     );
-    return draft;
-  };
-  function unfold(children: Draft["children"], row: Showing): void {
-    if (copied.has(row)) {
-      return;
-    }
-    // Copied before its lists unfold — a circle of names would otherwise unfold forever.
-    const draft = copyRow(row);
-    const befores: Draft["children"] = [];
-    (lists.get(row)?.before ?? []).forEach((early) => unfold(befores, early));
-    const afters: Draft["children"] = [];
-    (lists.get(row)?.after ?? []).forEach((late) => unfold(afters, late));
-    children.push(...befores, draft, ...afters);
-  }
-  const rootDraft = copyRow(root);
-  const sweepBookmarks = (draft: Draft): void => {
-    const chainDrafts = [];
-    let link: Draft | undefined = draft;
-    while (link) {
-      chainDrafts.push(link);
-      link = link.target;
-    }
-    chainDrafts.reverse().forEach((chainDraft) => {
-      const drafts = chainDraft.children;
-      for (let i = 0; i < drafts.length; i += 1) {
-        const entry = drafts[i];
-        if ("bookmark" in entry) {
-          if (copied.has(entry.bookmark)) {
-            drafts.splice(i, 1);
-            i -= 1;
-          } else {
-            lapsedRows.add(entry.bookmark);
-            const expansion: Draft["children"] = [];
-            unfold(expansion, entry.bookmark);
-            drafts.splice(i, 1, ...expansion);
-            i -= 1;
-          }
-        } else {
-          sweepBookmarks(entry);
-        }
+  const occurrences = admit(ImmutableMap<ID, Showing[]>(), root);
+  return candidates.reduce<Anchors>(
+    (anchors, row) => {
+      const claim = row.names
+        .map((name) => ({
+          name,
+          found: (occurrences.get(name.id) ?? []).filter(
+            (occurrence) => occurrence !== row
+          ),
+        }))
+        .find(({ found }) => found.length > 0);
+      if (!claim) {
+        return { ...anchors, lapsed: anchors.lapsed.add(row) };
       }
+      if (claim.found.length > 1) {
+        return { ...anchors, ambiguous: anchors.ambiguous.add(row) };
+      }
+      const anchor = claim.found[0];
+      const lists = anchors.listsOf.get(anchor) ?? {
+        before: [],
+        after: [],
+        child: [],
+      };
+      const { kind } = claim.name;
+      return {
+        ...anchors,
+        listsOf: anchors.listsOf.set(anchor, {
+          before: kind === "before" ? [...lists.before, row] : lists.before,
+          after: kind === "after" ? [...lists.after, row] : lists.after,
+          child: kind === "parent" ? [...lists.child, row] : lists.child,
+        }),
+        anchored: anchors.anchored.add(row),
+      };
+    },
+    {
+      listsOf: ImmutableMap(),
+      anchored: ImmutableSet(),
+      lapsed: ImmutableSet(),
+      ambiguous: ImmutableSet(),
+    }
+  );
+}
+
+function decidePlacements(
+  root: Showing,
+  anchors: Anchors
+): { moved: ImmutableSet<Showing>; parked: ImmutableSet<Showing> } {
+  const listRows = (row: Showing): Showing[] => {
+    const lists = anchors.listsOf.get(row);
+    return lists ? [...lists.before, ...lists.after, ...lists.child] : [];
+  };
+  const walkRow = (
+    walk: { copied: ImmutableSet<Showing>; bookmarks: ImmutableList<Showing> },
+    row: Showing
+  ): { copied: ImmutableSet<Showing>; bookmarks: ImmutableList<Showing> } => {
+    if (walk.copied.has(row)) {
+      return walk;
+    }
+    const withLists = listRows(row).reduce(walkRow, {
+      ...walk,
+      copied: walk.copied.add(row),
+    });
+    return rowsUnder(row).reduce(
+      (state, child) =>
+        anchors.anchored.has(child)
+          ? { ...state, bookmarks: state.bookmarks.push(child) }
+          : walkRow(state, child),
+      withLists
+    );
+  };
+  const walked = rowsUnder(root).reduce(
+    (state, child) =>
+      anchors.anchored.has(child)
+        ? { ...state, bookmarks: state.bookmarks.push(child) }
+        : walkRow(state, child),
+    { copied: ImmutableSet<Showing>(), bookmarks: ImmutableList<Showing>() }
+  );
+  const sweep = (state: {
+    copied: ImmutableSet<Showing>;
+    bookmarks: ImmutableList<Showing>;
+    at: number;
+    parked: ImmutableSet<Showing>;
+  }): ImmutableSet<Showing> => {
+    const row = state.bookmarks.get(state.at);
+    if (row === undefined) {
+      return state.parked;
+    }
+    if (state.copied.has(row)) {
+      return sweep({ ...state, at: state.at + 1 });
+    }
+    return sweep({
+      ...walkRow({ copied: state.copied, bookmarks: state.bookmarks }, row),
+      at: state.at + 1,
+      parked: state.parked.add(row),
     });
   };
-  sweepBookmarks(rootDraft);
-  const draftToShowing = (draft: Draft): Showing => {
-    const chainDrafts = [];
-    let link: Draft | undefined = draft;
-    while (link) {
-      chainDrafts.push(link);
-      link = link.target;
-    }
-    const [terminal, ...outer] = chainDrafts.reverse();
-    const materializeLink = (
-      chainDraft: Draft,
+  const parked = sweep({ ...walked, at: 0, parked: ImmutableSet<Showing>() });
+  return { moved: anchors.anchored.subtract(parked), parked };
+}
+
+function flatEmission(emitted: {
+  ahead: Showing[];
+  row: Showing;
+  behind: Showing[];
+}): Showing[] {
+  return [...emitted.ahead, emitted.row, ...emitted.behind];
+}
+
+function applyPlacements(
+  root: Showing,
+  anchors: Anchors,
+  moved: ImmutableSet<Showing>,
+  parked: ImmutableSet<Showing>
+): Showing {
+  const emitRow = (
+    row: Showing
+  ): { ahead: Showing[]; row: Showing; behind: Showing[] } => {
+    const placeRows = (rows: Showing[]): Showing[] =>
+      rows.flatMap((member) =>
+        moved.has(member) ? [] : flatEmission(emitRow(member))
+      );
+    const placedHere = (member: Showing): Showing[] =>
+      moved.has(member) ? flatEmission(emitRow(member)) : [];
+    const lists = anchors.listsOf.get(row);
+    const placedChildren = (lists?.child ?? []).flatMap(placedHere);
+    const rebuildLink = (
+      link: Showing,
       inner: Showing | undefined
     ): Showing => ({
-      ...chainDraft.original,
+      ...link,
       target: inner,
-      lapsed: chainDraft.original.lapsed || lapsedRows.has(chainDraft.original),
-      children: chainDraft.children.flatMap((entry) =>
-        "bookmark" in entry ? [] : [draftToShowing(entry)]
-      ),
+      lapsed:
+        link.lapsed ||
+        (link === row && (parked.has(row) || anchors.lapsed.has(row))),
+      ambiguous: link.ambiguous || (link === row && anchors.ambiguous.has(row)),
+      children: [
+        ...placeRows(link.children),
+        ...(link === row ? placedChildren : []),
+      ],
     });
-    return outer.reduce(
-      (inner, chainDraft) => materializeLink(chainDraft, inner),
-      materializeLink(terminal, undefined)
-    );
+    const [terminal, ...outer] = [...chainLinksOf(row)].reverse();
+    return {
+      ahead: (lists?.before ?? []).flatMap(placedHere),
+      row: outer.reduce(
+        (inner, link) => rebuildLink(link, inner),
+        rebuildLink(terminal, undefined)
+      ),
+      behind: (lists?.after ?? []).flatMap(placedHere),
+    };
   };
-  return draftToShowing(rootDraft);
+  return emitRow(root).row;
 }
-/* eslint-enable functional/no-let, functional/immutable-data, @typescript-eslint/no-use-before-define */
 
-export function settleLayer(layer: Showing): Showing {
-  const collected: { statement: Showing; scope: Showing | undefined }[] = [];
-  collectLayerStatements(layer, undefined, collected);
-  const staged =
-    collected.length > 0
-      ? applyLayerStatements(layer, collected)
-      : { showing: layer, candidates: [] };
-  const ownNamed: Showing[] = [];
-  layerNamedRows(staged.showing, ownNamed);
-  const candidates = new Set([...staged.candidates, ...ownNamed]);
-  if (candidates.size === 0) {
-    return staged.showing;
+function readNames(root: Showing, candidates: Showing[]): Showing {
+  if (candidates.length === 0) {
+    return root;
   }
-  return readNames(staged.showing, candidates);
+  const anchors = readAnchors(root, candidates);
+  const { moved, parked } = decidePlacements(root, anchors);
+  return applyPlacements(root, anchors, moved, parked);
+}
+
+function settleLayer(layer: Showing): {
+  showing: Showing;
+  spokenIds: ImmutableSet<ID>;
+} {
+  const decisions = decideStatements(layerStatements(layer, undefined));
+  const staged = decisions.applied.isEmpty()
+    ? { showing: layer, candidates: [] }
+    : applyDecisions(layer, decisions, false);
+  return {
+    showing: readNames(staged.showing, [
+      ...staged.candidates,
+      ...layerNamedRows(staged.showing),
+    ]),
+    spokenIds: ImmutableSet(
+      decisions.applied.toArray().map((statement) => statement.node.id)
+    ),
+  };
+}
+
+function settleMounts(showing: Showing): Showing {
+  return {
+    ...showing,
+    target: showing.target
+      ? settleLayer(settleMounts(showing.target)).showing
+      : undefined,
+    children: showing.children.map(settleMounts),
+  };
+}
+
+function keepSpeech(showing: Showing, kept: ImmutableSet<ID>): Showing {
+  const speaks = showing.spokenFor !== undefined && kept.has(showing.spokenFor);
+  return {
+    ...showing,
+    spokenFor: speaks ? showing.spokenFor : undefined,
+    spokenUnder: speaks ? showing.spokenUnder : undefined,
+    target: showing.target ? keepSpeech(showing.target, kept) : undefined,
+    children: showing.children.map((child) => keepSpeech(child, kept)),
+  };
 }
 
 export function showingTreeForRoot(
   graph: GraphLookup,
   root: ResolvedNode
 ): Showing {
-  return settleLayer(buildShowingTree(graph, root, settleLayer));
+  const settled = settleLayer(settleMounts(buildShowingTree(graph, root)));
+  return keepSpeech(settled.showing, settled.spokenIds);
 }

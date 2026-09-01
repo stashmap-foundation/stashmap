@@ -1,5 +1,4 @@
 Mid <!-- id:o0 -->
   Inner <!-- base:e2 -->
-    Two <!-- base:i2 -->
     One <!-- base:i1 -->
-  Two <!-- id:rs flag:dangling -->
+  Alpha <!-- base:ma -->

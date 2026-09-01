@@ -668,7 +668,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       return;
     }
 
-    const result = planBatchIndent(basePlan, [row], rows, {
+    const result = planBatchIndent(basePlan, data, [row], rows, {
       spans,
       viewKey,
     });
@@ -721,7 +721,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
 
     if (!isEditableNode(currentNode)) return;
 
-    const result = planBatchOutdent(basePlan, [row], rows, {
+    const result = planBatchOutdent(basePlan, data, [row], rows, {
       spans,
       viewKey,
     });

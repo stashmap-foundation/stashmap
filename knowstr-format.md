@@ -33,7 +33,7 @@ The second is a **move**. When I drag a row, the file records exactly one anchor
 - A row moved to the front <!-- id:a5 parent="s2" -->
 ```
 
-`after=` names the row above it; `parent=` names the row whose children it now leads. Never both — a second name could contradict the first. The idea: position is claimed relative to *rows*, never as "third from the top". So when the author reorders their document, my row travels with its named row — even when that row is itself a moved one, so resorting a whole list is a chain of `after=` claims. If the named row disappears, my row parks visibly where it is written until I drag it again. If several rows claim the same anchor, the order of their lines in my file decides. Rows I never dragged carry no names and simply follow the source order.
+`after=` names the row above it; `parent=` names the row whose children it now leads. Never both — a second name could contradict the first. The idea: position is claimed relative to *rows*, never as "third from the top". So when the author reorders their document, my row travels with its named row — even when that row is itself a moved one, so resorting a whole list is a chain of `after=` claims. If the named row disappears, my row parks visibly where it is written until I drag it again. If several rows claim the same anchor — possible only in hand-written or merged files, the app never writes two claims on one anchor — the order of their lines in my file breaks the tie. Rows I never dragged carry no names and simply follow the source order.
 
 ## The diff idea
 

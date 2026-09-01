@@ -10,7 +10,7 @@ import {
 } from "./core/graphLookup";
 
 export type PositionName = {
-  kind: "after" | "before" | "parent";
+  kind: "after" | "parent";
   id: ID;
 };
 
@@ -45,9 +45,7 @@ export function embedTargetOf(node: GraphNode): ID | undefined {
 export function positionNamesOf(node: GraphNode): PositionName[] {
   return Object.entries(node.extraAttrs ?? {}).flatMap(
     ([key, id]): PositionName[] =>
-      key === "after" || key === "before" || key === "parent"
-        ? [{ kind: key, id }]
-        : []
+      key === "after" || key === "parent" ? [{ kind: key, id }] : []
   );
 }
 

@@ -733,7 +733,7 @@ A
   `);
 });
 
-test("a hand-written move statement moves the row and rides when its name dies", async () => {
+test("a hand-written move statement moves the row and parks when its anchor dies", async () => {
   const workspacePath = writeWorkspace({
     "source.md": [
       "# Source <!-- id:s -->",
@@ -745,7 +745,7 @@ test("a hand-written move statement moves the row and rides when its name dies",
     "diff.md": [
       '# [Source](#s) <!-- id:o0 embed="true" -->',
       "",
-      '- [Gamma](#g) <!-- id:m1 embed="true" after="a" before="b" -->',
+      '- [Gamma](#g) <!-- id:m1 embed="true" after="a" -->',
     ].join("\n"),
   });
 
@@ -779,8 +779,8 @@ Source
 
   await expectTree(`
 Source
-  Gamma
   Beta
+  Gamma
   `);
 });
 

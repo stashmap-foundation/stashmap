@@ -725,7 +725,7 @@ Source
 `);
   await waitFor(() => {
     expect(fs.readFileSync(`${path}/diff.md`, "utf8")).toMatch(
-      /- \[Gamma\]\(#g\) <!-- id:\S+ embed="true" after="a" before="b" -->/u
+      /- \[Gamma\]\(#g\) <!-- id:\S+ embed="true" after="a" -->/u
     );
   });
   expect(fs.readFileSync(`${path}/source.md`, "utf8")).toBe(MOVE_SOURCE);
@@ -768,7 +768,7 @@ Doc
 `);
   await waitFor(() => {
     expect(fs.readFileSync(`${path}/diff.md`, "utf8")).toMatch(
-      /\n {2}- \[Gamma\]\(#g\) <!-- id:\S+ embed="true" after="n1" parent="root" -->/u
+      /\n {2}- \[Gamma\]\(#g\) <!-- id:\S+ embed="true" after="n1" -->/u
     );
   });
 
@@ -829,7 +829,7 @@ Doc
   await waitFor(() => {
     const content = fs.readFileSync(`${path}/diff.md`, "utf8");
     expect(content).toMatch(
-      /- \[First\]\(#f\) <!-- id:e1 embed="true" -->\n {2}- \[Alpha\]\(#a\) <!-- id:\S+ embed="true" after="c" before="d" parent="e2" -->/u
+      /- \[First\]\(#f\) <!-- id:e1 embed="true" -->\n {2}- \[Alpha\]\(#a\) <!-- id:\S+ embed="true" after="c" -->/u
     );
   });
 
@@ -843,6 +843,111 @@ Doc
     Gamma
     Alpha
     Delta
+`);
+});
+
+test("a drag re-derives a hand-written tie into an explicit chain", async () => {
+  const { path } = knowstrInit();
+  write(path, "source.md", MOVE_SOURCE);
+  write(
+    path,
+    "diff.md",
+    [
+      "# Doc <!-- id:root -->",
+      "",
+      '- [Source](#s) <!-- id:e1 embed="true" -->',
+      '  - [Beta](#b) <!-- id:m1 embed="true" after="a" -->',
+      '  - [Gamma](#g) <!-- id:m2 embed="true" after="a" -->',
+      "- One <!-- id:n1 -->",
+      "- Two <!-- id:n2 -->",
+      "",
+    ].join("\n")
+  );
+  await openDocumentExpanded(path, "diff.md");
+  await expectTree(`
+Doc
+  Source
+    Alpha
+    Beta
+    Gamma
+  One
+  Two
+`);
+
+  dragRowOnto("One", "Two");
+
+  await expectTree(`
+Doc
+  Source
+    Alpha
+    Beta
+    Gamma
+  Two
+  One
+`);
+  await waitFor(() => {
+    expect(fs.readFileSync(`${path}/diff.md`, "utf8")).toMatch(
+      /- \[Gamma\]\(#g\) <!-- id:m2 embed="true" after="b" -->/u
+    );
+  });
+
+  cleanup();
+  await openDocumentExpanded(path, "diff.md");
+  await expectTree(`
+Doc
+  Source
+    Alpha
+    Beta
+    Gamma
+  Two
+  One
+`);
+});
+
+test("dragging a projected row to another document writes a placement", async () => {
+  const { path } = knowstrInit();
+  const diff = '# [Source](#s) <!-- id:o0 embed="true" -->\n';
+  write(path, "source.md", MOVE_SOURCE);
+  write(path, "diff.md", diff);
+  write(path, "other.md", "# Other <!-- id:x -->\n");
+  await openDocumentExpanded(path, "diff.md");
+  await userEvent.click(await screen.findByLabelText("Open new pane"));
+  await navigateToNodeViaSearch(1, "Other");
+
+  await expectTree(`
+Source
+  Alpha
+  Beta
+  Gamma
+Other
+`);
+
+  dragRowOnto("Alpha", "Other");
+
+  await expectTree(`
+Source
+  Alpha
+    [I] Other ↩
+  Beta
+  Gamma
+Other
+  Alpha
+`);
+  await waitFor(() => {
+    expect(fs.readFileSync(`${path}/other.md`, "utf8")).toMatch(
+      /- \[Alpha\]\(#a\) <!-- id:\S+ embed="true" -->/u
+    );
+  });
+  expect(fs.readFileSync(`${path}/source.md`, "utf8")).toContain(
+    MOVE_SOURCE.trim()
+  );
+  expect(fs.readFileSync(`${path}/diff.md`, "utf8")).toContain(diff.trim());
+
+  cleanup();
+  await openDocumentExpanded(path, "other.md");
+  await expectTree(`
+Other
+  Alpha
 `);
 });
 
@@ -915,8 +1020,12 @@ Doc
   dragRowOnto("Loos Haus", "Art");
 
   await waitFor(() => {
-    expect(fs.readFileSync(`${path}/diff.md`, "utf8")).toMatch(
-      /\[Loos Haus\]\(#lh\)/u
+    const content = fs.readFileSync(`${path}/diff.md`, "utf8");
+    expect(content).toMatch(
+      /- \[Loos Haus\]\(#lh\) <!-- id:\S+ embed="true" parent="e1" -->/u
+    );
+    expect(content).toMatch(
+      /- \[Secession\]\(#se\) <!-- id:\S+ embed="true" after="lh" -->/u
     );
   });
   await expectTree(`
@@ -1021,7 +1130,7 @@ Doc
 `);
   await waitFor(() => {
     expect(fs.readFileSync(`${path}/diff.md`, "utf8")).toMatch(
-      /- \[Source\]\(#s\) <!-- id:e1 embed="true" -->\n {2}- My summary <!-- id:sum after="a" before="b" -->/u
+      /- \[Source\]\(#s\) <!-- id:e1 embed="true" -->\n {2}- My summary <!-- id:sum after="a" -->/u
     );
   });
   expect(fs.readFileSync(`${path}/source.md`, "utf8")).toBe(MOVE_SOURCE);
@@ -1038,7 +1147,7 @@ Doc
 `);
 });
 
-test("dragging your own diff line rewrites only its names", async () => {
+test("dragging your own diff line rewrites only its anchor", async () => {
   const { path } = knowstrInit();
   write(path, "source.md", MOVE_SOURCE);
   write(
@@ -1064,7 +1173,7 @@ Source
 `);
   await waitFor(() => {
     expect(fs.readFileSync(`${path}/diff.md`, "utf8")).toMatch(
-      /\n- My note <!-- id:n1 after="a" before="b" -->\n/u
+      /\n- My note <!-- id:n1 after="a" -->\n/u
     );
   });
 
@@ -1079,7 +1188,7 @@ Source
 `);
 });
 
-test("moving a row repairs a neighbor's stale name", async () => {
+test("dragging a row re-anchors only the claim that named it", async () => {
   const { path } = knowstrInit();
   write(path, "source.md", MOVE_SOURCE);
   write(
@@ -1088,8 +1197,8 @@ test("moving a row repairs a neighbor's stale name", async () => {
     [
       '# [Source](#s) <!-- id:o0 embed="true" -->',
       "",
-      '- [Gamma](#g) <!-- id:m1 embed="true" after="ghost" before="b" -->',
-      "- My note <!-- id:n1 -->",
+      '- [Gamma](#g) <!-- id:m1 embed="true" after="a" -->',
+      '- My note <!-- id:n1 after="g" -->',
       "",
     ].join("\n")
   );
@@ -1098,25 +1207,25 @@ test("moving a row repairs a neighbor's stale name", async () => {
 Source
   Alpha
   Gamma
-  Beta
   My note
+  Beta
 `);
 
-  dragRowOnto("My note", "Alpha");
+  dragRowOnto("Gamma", "Beta");
 
   await expectTree(`
 Source
   Alpha
   My note
-  Gamma
   Beta
+  Gamma
 `);
   await waitFor(() => {
     const content = fs.readFileSync(`${path}/diff.md`, "utf8");
     expect(content).toMatch(
-      /- \[Gamma\]\(#g\) <!-- id:m1 embed="true" after="n1" before="b" -->/u
+      /- \[Gamma\]\(#g\) <!-- id:m1 embed="true" after="b" -->/u
     );
-    expect(content).toMatch(/- My note <!-- id:n1 after="a" before="g" -->/u);
+    expect(content).toMatch(/- My note <!-- id:n1 after="a" -->/u);
   });
 
   cleanup();
@@ -1125,8 +1234,8 @@ Source
 Source
   Alpha
   My note
-  Gamma
   Beta
+  Gamma
 `);
 });
 
@@ -1206,7 +1315,7 @@ Source
   await waitFor(() => {
     const content = fs.readFileSync(`${path}/diff.md`, "utf8");
     expect(content).toContain(parkedLine);
-    expect(content).toMatch(/- My note <!-- id:n1 after="a" before="b" -->/u);
+    expect(content).toMatch(/- My note <!-- id:n1 after="a" -->/u);
   });
 
   cleanup();
@@ -1445,7 +1554,7 @@ Doc
 `);
 });
 
-test("non-adjacent grabbed rows land as one block, each with its own ladder", async () => {
+test("non-adjacent grabbed rows land as one block, each with its own anchor", async () => {
   const { path } = knowstrInit();
   write(path, "source.md", MOVE_SOURCE);
   write(
@@ -1476,10 +1585,10 @@ Doc
   await waitFor(() => {
     const content = fs.readFileSync(`${path}/diff.md`, "utf8");
     expect(content).toMatch(
-      /- \[Alpha\]\(#a\) <!-- id:\S+ embed="true" after="n1" before="g" parent="root" -->/u
+      /- \[Alpha\]\(#a\) <!-- id:\S+ embed="true" after="n1" -->/u
     );
     expect(content).toMatch(
-      /- \[Gamma\]\(#g\) <!-- id:\S+ embed="true" after="a" parent="root" -->/u
+      /- \[Gamma\]\(#g\) <!-- id:\S+ embed="true" after="a" -->/u
     );
   });
 
@@ -1550,7 +1659,7 @@ Doc
 `);
   await waitFor(() => {
     expect(fs.readFileSync(`${path}/diff.md`, "utf8")).toMatch(
-      /- \[Alpha\]\(#a\) <!-- id:\S+ embed="true" after="d" parent="e2" -->/u
+      /- \[Alpha\]\(#a\) <!-- id:\S+ embed="true" after="d" -->/u
     );
   });
 
@@ -1634,7 +1743,7 @@ test("dragging a row shown through an outer placement writes only the outer docu
     "# Mid <!-- id:mid -->",
     "",
     '- [Inner](#inner) <!-- id:e2 embed="true" -->',
-    '  - [Two](#i2) <!-- id:ms embed="true" before="i1" -->',
+    '  - [Two](#i2) <!-- id:ms embed="true" parent="inner" -->',
     "",
   ].join("\n");
   write(path, "inner.md", innerContent);
@@ -1658,7 +1767,7 @@ Mid
 `);
   await waitFor(() => {
     expect(fs.readFileSync(`${path}/outer.md`, "utf8")).toMatch(
-      /- \[Two\]\(#i2\) <!-- id:\S+ embed="true" after="i1" parent="e2" -->/u
+      /- \[Two\]\(#i2\) <!-- id:\S+ embed="true" after="i1" -->/u
     );
   });
   expect(fs.readFileSync(`${path}/mid.md`, "utf8")).toBe(midContent);

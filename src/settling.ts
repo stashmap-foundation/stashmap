@@ -183,7 +183,7 @@ function applyDecisions(
   );
 }
 
-type ReverseLists = { before: Showing[]; after: Showing[]; child: Showing[] };
+type ReverseLists = { after: Showing[]; child: Showing[] };
 
 type Anchors = {
   listsOf: ImmutableMap<Showing, ReverseLists>;
@@ -199,41 +199,74 @@ function readAnchors(root: Showing, candidates: Showing[]): Anchors {
   ): ImmutableMap<ID, Showing[]> =>
     rowsUnder(row).reduce(
       (map, under) => admit(map, under),
-      [row.node.id, ...row.answersTo].reduce(
-        (map, id) => map.set(id, [...(map.get(id) ?? []), row]),
-        found
-      )
+      chainLinksOf(row)
+        .flatMap((link) => [link.node.id, ...link.answersTo])
+        .reduce((map, id) => map.set(id, [...(map.get(id) ?? []), row]), found)
     );
   const occurrences = admit(ImmutableMap<ID, Showing[]>(), root);
-  return candidates.reduce<Anchors>(
-    (anchors, row) => {
-      const claim = row.names
-        .map((name) => ({
-          name,
-          found: (occurrences.get(name.id) ?? []).filter(
-            (occurrence) => occurrence !== row
-          ),
-        }))
-        .find(({ found }) => found.length > 0);
+  const claims = candidates.reduce<{
+    claimOf: ImmutableMap<
+      Showing,
+      { anchor: Showing; kind: "after" | "parent" }
+    >;
+    lapsed: ImmutableSet<Showing>;
+    ambiguous: ImmutableSet<Showing>;
+  }>(
+    (acc, row) => {
+      const name = row.names.at(0);
+      if (name === undefined) {
+        return { ...acc, lapsed: acc.lapsed.add(row) };
+      }
+      const found = (occurrences.get(name.id) ?? []).filter(
+        (occurrence) => occurrence !== row
+      );
+      if (found.length === 0) {
+        return { ...acc, lapsed: acc.lapsed.add(row) };
+      }
+      if (found.length > 1) {
+        return { ...acc, ambiguous: acc.ambiguous.add(row) };
+      }
+      return {
+        ...acc,
+        claimOf: acc.claimOf.set(row, { anchor: found[0], kind: name.kind }),
+      };
+    },
+    {
+      claimOf: ImmutableMap(),
+      lapsed: ImmutableSet(),
+      ambiguous: ImmutableSet(),
+    }
+  );
+  const onCircle = (row: Showing): boolean => {
+    const walk = (current: Showing, path: ImmutableSet<Showing>): boolean => {
+      const claim = claims.claimOf.get(current);
       if (!claim) {
+        return false;
+      }
+      if (claim.anchor === row) {
+        return true;
+      }
+      if (path.has(claim.anchor)) {
+        return false;
+      }
+      return walk(claim.anchor, path.add(current));
+    };
+    return walk(row, ImmutableSet([row]));
+  };
+  return claims.claimOf.reduce<Anchors>(
+    (anchors, claim, row) => {
+      if (onCircle(row)) {
         return { ...anchors, lapsed: anchors.lapsed.add(row) };
       }
-      if (claim.found.length > 1) {
-        return { ...anchors, ambiguous: anchors.ambiguous.add(row) };
-      }
-      const anchor = claim.found[0];
-      const lists = anchors.listsOf.get(anchor) ?? {
-        before: [],
+      const lists = anchors.listsOf.get(claim.anchor) ?? {
         after: [],
         child: [],
       };
-      const { kind } = claim.name;
       return {
         ...anchors,
-        listsOf: anchors.listsOf.set(anchor, {
-          before: kind === "before" ? [...lists.before, row] : lists.before,
-          after: kind === "after" ? [...lists.after, row] : lists.after,
-          child: kind === "parent" ? [...lists.child, row] : lists.child,
+        listsOf: anchors.listsOf.set(claim.anchor, {
+          after: claim.kind === "after" ? [...lists.after, row] : lists.after,
+          child: claim.kind === "parent" ? [...lists.child, row] : lists.child,
         }),
         anchored: anchors.anchored.add(row),
       };
@@ -241,8 +274,8 @@ function readAnchors(root: Showing, candidates: Showing[]): Anchors {
     {
       listsOf: ImmutableMap(),
       anchored: ImmutableSet(),
-      lapsed: ImmutableSet(),
-      ambiguous: ImmutableSet(),
+      lapsed: claims.lapsed,
+      ambiguous: claims.ambiguous,
     }
   );
 }
@@ -253,7 +286,7 @@ function decidePlacements(
 ): { moved: ImmutableSet<Showing>; parked: ImmutableSet<Showing> } {
   const listRows = (row: Showing): Showing[] => {
     const lists = anchors.listsOf.get(row);
-    return lists ? [...lists.before, ...lists.after, ...lists.child] : [];
+    return lists ? [...lists.after, ...lists.child] : [];
   };
   const walkRow = (
     walk: { copied: ImmutableSet<Showing>; bookmarks: ImmutableList<Showing> },
@@ -274,12 +307,16 @@ function decidePlacements(
       withLists
     );
   };
+  const seeded = listRows(root).reduce(walkRow, {
+    copied: ImmutableSet<Showing>([root]),
+    bookmarks: ImmutableList<Showing>(),
+  });
   const walked = rowsUnder(root).reduce(
     (state, child) =>
       anchors.anchored.has(child)
         ? { ...state, bookmarks: state.bookmarks.push(child) }
         : walkRow(state, child),
-    { copied: ImmutableSet<Showing>(), bookmarks: ImmutableList<Showing>() }
+    seeded
   );
   const sweep = (state: {
     copied: ImmutableSet<Showing>;
@@ -304,12 +341,8 @@ function decidePlacements(
   return { moved: anchors.anchored.subtract(parked), parked };
 }
 
-function flatEmission(emitted: {
-  ahead: Showing[];
-  row: Showing;
-  behind: Showing[];
-}): Showing[] {
-  return [...emitted.ahead, emitted.row, ...emitted.behind];
+function flatEmission(emitted: { row: Showing; behind: Showing[] }): Showing[] {
+  return [emitted.row, ...emitted.behind];
 }
 
 function applyPlacements(
@@ -318,9 +351,7 @@ function applyPlacements(
   moved: ImmutableSet<Showing>,
   parked: ImmutableSet<Showing>
 ): Showing {
-  const emitRow = (
-    row: Showing
-  ): { ahead: Showing[]; row: Showing; behind: Showing[] } => {
+  const emitRow = (row: Showing): { row: Showing; behind: Showing[] } => {
     const placeRows = (rows: Showing[]): Showing[] =>
       rows.flatMap((member) =>
         moved.has(member) ? [] : flatEmission(emitRow(member))
@@ -331,7 +362,8 @@ function applyPlacements(
     const placedChildren = (lists?.child ?? []).flatMap(placedHere);
     const rebuildLink = (
       link: Showing,
-      inner: Showing | undefined
+      inner: Showing | undefined,
+      leadsChildren: boolean
     ): Showing => ({
       ...link,
       target: inner,
@@ -340,16 +372,15 @@ function applyPlacements(
         (link === row && (parked.has(row) || anchors.lapsed.has(row))),
       ambiguous: link.ambiguous || (link === row && anchors.ambiguous.has(row)),
       children: [
+        ...(leadsChildren ? placedChildren : []),
         ...placeRows(link.children),
-        ...(link === row ? placedChildren : []),
       ],
     });
     const [terminal, ...outer] = [...chainLinksOf(row)].reverse();
     return {
-      ahead: (lists?.before ?? []).flatMap(placedHere),
       row: outer.reduce(
-        (inner, link) => rebuildLink(link, inner),
-        rebuildLink(terminal, undefined)
+        (inner, link) => rebuildLink(link, inner, false),
+        rebuildLink(terminal, undefined, true)
       ),
       behind: (lists?.after ?? []).flatMap(placedHere),
     };
@@ -366,6 +397,14 @@ function readNames(root: Showing, candidates: Showing[]): Showing {
   return applyPlacements(root, anchors, moved, parked);
 }
 
+function layerLineOrder(layer: Showing): ImmutableMap<ID, number> {
+  const lines = (owner: Showing): Showing[] =>
+    owner.children.flatMap((row) => [row, ...lines(row)]);
+  return ImmutableMap(
+    lines(layer).map((row, index) => [row.node.id, index] as const)
+  );
+}
+
 function settleLayer(layer: Showing): {
   showing: Showing;
   spokenIds: ImmutableSet<ID>;
@@ -374,11 +413,15 @@ function settleLayer(layer: Showing): {
   const staged = decisions.applied.isEmpty()
     ? { showing: layer, candidates: [] }
     : applyDecisions(layer, decisions, false);
+  const lineOrder = layerLineOrder(layer);
+  const ordinalOf = (row: Showing): number =>
+    lineOrder.get(row.spokenFor ?? row.node.id) ?? Number.MAX_SAFE_INTEGER;
+  const candidates = [
+    ...staged.candidates,
+    ...layerNamedRows(staged.showing),
+  ].sort((left, right) => ordinalOf(left) - ordinalOf(right));
   return {
-    showing: readNames(staged.showing, [
-      ...staged.candidates,
-      ...layerNamedRows(staged.showing),
-    ]),
+    showing: readNames(staged.showing, candidates),
     spokenIds: ImmutableSet(
       decisions.applied.toArray().map((statement) => statement.node.id)
     ),

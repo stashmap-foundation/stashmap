@@ -612,7 +612,7 @@ test("an authored node whose id starts with feed: stays an ordinary node", () =>
 
 test("a move statement disappears into its target", () => {
   expect(
-    composeFixtureShowingTree(fixtureFiles("33-full-ladder"), "diff.md")
+    composeFixtureShowingTree(fixtureFiles("33-after-anchor"), "diff.md")
   ).toBe(["o0", "  >s", "    a", "    g", "    b", ""].join("\n"));
 });
 
@@ -786,10 +786,10 @@ test("a moved row takes its subtree along", () => {
   );
 });
 
-test("the first row of a name circle parks lapsed and the rest unfold around it", () => {
+test("every row of an anchor circle parks lapsed where written", () => {
   expect(
-    composeFixtureShowingTree(fixtureFiles("37-name-circle"), "diff.md")
-  ).toBe(["o0", "  >s", "    a", "  n2", "  n1 lapsed", ""].join("\n"));
+    composeFixtureShowingTree(fixtureFiles("37-anchor-circle"), "diff.md")
+  ).toBe(["o0", "  >s", "    a", "  n1 lapsed", "  n2 lapsed", ""].join("\n"));
 });
 
 test("a name matching two visible occurrences parks flagged ambiguous-anchor", () => {

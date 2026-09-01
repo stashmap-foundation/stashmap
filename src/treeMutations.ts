@@ -28,7 +28,7 @@ import {
   getPaneRootItemID,
   newGraphNode,
 } from "./rowModel";
-import { embedTargetOf } from "./showings";
+import { PositionName, embedTargetOf } from "./showings";
 import {
   planMaterializeComputedRow,
   planRecordKnowstrSource,
@@ -265,9 +265,8 @@ const POSITION_KEYS = ["after", "before", "parent"];
 type SplicedEntry = { row: Row; depth: number };
 
 type ScreenLinks = {
-  parent: (SplicedEntry | undefined)[];
-  prevSibling: (SplicedEntry | undefined)[];
-  nextSibling: (SplicedEntry | undefined)[];
+  parent: (number | undefined)[];
+  prevSibling: (number | undefined)[];
 };
 
 function writerRows(data: Data, paneIndex: number): Row[] {
@@ -334,9 +333,8 @@ function fileMembershipNode(
 // Planned style exception: one linear pass beats the no-mutation lint.
 /* eslint-disable functional/no-let, functional/immutable-data */
 function screenLinksOf(entries: SplicedEntry[]): ScreenLinks {
-  const parent: (SplicedEntry | undefined)[] = [];
-  const prevSibling: (SplicedEntry | undefined)[] = [];
-  const nextSibling: (SplicedEntry | undefined)[] = [];
+  const parent: (number | undefined)[] = [];
+  const prevSibling: (number | undefined)[] = [];
   const stack: number[] = [];
   const lastChildOf = new Map<number, number>();
   entries.forEach((entry, index) => {
@@ -347,51 +345,61 @@ function screenLinksOf(entries: SplicedEntry[]): ScreenLinks {
       stack.pop();
     }
     const parentIndex = stack.length > 0 ? stack[stack.length - 1] : -1;
-    const previous = lastChildOf.get(parentIndex);
-    parent.push(parentIndex >= 0 ? entries[parentIndex] : undefined);
-    prevSibling.push(previous !== undefined ? entries[previous] : undefined);
-    nextSibling.push(undefined);
-    if (previous !== undefined) {
-      nextSibling[previous] = entry;
-    }
+    parent.push(parentIndex >= 0 ? parentIndex : undefined);
+    prevSibling.push(lastChildOf.get(parentIndex));
     lastChildOf.set(parentIndex, index);
     stack.push(index);
   });
-  return { parent, prevSibling, nextSibling };
+  return { parent, prevSibling };
 }
 /* eslint-enable functional/no-let, functional/immutable-data */
 
-function ladderOf(
-  links: ScreenLinks,
-  index: number,
-  membershipNodeId: ID | undefined
-): { after?: ID; before?: ID; parent?: ID } {
-  const after = links.prevSibling[index]?.row.node.id;
-  const before = links.nextSibling[index]?.row.node.id;
-  const parentId = links.parent[index]?.row.node.id;
-  if (after === undefined && before === undefined) {
-    return parentId !== undefined ? { parent: parentId } : {};
+type MoveContext = {
+  plan: Plan;
+  graph: GraphLookup;
+  entries: SplicedEntry[];
+  links: ScreenLinks;
+  lines: (ID | undefined)[];
+  lineHosts: (ID | undefined)[];
+};
+
+function lineHostOf(plan: Plan, row: Row): ID | undefined {
+  if (row.projected) {
+    if (row.spokenFor === undefined) {
+      return row.embeddedIn;
+    }
+    const statement = getWorkspaceNode(plan.knowledgeDBs, row.spokenFor);
+    return statement !== undefined
+      ? fileMembershipNode(plan, statement)?.id
+      : undefined;
   }
-  return {
-    ...(after !== undefined && { after }),
-    ...(before !== undefined && { before }),
-    ...(parentId !== undefined &&
-      parentId !== membershipNodeId && { parent: parentId }),
-  };
+  return fileMembershipNode(plan, row.node)?.id;
 }
 
-function withLadderAttrs(
+function anchorOf(
+  context: MoveContext,
+  index: number
+): PositionName | undefined {
+  const prev = context.links.prevSibling[index];
+  if (prev !== undefined) {
+    return { kind: "after", id: context.entries[prev].row.node.id };
+  }
+  const parent = context.links.parent[index];
+  return parent !== undefined
+    ? { kind: "parent", id: context.entries[parent].row.node.id }
+    : undefined;
+}
+
+function withAnchorAttrs(
   node: GraphNode,
-  ladder: { after?: ID; before?: ID; parent?: ID }
+  anchor: PositionName | undefined
 ): GraphNode | undefined {
   const kept = Object.entries(node.extraAttrs ?? {}).filter(
     ([key]) => !POSITION_KEYS.includes(key)
   );
   const next: Record<string, string> = {
     ...Object.fromEntries(kept),
-    ...(ladder.after !== undefined && { after: ladder.after }),
-    ...(ladder.before !== undefined && { before: ladder.before }),
-    ...(ladder.parent !== undefined && { parent: ladder.parent }),
+    ...(anchor !== undefined && { [anchor.kind]: anchor.id }),
   };
   if (JSON.stringify(next) === JSON.stringify(node.extraAttrs ?? {})) {
     return undefined;
@@ -412,12 +420,12 @@ function currentNodeOf(
   return updates.get(id) ?? getWorkspaceNode(plan.knowledgeDBs, id);
 }
 
-function withLadder(
+function withAnchor(
   updates: Updates,
   node: GraphNode,
-  ladder: { after?: ID; before?: ID; parent?: ID }
+  anchor: PositionName | undefined
 ): Updates {
-  const updated = withLadderAttrs(node, ladder);
+  const updated = withAnchorAttrs(node, anchor);
   return updated ? updates.set(updated.id, updated) : updates;
 }
 
@@ -476,49 +484,59 @@ function embedResolves(graph: GraphLookup, embedNode: GraphNode): boolean {
   );
 }
 
-type MoveContext = {
-  plan: Plan;
-  graph: GraphLookup;
-  entries: SplicedEntry[];
-  links: ScreenLinks;
-};
-
-function physicalAnchorId(context: MoveContext, index: number): ID | undefined {
-  const previous = context.links.prevSibling[index];
-  if (!previous) {
-    return undefined;
-  }
-  const { row } = previous;
-  if (
-    !row.projected &&
-    row.positioned !== true &&
-    fileMembershipNode(context.plan, row.node) === undefined
-  ) {
-    return row.node.id;
-  }
-  return physicalAnchorId(context, context.entries.indexOf(previous));
-}
-
-function moveProjectedRow(
+function hostResolves(
   context: MoveContext,
   updates: Updates,
+  hostId: ID
+): boolean {
+  const host = currentNodeOf(context.plan, updates, hostId);
+  return host !== undefined && embedResolves(context.graph, host);
+}
+
+/* eslint-disable functional/no-let */
+function physicalPredecessorOf(
+  context: MoveContext,
   index: number
+): ID | undefined {
+  let at = context.links.prevSibling[index];
+  while (at !== undefined) {
+    const { row } = context.entries[at];
+    if (
+      !row.projected &&
+      row.positioned !== true &&
+      context.lineHosts[at] === undefined
+    ) {
+      return row.node.id;
+    }
+    at = context.links.prevSibling[at];
+  }
+  return undefined;
+}
+/* eslint-enable functional/no-let */
+
+function positionHostOf(
+  context: MoveContext,
+  parentIndex: number
+): ID | undefined {
+  const parentRow = context.entries[parentIndex].row;
+  if (parentRow.projected) {
+    return parentRow.embeddedIn;
+  }
+  if (embedTargetOf(parentRow.node) !== undefined) {
+    return parentRow.node.id;
+  }
+  return context.lineHosts[parentIndex];
+}
+
+function createStatementLine(
+  context: MoveContext,
+  updates: Updates,
+  index: number,
+  anchor: PositionName | undefined
 ): Updates | undefined {
   const { row } = context.entries[index];
   if (row.embeddedIn === undefined) {
     return undefined;
-  }
-  const ladder = ladderOf(context.links, index, row.embeddedIn);
-  if (row.spokenFor !== undefined) {
-    const statement = currentNodeOf(context.plan, updates, row.spokenFor);
-    if (!statement) {
-      return undefined;
-    }
-    const membership = fileMembershipNode(context.plan, statement);
-    if (!membership || !embedResolves(context.graph, membership)) {
-      return undefined;
-    }
-    return withLadder(updates, statement, ladder);
   }
   const host = currentNodeOf(context.plan, updates, row.embeddedIn);
   if (!host || !embedResolves(context.graph, host)) {
@@ -531,9 +549,7 @@ function moveProjectedRow(
     }),
     extraAttrs: {
       embed: "true",
-      ...(ladder.after !== undefined && { after: ladder.after }),
-      ...(ladder.before !== undefined && { before: ladder.before }),
-      ...(ladder.parent !== undefined && { parent: ladder.parent }),
+      ...(anchor !== undefined && { [anchor.kind]: anchor.id }),
     },
   };
   return attachLine(
@@ -545,104 +561,82 @@ function moveProjectedRow(
   );
 }
 
-function moveOwnLineRow(
+function placeHomeEntry(
   context: MoveContext,
   updates: Updates,
-  index: number
+  index: number,
+  node: GraphNode,
+  anchor: PositionName | undefined
 ): Updates | undefined {
-  const { row } = context.entries[index];
-  const node = currentNodeOf(context.plan, updates, row.node.id);
-  if (!node) {
+  const parentIndex = context.links.parent[index];
+  if (parentIndex === undefined) {
     return undefined;
   }
-  const membership = fileMembershipNode(context.plan, node);
-  if (membership && !embedResolves(context.graph, membership)) {
-    return undefined;
-  }
-  return withLadder(
-    updates,
-    node,
-    ladderOf(context.links, index, membership?.id)
-  );
-}
-
-function governingHostId(context: MoveContext, parentRow: Row): ID | undefined {
-  if (parentRow.projected) {
-    return parentRow.embeddedIn;
-  }
-  if (embedTargetOf(parentRow.node) !== undefined) {
-    return parentRow.node.id;
-  }
-  return fileMembershipNode(context.plan, parentRow.node)?.id;
-}
-
-function moveHomeRow(
-  context: MoveContext,
-  updates: Updates,
-  index: number
-): Updates | undefined {
-  const parentEntry = context.links.parent[index];
-  if (!parentEntry) {
-    return undefined;
-  }
-  const node = currentNodeOf(
-    context.plan,
-    updates,
-    context.entries[index].row.node.id
-  );
-  if (!node) {
-    return undefined;
-  }
-  const hostId = governingHostId(context, parentEntry.row);
+  const hostId = positionHostOf(context, parentIndex);
   if (hostId === undefined) {
     const detached = detachLine(context.plan, updates, node);
     return detached
-      ? attachLine(context.plan, detached, node.id, parentEntry.row.node.id, {
-          after: physicalAnchorId(context, index),
-        })
+      ? attachLine(
+          context.plan,
+          detached,
+          node.id,
+          context.entries[parentIndex].row.node.id,
+          { after: physicalPredecessorOf(context, index) }
+        )
       : undefined;
   }
-  const host = currentNodeOf(context.plan, updates, hostId);
-  if (!host || !embedResolves(context.graph, host)) {
+  if (!hostResolves(context, updates, hostId)) {
     return undefined;
   }
   const detached = detachLine(context.plan, updates, node);
   if (!detached) {
     return undefined;
   }
-  const attached = attachLine(context.plan, detached, node.id, host.id, "end");
+  const attached = attachLine(context.plan, detached, node.id, hostId, "end");
   if (!attached) {
     return undefined;
   }
   const moved = currentNodeOf(context.plan, attached, node.id);
-  return moved
-    ? withLadder(attached, moved, ladderOf(context.links, index, host.id))
-    : attached;
+  return moved ? withAnchor(attached, moved, anchor) : attached;
 }
 
-function moveGrabbedRow(
+function moveEntry(
   context: MoveContext,
   updates: Updates,
   index: number
 ): Updates | undefined {
   const { row } = context.entries[index];
+  const anchor = anchorOf(context, index);
   if (row.projected) {
-    return moveProjectedRow(context, updates, index);
+    if (row.embeddedIn === undefined) {
+      return undefined;
+    }
+    const lineId = context.lines[index];
+    if (lineId === undefined) {
+      return createStatementLine(context, updates, index, anchor);
+    }
+    const line = currentNodeOf(context.plan, updates, lineId);
+    const host = context.lineHosts[index];
+    if (!line || host === undefined || !hostResolves(context, updates, host)) {
+      return undefined;
+    }
+    return withAnchor(updates, line, anchor);
   }
-  const membership = fileMembershipNode(context.plan, row.node);
-  if (membership !== undefined || row.positioned === true) {
-    return moveOwnLineRow(context, updates, index);
+  const node = currentNodeOf(context.plan, updates, row.node.id);
+  if (!node) {
+    return undefined;
   }
-  return moveHomeRow(context, updates, index);
+  const host = context.lineHosts[index];
+  if (host !== undefined || row.positioned === true) {
+    if (host !== undefined && !hostResolves(context, updates, host)) {
+      return undefined;
+    }
+    return withAnchor(updates, node, anchor);
+  }
+  return placeHomeEntry(context, updates, index, node, anchor);
 }
 
-function hasPositionNames(node: GraphNode): boolean {
-  return Object.keys(node.extraAttrs ?? {}).some((key) =>
-    POSITION_KEYS.includes(key)
-  );
-}
-
-function repairEntry(
+function deriveAnchorEntry(
   context: MoveContext,
   updates: Updates,
   index: number,
@@ -657,37 +651,22 @@ function repairEntry(
   ) {
     return updates;
   }
-  if (!row.projected) {
-    const node = currentNodeOf(context.plan, updates, row.node.id);
-    if (!node || !hasPositionNames(node)) {
-      return updates;
-    }
-    const membership = fileMembershipNode(context.plan, node);
-    if (membership && !embedResolves(context.graph, membership)) {
-      return updates;
-    }
-    return withLadder(
-      updates,
-      node,
-      ladderOf(context.links, index, membership?.id)
-    );
-  }
-  if (row.spokenFor === undefined) {
+  const lineId = context.lines[index];
+  const line =
+    lineId !== undefined
+      ? currentNodeOf(context.plan, updates, lineId)
+      : undefined;
+  if (!line) {
     return updates;
   }
-  const statement = currentNodeOf(context.plan, updates, row.spokenFor);
-  if (!statement) {
+  const host = context.lineHosts[index];
+  if (row.projected && host === undefined) {
     return updates;
   }
-  const membership = fileMembershipNode(context.plan, statement);
-  if (!membership || !embedResolves(context.graph, membership)) {
+  if (host !== undefined && !hostResolves(context, updates, host)) {
     return updates;
   }
-  return withLadder(
-    updates,
-    statement,
-    ladderOf(context.links, index, membership.id)
-  );
+  return withAnchor(updates, line, anchorOf(context, index));
 }
 
 function remapPaneKey(viewKey: string, paneIndex: number): string {
@@ -766,6 +745,10 @@ export function planMoveRows(
     graph: graphLookupFromData(data),
     entries,
     links: screenLinksOf(entries),
+    lines: entries.map(({ row }) =>
+      row.projected ? row.spokenFor : row.node.id
+    ),
+    lineHosts: entries.map(({ row }) => lineHostOf(plan, row)),
   };
   const grabbedRows = ImmutableSet(blocks.map(({ start }) => rows[start]));
   const rootIndexes = entries.flatMap((entry, index) =>
@@ -773,34 +756,29 @@ export function planMoveRows(
   );
   const staged = rootIndexes.reduce<Updates | undefined>(
     (updates, index) =>
-      updates === undefined
-        ? undefined
-        : moveGrabbedRow(context, updates, index),
+      updates === undefined ? undefined : moveEntry(context, updates, index),
     ImmutableMap<ID, GraphNode>()
   );
   if (staged === undefined) {
     return undefined;
   }
-  const repaired = context.entries.reduce(
+  const derived = context.entries.reduce<Updates>(
     (updates, ignored, index) =>
-      repairEntry(context, updates, index, grabbedRows),
+      deriveAnchorEntry(context, updates, index, grabbedRows),
     staged
   );
-  const written = repaired
+  const written = derived
     .valueSeq()
     .reduce((acc, node) => planUpsertNodes(acc, node), plan);
   return rootIndexes.reduce((acc, index) => {
     const { row } = entries[index];
-    const parentEntry = context.links.parent[index];
-    if (!parentEntry) {
+    const parentIndex = context.links.parent[index];
+    if (parentIndex === undefined) {
       return acc;
     }
-    const expanded = planExpandNode(
-      acc,
-      parentEntry.row.view,
-      parentEntry.row.viewPath
-    );
-    const newKey = childViewKey(parentEntry.row.viewKey, row.node.id);
+    const parentRow = entries[parentIndex].row;
+    const expanded = planExpandNode(acc, parentRow.view, parentRow.viewPath);
+    const newKey = childViewKey(parentRow.viewKey, row.node.id);
     if (newKey === row.viewKey) {
       return expanded;
     }
@@ -884,10 +862,7 @@ export function planAddRows(
     ? sourceDrag.draggedRows
     : [sourceDrag.row];
   const independentRows = getIndependentRows(sources);
-  if (
-    targetParentRow.projected ||
-    independentRows.some((row) => row.projected)
-  ) {
+  if (targetParentRow.projected) {
     return basePlan;
   }
   const [plan, targetParentNode] = planMaterializeComputedRow(

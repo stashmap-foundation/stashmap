@@ -6,4 +6,4 @@
 # Mid <!-- id:mid -->
 
 - [Inner](#inner) <!-- id:e2 embed="true" -->
-  - [Two](#i2) <!-- id:ms embed="true" before="i1" -->
+  - [Two](#i2) <!-- id:ms embed="true" parent="inner" -->

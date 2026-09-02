@@ -1,0 +1,7 @@
+Doc <!-- id:root -->
+  First <!-- id:e1 -->
+  Second <!-- id:e2 -->
+    Gamma <!-- base:c -->
+    Alpha <!-- base:a -->
+    Delta <!-- base:d -->
+  Beta <!-- base:b -->

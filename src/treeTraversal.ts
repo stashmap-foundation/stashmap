@@ -38,9 +38,9 @@ import {
   leavesDangling,
   linesShownThrough,
   presentedLineOf,
-  showingTreeForRoot,
   standsForOf,
 } from "./showings";
+import { showingTreeForRoot } from "./settling";
 
 export type TreeResult = {
   rows: List<Row>;
@@ -153,6 +153,20 @@ function searchVirtualType(input: RowPlacement): Row["virtualType"] {
     : undefined;
 }
 
+function hostEmbedOf(input: RowPlacement, showing: Showing): ID | undefined {
+  if (showing.spokenUnder !== undefined) {
+    return showing.spokenUnder;
+  }
+  const { parentRow } = input;
+  if (!parentRow) {
+    return undefined;
+  }
+  if (!parentRow.projected && embedTargetOf(parentRow.node) !== undefined) {
+    return parentRow.node.id;
+  }
+  return parentRow.embeddedIn;
+}
+
 function createShowingRow(
   data: Data,
   input: RowPlacement,
@@ -160,13 +174,19 @@ function createShowingRow(
 ): Row {
   const row = baseRow(data, input, searchVirtualType(input));
   const standsFor = standsForOf(showing);
+  const embeddedIn = hostEmbedOf(input, showing);
   return {
     ...row,
     ...(standsFor && { standsFor }),
+    ...(embeddedIn !== undefined && { embeddedIn }),
     presentedSpans: presentedLineOf(showing).node.spans,
     ...(closesCycle(showing) && { cycle: true }),
     ...(leavesDangling(showing) && { dangling: true }),
     ...(presentedLineOf(showing).demoted && { demoted: true }),
+    ...(showing.lapsed && { lapsed: true }),
+    ...(showing.ambiguous && { ambiguous: true }),
+    ...(showing.names.length > 0 && { positioned: true }),
+    ...(showing.spokenFor !== undefined && { spokenFor: showing.spokenFor }),
   };
 }
 
@@ -630,6 +650,38 @@ function projectedRow(
   );
 }
 
+function movedRow(
+  data: Data,
+  parentRow: Row,
+  owner: { node: GraphNode; ref: NodeRef },
+  line: Showing
+): Row {
+  const parentPath = addNodesToLastElement(
+    parentRow.viewPath,
+    parentRow.node.id
+  );
+  return createShowingRow(
+    data,
+    {
+      viewPath: appendNodeToPath(parentPath, line.node.id),
+      node: line.node,
+      sourceId: line.ref.sourceId,
+      projected: line.inProjection,
+      parentRow,
+      parentNode: owner.node,
+      parentRef: owner.ref,
+    },
+    line
+  );
+}
+
+function inHomePlace(ownerNode: GraphNode, line: Showing): boolean {
+  return (
+    line.reached.kind === "line" &&
+    ownerNode.children.get(line.reached.childIndex) === line.node.id
+  );
+}
+
 function fileRow(
   data: Data,
   parentRow: Row,
@@ -696,17 +748,8 @@ function convertShowingChildren(
   parentShowing: Showing | undefined,
   activeFilters: NonNullable<Pane["typeFilters"]>
 ): List<{ row: Row; showing: Showing | undefined }> {
-  const shown = linesShownThrough(
+  const shownLines = linesShownThrough(
     parentShowing ? parentShowing.target : undefined
-  ).flatMap(({ source, line }) =>
-    itemPassesFilters(line.node, activeFilters)
-      ? [
-          {
-            row: projectedRow(data, parentRow, source, line),
-            showing: line,
-          },
-        ]
-      : []
   );
   const lineEntries = (parentShowing ? parentShowing.children : []).flatMap(
     (line) =>
@@ -714,29 +757,62 @@ function convertShowingChildren(
         ? [{ childIndex: line.reached.childIndex, line }]
         : []
   );
-  const empties = emptyChildIndexes(parentRow).map((childIndex) => ({
-    childIndex,
-    line: undefined,
-  }));
-  const file = [...lineEntries, ...empties]
-    .sort((left, right) => left.childIndex - right.childIndex)
-    .flatMap(
-      ({ childIndex, line }): { row: Row; showing: Showing | undefined }[] => {
-        if (!line) {
-          const row = emptyChildRow(data, graph, parentRow, childIndex);
-          return row ? [{ row, showing: undefined }] : [];
-        }
-        return itemPassesFilters(line.node, activeFilters)
-          ? [
-              {
-                row: fileRow(data, parentRow, line, childIndex),
-                showing: line,
-              },
-            ]
-          : [];
+  const shown = shownLines.flatMap(({ source, line }) =>
+    itemPassesFilters(line.node, activeFilters)
+      ? [
+          {
+            row: inHomePlace(source.node, line)
+              ? projectedRow(data, parentRow, source, line)
+              : movedRow(data, parentRow, source, line),
+            showing: line,
+          },
+        ]
+      : []
+  );
+  const emptyRows = (
+    childIndexes: number[]
+  ): { row: Row; showing: Showing | undefined }[] =>
+    childIndexes.flatMap(
+      (childIndex): { row: Row; showing: Showing | undefined }[] => {
+        const row = emptyChildRow(data, graph, parentRow, childIndex);
+        return row ? [{ row, showing: undefined }] : [];
       }
     );
-  return List([...shown, ...file]);
+  const merged = lineEntries.reduce<{
+    entries: { row: Row; showing: Showing | undefined }[];
+    empties: number[];
+  }>(
+    (acc, { childIndex, line }) => {
+      const inPlace = inHomePlace(parentRow.node, line);
+      const flushed = inPlace
+        ? acc.empties.filter((index) => index < childIndex)
+        : [];
+      const kept = inPlace
+        ? acc.empties.filter((index) => index >= childIndex)
+        : acc.empties;
+      const lineRows = itemPassesFilters(line.node, activeFilters)
+        ? [
+            {
+              row: inPlace
+                ? fileRow(data, parentRow, line, childIndex)
+                : movedRow(
+                    data,
+                    parentRow,
+                    { node: parentRow.node, ref: parentRow.ref },
+                    line
+                  ),
+              showing: line,
+            },
+          ]
+        : [];
+      return {
+        entries: [...acc.entries, ...emptyRows(flushed), ...lineRows],
+        empties: kept,
+      };
+    },
+    { entries: [], empties: emptyChildIndexes(parentRow) }
+  );
+  return List([...shown, ...merged.entries, ...emptyRows(merged.empties)]);
 }
 
 function fileChildNodes(parentShowing: Showing | undefined): List<GraphNode> {

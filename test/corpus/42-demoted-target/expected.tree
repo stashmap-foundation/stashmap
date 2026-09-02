@@ -1,0 +1,7 @@
+Doc <!-- id:root -->
+  First <!-- id:e1 -->
+    Topic <!-- base:x -->
+  Second <!-- id:e2 -->
+    Topic <!-- base:gx -->
+    Other <!-- base:go -->
+    Topic <!-- id:m1 flag:dangling -->

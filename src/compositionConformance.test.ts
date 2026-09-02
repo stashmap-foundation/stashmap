@@ -10,7 +10,7 @@ import {
   resolveAuthoredFirst,
 } from "./core/graphLookup";
 import { addNodesToGraphIndex, createEmptyGraphIndex } from "./graphIndex";
-import { showingTreeForRoot } from "./showings";
+import { showingTreeForRoot } from "./settling";
 import {
   composeFixtureShowingTree,
   composeFixtureTree,
@@ -608,6 +608,249 @@ test("an authored node whose id starts with feed: stays an ordinary node", () =>
     "diff.md"
   );
   expect(tree).toBe(["o0", "  >feed:notes", "    c", ""].join("\n"));
+});
+
+test("a move statement disappears into its target", () => {
+  expect(
+    composeFixtureShowingTree(fixtureFiles("33-after-anchor"), "diff.md")
+  ).toBe(["o0", "  >s", "    a", "    g", "    b", ""].join("\n"));
+});
+
+test("a line embedding a row of its own document is a positioned placement", () => {
+  const sourceFile = {
+    name: "source.md",
+    content: "# Source <!-- id:s -->\n\n- Alpha <!-- id:a -->\n",
+  };
+  const noteFirst = [
+    '# [Source](#s) <!-- id:o0 embed="true" -->',
+    "",
+    "- My note <!-- id:n1 -->",
+    '- [My note](#n1) <!-- id:m1 embed="true" after="a" -->',
+    "",
+  ].join("\n");
+  const placementFirst = [
+    '# [Source](#s) <!-- id:o0 embed="true" -->',
+    "",
+    '- [My note](#n1) <!-- id:m1 embed="true" after="a" -->',
+    "- My note <!-- id:n1 -->",
+    "",
+  ].join("\n");
+  expect(
+    composeFixtureShowingTree(
+      [sourceFile, { name: "diff.md", content: noteFirst }],
+      "diff.md"
+    )
+  ).toBe(["o0", "  >s", "    a", "    m1 demoted", "  n1", ""].join("\n"));
+  expect(
+    composeFixtureShowingTree(
+      [sourceFile, { name: "diff.md", content: placementFirst }],
+      "diff.md"
+    )
+  ).toBe(
+    ["o0", "  >s", "    a", "    m1", "      >n1", "  n1 demoted", ""].join(
+      "\n"
+    )
+  );
+});
+
+test("a name naming the applied statement finds the moved row", () => {
+  const tree = composeFixtureShowingTree(
+    [
+      {
+        name: "source.md",
+        content: [
+          "# Source <!-- id:s -->",
+          "",
+          "- Alpha <!-- id:a -->",
+          "- Beta <!-- id:b -->",
+          "- Gamma <!-- id:g -->",
+          "",
+        ].join("\n"),
+      },
+      {
+        name: "diff.md",
+        content: [
+          '# [Source](#s) <!-- id:o0 embed="true" -->',
+          "",
+          '- [Gamma](#g) <!-- id:m1 embed="true" after="a" -->',
+          '- My note <!-- id:n1 after="m1" -->',
+          "",
+        ].join("\n"),
+      },
+    ],
+    "diff.md"
+  );
+  expect(tree).toBe(
+    ["o0", "  >s", "    a", "    g", "    n1", "    b", ""].join("\n")
+  );
+});
+
+test("an applied statement's own lines follow onto the target", () => {
+  const tree = composeFixtureShowingTree(
+    [
+      {
+        name: "source.md",
+        content: [
+          "# Source <!-- id:s -->",
+          "",
+          "- Alpha <!-- id:a -->",
+          "- Beta <!-- id:b -->",
+          "- Gamma <!-- id:g -->",
+          "",
+        ].join("\n"),
+      },
+      {
+        name: "diff.md",
+        content: [
+          '# [Source](#s) <!-- id:o0 embed="true" -->',
+          "",
+          '- [Gamma](#g) <!-- id:m1 embed="true" after="a" -->',
+          "  - My note <!-- id:c1 -->",
+          "",
+        ].join("\n"),
+      },
+    ],
+    "diff.md"
+  );
+  expect(tree).toBe(
+    ["o0", "  >s", "    a", "    g", "      c1", "    b", ""].join("\n")
+  );
+});
+
+test("a positioned line whose row left the source re-finds it in its new home", () => {
+  const tree = composeFixtureShowingTree(
+    [
+      {
+        name: "source.md",
+        content: [
+          "# Source <!-- id:s -->",
+          "",
+          "- Alpha <!-- id:a -->",
+          "- Beta <!-- id:b -->",
+          "",
+          "# Elsewhere <!-- id:e -->",
+          "",
+          "- Moved here <!-- id:z -->",
+          "",
+        ].join("\n"),
+      },
+      {
+        name: "diff.md",
+        content: [
+          '# [Source](#s) <!-- id:o0 embed="true" -->',
+          "",
+          '- [Moved here](#z) <!-- id:d1 embed="true" after="a" -->',
+          "",
+        ].join("\n"),
+      },
+    ],
+    "diff.md"
+  );
+  expect(tree).toBe(
+    ["o0", "  >s", "    a", "    d1", "      >z", "    b", ""].join("\n")
+  );
+});
+
+test("a moved row takes its subtree along", () => {
+  const tree = composeFixtureShowingTree(
+    [
+      {
+        name: "source.md",
+        content: [
+          "# Source <!-- id:s -->",
+          "",
+          "- Alpha <!-- id:a -->",
+          "- Beta <!-- id:b -->",
+          "- Gamma <!-- id:g -->",
+          "  - G one <!-- id:g1 -->",
+          "  - G two <!-- id:g2 -->",
+          "",
+        ].join("\n"),
+      },
+      {
+        name: "diff.md",
+        content: [
+          '# [Source](#s) <!-- id:o0 embed="true" -->',
+          "",
+          '- [Gamma](#g) <!-- id:m1 embed="true" after="a" -->',
+          "",
+        ].join("\n"),
+      },
+    ],
+    "diff.md"
+  );
+  expect(tree).toBe(
+    ["o0", "  >s", "    a", "    g", "      g1", "      g2", "    b", ""].join(
+      "\n"
+    )
+  );
+});
+
+test("every row of an anchor circle parks lapsed where written", () => {
+  expect(
+    composeFixtureShowingTree(fixtureFiles("37-anchor-circle"), "diff.md")
+  ).toBe(["o0", "  >s", "    a", "  n1 lapsed", "  n2 lapsed", ""].join("\n"));
+});
+
+test("a name matching two visible occurrences parks flagged ambiguous-anchor", () => {
+  const tree = composeFixtureTree(
+    [
+      {
+        name: "source.md",
+        content: "# Source <!-- id:s -->\n\n- Topic <!-- id:x -->\n",
+      },
+      {
+        name: "diff.md",
+        content: [
+          '# [Source](#s) <!-- id:o0 embed="true" -->',
+          "",
+          "- Topic <!-- id:x -->",
+          '- Note <!-- id:n1 after="x" -->',
+          "",
+        ].join("\n"),
+      },
+    ],
+    "diff.md"
+  );
+  expect(tree).toBe(
+    [
+      "Source <!-- id:o0 -->",
+      "  Topic <!-- base:x -->",
+      "  Topic <!-- id:x -->",
+      "  Note <!-- id:n1 flag:ambiguous-anchor -->",
+      "",
+    ].join("\n")
+  );
+});
+
+test("an applied statement nested under an applied statement disappears too", () => {
+  const tree = composeFixtureShowingTree(
+    [
+      {
+        name: "source.md",
+        content: [
+          "# Source <!-- id:s -->",
+          "",
+          "- Alpha <!-- id:a -->",
+          "- Beta <!-- id:b -->",
+          "- Gamma <!-- id:g -->",
+          "",
+        ].join("\n"),
+      },
+      {
+        name: "diff.md",
+        content: [
+          '# [Source](#s) <!-- id:o0 embed="true" -->',
+          "",
+          '- [Gamma](#g) <!-- id:m1 embed="true" after="a" -->',
+          '  - [Beta](#b) <!-- id:m2 embed="true" after="g" -->',
+          "",
+        ].join("\n"),
+      },
+    ],
+    "diff.md"
+  );
+  expect(tree).toBe(["o0", "  >s", "    a", "    g", "    b", ""].join("\n"));
 });
 
 test("a cycle attaches to the embed line that reopens an open source", () => {

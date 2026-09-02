@@ -733,6 +733,57 @@ A
   `);
 });
 
+test("a hand-written move statement moves the row and parks when its anchor dies", async () => {
+  const workspacePath = writeWorkspace({
+    "source.md": [
+      "# Source <!-- id:s -->",
+      "",
+      "- Alpha <!-- id:a -->",
+      "- Beta <!-- id:b -->",
+      "- Gamma <!-- id:g -->",
+    ].join("\n"),
+    "diff.md": [
+      '# [Source](#s) <!-- id:o0 embed="true" -->',
+      "",
+      '- [Gamma](#g) <!-- id:m1 embed="true" after="a" -->',
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "diff.md"),
+  });
+  const [diffRoot] = await screen.findAllByRole("treeitem");
+  await userEvent.click(diffRoot);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await expectTree(`
+Source
+  Alpha
+  Gamma
+  Beta
+  `);
+
+  fs.writeFileSync(
+    pathModule.join(workspacePath, "source.md"),
+    [
+      "# Source <!-- id:s -->",
+      "",
+      "- Beta <!-- id:b -->",
+      "- Gamma <!-- id:g -->",
+    ].join("\n")
+  );
+
+  await screen.findByRole("treeitem", { name: "Source" });
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await expectTree(`
+Source
+  Beta
+  Gamma
+  `);
+});
+
 test("mutual embeds keep the reciprocal arrow and terminate composition", async () => {
   const [alice] = setup([ALICE]);
   renderApp(alice());
@@ -768,4 +819,56 @@ Target
     Target↩
     Descendant
   `);
+});
+
+test("a positioned placement is an incoming reference; an applied move statement is not", async () => {
+  const workspacePath = writeWorkspace({
+    "source.md": [
+      "# Source <!-- id:s -->",
+      "",
+      "- Alpha <!-- id:a -->",
+      "- Gamma <!-- id:g -->",
+    ].join("\n"),
+    "topic.md": ["# Topic <!-- id:t -->", "", "- T one <!-- id:t1 -->"].join(
+      "\n"
+    ),
+    "doc.md": [
+      '# [Source](#s) <!-- id:o0 embed="true" -->',
+      "",
+      '- [Gamma](#g) <!-- id:m1 embed="true" after="a" -->',
+      '- [Topic](#t) <!-- id:d1 embed="true" after="g" -->',
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "topic.md"),
+  });
+  const [topicRoot] = await screen.findAllByRole("treeitem");
+  await userEvent.click(topicRoot);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await screen.findByRole("treeitem", { name: "T one" });
+  await waitFor(() => {
+    expect(
+      screen
+        .getAllByRole("treeitem")
+        .some((item) => (item.textContent ?? "").includes("Source"))
+    ).toBe(true);
+  });
+
+  cleanup();
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "source.md"),
+  });
+  const [sourceRoot] = await screen.findAllByRole("treeitem");
+  await userEvent.click(sourceRoot);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+  await screen.findByRole("treeitem", { name: "Gamma" });
+  expect(
+    screen
+      .getAllByRole("treeitem")
+      .every((item) => !(item.textContent ?? "").startsWith("[I]"))
+  ).toBe(true);
 });

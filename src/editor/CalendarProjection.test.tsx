@@ -21,7 +21,7 @@ import {
   setup,
   type,
 } from "../utils.test";
-import { firePaste } from "./Multiselect.testUtils";
+import { clickRow, firePaste } from "./Multiselect.testUtils";
 
 const FEED = [
   "BEGIN:VCALENDAR",
@@ -268,7 +268,81 @@ Salon
     14.07.2030 Sommerfest
     ${dunbarText()}
   Studium
-    https://scholarium.at/salon.ics↗
+    https://scholarium.at/salon.ics
+  `);
+});
+
+test("a demoted feed placement opens its calendar whole with its own diff", async () => {
+  const workspace = knowstrInit().path;
+  write(
+    workspace,
+    "salon.md",
+    [
+      "# Salon <!-- id:salon -->",
+      "",
+      '- [Termine](feed:https://scholarium.at/salon.ics) <!-- id:f1 embed="true" -->',
+      "- Studium <!-- id:st -->",
+      '  - [Termine](feed:https://scholarium.at/salon.ics) <!-- id:f2 embed="true" -->',
+      "    - Meine Notiz <!-- id:n1 -->",
+      "",
+    ].join("\n")
+  );
+  await knowstrSave(workspace);
+  await renderAppTree({
+    path: workspace,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "salon.md"),
+    fetchCalendarFeed: () => Promise.resolve(FEED),
+  });
+  const [docRoot] = await screen.findAllByRole("treeitem");
+  await userEvent.click(docRoot);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+  await screen.findByText("14.07.2030 Sommerfest");
+
+  await userEvent.click(
+    await screen.findByRole("link", { name: "Navigate to Termine" })
+  );
+
+  await expectTree(`
+https://scholarium.at/salon.ics
+  01.01.2020 Founding seminar
+  14.07.2030 Sommerfest
+  ${dunbarText()}
+  Meine Notiz
+  `);
+});
+
+test("a demoted event placement opens its event whole with its own diff", async () => {
+  const workspace = knowstrInit().path;
+  write(
+    workspace,
+    "salon.md",
+    [
+      "# Salon <!-- id:salon -->",
+      "",
+      '- [Termine](feed:https://scholarium.at/salon.ics) <!-- id:f1 embed="true" -->',
+      '- [My standup](#ical:sommerfest@scholarium.at) <!-- id:l1 embed="true" -->',
+      "  - Meine Notiz <!-- id:n1 -->",
+      "",
+    ].join("\n")
+  );
+  await knowstrSave(workspace);
+  await renderAppTree({
+    path: workspace,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "salon.md"),
+    fetchCalendarFeed: () => Promise.resolve(FEED),
+  });
+  const [docRoot] = await screen.findAllByRole("treeitem");
+  await userEvent.click(docRoot);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+  await screen.findByText("14.07.2030 Sommerfest");
+
+  await userEvent.click(
+    await screen.findByRole("link", { name: "Navigate to My standup" })
+  );
+
+  await expectTree(`
+14.07.2030 Sommerfest
+  Meine Notiz
   `);
 });
 
@@ -306,6 +380,137 @@ Salon
   expect(
     screen.queryByRole("textbox", { name: `edit ${dunbarText()}` })
   ).toBeNull();
+});
+
+test("a note dropped among entries keeps its slot", async () => {
+  const [alice] = setup([ALICE]);
+  renderApp({ ...alice(), fetchCalendarFeed: () => Promise.resolve(FEED) });
+
+  await type(
+    "Salon{Enter}{Tab}https://scholarium.at/salon.ics{Enter}{Shift>}{Tab}{/Shift}Notes{Escape}"
+  );
+  await userEvent.click(
+    await screen.findByLabelText("expand https://scholarium.at/salon.ics")
+  );
+  await screen.findByText("14.07.2030 Sommerfest");
+
+  fireEvent.dragStart(screen.getByRole("treeitem", { name: "Notes" }));
+  fireEvent.drop(
+    screen.getByRole("treeitem", { name: "14.07.2030 Sommerfest" })
+  );
+
+  const expected = `
+Salon
+  https://scholarium.at/salon.ics
+    01.01.2020 Founding seminar
+    14.07.2030 Sommerfest
+    Notes
+    ${dunbarText()}
+  `;
+  await expectTree(expected);
+
+  cleanup();
+  renderApp({ ...alice(), fetchCalendarFeed: () => Promise.resolve(FEED) });
+  await expectTree(expected);
+});
+
+test("dragging an entry within the feed resorts it", async () => {
+  const [alice] = setup([ALICE]);
+  renderApp({ ...alice(), fetchCalendarFeed: () => Promise.resolve(FEED) });
+
+  await type("Salon{Enter}{Tab}https://scholarium.at/salon.ics{Escape}");
+  await userEvent.click(
+    await screen.findByLabelText("expand https://scholarium.at/salon.ics")
+  );
+  await screen.findByText("14.07.2030 Sommerfest");
+
+  fireEvent.dragStart(screen.getByRole("treeitem", { name: dunbarText() }));
+  fireEvent.drop(
+    screen.getByRole("treeitem", { name: "01.01.2020 Founding seminar" })
+  );
+
+  const expected = `
+Salon
+  https://scholarium.at/salon.ics
+    01.01.2020 Founding seminar
+    ${dunbarText()}
+    14.07.2030 Sommerfest
+  `;
+  await expectTree(expected);
+
+  cleanup();
+  renderApp({ ...alice(), fetchCalendarFeed: () => Promise.resolve(FEED) });
+  await expectTree(expected);
+});
+
+test("Tab indents a note under an entry", async () => {
+  const [alice] = setup([ALICE]);
+  renderApp({ ...alice(), fetchCalendarFeed: () => Promise.resolve(FEED) });
+
+  await type(
+    "Salon{Enter}{Tab}https://scholarium.at/salon.ics{Enter}{Shift>}{Tab}{/Shift}Notes{Escape}"
+  );
+  await userEvent.click(
+    await screen.findByLabelText("expand https://scholarium.at/salon.ics")
+  );
+  await screen.findByText("14.07.2030 Sommerfest");
+
+  fireEvent.dragStart(screen.getByRole("treeitem", { name: "Notes" }));
+  fireEvent.drop(
+    screen.getByRole("treeitem", { name: "14.07.2030 Sommerfest" })
+  );
+  await screen.findByText("Notes");
+
+  await clickRow("Notes");
+  await userEvent.keyboard("{Tab}");
+
+  const expected = `
+Salon
+  https://scholarium.at/salon.ics
+    01.01.2020 Founding seminar
+    14.07.2030 Sommerfest
+      Notes
+    ${dunbarText()}
+  `;
+  await expectTree(expected);
+
+  cleanup();
+  renderApp({ ...alice(), fetchCalendarFeed: () => Promise.resolve(FEED) });
+  await expectTree(expected);
+});
+
+test("cross-pane drag of an entry lays down a link row, never a copy", async () => {
+  const [alice] = setup([ALICE]);
+  renderApp({ ...alice(), fetchCalendarFeed: () => Promise.resolve(FEED) });
+
+  await type(
+    "Salon{Enter}{Tab}https://scholarium.at/salon.ics{Enter}{Shift>}{Tab}{/Shift}Notes{Escape}"
+  );
+  await userEvent.click(
+    await screen.findByLabelText("expand https://scholarium.at/salon.ics")
+  );
+  await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+  await navigateToNodeViaSearch(1, "Notes");
+  await openNodeInFullscreen(1, "Notes");
+
+  fireEvent.dragStart(screen.getByRole("treeitem", { name: dunbarText() }));
+  fireEvent.drop(getPane(1).getByRole("treeitem", { name: "Notes" }));
+
+  const expected = `
+Salon
+  https://scholarium.at/salon.ics
+    01.01.2020 Founding seminar
+    14.07.2030 Sommerfest
+    ${dunbarText()}
+  Notes
+Notes
+  ${dunbarText()}
+  `;
+  await expectTree(expected);
+
+  cleanup();
+  renderApp({ ...alice(), fetchCalendarFeed: () => Promise.resolve(FEED) });
+  await expectTree(expected);
 });
 
 test("feed loading follows embeds in loaded documents, not drawn rows", async () => {

@@ -1,0 +1,7 @@
+Salon <!-- id:o0 -->
+  https://example.org/salon.ics <!-- base:f1 -->
+    01.01.2020 Founding <!-- base:ical:founding@example.org -->
+    Meine Notiz <!-- base:n1 -->
+    01.01.9999 Standup <!-- base:ical:standup@example.org -->
+      Agenda <!-- base:n2 -->
+    02.01.9999 Retro <!-- base:ical:retro@example.org -->

@@ -62,20 +62,23 @@ function sourceRowsUnder(showing: Showing): Showing[] {
   ];
 }
 
-function findOccurrence(scope: Showing, id: ID): Showing | undefined {
-  const answers = (row: Showing): boolean =>
-    chainLinksOf(row).some((link) => link.node.id === id);
-  const search = (rows: Showing[]): Showing | undefined =>
-    rows.reduce<Showing | undefined>((found, row) => {
-      if (found) {
-        return found;
-      }
-      if (answers(row) && !row.statement) {
-        return row;
-      }
-      return search(sourceRowsUnder(row));
-    }, undefined);
-  return search(linesShownThrough(scope.target).map(({ line }) => line));
+function occurrenceIndex(scope: Showing): ImmutableMap<ID, Showing> {
+  const enter = (
+    map: ImmutableMap<ID, Showing>,
+    row: Showing
+  ): ImmutableMap<ID, Showing> => {
+    const withRow = row.statement
+      ? map
+      : chainLinksOf(row).reduce(
+          (acc, link) =>
+            acc.has(link.node.id) ? acc : acc.set(link.node.id, row),
+          map
+        );
+    return sourceRowsUnder(row).reduce(enter, withRow);
+  };
+  return linesShownThrough(scope.target)
+    .map(({ line }) => line)
+    .reduce(enter, ImmutableMap<ID, Showing>());
 }
 
 type Spoken = {
@@ -89,6 +92,13 @@ type Spoken = {
 function decideStatements(
   collected: { statement: Showing; scope: Showing | undefined }[]
 ): { applied: ImmutableSet<Showing>; targets: ImmutableMap<Showing, Spoken> } {
+  const occurrences = collected.reduce(
+    (cache, { scope }) =>
+      scope === undefined || cache.has(scope)
+        ? cache
+        : cache.set(scope, occurrenceIndex(scope)),
+    ImmutableMap<Showing, ImmutableMap<ID, Showing>>()
+  );
   return collected.reduce<{
     applied: ImmutableSet<Showing>;
     targets: ImmutableMap<Showing, Spoken>;
@@ -97,7 +107,7 @@ function decideStatements(
       const targetId = embedTargetOf(statement.node);
       const target =
         scope !== undefined && targetId !== undefined
-          ? findOccurrence(scope, targetId)
+          ? occurrences.get(scope)?.get(targetId)
           : undefined;
       if (!target) {
         return decisions;
@@ -237,25 +247,33 @@ function readAnchors(root: Showing, candidates: Showing[]): Anchors {
       ambiguous: ImmutableSet(),
     }
   );
-  const onCircle = (row: Showing): boolean => {
-    const walk = (current: Showing, path: ImmutableSet<Showing>): boolean => {
-      const claim = claims.claimOf.get(current);
-      if (!claim) {
-        return false;
+  // Planned style exception: one linear chain walk beats the no-mutation lint.
+  /* eslint-disable functional/no-let, functional/immutable-data */
+  const onCircle = ((): ImmutableSet<Showing> => {
+    const seen = new Map<Showing, "walking" | "done">();
+    let circles = ImmutableSet<Showing>();
+    claims.claimOf.keySeq().forEach((start) => {
+      if (seen.has(start)) {
+        return;
       }
-      if (claim.anchor === row) {
-        return true;
+      const path: Showing[] = [];
+      let current: Showing | undefined = start;
+      while (current !== undefined && !seen.has(current)) {
+        seen.set(current, "walking");
+        path.push(current);
+        current = claims.claimOf.get(current)?.anchor;
       }
-      if (path.has(claim.anchor)) {
-        return false;
+      if (current !== undefined && seen.get(current) === "walking") {
+        circles = circles.union(path.slice(path.indexOf(current)));
       }
-      return walk(claim.anchor, path.add(current));
-    };
-    return walk(row, ImmutableSet([row]));
-  };
+      path.forEach((member) => seen.set(member, "done"));
+    });
+    return circles;
+  })();
+  /* eslint-enable functional/no-let, functional/immutable-data */
   return claims.claimOf.reduce<Anchors>(
     (anchors, claim, row) => {
-      if (onCircle(row)) {
+      if (onCircle.has(row)) {
         return { ...anchors, lapsed: anchors.lapsed.add(row) };
       }
       const lists = anchors.listsOf.get(claim.anchor) ?? {

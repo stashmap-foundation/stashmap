@@ -217,23 +217,17 @@ export function getVisibleParentRow(
     );
 }
 
-function getPreviousSiblingFromRows(
+export function getPreviousSiblingFromRows(
   rows: List<Row>,
   row: Row
 ): Row | undefined {
-  const { childIndex } = row;
-  if (childIndex === undefined || childIndex === 0) {
-    return undefined;
-  }
-  return rows
-    .slice(0, row.index)
-    .reverse()
+  const above = rows.slice(0, row.index).reverse();
+  const blocked = above.findIndex((candidate) => candidate.depth < row.depth);
+  return above
+    .slice(0, blocked < 0 ? above.size : blocked)
     .find(
       (candidate) =>
-        candidate.childIndex !== undefined &&
-        candidate.parentRef?.sourceId === row.parentRef?.sourceId &&
-        candidate.parentRef?.id === row.parentRef?.id &&
-        candidate.childIndex < childIndex
+        candidate.depth === row.depth && candidate.virtualType === undefined
     );
 }
 

@@ -17,6 +17,7 @@ import {
 } from "../rowModel";
 import { isEditableNode } from "./temporaryViewState";
 import {
+  getPreviousSiblingFromRows,
   getVisibleParentRow,
   planBatchIndent,
   planBatchOutdent,
@@ -449,26 +450,6 @@ function NodeContent(): JSX.Element {
   }
 
   return <span className="break-word">{displayText}</span>;
-}
-
-function getPreviousSiblingFromRows(
-  rows: List<Row>,
-  row: Row
-): Row | undefined {
-  const { childIndex } = row;
-  if (childIndex === undefined || childIndex === 0) {
-    return undefined;
-  }
-  return rows
-    .slice(0, row.index)
-    .reverse()
-    .find(
-      (candidate) =>
-        candidate.childIndex !== undefined &&
-        candidate.parentRef?.sourceId === row.parentRef?.sourceId &&
-        candidate.parentRef?.id === row.parentRef?.id &&
-        candidate.childIndex < childIndex
-    );
 }
 
 function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {

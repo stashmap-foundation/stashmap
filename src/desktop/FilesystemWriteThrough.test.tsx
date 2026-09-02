@@ -846,6 +846,43 @@ Doc
 `);
 });
 
+test("Tab indents a projected row and writes its move statement", async () => {
+  const { path } = knowstrInit();
+  write(path, "source.md", MOVE_SOURCE);
+  write(path, "diff.md", '# [Source](#s) <!-- id:o0 embed="true" -->\n');
+  await openDocumentExpanded(path, "diff.md");
+  await expectTree(`
+Source
+  Alpha
+  Beta
+  Gamma
+`);
+
+  await clickRow("Gamma");
+  await userEvent.keyboard("{Tab}");
+
+  await expectTree(`
+Source
+  Alpha
+  Beta
+    Gamma
+`);
+  await waitFor(() => {
+    expect(fs.readFileSync(`${path}/diff.md`, "utf8")).toMatch(
+      /- \[Gamma\]\(#g\) <!-- id:\S+ embed="true" parent="b" -->/u
+    );
+  });
+
+  cleanup();
+  await openDocumentExpanded(path, "diff.md");
+  await expectTree(`
+Source
+  Alpha
+  Beta
+    Gamma
+`);
+});
+
 test("a drag re-derives a hand-written tie into an explicit chain", async () => {
   const { path } = knowstrInit();
   write(path, "source.md", MOVE_SOURCE);

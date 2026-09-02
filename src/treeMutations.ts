@@ -360,11 +360,18 @@ type MoveContext = {
   entries: SplicedEntry[];
   links: ScreenLinks;
   lines: (ID | undefined)[];
-  lineHosts: (ID | undefined)[];
+  hosts: (ID | undefined)[];
 };
 
-function lineHostOf(plan: Plan, row: Row): ID | undefined {
-  if (row.projected) {
+function moveContextOf(
+  plan: Plan,
+  graph: GraphLookup,
+  entries: SplicedEntry[]
+): MoveContext {
+  const hostOf = (row: Row): ID | undefined => {
+    if (!row.projected) {
+      return fileMembershipNode(plan, row.node)?.id;
+    }
     if (row.spokenFor === undefined) {
       return row.embeddedIn;
     }
@@ -372,8 +379,29 @@ function lineHostOf(plan: Plan, row: Row): ID | undefined {
     return statement !== undefined
       ? fileMembershipNode(plan, statement)?.id
       : undefined;
+  };
+  return {
+    plan,
+    graph,
+    entries,
+    links: screenLinksOf(entries),
+    lines: entries.map(({ row }) =>
+      row.projected ? row.spokenFor : row.node.id
+    ),
+    hosts: entries.map(({ row }) => hostOf(row)),
+  };
+}
+
+function hostResolves(context: MoveContext, hostId: ID | undefined): boolean {
+  if (hostId === undefined) {
+    return false;
   }
-  return fileMembershipNode(plan, row.node)?.id;
+  const host = getWorkspaceNode(context.plan.knowledgeDBs, hostId);
+  const targetId = host !== undefined ? embedTargetOf(host) : undefined;
+  return (
+    targetId !== undefined &&
+    resolveAuthoredFirst(context.graph, targetId, LOCAL) !== undefined
+  );
 }
 
 function anchorOf(
@@ -420,79 +448,6 @@ function currentNodeOf(
   return updates.get(id) ?? getWorkspaceNode(plan.knowledgeDBs, id);
 }
 
-function withAnchor(
-  updates: Updates,
-  node: GraphNode,
-  anchor: PositionName | undefined
-): Updates {
-  const updated = withAnchorAttrs(node, anchor);
-  return updated ? updates.set(updated.id, updated) : updates;
-}
-
-function detachLine(
-  plan: Plan,
-  updates: Updates,
-  node: GraphNode
-): Updates | undefined {
-  const oldParent =
-    node.parent !== undefined
-      ? currentNodeOf(plan, updates, node.parent)
-      : undefined;
-  if (!oldParent) {
-    return undefined;
-  }
-  return updates.set(oldParent.id, {
-    ...oldParent,
-    children: oldParent.children.filter((childId) => childId !== node.id),
-  });
-}
-
-function attachLine(
-  plan: Plan,
-  updates: Updates,
-  nodeId: ID,
-  parentId: ID,
-  anchor: { after: ID | undefined } | "end"
-): Updates | undefined {
-  const parent = currentNodeOf(plan, updates, parentId);
-  const node = currentNodeOf(plan, updates, nodeId);
-  if (!parent || !node) {
-    return undefined;
-  }
-  const insertAt = ((): number => {
-    if (anchor === "end") {
-      return parent.children.size;
-    }
-    const at =
-      anchor.after !== undefined ? parent.children.indexOf(anchor.after) : -1;
-    return at >= 0 ? at + 1 : 0;
-  })();
-  const withParent = updates.set(parentId, {
-    ...parent,
-    children: parent.children.insert(insertAt, nodeId),
-  });
-  return node.parent !== parentId
-    ? withParent.set(nodeId, { ...node, parent: parentId })
-    : withParent;
-}
-
-function embedResolves(graph: GraphLookup, embedNode: GraphNode): boolean {
-  const targetId = embedTargetOf(embedNode);
-  return (
-    targetId !== undefined &&
-    resolveAuthoredFirst(graph, targetId, LOCAL) !== undefined
-  );
-}
-
-function hostResolves(
-  context: MoveContext,
-  updates: Updates,
-  hostId: ID
-): boolean {
-  const host = currentNodeOf(context.plan, updates, hostId);
-  return host !== undefined && embedResolves(context.graph, host);
-}
-
 /* eslint-disable functional/no-let */
 function physicalPredecessorOf(
   context: MoveContext,
@@ -504,7 +459,7 @@ function physicalPredecessorOf(
     if (
       !row.projected &&
       row.positioned !== true &&
-      context.lineHosts[at] === undefined
+      context.hosts[at] === undefined
     ) {
       return row.node.id;
     }
@@ -525,163 +480,171 @@ function positionHostOf(
   if (embedTargetOf(parentRow.node) !== undefined) {
     return parentRow.node.id;
   }
-  return context.lineHosts[parentIndex];
+  return context.hosts[parentIndex];
 }
 
-function createStatementLine(
-  context: MoveContext,
-  updates: Updates,
-  index: number,
-  anchor: PositionName | undefined
-): Updates | undefined {
+function dropAllowed(context: MoveContext, index: number): boolean {
   const { row } = context.entries[index];
-  if (row.embeddedIn === undefined) {
-    return undefined;
+  if (row.projected) {
+    if (row.embeddedIn === undefined) {
+      return false;
+    }
+    return context.lines[index] === undefined
+      ? hostResolves(context, row.embeddedIn)
+      : hostResolves(context, context.hosts[index]);
   }
-  const host = currentNodeOf(context.plan, updates, row.embeddedIn);
-  if (!host || !embedResolves(context.graph, host)) {
-    return undefined;
+  if (context.hosts[index] !== undefined) {
+    return hostResolves(context, context.hosts[index]);
   }
-  const statementNode: GraphNode = {
-    ...newGraphNode([linkSpan(row.node.id, nodeText(row.node))], {
-      root: host.root,
-      parent: host.id,
-    }),
-    extraAttrs: {
-      embed: "true",
-      ...(anchor !== undefined && { [anchor.kind]: anchor.id }),
-    },
-  };
-  return attachLine(
-    context.plan,
-    updates.set(statementNode.id, statementNode),
-    statementNode.id,
-    host.id,
-    "end"
+  if (row.positioned === true) {
+    return true;
+  }
+  const parentIndex = context.links.parent[index];
+  const node = getWorkspaceNode(context.plan.knowledgeDBs, row.node.id);
+  if (parentIndex === undefined || !node || node.parent === undefined) {
+    return false;
+  }
+  const hostId = positionHostOf(context, parentIndex);
+  return hostId === undefined || hostResolves(context, hostId);
+}
+
+function movesFor(
+  context: MoveContext,
+  index: number
+): { node: GraphNode; to: ID; at: { after: ID | undefined } | "end" }[] {
+  const { row } = context.entries[index];
+  if (row.projected) {
+    if (context.lines[index] !== undefined || row.embeddedIn === undefined) {
+      return [];
+    }
+    const host = getWorkspaceNode(context.plan.knowledgeDBs, row.embeddedIn);
+    if (!host) {
+      return [];
+    }
+    const anchor = anchorOf(context, index);
+    const statement: GraphNode = {
+      ...newGraphNode([linkSpan(row.node.id, nodeText(row.node))], {
+        root: host.root,
+        parent: host.id,
+      }),
+      extraAttrs: {
+        embed: "true",
+        ...(anchor !== undefined && { [anchor.kind]: anchor.id }),
+      },
+    };
+    return [{ node: statement, to: host.id, at: "end" }];
+  }
+  if (context.hosts[index] !== undefined || row.positioned === true) {
+    return [];
+  }
+  const node = getWorkspaceNode(context.plan.knowledgeDBs, row.node.id);
+  const parentIndex = context.links.parent[index];
+  if (!node || parentIndex === undefined) {
+    return [];
+  }
+  const hostId = positionHostOf(context, parentIndex);
+  return hostId === undefined
+    ? [
+        {
+          node,
+          to: context.entries[parentIndex].row.node.id,
+          at: { after: physicalPredecessorOf(context, index) },
+        },
+      ]
+    : [{ node, to: hostId, at: "end" }];
+}
+
+function claimsAnchor(context: MoveContext, index: number): boolean {
+  const { row } = context.entries[index];
+  if (row.projected) {
+    return context.lines[index] !== undefined;
+  }
+  if (context.hosts[index] !== undefined || row.positioned === true) {
+    return true;
+  }
+  const parentIndex = context.links.parent[index];
+  return (
+    parentIndex !== undefined &&
+    positionHostOf(context, parentIndex) !== undefined
   );
 }
 
-function placeHomeEntry(
-  context: MoveContext,
+function applyMove(
+  plan: Plan,
   updates: Updates,
-  index: number,
-  node: GraphNode,
-  anchor: PositionName | undefined
-): Updates | undefined {
-  const parentIndex = context.links.parent[index];
-  if (parentIndex === undefined) {
-    return undefined;
-  }
-  const hostId = positionHostOf(context, parentIndex);
-  if (hostId === undefined) {
-    const detached = detachLine(context.plan, updates, node);
-    return detached
-      ? attachLine(
-          context.plan,
-          detached,
-          node.id,
-          context.entries[parentIndex].row.node.id,
-          { after: physicalPredecessorOf(context, index) }
-        )
-      : undefined;
-  }
-  if (!hostResolves(context, updates, hostId)) {
-    return undefined;
-  }
-  const detached = detachLine(context.plan, updates, node);
-  if (!detached) {
-    return undefined;
-  }
-  const attached = attachLine(context.plan, detached, node.id, hostId, "end");
-  if (!attached) {
-    return undefined;
-  }
-  const moved = currentNodeOf(context.plan, attached, node.id);
-  return moved ? withAnchor(attached, moved, anchor) : attached;
-}
-
-function moveEntry(
-  context: MoveContext,
-  updates: Updates,
-  index: number
-): Updates | undefined {
-  const { row } = context.entries[index];
-  const anchor = anchorOf(context, index);
-  if (row.projected) {
-    if (row.embeddedIn === undefined) {
-      return undefined;
-    }
-    const lineId = context.lines[index];
-    if (lineId === undefined) {
-      return createStatementLine(context, updates, index, anchor);
-    }
-    const line = currentNodeOf(context.plan, updates, lineId);
-    const host = context.lineHosts[index];
-    if (!line || host === undefined || !hostResolves(context, updates, host)) {
-      return undefined;
-    }
-    return withAnchor(updates, line, anchor);
-  }
-  const node = currentNodeOf(context.plan, updates, row.node.id);
-  if (!node) {
-    return undefined;
-  }
-  const host = context.lineHosts[index];
-  if (host !== undefined || row.positioned === true) {
-    if (host !== undefined && !hostResolves(context, updates, host)) {
-      return undefined;
-    }
-    return withAnchor(updates, node, anchor);
-  }
-  return placeHomeEntry(context, updates, index, node, anchor);
-}
-
-function deriveAnchorEntry(
-  context: MoveContext,
-  updates: Updates,
-  index: number,
-  grabbedRoots: ImmutableSet<Row>
+  move: { node: GraphNode; to: ID; at: { after: ID | undefined } | "end" }
 ): Updates {
-  const { row } = context.entries[index];
-  if (
-    grabbedRoots.has(row) ||
-    row.lapsed ||
-    row.ambiguous ||
-    row.positioned !== true
-  ) {
-    return updates;
-  }
-  const lineId = context.lines[index];
-  const line =
-    lineId !== undefined
-      ? currentNodeOf(context.plan, updates, lineId)
+  const node = currentNodeOf(plan, updates, move.node.id) ?? move.node;
+  const from =
+    node.parent !== undefined
+      ? currentNodeOf(plan, updates, node.parent)
       : undefined;
-  if (!line) {
+  const removed = from
+    ? updates.set(from.id, {
+        ...from,
+        children: from.children.filter((childId) => childId !== node.id),
+      })
+    : updates;
+  const to = currentNodeOf(plan, removed, move.to);
+  if (!to) {
     return updates;
   }
-  const host = context.lineHosts[index];
-  if (row.projected && host === undefined) {
-    return updates;
-  }
-  if (host !== undefined && !hostResolves(context, updates, host)) {
-    return updates;
-  }
-  return withAnchor(updates, line, anchorOf(context, index));
+  const insertAt = ((): number => {
+    if (move.at === "end") {
+      return to.children.size;
+    }
+    if (move.at.after === undefined) {
+      return 0;
+    }
+    return to.children.indexOf(move.at.after) + 1;
+  })();
+  return removed
+    .set(to.id, { ...to, children: to.children.insert(insertAt, node.id) })
+    .set(node.id, { ...node, parent: to.id });
+}
+
+function deriveAnchors(
+  context: MoveContext,
+  updates: Updates,
+  grabbedRows: ImmutableSet<Row>,
+  anchored: ImmutableSet<number>
+): Updates {
+  return context.entries.reduce((acc, { row }, index) => {
+    const grabbedClaim = anchored.has(index);
+    const standingClaim =
+      !grabbedRows.has(row) &&
+      row.positioned === true &&
+      !row.lapsed &&
+      !row.ambiguous &&
+      (!row.projected || context.hosts[index] !== undefined) &&
+      (context.hosts[index] === undefined ||
+        hostResolves(context, context.hosts[index]));
+    if (!grabbedClaim && !standingClaim) {
+      return acc;
+    }
+    const anchor = anchorOf(context, index);
+    const lineId = context.lines[index];
+    const line =
+      lineId !== undefined
+        ? currentNodeOf(context.plan, acc, lineId)
+        : undefined;
+    const updated =
+      line !== undefined ? withAnchorAttrs(line, anchor) : undefined;
+    return updated !== undefined ? acc.set(updated.id, updated) : acc;
+  }, updates);
 }
 
 function remapPaneKey(viewKey: string, paneIndex: number): string {
   return viewKey.replace(/^p\d+:/u, `p${paneIndex}:`);
 }
 
-export function planMoveRows(
-  plan: Plan,
-  data: Data,
-  paneIndex: number,
+function spliceRows(
+  rows: Row[],
   grabbed: Row[],
   insertBefore: Row | undefined,
-  indent: number
-): Plan | undefined {
-  const rows = writerRows(data, paneIndex);
+  indent: number,
+  paneIndex: number
+): { entries: SplicedEntry[]; grabbedRows: ImmutableSet<Row> } | undefined {
   const indexOfKey = new Map(rows.map((row, i) => [row.viewKey, i] as const));
   const requested = grabbed.flatMap((row) => {
     const at = indexOfKey.get(remapPaneKey(row.viewKey, paneIndex));
@@ -690,24 +653,19 @@ export function planMoveRows(
   if (requested.length < grabbed.length) {
     return undefined;
   }
-  const sorted = ImmutableSet(requested).sort().toArray();
-  const blocks = sorted.reduce<{ start: number; end: number }[]>(
-    (acc, start) => {
+  const blocks = ImmutableSet(requested)
+    .sort()
+    .toArray()
+    .reduce<{ start: number; end: number }[]>((acc, start) => {
       const last = acc[acc.length - 1];
-      if (last && start < last.end) {
-        return acc;
-      }
-      return [...acc, { start, end: blockEndAt(rows, start) }];
-    },
-    []
-  );
-  if (blocks.length === 0) {
-    return undefined;
-  }
-  const refused = blocks.some(
-    ({ start }) => rows[start].parentRef === undefined
-  );
-  if (refused) {
+      return last && start < last.end
+        ? acc
+        : [...acc, { start, end: blockEndAt(rows, start) }];
+    }, []);
+  if (
+    blocks.length === 0 ||
+    blocks.some(({ start }) => rows[start].parentRef === undefined)
+  ) {
     return undefined;
   }
   const inBlocks = ImmutableSet(
@@ -740,33 +698,43 @@ export function planMoveRows(
       .slice(insertAt)
       .map((row): SplicedEntry => ({ row, depth: row.depth })),
   ];
-  const context: MoveContext = {
-    plan,
-    graph: graphLookupFromData(data),
+  return {
     entries,
-    links: screenLinksOf(entries),
-    lines: entries.map(({ row }) =>
-      row.projected ? row.spokenFor : row.node.id
-    ),
-    lineHosts: entries.map(({ row }) => lineHostOf(plan, row)),
+    grabbedRows: ImmutableSet(blocks.map(({ start }) => rows[start])),
   };
-  const grabbedRows = ImmutableSet(blocks.map(({ start }) => rows[start]));
+}
+
+export function planMoveRows(
+  plan: Plan,
+  data: Data,
+  paneIndex: number,
+  grabbed: Row[],
+  insertBefore: Row | undefined,
+  indent: number
+): Plan | undefined {
+  const rows = writerRows(data, paneIndex);
+  const spliced = spliceRows(rows, grabbed, insertBefore, indent, paneIndex);
+  if (spliced === undefined) {
+    return undefined;
+  }
+  const { entries, grabbedRows } = spliced;
+  const context = moveContextOf(plan, graphLookupFromData(data), entries);
   const rootIndexes = entries.flatMap((entry, index) =>
     grabbedRows.has(entry.row) ? [index] : []
   );
-  const staged = rootIndexes.reduce<Updates | undefined>(
-    (updates, index) =>
-      updates === undefined ? undefined : moveEntry(context, updates, index),
-    ImmutableMap<ID, GraphNode>()
-  );
-  if (staged === undefined) {
+  if (!rootIndexes.every((index) => dropAllowed(context, index))) {
     return undefined;
   }
-  const derived = context.entries.reduce<Updates>(
-    (updates, ignored, index) =>
-      deriveAnchorEntry(context, updates, index, grabbedRows),
-    staged
+  const moved = rootIndexes
+    .flatMap((index) => movesFor(context, index))
+    .reduce<Updates>(
+      (updates, move) => applyMove(plan, updates, move),
+      ImmutableMap<ID, GraphNode>()
+    );
+  const anchored = ImmutableSet(
+    rootIndexes.filter((index) => claimsAnchor(context, index))
   );
+  const derived = deriveAnchors(context, moved, grabbedRows, anchored);
   const written = derived
     .valueSeq()
     .reduce((acc, node) => planUpsertNodes(acc, node), plan);

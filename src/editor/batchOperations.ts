@@ -5,10 +5,7 @@ import {
   planUpdateViewItemMetadata,
   NodeItemMetadata,
 } from "../nodeItemMutations";
-import {
-  planMoveRows,
-  planMoveRowsIntoMaterializedRow,
-} from "../treeMutations";
+import { planMoveRows } from "../treeMutations";
 import { isEmptyNodeID } from "../core/connections";
 import {
   planAddTopTargetsToDocument,
@@ -288,31 +285,6 @@ function planRowMove(
   return remapSelectionForMovedKeys(plan, withSpans, remappedKeys);
 }
 
-function planIndentIntoComputedRow(
-  plan: Plan,
-  sortedRows: Row[],
-  prevSibling: Row,
-  editorInfo: EditorInfo | undefined
-): Plan {
-  const { plan: moved, remappedKeys } = planMoveRowsIntoMaterializedRow(
-    plan,
-    sortedRows,
-    prevSibling
-  );
-  const withSpans = sortedRows.reduce((acc, row) => {
-    const editorSpans = getEditorSpansForRow(editorInfo, row);
-    if (
-      !editorSpans ||
-      spansToMarkdown(editorSpans) === spansToMarkdown(row.node.spans) ||
-      !remappedKeys.some(({ fromKey }) => fromKey === row.viewKey)
-    ) {
-      return acc;
-    }
-    return planUpdateNodeSpans(acc, row.node.id, editorSpans);
-  }, moved);
-  return remapSelectionForMovedKeys(plan, withSpans, remappedKeys);
-}
-
 export function planBatchIndent(
   plan: Plan,
   data: Data,
@@ -328,9 +300,6 @@ export function planBatchIndent(
   const prevSibling = getPreviousSiblingFromRows(orderedRows, firstRow);
   if (!prevSibling) return undefined;
 
-  if (prevSibling.materialize !== undefined) {
-    return planIndentIntoComputedRow(plan, sortedRows, prevSibling, editorInfo);
-  }
   const lastRow = sortedRows[sortedRows.length - 1];
   return planRowMove(
     plan,

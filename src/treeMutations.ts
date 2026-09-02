@@ -20,9 +20,6 @@ import {
   ViewPath,
   getIndependentRows,
   updateViewPathsAfterDisconnect,
-  addNodeToPathWithNodes,
-  addNodesToLastElement,
-  viewPathToString,
   childViewKey,
   copyViewsWithNewPrefix,
   getPaneRootItemID,
@@ -43,7 +40,6 @@ import {
   planDeleteNodes,
   planDeleteDescendantNodes,
   planExpandNode,
-  planMoveDescendantNodes,
   planUpdatePanes,
   planUpdateViews,
   planUpsertNodes,
@@ -112,144 +108,6 @@ export function planDeleteNode(
   const planAfterDescendants = planDeleteDescendantNodes(plan, node);
   const planAfterDelete = planDeleteNodes(planAfterDescendants, node.id);
   return resetInvalidPanes(planAfterDelete, paneIndex);
-}
-
-function planMoveNode(
-  plan: Plan,
-  sourceNodeID: ID,
-  sourceChildID: ID,
-  sourceParentID: ID,
-  sourceViewPath: ViewPath,
-  targetParentID: ID,
-  targetParentViewPath: ViewPath,
-  insertAtIndex?: number
-): Plan {
-  const sourceNode = getWorkspaceNode(plan.knowledgeDBs, sourceNodeID);
-  if (!sourceNode) {
-    return plan;
-  }
-
-  const [planWithAdd] = planAddToParent(
-    plan,
-    sourceNodeID,
-    targetParentID,
-    insertAtIndex
-  );
-
-  const actualTargetParentNode = getWorkspaceNode(
-    planWithAdd.knowledgeDBs,
-    targetParentID
-  );
-
-  if (!actualTargetParentNode || actualTargetParentNode.children.size === 0) {
-    return planDisconnectFromParent(
-      planWithAdd,
-      sourceParentID,
-      sourceChildID,
-      true
-    );
-  }
-
-  const targetIndex = insertAtIndex ?? actualTargetParentNode.children.size - 1;
-  const targetViewPath = addNodeToPathWithNodes(
-    targetParentViewPath,
-    actualTargetParentNode,
-    targetIndex
-  );
-
-  const sourceKey = viewPathToString(sourceViewPath);
-  const targetKey = viewPathToString(targetViewPath);
-  const preservedSourceViews =
-    sourceKey === targetKey
-      ? planWithAdd.views.filter(
-          (_view, key) => key === sourceKey || key.startsWith(`${sourceKey}:`)
-        )
-      : undefined;
-  const updatedViews = copyViewsWithNewPrefix(
-    planWithAdd.views,
-    sourceKey,
-    targetKey
-  );
-  const planWithViews = planUpdateViews(planWithAdd, updatedViews);
-
-  const disconnectedPlan = planDisconnectFromParent(
-    planWithViews,
-    sourceParentID,
-    sourceChildID,
-    true
-  );
-  const planWithDisconnect =
-    preservedSourceViews && preservedSourceViews.size > 0
-      ? planUpdateViews(
-          disconnectedPlan,
-          disconnectedPlan.views.merge(preservedSourceViews)
-        )
-      : disconnectedPlan;
-
-  return planMoveDescendantNodes(
-    planWithDisconnect,
-    sourceNode,
-    actualTargetParentNode.id,
-    actualTargetParentNode.root
-  );
-}
-
-export function planMoveRowsIntoMaterializedRow(
-  plan: Plan,
-  sortedRows: Row[],
-  prevSibling: Row
-): { plan: Plan; remappedKeys: { fromKey: string; toKey: string }[] } {
-  const [planMaterialized, takenPrevSibling] = planMaterializeComputedRow(
-    plan,
-    prevSibling
-  );
-  const takenViewPath = addNodesToLastElement(
-    prevSibling.viewPath,
-    takenPrevSibling.id
-  );
-  const currentTaken = (current: Plan): GraphNode =>
-    getNode(current.knowledgeDBs, takenPrevSibling.id, LOCAL) ??
-    takenPrevSibling;
-  return sortedRows.reduce<{
-    plan: Plan;
-    remappedKeys: { fromKey: string; toKey: string }[];
-  }>(
-    (state, row) => {
-      if (!row.parentNode) {
-        return state;
-      }
-      const targetBefore = currentTaken(state.plan);
-      const insertAt = targetBefore.children.size;
-      const moved = planMoveNode(
-        state.plan,
-        row.node.id,
-        row.node.id,
-        row.parentNode.id,
-        row.viewPath,
-        targetBefore.id,
-        takenViewPath,
-        insertAt
-      );
-      const targetAfter = currentTaken(moved);
-      const movedViewPath =
-        insertAt < targetAfter.children.size
-          ? addNodeToPathWithNodes(takenViewPath, targetAfter, insertAt)
-          : undefined;
-      return {
-        plan: moved,
-        remappedKeys: movedViewPath
-          ? [
-              ...state.remappedKeys,
-              { fromKey: row.viewKey, toKey: viewPathToString(movedViewPath) },
-            ]
-          : state.remappedKeys,
-      };
-    },
-    {
-      plan: planExpandNode(planMaterialized, prevSibling.view, takenViewPath),
-      remappedKeys: [],
-    }
-  );
 }
 
 const WRITER_FILTERS: Pane["typeFilters"] = [

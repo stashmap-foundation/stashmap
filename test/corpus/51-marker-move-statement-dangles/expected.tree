@@ -1,0 +1,4 @@
+Source <!-- id:o0 -->
+  Alpha <!-- base:a -->
+  Beta <!-- base:b -->
+  {!} Alpha <!-- id:j1 flag:dangling -->

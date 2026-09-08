@@ -2,7 +2,8 @@ import React, { RefObject, useRef } from "react";
 import { List, OrderedSet } from "immutable";
 import { ConnectDropTarget, DropTargetMonitor, useDrop } from "react-dnd";
 import { NativeTypes } from "react-dnd-html5-backend";
-import { dnd, getDropDestinationFromRows } from "../dnd";
+import { dnd, getDropDestinationFromRows, moveWithinView } from "../dnd";
+import { useData } from "../DataContext";
 import { planMaterializeComputedRow } from "../core/plan";
 import { getWorkspaceNode } from "../core/knowledge";
 import {
@@ -202,6 +203,7 @@ export function useDroppable({
 ] {
   const { anchor } = useTemporaryView();
   const { createPlan, executePlan } = usePlanner();
+  const data = useData();
 
   const currentDepth = row.depth;
 
@@ -393,6 +395,28 @@ export function useDroppable({
         return item;
       }
       const dragItem = item;
+      const moved = moveWithinView(
+        createPlan(),
+        data,
+        paneIndex,
+        dragItem,
+        rows,
+        row,
+        targetDepth
+      );
+      if (moved) {
+        if (moved.plan) {
+          executePlan(
+            planSetTemporarySelectionState(moved.plan, {
+              baseSelection: OrderedSet<string>(),
+              shiftSelection: OrderedSet<string>(),
+              anchor,
+            })
+          );
+          (document.activeElement as HTMLElement | null)?.blur();
+        }
+        return dragItem;
+      }
       const dropDestination = getDropDestinationFromRows(
         rows,
         row,

@@ -17,6 +17,7 @@ import {
 } from "../rowModel";
 import { isEditableNode } from "./temporaryViewState";
 import {
+  getPreviousSiblingFromRows,
   getVisibleParentRow,
   planBatchIndent,
   planBatchOutdent,
@@ -237,7 +238,7 @@ function priorRowRootHref(
   if (
     (!row.demoted && !row.cycle) ||
     targetID === undefined ||
-    href !== `#${targetID}`
+    (href !== `#${targetID}` && href !== targetID)
   ) {
     return undefined;
   }
@@ -279,12 +280,15 @@ function InlineLinkSpan({
     embedTargetOf(node) === row.standsFor.id
       ? spansText(row.presentedSpans)
       : span.text;
-  const externalUrl = externalLinkUrl(span.href);
   const dead = isDeadLinkTarget(data, span.href, node, sourceId);
+  const priorHref = dead
+    ? undefined
+    : priorRowRootHref(data, pane, row, span.href);
+  const externalUrl =
+    priorHref !== undefined ? undefined : externalLinkUrl(span.href);
   const internalHref = dead
     ? undefined
-    : priorRowRootHref(data, pane, row, span.href) ??
-      inlineLinkToHref(data, span.href, node, sourceId, span.text);
+    : priorHref ?? inlineLinkToHref(data, span.href, node, sourceId, span.text);
   const href = externalUrl ?? internalHref;
   const style: React.CSSProperties = isSearchResult
     ? { fontStyle: "italic", textDecoration: "none" }
@@ -449,26 +453,6 @@ function NodeContent(): JSX.Element {
   }
 
   return <span className="break-word">{displayText}</span>;
-}
-
-function getPreviousSiblingFromRows(
-  rows: List<Row>,
-  row: Row
-): Row | undefined {
-  const { childIndex } = row;
-  if (childIndex === undefined || childIndex === 0) {
-    return undefined;
-  }
-  return rows
-    .slice(0, row.index)
-    .reverse()
-    .find(
-      (candidate) =>
-        candidate.childIndex !== undefined &&
-        candidate.parentRef?.sourceId === row.parentRef?.sourceId &&
-        candidate.parentRef?.id === row.parentRef?.id &&
-        candidate.childIndex < childIndex
-    );
 }
 
 function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
@@ -668,7 +652,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
       return;
     }
 
-    const result = planBatchIndent(basePlan, [row], rows, {
+    const result = planBatchIndent(basePlan, data, [row], rows, {
       spans,
       viewKey,
     });
@@ -721,7 +705,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
 
     if (!isEditableNode(currentNode)) return;
 
-    const result = planBatchOutdent(basePlan, [row], rows, {
+    const result = planBatchOutdent(basePlan, data, [row], rows, {
       spans,
       viewKey,
     });

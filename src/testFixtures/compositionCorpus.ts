@@ -11,7 +11,8 @@ import {
 } from "../core/ical";
 import { graphLookupFromData, lookupNode } from "../core/graphLookup";
 import { createEmptyGraphIndex } from "../graphIndex";
-import { Showing, showingTreeForRoot } from "../showings";
+import { Showing } from "../showings";
+import { showingTreeForRoot } from "../settling";
 import { getNodesInTree } from "../treeTraversal";
 import type { ViewPath } from "../rowModel";
 
@@ -48,9 +49,9 @@ function printRow(row: Row): string {
     spansToMarkdown(row.presentedSpans ?? row.node.spans)
   );
   const identity = `${row.projected ? "base" : "id"}:${row.node.id}`;
-  const flags = `${row.cycle ? " flag:cycle" : ""}${
-    row.dangling ? " flag:dangling" : ""
-  }`;
+  const flags = `${row.ambiguous ? " flag:ambiguous-anchor" : ""}${
+    row.cycle ? " flag:cycle" : ""
+  }${row.dangling ? " flag:dangling" : ""}${row.lapsed ? " flag:lapsed" : ""}`;
   return `${indent}${rowMarker(
     row.node
   )}${text} <!-- ${identity}${flags} -->\n`;
@@ -151,7 +152,7 @@ function printShowing(
 ): string {
   const line = `${"  ".repeat(indent)}${mounted ? ">" : ""}${showing.node.id}${
     showing.cycle ? " cycle" : ""
-  }${showing.demoted ? " demoted" : ""}\n`;
+  }${showing.demoted ? " demoted" : ""}${showing.lapsed ? " lapsed" : ""}\n`;
   const target = showing.target
     ? printShowing(showing.target, indent + 1, true)
     : "";

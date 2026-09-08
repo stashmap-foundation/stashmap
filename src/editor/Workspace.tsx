@@ -1148,8 +1148,8 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       );
       const plan = createPlan();
       const result = e.shiftKey
-        ? planBatchOutdent(plan, targetRows, rows)
-        : planBatchIndent(plan, targetRows, rows);
+        ? planBatchOutdent(plan, data, targetRows, rows)
+        : planBatchIndent(plan, data, targetRows, rows);
       if (result) {
         executePlan(result);
         refocusPaneAfterRowMutation(root);

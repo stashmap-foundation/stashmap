@@ -1,4 +1,4 @@
-import { Set as ImmutableSet } from "immutable";
+import { List as ImmutableList, Set as ImmutableSet } from "immutable";
 import { EMPTY_NODE_ID } from "./core/connections";
 import { embeddedTarget } from "./core/nodeSpans";
 import { calendarIdOf, embeddedFeedUrl } from "./core/ical";
@@ -8,6 +8,11 @@ import {
   resolveAuthoredFirst,
   resolveChildOf,
 } from "./core/graphLookup";
+
+export type PositionName = {
+  kind: "after" | "parent";
+  id: ID;
+};
 
 export type Showing = {
   node: GraphNode;
@@ -19,6 +24,14 @@ export type Showing = {
   target: Showing | undefined;
   cycle: boolean;
   demoted: boolean;
+  inProjection: boolean;
+  statement: boolean;
+  names: PositionName[];
+  answersTo: ID[];
+  spokenFor: ID | undefined;
+  spokenUnder: ID | undefined;
+  lapsed: boolean;
+  ambiguous: boolean;
   children: Showing[];
 };
 
@@ -29,9 +42,109 @@ export function embedTargetOf(node: GraphNode): ID | undefined {
   );
 }
 
+export function positionNamesOf(node: GraphNode): PositionName[] {
+  return Object.entries(node.extraAttrs ?? {}).flatMap(
+    ([key, id]): PositionName[] =>
+      key === "after" || key === "parent" ? [{ kind: key, id }] : []
+  );
+}
+
+export function carriesMarker(node: GraphNode): boolean {
+  return node.relevance !== undefined || node.argument !== undefined;
+}
+
+function reachContains(
+  graph: GraphLookup,
+  fromId: ID,
+  targetId: ID,
+  sourceId: SourceId
+): boolean {
+  const visit = (
+    resolved: ResolvedNode | undefined,
+    visited: ImmutableSet<ID>
+  ): { found: boolean; visited: ImmutableSet<ID> } => {
+    if (!resolved || visited.has(resolved.node.id)) {
+      return { found: false, visited };
+    }
+    if (resolved.node.id === targetId) {
+      return { found: true, visited };
+    }
+    const seen = { found: false, visited: visited.add(resolved.node.id) };
+    const opened = embedTargetOf(resolved.node);
+    if (opened === targetId) {
+      return { ...seen, found: true };
+    }
+    const throughEmbed =
+      opened !== undefined
+        ? visit(
+            resolveAuthoredFirst(graph, opened, resolved.ref.sourceId),
+            seen.visited
+          )
+        : seen;
+    return resolved.node.children.toArray().reduce((acc, childID) => {
+      if (acc.found || childID === EMPTY_NODE_ID) {
+        return acc;
+      }
+      if (childID === targetId) {
+        return { ...acc, found: true };
+      }
+      return visit(resolveChildOf(graph, resolved, childID), acc.visited);
+    }, throughEmbed);
+  };
+  if (fromId === targetId) {
+    return true;
+  }
+  return visit(resolveAuthoredFirst(graph, fromId, sourceId), ImmutableSet())
+    .found;
+}
+
+function isStatementLine(
+  graph: GraphLookup,
+  line: ResolvedNode,
+  diffTarget: ID
+): boolean {
+  const targetId = embedTargetOf(line.node);
+  if (targetId === undefined) {
+    return false;
+  }
+  if (!carriesMarker(line.node) && positionNamesOf(line.node).length === 0) {
+    return false;
+  }
+  return reachContains(graph, diffTarget, targetId, line.ref.sourceId);
+}
+
+export function isStatementShapedLine(
+  graph: GraphLookup,
+  line: ResolvedNode
+): boolean {
+  if (embedTargetOf(line.node) === undefined) {
+    return false;
+  }
+  const membershipEmbed = (
+    currentId: ID | undefined,
+    visited: ImmutableSet<ID>
+  ): ResolvedNode | undefined => {
+    if (currentId === undefined || visited.has(currentId)) {
+      return undefined;
+    }
+    const current = resolveAuthoredFirst(graph, currentId, line.ref.sourceId);
+    if (!current) {
+      return undefined;
+    }
+    if (embedTargetOf(current.node) !== undefined) {
+      return current;
+    }
+    return membershipEmbed(current.node.parent, visited.add(currentId));
+  };
+  const embed = membershipEmbed(line.node.parent, ImmutableSet());
+  const diffTarget = embed ? embedTargetOf(embed.node) : undefined;
+  return diffTarget !== undefined && isStatementLine(graph, line, diffTarget);
+}
+
 function claimsBelow(
   graph: GraphLookup,
   parent: ResolvedNode,
+  diffTarget: ID,
   walk: { visited: ImmutableSet<ID>; claims: ImmutableSet<ID> }
 ): { visited: ImmutableSet<ID>; claims: ImmutableSet<ID> } {
   return parent.node.children.toArray().reduce((acc, childID) => {
@@ -43,13 +156,15 @@ function claimsBelow(
       return acc;
     }
     const targetID = embedTargetOf(child.node);
-    if (targetID !== undefined) {
+    const placement =
+      targetID !== undefined && !isStatementLine(graph, child, diffTarget);
+    if (placement && targetID !== undefined) {
       return {
         visited: acc.visited.add(child.node.id),
         claims: acc.claims.add(targetID),
       };
     }
-    return claimsBelow(graph, child, {
+    return claimsBelow(graph, child, diffTarget, {
       visited: acc.visited.add(child.node.id),
       claims: acc.claims,
     });
@@ -60,10 +175,18 @@ function diffClaims(
   graph: GraphLookup,
   parents: readonly ResolvedNode[]
 ): ImmutableSet<ID> {
-  return parents.reduce((walk, parent) => claimsBelow(graph, parent, walk), {
-    visited: ImmutableSet<ID>(),
-    claims: ImmutableSet<ID>(),
-  }).claims;
+  return parents.reduce(
+    (walk, parent) => {
+      const diffTarget = embedTargetOf(parent.node);
+      return diffTarget === undefined
+        ? walk
+        : claimsBelow(graph, parent, diffTarget, walk);
+    },
+    {
+      visited: ImmutableSet<ID>(),
+      claims: ImmutableSet<ID>(),
+    }
+  ).claims;
 }
 
 function priorShowing(
@@ -81,30 +204,41 @@ function sourceChain(
   resolved: ResolvedNode,
   reached: Showing["reached"],
   ancestorsBefore: ImmutableSet<ID>,
-  winnersBefore: ImmutableSet<ID>
+  winnersBefore: ImmutableSet<ID>,
+  statement: boolean
 ): {
   links: {
     resolved: ResolvedNode;
     reached: Showing["reached"];
     cycle: boolean;
     demoted: boolean;
+    statement: boolean;
   }[];
   ancestors: ImmutableSet<ID>;
   winners: ImmutableSet<ID>;
 } {
-  const links = [];
+  const links: {
+    resolved: ResolvedNode;
+    reached: Showing["reached"];
+    cycle: boolean;
+    demoted: boolean;
+    statement: boolean;
+  }[] = [];
   let current = { resolved, reached };
   let ancestors = ancestorsBefore;
   let winners = winnersBefore;
   for (;;) {
     ancestors = ancestors.add(current.resolved.node.id);
     winners = winners.add(current.resolved.node.id);
-    const targetID = embedTargetOf(current.resolved.node);
+    const lineStatement = links.length === 0 && statement;
+    const targetID = lineStatement
+      ? undefined
+      : embedTargetOf(current.resolved.node);
     const prior =
       targetID !== undefined
         ? priorShowing(targetID, ancestors, winners)
         : { cycle: false, demoted: false };
-    links.push({ ...current, ...prior });
+    links.push({ ...current, ...prior, statement: lineStatement });
     const target =
       targetID === undefined || prior.cycle || prior.demoted
         ? undefined
@@ -120,7 +254,8 @@ function sourceChain(
 function demotedLine(
   resolved: ResolvedNode,
   reached: Showing["reached"],
-  winners: ImmutableSet<ID>
+  winners: ImmutableSet<ID>,
+  inProjection: boolean
 ): { showing: Showing; winners: ImmutableSet<ID> } {
   return {
     showing: {
@@ -130,6 +265,14 @@ function demotedLine(
       target: undefined,
       cycle: false,
       demoted: true,
+      inProjection,
+      statement: false,
+      names: positionNamesOf(resolved.node),
+      answersTo: [],
+      spokenFor: undefined,
+      spokenUnder: undefined,
+      lapsed: false,
+      ambiguous: false,
       children: [],
     },
     winners,
@@ -143,62 +286,92 @@ function buildShowing(
   ancestors: ImmutableSet<ID>,
   winners: ImmutableSet<ID>,
   claims: ImmutableSet<ID>,
-  inProjection: boolean
+  inProjection: boolean,
+  diffTarget: ID | undefined
 ): { showing: Showing; winners: ImmutableSet<ID> } {
   if (reached.kind === "line") {
     const prior = priorShowing(resolved.node.id, ancestors, winners);
     const claimed = inProjection && claims.has(resolved.node.id);
     if (prior.cycle || prior.demoted || claimed) {
-      return demotedLine(resolved, reached, winners);
+      return demotedLine(resolved, reached, winners, inProjection);
     }
   }
-  const chain = sourceChain(graph, resolved, reached, ancestors, winners);
+  const statement =
+    reached.kind === "line" &&
+    diffTarget !== undefined &&
+    isStatementLine(graph, resolved, diffTarget);
+  const chain = sourceChain(
+    graph,
+    resolved,
+    reached,
+    ancestors,
+    winners,
+    statement
+  );
   const activeClaims = claims.union(
     diffClaims(
       graph,
       chain.links.slice(0, -1).map((link) => link.resolved)
     )
   );
-  /* eslint-disable functional/no-let, functional/immutable-data */
   const lineShowings = (
     parent: ResolvedNode,
     linesInProjection: boolean,
+    linesDiffTarget: ID | undefined,
     winnersBefore: ImmutableSet<ID>
   ): { children: Showing[]; winners: ImmutableSet<ID> } => {
-    // Mutable accumulation: an immutable append copies the array per child, O(n²) on wide trees.
-    const children: Showing[] = [];
-    let childWinners = winnersBefore;
-    parent.node.children.toArray().forEach((childID, childIndex) => {
-      if (childID === EMPTY_NODE_ID) {
-        return;
+    const lines = parent.node.children.toArray().reduce(
+      (acc, childID, childIndex) => {
+        if (childID === EMPTY_NODE_ID) {
+          return acc;
+        }
+        const child = resolveChildOf(graph, parent, childID);
+        if (!child) {
+          return acc;
+        }
+        const built = buildShowing(
+          graph,
+          child,
+          { kind: "line", childIndex },
+          chain.ancestors,
+          acc.winners,
+          activeClaims,
+          linesInProjection,
+          linesDiffTarget
+        );
+        return {
+          children: acc.children.push(built.showing),
+          winners: built.winners,
+        };
+      },
+      {
+        children: ImmutableList<Showing>(),
+        winners: winnersBefore,
       }
-      const child = resolveChildOf(graph, parent, childID);
-      if (!child) {
-        return;
-      }
-      const built = buildShowing(
-        graph,
-        child,
-        { kind: "line", childIndex },
-        chain.ancestors,
-        childWinners,
-        activeClaims,
-        linesInProjection
-      );
-      children.push(built.showing);
-      childWinners = built.winners;
-    });
-    return { children, winners: childWinners };
+    );
+    return { children: lines.children.toArray(), winners: lines.winners };
   };
-  /* eslint-enable functional/no-let, functional/immutable-data */
+  const linkDiffTarget = (link: typeof chain.links[number]): ID | undefined => {
+    if (link.statement) {
+      return diffTarget;
+    }
+    const opened = embedTargetOf(link.resolved.node);
+    if (opened !== undefined) {
+      return opened;
+    }
+    return link.reached.kind === "target" ? undefined : diffTarget;
+  };
   const mountLink = (
     link: typeof chain.links[number],
     target: Showing | undefined,
     winnersBefore: ImmutableSet<ID>
   ): { showing: Showing; winners: ImmutableSet<ID> } => {
+    const linkInProjection =
+      link.reached.kind === "target" ? true : inProjection;
     const lines = lineShowings(
       link.resolved,
-      link.reached.kind === "target" ? true : inProjection,
+      linkInProjection,
+      linkDiffTarget(link),
       winnersBefore
     );
     return {
@@ -209,6 +382,14 @@ function buildShowing(
         target,
         cycle: link.cycle,
         demoted: link.demoted,
+        inProjection: linkInProjection,
+        statement: link.statement,
+        names: link.statement ? [] : positionNamesOf(link.resolved.node),
+        answersTo: [],
+        spokenFor: undefined,
+        spokenUnder: undefined,
+        lapsed: false,
+        ambiguous: false,
         children: lines.children,
       },
       winners: lines.winners,
@@ -222,7 +403,31 @@ function buildShowing(
     );
 }
 
-export function showingTreeForRoot(
+// Planned style exception: stack safety beats the no-mutation lint.
+/* eslint-disable functional/no-let, functional/immutable-data */
+export function chainLinksOf(showing: Showing): Showing[] {
+  const links: Showing[] = [];
+  let link: Showing | undefined = showing;
+  while (link) {
+    links.push(link);
+    link = link.target;
+  }
+  return links;
+}
+/* eslint-enable functional/no-let, functional/immutable-data */
+
+export function linesShownThrough(
+  target: Showing | undefined
+): { source: Showing; line: Showing }[] {
+  if (!target) {
+    return [];
+  }
+  return [...chainLinksOf(target)]
+    .reverse()
+    .flatMap((source) => source.children.map((line) => ({ source, line })));
+}
+
+export function buildShowingTree(
   graph: GraphLookup,
   root: ResolvedNode
 ): Showing {
@@ -233,7 +438,8 @@ export function showingTreeForRoot(
     ImmutableSet(),
     ImmutableSet(),
     ImmutableSet(),
-    false
+    false,
+    undefined
   ).showing;
 }
 
@@ -273,19 +479,3 @@ export function leavesDangling(showing: Showing): boolean {
     !presented.demoted
   );
 }
-
-/* eslint-disable functional/no-let, functional/immutable-data */
-export function linesShownThrough(
-  target: Showing | undefined
-): { source: Showing; line: Showing }[] {
-  const chain = [];
-  let opened = target;
-  while (opened) {
-    chain.push(opened);
-    opened = opened.target;
-  }
-  return [...chain]
-    .reverse()
-    .flatMap((source) => source.children.map((line) => ({ source, line })));
-}
-/* eslint-enable functional/no-let, functional/immutable-data */

@@ -52,6 +52,13 @@ function loadPubkey(nsecPath: string): PublicKey {
   return pubkey;
 }
 
+export function writeJsonFile(filePath: string, value: unknown): void {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  const temporaryPath = `${filePath}.${process.pid}.tmp`;
+  fs.writeFileSync(temporaryPath, `${JSON.stringify(value, null, 2)}\n`);
+  fs.renameSync(temporaryPath, filePath);
+}
+
 export function writeCliWorkspaceConfig(
   workspaceDir: string,
   config: WorkspaceConfig
@@ -83,14 +90,10 @@ export function writeCliWorkspaceConfig(
   }
   loadPubkey(nsecPath);
 
-  const profile = filesystemProfileFromWorkspaceConfig(
-    normalized,
-    relativeNsecFile
+  writeJsonFile(
+    profilePath,
+    filesystemProfileFromWorkspaceConfig(normalized, relativeNsecFile)
   );
-  fs.mkdirSync(knowstrDir, { recursive: true });
-  const temporaryPath = `${profilePath}.${process.pid}.tmp`;
-  fs.writeFileSync(temporaryPath, `${JSON.stringify(profile, null, 2)}\n`);
-  fs.renameSync(temporaryPath, profilePath);
 }
 export function loadCliProfile({
   cwd = process.cwd(),

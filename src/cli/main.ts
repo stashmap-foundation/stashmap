@@ -1,5 +1,7 @@
+import { SimplePool } from "nostr-tools";
 import { initHelp, runInitCommand } from "./init";
 import { saveHelp, runSaveCommand } from "./save";
+import { publishHelp, runPublishCommand } from "./publish";
 
 function isHelpResult(value: unknown): value is { help: true; text: string } {
   return (
@@ -17,14 +19,17 @@ function generalHelp(): string {
     "Usage: knowstr <command>",
     "",
     "Commands:",
-    "  init   Initialize a new Knowstr workspace",
-    "  save   Run local integrity checks and assign IDs without publishing",
+    "  init     Initialize a new Knowstr workspace",
+    "  save     Run local integrity checks and assign IDs without publishing",
+    "  publish  Save, then publish changed documents to the room relays",
     "",
-    "Use a .knowstrignore file to exclude files/directories from save.",
+    "Use a .knowstrignore file to exclude files/directories from save and publish.",
     "",
     initHelp(),
     "",
     saveHelp(),
+    "",
+    publishHelp(),
   ].join("\n");
 }
 
@@ -51,6 +56,20 @@ export async function runCli(argv: string[]): Promise<void> {
 
   if (command === "save") {
     printResult(await runSaveCommand([subcommand, ...rest].filter(Boolean)));
+    return;
+  }
+
+  if (command === "publish") {
+    const result = await runPublishCommand(
+      [subcommand, ...rest].filter(Boolean),
+      new SimplePool()
+    );
+    printResult(result);
+    if (!("help" in result) && result.unaccepted_paths.length > 0) {
+      throw new Error(
+        `No relay accepted: ${result.unaccepted_paths.join(", ")}`
+      );
+    }
     return;
   }
 

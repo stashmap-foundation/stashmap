@@ -64,6 +64,24 @@ test("shared init creates the exact room profile", () => {
   });
 });
 
+test("shared init keeps each room relay once", () => {
+  const workspaceDir = workspace();
+  init(
+    [
+      "--shared",
+      "--relay",
+      "wss://room.example/",
+      "--relay",
+      "wss://room.example",
+    ],
+    workspaceDir
+  );
+
+  expect(readProfile(workspaceDir).shared.relays).toEqual([
+    "wss://room.example/",
+  ]);
+});
+
 test("shared init persists the pinned default room relays", () => {
   const workspaceDir = workspace();
   init(["--shared"], workspaceDir);

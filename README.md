@@ -2,12 +2,12 @@ Planning docs (idea.md, implementation.md, spaces-protocol.md) live in the share
 
 ## Prerequisites
 
-- node v16.14.2
+- node >= 22 (the CLI relies on the global WebSocket)
 
 # Build cli
 
 npx esbuild src/cli/index.ts \
- --bundle --platform=node --target=node20 --format=cjs \
+ --bundle --platform=node --target=node22 --format=cjs \
  --outfile=dist/knowstr.js \
  --loader:.css=empty
 

@@ -8,28 +8,11 @@ import {
   scanWorkspaceDocuments,
 } from "./workspaceScan";
 
-type NormalizedWorkspaceDocument = {
-  filePath: string;
-  relativePath: string;
-  docId: string;
-  normalizedContent: string;
-  changed: boolean;
+export type SavedWorkspaceDocument = {
+  document: ScannedWorkspaceDocument;
+  content: string;
+  warnings: string[];
 };
-
-function normalizeWorkspaceDocument(
-  knowledgeDBs: KnowledgeDBs,
-  document: ScannedWorkspaceDocument
-): NormalizedWorkspaceDocument {
-  // eslint-disable-next-line testing-library/render-result-naming-convention
-  const normalizedContent = renderDocumentMarkdown(knowledgeDBs, document);
-  return {
-    filePath: document.filePath,
-    relativePath: document.relativePath,
-    docId: document.docId,
-    normalizedContent,
-    changed: document.currentContent !== normalizedContent,
-  };
-}
 
 export type WorkspaceWrite = {
   filePath: string;
@@ -99,25 +82,29 @@ function documentWarnings(
 export async function saveEditedWorkspaceDocuments(
   profile: WorkspaceSaveProfile
 ): Promise<{
+  documents: SavedWorkspaceDocument[];
   changed_paths: string[];
   warnings: string[];
 }> {
   const { documents: scannedDocuments, knowledgeDBs } =
     await scanWorkspaceDocuments(profile);
-  const normalizedDocuments = scannedDocuments.map((document) =>
-    normalizeWorkspaceDocument(knowledgeDBs, document)
-  );
-  const warnings = scannedDocuments.flatMap((document) =>
-    documentWarnings(knowledgeDBs, document)
-  );
+  const documents = scannedDocuments.map((document) => ({
+    document,
+    content: renderDocumentMarkdown(knowledgeDBs, document),
+    warnings: documentWarnings(knowledgeDBs, document),
+  }));
 
-  const writes = normalizedDocuments
-    .filter((document) => document.changed)
-    .map((document) => ({
+  const writes = documents
+    .filter(({ document, content }) => document.currentContent !== content)
+    .map(({ document, content }) => ({
       filePath: path.join(profile.workspaceDir, document.filePath),
-      content: document.normalizedContent,
+      content,
     }));
 
   const result = await applyWorkspaceChanges(writes);
-  return { changed_paths: result.changed_paths, warnings };
+  return {
+    documents,
+    changed_paths: result.changed_paths,
+    warnings: documents.flatMap((entry) => entry.warnings),
+  };
 }

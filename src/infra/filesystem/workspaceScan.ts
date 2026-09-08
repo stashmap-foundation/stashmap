@@ -30,6 +30,15 @@ export type WorkspaceScanResult = {
 
 const ALWAYS_IGNORED = [".git", ".knowstr", "node_modules"];
 
+function isMissingFile(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "ENOENT"
+  );
+}
+
 export async function loadIgnorePatterns(
   workspaceDir: string,
   ignoredPatterns: string[] = []
@@ -37,10 +46,11 @@ export async function loadIgnorePatterns(
   const ig = ignore().add([...ALWAYS_IGNORED, ...ignoredPatterns]);
   const ignorePath = path.join(workspaceDir, ".knowstrignore");
   try {
-    const content = await fs.readFile(ignorePath, "utf8");
-    ig.add(content);
-  } catch {
-    // no .knowstrignore file
+    ig.add(await fs.readFile(ignorePath, "utf8"));
+  } catch (error) {
+    if (!isMissingFile(error)) {
+      throw error;
+    }
   }
   return ig;
 }

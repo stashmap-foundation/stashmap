@@ -6,6 +6,9 @@
   "bin": {
     "knowstr": "dist/cli/index.js"
   },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "test": "jest",
     "start": "webpack serve --config config/webpack/dev.config.js",

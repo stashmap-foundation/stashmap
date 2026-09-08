@@ -72,7 +72,9 @@ function relayUrls(
       } array`
     );
   }
-  return value.map((url, index) => relayUrl(url, `${source}[${index}]`));
+  return Array.from(
+    new Set(value.map((url, index) => relayUrl(url, `${source}[${index}]`)))
+  );
 }
 
 function nsecFile(value: unknown): string {

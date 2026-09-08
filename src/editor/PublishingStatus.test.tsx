@@ -88,8 +88,8 @@ test("Details of Sync Status", async () => {
   await screen.findByText("relay.test.fourth.success/");
 
   await screen.findByText("relay.test.third.rand/");
-  await screen.findByText("Error: too many requests");
+  await screen.findByText("too many requests");
 
   await screen.findByText("relay.test.second.fail/");
-  await screen.findByText("Error: paid relay");
+  await screen.findByText("paid relay");
 });

@@ -1,38 +1,6 @@
 import { loadCliProfile } from "./config";
-import { requireValue } from "./args";
+import { parseConfigArgs } from "./args";
 import { saveEditedWorkspaceDocuments } from "../infra/filesystem/workspaceSave";
-
-type SaveCliArgs = {
-  configPath?: string;
-  help: boolean;
-};
-
-function parseSaveArgs(args: string[]): SaveCliArgs {
-  const parse = (index: number, current: SaveCliArgs): SaveCliArgs => {
-    const arg = args[index];
-    if (!arg) {
-      return current;
-    }
-
-    switch (arg) {
-      case "--help":
-      case "-h":
-        return parse(index + 1, {
-          ...current,
-          help: true,
-        });
-      case "--config":
-        return parse(index + 2, {
-          ...current,
-          configPath: requireValue(args, index, "--config"),
-        });
-      default:
-        throw new Error(`Unknown save argument: ${arg}`);
-    }
-  };
-
-  return parse(0, { help: false });
-}
 
 export function saveHelp(): string {
   return [
@@ -51,10 +19,9 @@ export function saveHelp(): string {
 export async function runSaveCommand(
   args: string[]
 ): Promise<
-  | { help: true; text: string }
-  | Awaited<ReturnType<typeof saveEditedWorkspaceDocuments>>
+  { help: true; text: string } | { changed_paths: string[]; warnings: string[] }
 > {
-  const parsed = parseSaveArgs(args);
+  const parsed = parseConfigArgs("save", args);
   if (parsed.help) {
     return {
       help: true,
@@ -63,5 +30,6 @@ export async function runSaveCommand(
   }
 
   const profile = loadCliProfile({ configPath: parsed.configPath });
-  return saveEditedWorkspaceDocuments(profile);
+  const saved = await saveEditedWorkspaceDocuments(profile);
+  return { changed_paths: saved.changed_paths, warnings: saved.warnings };
 }

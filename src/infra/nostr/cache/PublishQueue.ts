@@ -1,9 +1,10 @@
 import { List, Map } from "immutable";
-import { Event, UnsignedEvent } from "nostr-tools";
+import { UnsignedEvent } from "nostr-tools";
 import { FinalizeEvent } from "../../../Apis";
 import { Backend } from "../../../BackendContext";
 import { KIND_DELETE } from "../../../nostr";
 import { publicationRouteUrls, signEvents, PUBLISH_TIMEOUT } from "../executor";
+import { publishStatuses } from "../nostrPublish";
 import type { WorkspaceConfig } from "../../../workspaceConfig";
 import {
   StashmapDB,
@@ -89,45 +90,6 @@ const deleteTargetToOutboxKey = (aTagValue: string): string | undefined => {
   const parts = aTagValue.split(":");
   if (parts.length < 3) return undefined;
   return `${parts[0]}:${parts[1]}:${parts.slice(2).join(":")}`;
-};
-
-const publishToRelays = async (
-  backend: Pick<Backend, "publish">,
-  event: Event,
-  writeRelayUrls: ReadonlyArray<string>
-): Promise<Map<string, PublishStatus>> => {
-  if (writeRelayUrls.length === 0) {
-    return Map<string, PublishStatus>();
-  }
-  const withTimeout = (promise: Promise<unknown>): Promise<unknown> =>
-    new Promise((resolve, reject) => {
-      const timeout = setTimeout(
-        () => reject(new Error("Timeout")),
-        PUBLISH_TIMEOUT
-      );
-      promise.then(
-        (value) => {
-          clearTimeout(timeout);
-          resolve(value);
-        },
-        (error) => {
-          clearTimeout(timeout);
-          reject(error);
-        }
-      );
-    });
-
-  const results = await Promise.allSettled(
-    backend.publish([...writeRelayUrls], event).map(withTimeout)
-  );
-
-  return writeRelayUrls.reduce((rdx, url, index) => {
-    const res = results[index];
-    return rdx.set(url, {
-      status: res.status,
-      reason: res.status === "rejected" ? (res.reason as string) : undefined,
-    });
-  }, Map<string, PublishStatus>());
 };
 
 export const createPublishQueue = (
@@ -287,10 +249,13 @@ export const createPublishQueue = (
           return;
         }
 
-        const relayResults = await publishToRelays(
-          deps.backend,
-          event,
-          availableUrls
+        const relayResults = Map(
+          await publishStatuses(
+            deps.backend,
+            event,
+            availableUrls,
+            PUBLISH_TIMEOUT
+          )
         );
 
         const newSucceeded = [...alreadyDone];
@@ -422,10 +387,13 @@ export const createPublishQueue = (
       const relayUrls = publicationRouteUrls(first.route, deps.workspaceConfig);
       if (!relayUrls) return;
 
-      const relayResults = await publishToRelays(
-        deps.backend,
-        first.event,
-        relayUrls
+      const relayResults = Map(
+        await publishStatuses(
+          deps.backend,
+          first.event,
+          relayUrls,
+          PUBLISH_TIMEOUT
+        )
       );
 
       relayResults.forEach((status, url) => {

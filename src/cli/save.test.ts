@@ -1174,3 +1174,11 @@ test("save survives an inline code span whose content equals the line's id comme
   expect(count).toBe(1);
   expect((await knowstrSave(workspaceDir)).changed_paths).toEqual([]);
 });
+
+test("save rejects an unreadable .knowstrignore", async () => {
+  const { path: workspaceDir } = knowstrInit();
+  fs.mkdirSync(path.join(workspaceDir, ".knowstrignore"));
+  write(workspaceDir, "doc.md", "# Doc\n- one\n");
+
+  await expect(knowstrSave(workspaceDir)).rejects.toThrow("EISDIR");
+});

@@ -1,8 +1,10 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { SimplePool } from "nostr-tools";
 import { runInitCommand } from "../cli/init";
 import { runSaveCommand } from "../cli/save";
+import { Rejection, runPublishCommand } from "../cli/publish";
 
 type InitResult = {
   nsec: string;
@@ -57,6 +59,26 @@ export async function knowstrSave(
   ]);
   if ("help" in result) {
     throw new Error("knowstrSave: unexpected help output");
+  }
+  return result;
+}
+
+export async function knowstrPublish(
+  workspaceDir: string,
+  pool: Pick<SimplePool, "ensureRelay" | "publish" | "close">
+): Promise<{
+  changed_paths: string[];
+  accepted_paths: string[];
+  unaccepted_paths: string[];
+  rejections: Rejection[];
+  warnings: string[];
+}> {
+  const result = await runPublishCommand(
+    ["--config", profilePathFor(workspaceDir)],
+    pool
+  );
+  if ("help" in result) {
+    throw new Error("knowstrPublish: unexpected help output");
   }
   return result;
 }

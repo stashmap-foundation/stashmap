@@ -228,7 +228,12 @@ test("web settings keep the default profile after total failure and retry", asyn
   await addRelay("room", "wss://room.example/");
   await userEvent.click(screen.getByText("Save"));
 
-  await screen.findByText(new RegExp(`Failed to publish on: ${CONFIG_RELAYS}`));
+  await screen.findByText(
+    `Failed to publish on: ${CONFIG_RELAYS.map(
+      (url) => `${url} (connection refused)`
+    ).join(", ")}`,
+    { exact: false }
+  );
   expect(screen.getByLabelText("workspace room").textContent).toBe("");
   expect(relayPool.getEvents()).toEqual([]);
 

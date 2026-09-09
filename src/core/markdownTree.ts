@@ -7,7 +7,9 @@ import { classifyLinkHref } from "./linkPath";
 import { parseFrontMatter } from "./knowstrFrontmatter";
 import { isSafeMarkdownNodeId } from "./graphLookup";
 
-const markdown = new MarkdownIt({ html: true });
+const markdown = Object.assign(new MarkdownIt({ html: true }), {
+  normalizeLink: (url: string): string => url,
+});
 markdown.use(markdownItFrontMatter, () => undefined);
 
 const ID_COMMENT_RE = /^<!--\s+id:(\S+)(.*?)-->$/;

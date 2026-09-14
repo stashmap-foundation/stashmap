@@ -3,7 +3,14 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { Event, Relay, UnsignedEvent, nip19, verifyEvent } from "nostr-tools";
+import {
+  Event,
+  Relay,
+  UnsignedEvent,
+  kinds,
+  nip19,
+  verifyEvent,
+} from "nostr-tools";
 import { sha256 } from "@noble/hashes/sha256";
 import { bytesToHex } from "@noble/hashes/utils";
 import { KIND_KNOWLEDGE_DEPOSIT } from "../nostr";
@@ -35,12 +42,34 @@ function progress(): string[] {
     .filter((line) => !line.startsWith("(node:"));
 }
 
+function challenged(
+  relayUrl: string,
+  login: (relayUrl: string, event: Event) => Promise<string>
+): Relay {
+  const relay = new Relay(relayUrl);
+  // eslint-disable-next-line functional/immutable-data
+  relay.auth = (sign) =>
+    sign({
+      kind: kinds.ClientAuth,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: [
+        ["relay", relayUrl],
+        ["challenge", "nonce"],
+      ],
+      content: "",
+    }).then((event) => login(relayUrl, event));
+  return relay;
+}
+
 function recordingPool({
   answer = () => Promise.resolve(""),
   unreachable = [],
+  login = () =>
+    Promise.reject(new Error("can't perform auth, no challenge was received")),
 }: {
   answer?: (relayUrl: string, event: Event) => Promise<string>;
   unreachable?: string[];
+  login?: (relayUrl: string, event: Event) => Promise<string>;
 } = {}): {
   pool: { ensureRelay: jest.Mock; publish: jest.Mock; close: jest.Mock };
   ensureRelay: jest.Mock<Promise<Relay>, [string]>;
@@ -50,7 +79,7 @@ function recordingPool({
   const ensureRelay = jest.fn<Promise<Relay>, [string]>((relayUrl) =>
     unreachable.includes(relayUrl)
       ? Promise.reject(new Error("connection timed out"))
-      : Promise.resolve(new Relay(relayUrl))
+      : Promise.resolve(challenged(relayUrl, login))
   );
   const publish = jest.fn<Promise<string>[], [string[], Event]>(
     (relayUrls, event) => relayUrls.map((relayUrl) => answer(relayUrl, event))
@@ -479,7 +508,7 @@ test("publish leaves out a relay that stops answering for the rest of the run", 
     expect(progress()).toEqual([
       "Saved 3 documents. Publishing 3 to 2 relays, 0 unchanged, 0 with warnings.",
       `[1/3] a.md  1/2 relays  ${MIRROR}: Timeout`,
-      `${MIRROR} timed out, leaving it out for the rest of this run.`,
+      `${MIRROR}: Timeout. Leaving it out for the rest of this run.`,
       `[2/3] b.md  1/2 relays  ${MIRROR}: Timeout`,
       `[3/3] c.md  1/2 relays  ${MIRROR}: Timeout`,
       "Published 3 documents. Relay rejections: 3 (retried on the next run).",
@@ -540,4 +569,112 @@ test("publish needs a shared workspace", async () => {
     "Publishing needs a shared workspace: run knowstr init --shared"
   );
   expect(publish).not.toHaveBeenCalled();
+});
+
+test("publish logs in when a relay demands it and retries the deposit", async () => {
+  const { path: workspaceDir, npub } = knowstrInit({
+    relays: [ROOM, MIRROR],
+  });
+  write(workspaceDir, "a.md", "# Alpha\n- one\n");
+  write(workspaceDir, "b.md", "# Beta\n- two\n");
+  const login = jest.fn<Promise<string>, [string, Event]>(() =>
+    Promise.resolve("")
+  );
+  const { pool, publish } = recordingPool({
+    answer: (relayUrl) =>
+      relayUrl === ROOM && login.mock.calls.length === 0
+        ? Promise.reject(new Error("auth-required: NIP-42 auth required"))
+        : Promise.resolve(""),
+    login,
+  });
+
+  const result = await knowstrPublish(workspaceDir, pool);
+
+  const paths = [
+    path.join(workspaceDir, "a.md"),
+    path.join(workspaceDir, "b.md"),
+  ];
+  expect(result).toEqual({
+    changed_paths: paths,
+    accepted_paths: paths,
+    unaccepted_paths: [],
+    rejections: [],
+    warnings: [],
+  });
+  expect(login.mock.calls.map(([relayUrl]) => relayUrl)).toEqual([ROOM]);
+  const [[, loginEvent]] = login.mock.calls;
+  expect(verifyEvent(loginEvent)).toBe(true);
+  expect(loginEvent.kind).toBe(kinds.ClientAuth);
+  expect(loginEvent.pubkey).toBe(nip19.decode(npub).data);
+  expect(loginEvent.tags).toEqual([
+    ["relay", ROOM],
+    ["challenge", "nonce"],
+  ]);
+  const events = publishedEvents(publish);
+  expect(events.map(({ relayUrls }) => relayUrls)).toEqual([
+    [ROOM, MIRROR],
+    [ROOM],
+    [ROOM, MIRROR],
+  ]);
+  expect(events[1].event).toEqual(events[0].event);
+  expect(progress()).toEqual([
+    "Saved 2 documents. Publishing 2 to 2 relays, 0 unchanged, 0 with warnings.",
+    "[1/2] a.md  2/2 relays",
+    "[2/2] b.md  2/2 relays",
+    "Published 2 documents.",
+  ]);
+  expect(readPublished(workspaceDir)).toEqual({
+    [ROOM]: {
+      [readDocId(workspaceDir, "a.md")]: fingerprintOf(events[0].event),
+      [readDocId(workspaceDir, "b.md")]: fingerprintOf(events[2].event),
+    },
+    [MIRROR]: {
+      [readDocId(workspaceDir, "a.md")]: fingerprintOf(events[0].event),
+      [readDocId(workspaceDir, "b.md")]: fingerprintOf(events[2].event),
+    },
+  });
+});
+
+test("publish leaves out a relay that refuses the workspace key after login", async () => {
+  const { path: workspaceDir } = knowstrInit({ relays: [ROOM, MIRROR] });
+  write(workspaceDir, "a.md", "# Alpha\n- one\n");
+  write(workspaceDir, "b.md", "# Beta\n- two\n");
+  const login = jest.fn<Promise<string>, [string, Event]>(() =>
+    Promise.resolve("")
+  );
+  const { pool, publish } = recordingPool({
+    answer: rejecting(ROOM, "auth-required: pubkey not in whitelist"),
+    login,
+  });
+
+  const result = await knowstrPublish(workspaceDir, pool);
+
+  const paths = [
+    path.join(workspaceDir, "a.md"),
+    path.join(workspaceDir, "b.md"),
+  ];
+  expect(result).toEqual({
+    changed_paths: paths,
+    accepted_paths: paths,
+    unaccepted_paths: [],
+    rejections: paths.map((docPath) => ({
+      path: docPath,
+      relay: ROOM,
+      reason: "auth-required: pubkey not in whitelist",
+    })),
+    warnings: [],
+  });
+  expect(login).toHaveBeenCalledTimes(1);
+  expect(publishedEvents(publish).map(({ relayUrls }) => relayUrls)).toEqual([
+    [ROOM, MIRROR],
+    [ROOM],
+    [MIRROR],
+  ]);
+  expect(progress()).toEqual([
+    "Saved 2 documents. Publishing 2 to 2 relays, 0 unchanged, 0 with warnings.",
+    `[1/2] a.md  1/2 relays  ${ROOM}: auth-required: pubkey not in whitelist`,
+    `${ROOM}: auth-required: pubkey not in whitelist. Leaving it out for the rest of this run.`,
+    `[2/2] b.md  1/2 relays  ${ROOM}: auth-required: pubkey not in whitelist`,
+    "Published 2 documents. Relay rejections: 2 (retried on the next run).",
+  ]);
 });

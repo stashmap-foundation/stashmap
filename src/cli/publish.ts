@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { SimplePool, UnsignedEvent, finalizeEvent } from "nostr-tools";
+import { Event, SimplePool, UnsignedEvent, finalizeEvent } from "nostr-tools";
 import { sha256 } from "@noble/hashes/sha256";
 import { bytesToHex } from "@noble/hashes/utils";
 import { parseConfigArgs } from "./args";
@@ -49,8 +49,9 @@ export function publishHelp(): string {
     "every room relay that has not accepted its current content and tags.",
     "Documents with save warnings are not published.",
     "Acceptances are kept per relay in published.json next to profile.json.",
-    "A relay that cannot be reached or times out is left out for the rest",
-    "of the run; its documents are retried on the next run.",
+    "A relay that demands a login gets one, signed with the workspace key.",
+    "A relay that cannot be reached, times out, or refuses the key is left",
+    "out for the rest of the run; its documents are retried on the next run.",
     "accepted_paths lists documents accepted by at least one relay in this",
     "run, unaccepted_paths those no relay holds afterwards (exit code 1).",
   ].join("\n");
@@ -159,6 +160,58 @@ async function connectRelays(
   );
 }
 
+function needsLogin(status: PublishStatus): boolean {
+  return status.reason?.startsWith("auth-required:") === true;
+}
+
+async function loggedIn(
+  pool: Pick<SimplePool, "ensureRelay">,
+  url: string,
+  secretKey: Uint8Array
+): Promise<PublishStatus> {
+  const relay = await pool.ensureRelay(url);
+  const attempts = await Promise.allSettled([
+    relay.auth((template) =>
+      Promise.resolve(finalizeEvent(template, secretKey))
+    ),
+  ]);
+  return statusOf(attempts[0]);
+}
+
+async function deliver(
+  run: {
+    pool: Pick<SimplePool, "ensureRelay" | "publish">;
+    secretKey: Uint8Array;
+  },
+  event: Event,
+  relayUrls: string[]
+): Promise<Array<[string, PublishStatus]>> {
+  const attempted = await publishStatuses(
+    run.pool,
+    event,
+    relayUrls,
+    PUBLISH_TIMEOUT
+  );
+  return Promise.all(
+    attempted.map(async ([url, status]): Promise<[string, PublishStatus]> => {
+      if (!needsLogin(status)) {
+        return [url, status];
+      }
+      const login = await loggedIn(run.pool, url, run.secretKey);
+      if (login.status === "rejected") {
+        return [url, login];
+      }
+      const [again] = await publishStatuses(
+        run.pool,
+        event,
+        [url],
+        PUBLISH_TIMEOUT
+      );
+      return again;
+    })
+  );
+}
+
 function outcomeOf(
   deposit: Deposit,
   statuses: Array<[string, PublishStatus]>,
@@ -203,11 +256,10 @@ async function publishPending(
   const outcomes: Outcome[] = [];
   for (const deposit of pending) {
     const targets = pendingRelays(receipts, run.relayUrls, deposit);
-    const attempted = await publishStatuses(
-      run.pool,
+    const attempted = await deliver(
+      run,
       finalizeEvent(deposit.event, run.secretKey),
-      targets.filter((url) => health[url].status === "fulfilled"),
-      PUBLISH_TIMEOUT
+      targets.filter((url) => health[url].status === "fulfilled")
     );
     const skipped = targets
       .filter((url) => health[url].status === "rejected")
@@ -229,9 +281,13 @@ async function publishPending(
     outcomes.push(outcome);
     report(progressLine(outcomes.length, pending.length, outcome));
     attempted
-      .filter(([, status]) => status.reason === TIMEOUT_REASON)
+      .filter(
+        ([, status]) => status.reason === TIMEOUT_REASON || needsLogin(status)
+      )
       .forEach(([url, status]) => {
-        report(`${url} timed out, leaving it out for the rest of this run.`);
+        report(
+          `${url}: ${status.reason}. Leaving it out for the rest of this run.`
+        );
         health[url] = status;
       });
   }

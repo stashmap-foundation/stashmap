@@ -158,6 +158,33 @@ custom: yes
   );
 });
 
+test("save names the source of a generated view in its editing hint", async () => {
+  const { path: workspaceDir } = knowstrInit();
+  write(
+    workspaceDir,
+    "view.md",
+    `---
+generated_from: scripts/render-views.py
+---
+
+# View
+
+- one
+`
+  );
+
+  await knowstrSave(workspaceDir);
+  const second = await knowstrSave(workspaceDir);
+
+  const raw = fs.readFileSync(path.join(workspaceDir, "view.md"), "utf8");
+  expect(raw).toContain("generated_from: scripts/render-views.py");
+  expect(raw).toContain(
+    "Generated view from scripts/render-views.py; edit the source there and regenerate. Never modify <!-- id:... --> comments."
+  );
+  expect(raw).not.toContain("Edit text freely.");
+  expect(second.changed_paths).toEqual([]);
+});
+
 test("save round-trips knowstr_vote_id frontmatter unchanged", async () => {
   const { path: workspaceDir } = knowstrInit();
   write(

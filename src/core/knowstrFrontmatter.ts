@@ -1,12 +1,22 @@
 import { v4 } from "uuid";
 import * as YAML from "yaml";
 
-const EDITING_BLOCK = `${[
-  "Edit text freely. Never modify <!-- id:... --> comments.",
+const EDITING_RULES = [
   "Never add <!-- id:... --> to new items. knowstr save will reject invented IDs.",
   "Markers: (!) relevant (?) maybe (~) little relevant (x) not relevant (+) confirms (-) contra. Combine: (-!) contra+relevant (-~) contra+little relevant",
   "Save changes with: knowstr save",
-].join("\n")}\n`;
+];
+
+function editingBlock(generatedFrom: unknown): string {
+  const opening =
+    typeof generatedFrom === "string"
+      ? `Generated view from ${generatedFrom}; edit the source there and regenerate.`
+      : "Edit text freely.";
+  return `${[
+    `${opening} Never modify <!-- id:... --> comments.`,
+    ...EDITING_RULES,
+  ].join("\n")}\n`;
+}
 
 export function parseFrontMatter(inner: string): FrontMatter {
   const parsed: unknown = YAML.parse(inner);
@@ -37,7 +47,7 @@ export function ensureKnowstrDocId(
     frontMatter: {
       ...(fm ?? {}),
       knowstr_doc_id: docId,
-      editing: EDITING_BLOCK,
+      editing: editingBlock(fm?.generated_from),
     },
   };
 }

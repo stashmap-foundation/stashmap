@@ -179,9 +179,9 @@ generated_from: scripts/render-views.py
   const raw = fs.readFileSync(path.join(workspaceDir, "view.md"), "utf8");
   expect(raw).toContain("generated_from: scripts/render-views.py");
   expect(raw).toContain(
-    "Generated view from scripts/render-views.py; edit the source there and regenerate. Never modify <!-- id:... --> comments."
+    "editing: |\n  Generated view from scripts/render-views.py; edit the source there and regenerate.\n"
   );
-  expect(raw).not.toContain("Edit text freely.");
+  expect(raw).not.toContain("knowstr save will reject");
   expect(second.changed_paths).toEqual([]);
 });
 

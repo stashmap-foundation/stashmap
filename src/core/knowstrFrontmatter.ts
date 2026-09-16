@@ -8,12 +8,11 @@ const EDITING_RULES = [
 ];
 
 function editingBlock(generatedFrom: unknown): string {
-  const opening =
-    typeof generatedFrom === "string"
-      ? `Generated view from ${generatedFrom}; edit the source there and regenerate.`
-      : "Edit text freely.";
+  if (typeof generatedFrom === "string") {
+    return `Generated view from ${generatedFrom}; edit the source there and regenerate.\n`;
+  }
   return `${[
-    `${opening} Never modify <!-- id:... --> comments.`,
+    "Edit text freely. Never modify <!-- id:... --> comments.",
     ...EDITING_RULES,
   ].join("\n")}\n`;
 }

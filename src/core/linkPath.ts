@@ -44,15 +44,21 @@ type AddressParts = {
   rowId: string | undefined;
 };
 
+function decodedPath(pathname: string): string | undefined {
+  try {
+    return decodeURIComponent(pathname.replace(/^\//u, "")).normalize("NFC");
+  } catch {
+    return undefined;
+  }
+}
+
 function addressParts(url: URL): AddressParts | undefined {
   if (url.protocol !== ADDRESS_SCHEME || url.search !== "") {
     return undefined;
   }
-  const path = decodeURIComponent(url.pathname.replace(/^\//u, "")).normalize(
-    "NFC"
-  );
+  const path = decodedPath(url.pathname);
   const rowId = url.hash === "" ? undefined : url.hash.slice(1);
-  if (rowId !== undefined && !isValidRowId(rowId)) {
+  if (path === undefined || (rowId !== undefined && !isValidRowId(rowId))) {
     return undefined;
   }
   return { author: url.host, path, rowId };

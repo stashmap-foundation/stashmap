@@ -654,6 +654,9 @@ test("parseMarkdownHierarchy parses addresses; doc: links and bare ids are text"
       `- [Alice](//${alice})`,
       `- [Imported](doc:${docId})`,
       `- [Bare](${docId})`,
+      "- [Sale](50%off.md)",
+      "- [Empty]()",
+      "- [Hash](#)",
       "",
     ].join("\n")
   );
@@ -665,6 +668,9 @@ test("parseMarkdownHierarchy parses addresses; doc: links and bare ids are text"
         [{ kind: "link", href: `//${alice}`, text: "Alice" }],
         [{ kind: "text", text: `[Imported](doc:${docId})` }],
         [{ kind: "text", text: `[Bare](${docId})` }],
+        [{ kind: "text", text: "[Sale](50%off.md)" }],
+        [{ kind: "text", text: "[Empty]()" }],
+        [{ kind: "text", text: "[Hash](#)" }],
       ].map((spans) => expect.objectContaining({ spans })),
     }),
   ]);

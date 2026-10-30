@@ -1,6 +1,6 @@
 import React from "react";
 import { Map, List } from "immutable";
-import { LOCAL } from "./core/nodeRef";
+import { LOCAL, nodeRefKey } from "./core/nodeRef";
 import {
   getNodeText,
   isSearchId,
@@ -15,7 +15,7 @@ import { getLocalSearchResultIDs } from "./localSearch";
 import { getDocumentForNode } from "./core/Document";
 import { newGraphNode, newRowKey } from "./core/nodeFactory";
 import { linkSpan, plainSpans } from "./core/nodeSpans";
-import { graphLookupFromData, lookupNode } from "./core/graphLookup";
+import { getNodeInSource, graphLookupFromData } from "./core/graphLookup";
 
 function SearchCrefBuilder({
   children,
@@ -34,14 +34,16 @@ function SearchCrefBuilder({
   const crefItems = uniqueNodeIDs
     .flatMap((nodeID) => findRefsToNode(graph, nodeID))
     .sortBy((ref) => -ref.updated)
-    .map((ref) => ref.nodeID);
+    .map((ref): NodeRef => ({ sourceId: ref.sourceId, id: ref.nodeID }));
 
   const searchNodeBase = newGraphNode(plainSpans(""), { id: searchId });
   const childNodes = crefItems
-    .toSet()
+    .groupBy((ref) => nodeRefKey(ref))
+    .valueSeq()
     .toList()
-    .flatMap((nodeID): GraphNode[] => {
-      const target = lookupNode(graph, nodeID, LOCAL);
+    .flatMap((refs): GraphNode[] => {
+      const ref = refs.first();
+      const target = ref ? getNodeInSource(graph, ref) : undefined;
       const targetNode = target?.node;
       if (!target || !targetNode) return [];
       const targetDocument = targetNode.parent

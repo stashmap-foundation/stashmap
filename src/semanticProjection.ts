@@ -83,7 +83,7 @@ export function findRefsToNode(
     : resolvedRefs.map(({ ref }) => ref).toList();
 
   return allRefs
-    .groupBy((ref) => ref.nodeID)
+    .groupBy((ref) => nodeRefKey({ sourceId: ref.sourceId, id: ref.nodeID }))
     .map((grp) => grp.first()!)
     .valueSeq()
     .toList();

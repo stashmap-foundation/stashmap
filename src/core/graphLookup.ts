@@ -157,17 +157,7 @@ export function lookupNode(
   id: ID,
   currentSourceId: SourceId
 ): ResolvedNode | undefined {
-  const direct = getNodeInSource(graph, { sourceId: currentSourceId, id });
-  if (direct) {
-    return direct;
-  }
-  if (currentSourceId !== graph.localSourceId) {
-    return undefined;
-  }
-  const candidate = sourceCandidatesForID(graph, id).find(
-    (ref) => ref.sourceId !== graph.localSourceId
-  );
-  return candidate ? getNodeInSource(graph, candidate) : undefined;
+  return getNodeInSource(graph, { sourceId: currentSourceId, id });
 }
 
 export function resolveAuthoredFirst(

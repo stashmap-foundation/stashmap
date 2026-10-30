@@ -318,12 +318,38 @@ test("web saves route storage and canonical deposits independently", async () =>
   expect(deposit.relays).toEqual([roomRelay]);
   expect(storageWire.relays).toEqual(TEST_RELAYS.map((relay) => relay.url));
   expect(deposit.content).toBe(storage.content);
-  expect(deposit.tags[0]?.[0]).toBe("d");
+  expect(deposit.tags[0]).toEqual(["d", "room-note.md"]);
+  expect(storage.tags[0]).toEqual(["d", "room-note.md"]);
   expect(deposit.tags.some((tag) => tag[0] === "ms")).toBe(true);
   expect(deposit.tags).toContainEqual([
     "i",
     "rgb:cdtFZh2Q-YTY1rYW-yBdMlZb-GbkThw~-ArYpJ72-eXiti5Y",
   ]);
+});
+
+test("web documents are named after their title, with a number added when it is taken", async () => {
+  const [alice] = setup([ALICE]);
+  const { relayPool } = renderWithTestData(
+    <RootViewOrPaneIsLoading>
+      <PaneView />
+    </RootViewOrPaneIsLoading>,
+    { ...alice(), storageRelays: DEFAULT_STORAGE_RELAYS }
+  );
+
+  await typeText("Trip to Rome{Escape}");
+  await userEvent.click(await screen.findByLabelText("Create new note"));
+  await typeText("Trip to Rome{Escape}");
+
+  await waitFor(() => {
+    expect(
+      relayPool
+        .getDecryptedEvents()
+        .filter((event) => event.kind === KIND_KNOWLEDGE_DOCUMENT)
+        .map((event) => event.tags.find((tag) => tag[0] === "d")?.[1])
+        .filter((documentPath) => documentPath !== "log.md")
+        .sort()
+    ).toEqual(["trip-to-rome-2.md", "trip-to-rome.md"]);
+  });
 });
 
 test("web saves emit no deposit without a room", async () => {

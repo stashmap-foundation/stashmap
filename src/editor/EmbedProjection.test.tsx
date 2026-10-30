@@ -45,18 +45,18 @@ test("plain block links stay links; embeds project live text and children recurs
     "note.md": [
       "# Note <!-- id:note -->",
       "",
-      "- Prose with an inline [Other](#oth) mention <!-- id:mix -->",
-      "- [Other Label](#oth) <!-- id:plain -->",
+      "- Prose with an inline [Other](other.md#oth) mention <!-- id:mix -->",
+      "- [Other Label](other.md#oth) <!-- id:plain -->",
       "- [Scholarium Salon](rgb:yqfLWnLr-9iJZlLy-NOw0b2M) <!-- id:thing -->",
-      '- [Attr Label](#oth) <!-- id:attr embed="true" -->',
-      "- ![Old Label](#src) <!-- id:emb -->",
+      '- [Attr Label](other.md#oth) <!-- id:attr embed="true" -->',
+      "- ![Old Label](source.md#src) <!-- id:emb -->",
       "- ![Our oven](https://example.org/oven.jpg) <!-- id:pic -->",
     ].join("\n"),
     "source.md": [
       "# Source <!-- id:src -->",
       "",
       "- Argument A <!-- id:a -->",
-      "  - ![Detail](#det) <!-- id:demb -->",
+      "  - ![Detail](detail.md#det) <!-- id:demb -->",
     ].join("\n"),
     "detail.md": [
       "# Detail Document <!-- id:det -->",
@@ -92,12 +92,62 @@ Note
   `);
 });
 
+test("an embed that can't show keeps its label and an embed of itself stops at the loop", async () => {
+  const workspacePath = writeWorkspace({
+    "party.md": [
+      "# Saturday party <!-- id:party -->",
+      "",
+      "- ![Grandma's lasagne](lasagne.md) <!-- id:lasagne -->",
+      "  - Bring a big dish <!-- id:dish -->",
+      "- ![Pizza Margherita](pizza.md) <!-- id:pizza -->",
+    ].join("\n"),
+    "pizza.md": [
+      "# Pizza Margherita <!-- id:root -->",
+      "",
+      "- Dough <!-- id:dough -->",
+      "- Serve with <!-- id:serve -->",
+      "  - ![Garlic bread](garlic-bread.md) <!-- id:bread -->",
+    ].join("\n"),
+    "garlic-bread.md": [
+      "# Garlic bread <!-- id:root -->",
+      "",
+      "- Toast with garlic butter <!-- id:toast -->",
+      "- Goes well with <!-- id:with -->",
+      "  - ![Pizza Margherita](pizza.md) <!-- id:again -->",
+    ].join("\n"),
+  });
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "party.md"),
+  });
+  const [root] = await screen.findAllByRole("treeitem");
+  await userEvent.click(root);
+  await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
+
+  await expectTree(
+    `
+Saturday party
+  Grandma's lasagne
+    Bring a big dish
+  Pizza Margherita
+    Dough
+    Serve with
+      Garlic bread
+        Toast with garlic butter
+        Goes well with
+          Pizza Margherita
+  `,
+    { composedOnly: true }
+  );
+});
+
 test("a user's own line below an embed appears after the projected rows", async () => {
   const workspacePath = writeWorkspace({
     "note.md": [
       "# Note <!-- id:note -->",
       "",
-      "- ![Old Label](#src) <!-- id:emb -->",
+      "- ![Old Label](source.md#src) <!-- id:emb -->",
       "  - My own note <!-- id:own -->",
     ].join("\n"),
     "source.md": [
@@ -128,9 +178,9 @@ Note
 test("a line below an embed cannot reopen the source the embed shows", async () => {
   const workspacePath = writeWorkspace({
     "note.md": [
-      "# ![Source](#src) <!-- id:emb -->",
+      "# ![Source](source.md#src) <!-- id:emb -->",
       "",
-      "- ![Source again](#src) <!-- id:again -->",
+      "- ![Source again](source.md#src) <!-- id:again -->",
     ].join("\n"),
     "source.md": [
       "# Source <!-- id:src -->",
@@ -159,8 +209,8 @@ test("the second placement of a source is a childless link", async () => {
     "note.md": [
       "# Note <!-- id:note -->",
       "",
-      "- ![First](#src) <!-- id:e1 -->",
-      "- ![Second](#src) <!-- id:e2 -->",
+      "- ![First](source.md#src) <!-- id:e1 -->",
+      "- ![Second](source.md#src) <!-- id:e2 -->",
     ].join("\n"),
     "source.md": [
       "# Source <!-- id:src -->",
@@ -196,7 +246,7 @@ Note
 
 test("incoming references reach a chain embed's footer", async () => {
   const workspacePath = writeWorkspace({
-    "note.md": "# ![Outer](#head) <!-- id:o -->",
+    "note.md": "# ![Outer](source.md#head) <!-- id:o -->",
     "source.md": [
       "# ![Head](#src) <!-- id:head -->",
       "",
@@ -207,7 +257,7 @@ test("incoming references reach a chain embed's footer", async () => {
     "other.md": [
       "# Other Doc <!-- id:oth -->",
       "",
-      "- Points at [head](#head) <!-- id:p -->",
+      "- Points at [head](source.md#head) <!-- id:p -->",
     ].join("\n"),
   });
 
@@ -231,7 +281,7 @@ test("the in-progress editor row appears below an embed", async () => {
     "note.md": [
       "# Note <!-- id:note -->",
       "",
-      "- ![Old Label](#src) <!-- id:emb -->",
+      "- ![Old Label](source.md#src) <!-- id:emb -->",
       "  - My own note <!-- id:own -->",
     ].join("\n"),
     "source.md": [
@@ -289,7 +339,7 @@ test("Log entries are plain links and stay flat", async () => {
     if (!logDoc) {
       throw new Error("Missing log document event");
     }
-    expect(logDoc).toContain("[My Notes](#");
+    expect(logDoc).toContain("[My Notes](my-notes.md#");
     expect(logDoc).not.toContain("![");
   });
 });
@@ -395,20 +445,16 @@ test("dragging from another user's document records knowstr_sources", async () =
   await type(
     "Holidays{Enter}{Tab}Cities{Enter}{Tab}Paris{Enter}London{Escape}"
   );
-  const aliceDocId = await waitFor(() => {
-    const content = aliceRelayPool
-      .getDecryptedEvents()
-      .filter(
-        (event) =>
-          event.kind === KIND_KNOWLEDGE_DOCUMENT &&
-          event.content.includes("- Holidays")
-      )
-      .at(-1)?.content;
-    const docId = content?.match(/knowstr_doc_id: (\S+)/u)?.[1];
-    if (!docId) {
-      throw new Error("Missing Alice's document id");
-    }
-    return docId;
+  await waitFor(() => {
+    expect(
+      aliceRelayPool
+        .getDecryptedEvents()
+        .some(
+          (event) =>
+            event.kind === KIND_KNOWLEDGE_DOCUMENT &&
+            event.tags.some((tag) => tag[0] === "d" && tag[1] === "holidays.md")
+        )
+    ).toBe(true);
   });
   const nodeUrl = readonlyRoute(
     requireUser(alice()).publicKey,
@@ -462,7 +508,10 @@ Mine
     }
     expect(bobDoc).toContain("knowstr_sources:");
     expect(bobDoc).toContain(`author: ${aliceNpub}`);
-    expect(bobDoc).toContain(`doc: ${aliceDocId}`);
+    expect(bobDoc).toContain("path: holidays.md");
+    expect(bobDoc).toMatch(
+      new RegExp(`!\\[Paris\\]\\(//${aliceNpub}/holidays\\.md#[\\w-]+\\)`, "u")
+    );
     expect(bobDoc.match(/author: /gu)).toHaveLength(1);
   });
 });
@@ -471,12 +520,16 @@ const CONTEXT_FILES = {
   "shared.md": ["# Shared <!-- id:sh -->", "", "- Insight <!-- id:i1 -->"].join(
     "\n"
   ),
-  "b.md": ["# B <!-- id:b -->", "", "- ![Shared](#sh) <!-- id:bs -->"].join(
-    "\n"
-  ),
-  "c.md": ["# C <!-- id:c -->", "", "- ![Shared](#sh) <!-- id:cs -->"].join(
-    "\n"
-  ),
+  "b.md": [
+    "# B <!-- id:b -->",
+    "",
+    "- ![Shared](shared.md#sh) <!-- id:bs -->",
+  ].join("\n"),
+  "c.md": [
+    "# C <!-- id:c -->",
+    "",
+    "- ![Shared](shared.md#sh) <!-- id:cs -->",
+  ].join("\n"),
 };
 
 test("which copy shows whole depends on the composed view", async () => {
@@ -485,8 +538,8 @@ test("which copy shows whole depends on the composed view", async () => {
     "a.md": [
       "# A <!-- id:a -->",
       "",
-      "- ![B](#b) <!-- id:ab -->",
-      "- ![C](#c) <!-- id:ac -->",
+      "- ![B](b.md#b) <!-- id:ab -->",
+      "- ![C](c.md#c) <!-- id:ac -->",
     ].join("\n"),
   });
 
@@ -532,14 +585,14 @@ test("opening a demoted link shows its target whole with that placement's diff",
     "c.md": [
       "# C <!-- id:c -->",
       "",
-      "- ![Shared](#sh) <!-- id:cs -->",
+      "- ![Shared](shared.md#sh) <!-- id:cs -->",
       "  - My note <!-- id:cn -->",
     ].join("\n"),
     "a.md": [
       "# A <!-- id:a -->",
       "",
-      "- ![B](#b) <!-- id:ab -->",
-      "- ![C](#c) <!-- id:ac -->",
+      "- ![B](b.md#b) <!-- id:ab -->",
+      "- ![C](c.md#c) <!-- id:ac -->",
     ].join("\n"),
   });
 
@@ -584,11 +637,13 @@ Shared
 
 test("opening a cycle link shows its target whole with that placement's diff", async () => {
   const workspacePath = writeWorkspace({
-    "a.md": ["# A <!-- id:a -->", "", "- ![B](#b) <!-- id:ab -->"].join("\n"),
+    "a.md": ["# A <!-- id:a -->", "", "- ![B](b.md#b) <!-- id:ab -->"].join(
+      "\n"
+    ),
     "b.md": [
       "# B <!-- id:b -->",
       "",
-      "- ![Back to A](#a) <!-- id:x -->",
+      "- ![Back to A](a.md#a) <!-- id:x -->",
       "  - Kept below the loop <!-- id:k -->",
     ].join("\n"),
   });
@@ -634,10 +689,10 @@ test("each demoted placement drills down to its own diff", async () => {
     "doc.md": [
       "# Doc <!-- id:doc -->",
       "",
-      "- ![Winner](#s) <!-- id:p1 -->",
-      "- ![Second](#s) <!-- id:p2 -->",
+      "- ![Winner](source.md#s) <!-- id:p1 -->",
+      "- ![Second](source.md#s) <!-- id:p2 -->",
       "  - Note two <!-- id:n2 -->",
-      "- ![Third](#s) <!-- id:p3 -->",
+      "- ![Third](source.md#s) <!-- id:p3 -->",
       "  - Note three <!-- id:n3 -->",
     ].join("\n"),
   };
@@ -684,8 +739,8 @@ test("reordering the routes flips which copy shows whole", async () => {
     "a.md": [
       "# A <!-- id:a -->",
       "",
-      "- ![B](#b) <!-- id:ab -->",
-      "- ![C](#c) <!-- id:ac -->",
+      "- ![B](b.md#b) <!-- id:ab -->",
+      "- ![C](c.md#c) <!-- id:ac -->",
     ].join("\n"),
   });
 
@@ -712,8 +767,8 @@ A
     [
       "# A <!-- id:a -->",
       "",
-      "- ![C](#c) <!-- id:ac -->",
-      "- ![B](#b) <!-- id:ab -->",
+      "- ![C](c.md#c) <!-- id:ac -->",
+      "- ![B](b.md#b) <!-- id:ab -->",
     ].join("\n")
   );
 

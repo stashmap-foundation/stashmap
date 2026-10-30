@@ -40,11 +40,11 @@ import {
   getNodesInTree,
   type TreeResult,
 } from "../treeTraversal";
-import { isCanonicalId } from "../core/entityRecognition";
+import { isThingAddress } from "../core/linkPath";
 import { graphLookupFromData, resolveAuthoredFirst } from "../core/graphLookup";
 import { newGraphNode } from "../core/nodeFactory";
-import { nodeText, plainSpans } from "../core/nodeSpans";
-import { getDocumentByIdOrFilePath } from "../core/Document";
+import { nodeText } from "../core/nodeSpans";
+import { documentKeyOf } from "../core/Document";
 import { useEntityLabels } from "../EntityLabelContext";
 import { defaultEntitySurfaceTitle } from "../entityLabels";
 import { useNavigationState } from "../NavigationStateContext";
@@ -90,15 +90,12 @@ export function PaneTreeResultProvider({
     [pane.rootNodeId, pane.searchQuery, paneIndex]
   );
   const paneDocument = pane.documentId
-    ? getDocumentByIdOrFilePath(
-        data.documents,
-        data.documentByFilePath,
-        pane.sourceId,
-        pane.documentId
-      )
+    ? data.documents.get(documentKeyOf(pane.sourceId, pane.documentId))
     : undefined;
   const canonicalRootId =
-    pane.sourceId === LOCAL && pane.rootNodeId && isCanonicalId(pane.rootNodeId)
+    pane.sourceId === LOCAL &&
+    pane.rootNodeId &&
+    isThingAddress(pane.rootNodeId)
       ? pane.rootNodeId
       : undefined;
   const localCanonicalRoot = useMemo(() => {
@@ -129,7 +126,10 @@ export function PaneTreeResultProvider({
       displayedResolvedLabel ??
       pane.fallbackLabel ??
       defaultEntitySurfaceTitle(canonicalRootId);
-    return newGraphNode(plainSpans(displayTitle), { uuid: canonicalRootId });
+    return newGraphNode(
+      [{ kind: "link", href: canonicalRootId, text: displayTitle }],
+      { id: canonicalRootId }
+    );
   }, [
     canonicalRootId,
     displayedResolvedLabel,

@@ -1,5 +1,6 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { rowIdOf } from "../core/nodeRef";
 import {
   ALICE,
   expectTree,
@@ -301,8 +302,9 @@ Root
 
     await type("Root{Enter}{Tab}Target{Escape}");
     const targetRow = await screen.findByRole("treeitem", { name: "Target" });
-    const targetID = targetRow.getAttribute("data-node-id");
-    if (!targetID) throw new Error("Expected target ID");
+    const targetKey = targetRow.getAttribute("data-node-id");
+    if (!targetKey) throw new Error("Expected target ID");
+    const targetID = rowIdOf(targetKey);
     await clickRow("Root");
     mockReadText.mockResolvedValueOnce(
       `[Alias](#${targetID})\n[Second alias](#${targetID})`

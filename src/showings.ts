@@ -2,11 +2,13 @@ import { Set as ImmutableSet } from "immutable";
 import { EMPTY_NODE_ID } from "./core/connections";
 import { embeddedTarget } from "./core/nodeSpans";
 import { calendarIdOf, embeddedFeedUrl } from "./core/ical";
+import { LOCAL, nodeRefKey } from "./core/nodeRef";
 import {
   GraphLookup,
   ResolvedNode,
-  resolveAuthoredFirst,
+  fileTopRowRef,
   resolveChildOf,
+  resolveRef,
 } from "./core/graphLookup";
 
 export type Showing = {
@@ -22,35 +24,48 @@ export type Showing = {
   children: Showing[];
 };
 
-export function embedTargetOf(node: GraphNode): ID | undefined {
+export function embedTargetOf(
+  node: GraphNode,
+  sourceId: SourceId
+): NodeRef | undefined {
   const url = embeddedFeedUrl(node);
   return (
-    embeddedTarget(node) ?? (url !== undefined ? calendarIdOf(url) : undefined)
+    embeddedTarget(node, sourceId) ??
+    (url !== undefined ? { sourceId: LOCAL, id: calendarIdOf(url) } : undefined)
   );
+}
+
+function embedTargetKey(
+  graph: GraphLookup,
+  resolved: ResolvedNode
+): string | undefined {
+  const target = embedTargetOf(resolved.node, resolved.ref.sourceId);
+  return target ? nodeRefKey(fileTopRowRef(graph, target)) : undefined;
 }
 
 function claimsBelow(
   graph: GraphLookup,
   parent: ResolvedNode,
-  walk: { visited: ImmutableSet<ID>; claims: ImmutableSet<ID> }
-): { visited: ImmutableSet<ID>; claims: ImmutableSet<ID> } {
+  walk: { visited: ImmutableSet<string>; claims: ImmutableSet<string> }
+): { visited: ImmutableSet<string>; claims: ImmutableSet<string> } {
   return parent.node.children.toArray().reduce((acc, childID) => {
     if (childID === EMPTY_NODE_ID) {
       return acc;
     }
     const child = resolveChildOf(graph, parent, childID);
-    if (!child || acc.visited.has(child.node.id)) {
+    const childKey = child ? nodeRefKey(child.ref) : undefined;
+    if (!child || !childKey || acc.visited.has(childKey)) {
       return acc;
     }
-    const targetID = embedTargetOf(child.node);
-    if (targetID !== undefined) {
+    const targetKey = embedTargetKey(graph, child);
+    if (targetKey !== undefined) {
       return {
-        visited: acc.visited.add(child.node.id),
-        claims: acc.claims.add(targetID),
+        visited: acc.visited.add(childKey),
+        claims: acc.claims.add(targetKey),
       };
     }
     return claimsBelow(graph, child, {
-      visited: acc.visited.add(child.node.id),
+      visited: acc.visited.add(childKey),
       claims: acc.claims,
     });
   }, walk);
@@ -59,17 +74,17 @@ function claimsBelow(
 function diffClaims(
   graph: GraphLookup,
   parents: readonly ResolvedNode[]
-): ImmutableSet<ID> {
+): ImmutableSet<string> {
   return parents.reduce((walk, parent) => claimsBelow(graph, parent, walk), {
-    visited: ImmutableSet<ID>(),
-    claims: ImmutableSet<ID>(),
+    visited: ImmutableSet<string>(),
+    claims: ImmutableSet<string>(),
   }).claims;
 }
 
 function priorShowing(
-  id: ID,
-  ancestors: ImmutableSet<ID>,
-  winners: ImmutableSet<ID>
+  id: string,
+  ancestors: ImmutableSet<string>,
+  winners: ImmutableSet<string>
 ): { cycle: boolean; demoted: boolean } {
   const cycle = ancestors.has(id);
   return { cycle, demoted: !cycle && winners.has(id) };
@@ -80,8 +95,8 @@ function sourceChain(
   graph: GraphLookup,
   resolved: ResolvedNode,
   reached: Showing["reached"],
-  ancestorsBefore: ImmutableSet<ID>,
-  winnersBefore: ImmutableSet<ID>
+  ancestorsBefore: ImmutableSet<string>,
+  winnersBefore: ImmutableSet<string>
 ): {
   links: {
     resolved: ResolvedNode;
@@ -89,26 +104,33 @@ function sourceChain(
     cycle: boolean;
     demoted: boolean;
   }[];
-  ancestors: ImmutableSet<ID>;
-  winners: ImmutableSet<ID>;
+  ancestors: ImmutableSet<string>;
+  winners: ImmutableSet<string>;
 } {
   const links = [];
   let current = { resolved, reached };
   let ancestors = ancestorsBefore;
   let winners = winnersBefore;
   for (;;) {
-    ancestors = ancestors.add(current.resolved.node.id);
-    winners = winners.add(current.resolved.node.id);
-    const targetID = embedTargetOf(current.resolved.node);
+    ancestors = ancestors.add(nodeRefKey(current.resolved.ref));
+    winners = winners.add(nodeRefKey(current.resolved.ref));
+    const targetRef = embedTargetOf(
+      current.resolved.node,
+      current.resolved.ref.sourceId
+    );
     const prior =
-      targetID !== undefined
-        ? priorShowing(targetID, ancestors, winners)
+      targetRef !== undefined
+        ? priorShowing(
+            nodeRefKey(fileTopRowRef(graph, targetRef)),
+            ancestors,
+            winners
+          )
         : { cycle: false, demoted: false };
     links.push({ ...current, ...prior });
     const target =
-      targetID === undefined || prior.cycle || prior.demoted
+      targetRef === undefined || prior.cycle || prior.demoted
         ? undefined
-        : resolveAuthoredFirst(graph, targetID, current.resolved.ref.sourceId);
+        : resolveRef(graph, targetRef);
     if (!target) {
       return { links, ancestors, winners };
     }
@@ -120,8 +142,8 @@ function sourceChain(
 function demotedLine(
   resolved: ResolvedNode,
   reached: Showing["reached"],
-  winners: ImmutableSet<ID>
-): { showing: Showing; winners: ImmutableSet<ID> } {
+  winners: ImmutableSet<string>
+): { showing: Showing; winners: ImmutableSet<string> } {
   return {
     showing: {
       node: resolved.node,
@@ -140,14 +162,15 @@ function buildShowing(
   graph: GraphLookup,
   resolved: ResolvedNode,
   reached: Showing["reached"],
-  ancestors: ImmutableSet<ID>,
-  winners: ImmutableSet<ID>,
-  claims: ImmutableSet<ID>,
+  ancestors: ImmutableSet<string>,
+  winners: ImmutableSet<string>,
+  claims: ImmutableSet<string>,
   inProjection: boolean
-): { showing: Showing; winners: ImmutableSet<ID> } {
+): { showing: Showing; winners: ImmutableSet<string> } {
   if (reached.kind === "line") {
-    const prior = priorShowing(resolved.node.id, ancestors, winners);
-    const claimed = inProjection && claims.has(resolved.node.id);
+    const key = nodeRefKey(resolved.ref);
+    const prior = priorShowing(key, ancestors, winners);
+    const claimed = inProjection && claims.has(key);
     if (prior.cycle || prior.demoted || claimed) {
       return demotedLine(resolved, reached, winners);
     }
@@ -163,8 +186,8 @@ function buildShowing(
   const lineShowings = (
     parent: ResolvedNode,
     linesInProjection: boolean,
-    winnersBefore: ImmutableSet<ID>
-  ): { children: Showing[]; winners: ImmutableSet<ID> } => {
+    winnersBefore: ImmutableSet<string>
+  ): { children: Showing[]; winners: ImmutableSet<string> } => {
     // Mutable accumulation: an immutable append copies the array per child, O(n²) on wide trees.
     const children: Showing[] = [];
     let childWinners = winnersBefore;
@@ -194,8 +217,8 @@ function buildShowing(
   const mountLink = (
     link: typeof chain.links[number],
     target: Showing | undefined,
-    winnersBefore: ImmutableSet<ID>
-  ): { showing: Showing; winners: ImmutableSet<ID> } => {
+    winnersBefore: ImmutableSet<string>
+  ): { showing: Showing; winners: ImmutableSet<string> } => {
     const lines = lineShowings(
       link.resolved,
       link.reached.kind === "target" ? true : inProjection,
@@ -267,7 +290,7 @@ export function closesCycle(showing: Showing): boolean {
 export function leavesDangling(showing: Showing): boolean {
   const presented = presentedLineOf(showing);
   return (
-    embedTargetOf(presented.node) !== undefined &&
+    embedTargetOf(presented.node, presented.ref.sourceId) !== undefined &&
     presented.target === undefined &&
     !presented.cycle &&
     !presented.demoted

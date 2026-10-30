@@ -37,7 +37,9 @@ test("/local/d route keeps showing a known file after top node ids change", asyn
     throw new Error("Missing test workspace pubkey");
   }
   const savedContent = fs.readFileSync(pathModule.join(path, "doc.md"), "utf8");
-  const { document } = parseToDocument(profile.pubkey, savedContent);
+  const { document } = parseToDocument(profile.pubkey, savedContent, {
+    path: "doc.md",
+  });
 
   await renderAppTree({
     path,

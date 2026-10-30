@@ -1,4 +1,4 @@
-import { LOCAL } from "../core/nodeRef";
+import { LOCAL, pathOf } from "../core/nodeRef";
 import {
   Plan,
   ParsedLine,
@@ -13,16 +13,16 @@ import {
   parseMarkdown,
 } from "../core/markdownTree";
 import { planInsertMarkdownTrees } from "../markdownPlan";
-import { linkSpan, nodeText, plainSpans, spansText } from "../core/nodeSpans";
+import { plainSpans, spansText } from "../core/nodeSpans";
 import { bareFeedUrlIn, feedLinkSpans } from "../core/ical";
 import { entityIdForText } from "../core/entityRecognition";
-import { getWorkspaceNode } from "../core/knowledge";
-import { newGraphNode } from "../core/nodeFactory";
+import { newGraphNode, newRowKey } from "../core/nodeFactory";
 import { createDocumentLinkTarget } from "../core/connections";
-import { withDocumentRoot } from "../core/plan";
+import { isValidPath } from "../core/linkPath";
 import {
   documentDisplayName,
   documentKeyOf,
+  newDocumentPath,
   parseToDocument,
 } from "../core/Document";
 import type { Document } from "../core/Document";
@@ -68,6 +68,13 @@ function titleFromFileName(fileName: string): string {
   return baseName || "Imported Markdown";
 }
 
+function importedDocumentPath(plan: Plan, fileName: string): string {
+  const name = fileName.normalize("NFC");
+  return isValidPath(name) && !plan.documents.has(documentKeyOf(LOCAL, name))
+    ? name
+    : newDocumentPath(plan.documents, titleFromFileName(fileName));
+}
+
 function setPaneToDocument(
   plan: Plan,
   paneIndex: number,
@@ -96,8 +103,7 @@ function upsertParsedDocument(
   file: MarkdownImportFile
 ): { plan: Plan; document: Document } {
   const parsed = parseToDocument(LOCAL, file.markdown, {
-    filePath: file.name,
-    relativePath: file.name,
+    path: importedDocumentPath(plan, file.name),
     fallbackTitle: titleFromFileName(file.name),
     context: {
       knowledgeDBs: plan.knowledgeDBs,
@@ -112,9 +118,6 @@ function upsertParsedDocument(
       ...plan,
       knowledgeDBs: parsed.context.knowledgeDBs,
       documents: plan.documents.set(key, document),
-      documentByFilePath: document.filePath
-        ? plan.documentByFilePath.set(document.filePath, document)
-        : plan.documentByFilePath,
       affectedDocuments: parsed.context.affectedDocuments.add(document.docId),
     },
     document,
@@ -141,13 +144,14 @@ function planCreateImportedFilesDocument(
   plan: Plan,
   importedDocuments: ReadonlyArray<Document>
 ): { plan: Plan; document: Document } {
-  const root = withDocumentRoot(newGraphNode(plainSpans("Imported Files")));
+  const title = "Imported Files";
+  const root = newGraphNode(plainSpans(title), {
+    id: newRowKey(newDocumentPath(plan.documents, title)),
+  });
   const planWithRoot = planUpsertNodes(plan, root);
-  const rootDocId = root.docId;
-  if (!rootDocId) {
-    throw new Error("Imported files document was not created");
-  }
-  const document = planWithRoot.documents.get(documentKeyOf(LOCAL, rootDocId));
+  const document = planWithRoot.documents.get(
+    documentKeyOf(LOCAL, pathOf(root.id))
+  );
   if (!document) {
     throw new Error("Imported files document was not created");
   }
@@ -155,7 +159,6 @@ function planCreateImportedFilesDocument(
     createDocumentLinkTarget(
       importedDocument.sourceId,
       importedDocument.docId,
-      undefined,
       documentDisplayName(importedDocument)
     )
   );
@@ -199,24 +202,18 @@ function entityLinkedTrees(
 ): MarkdownTreeNode[] {
   return trees.map((tree) => {
     const text = spansText(tree.spans);
-    const entityId = tree.uuid ? undefined : entityIdForText(text);
-    const home = entityId
-      ? getWorkspaceNode(plan.knowledgeDBs, entityId as ID)
-      : undefined;
+    const thing = tree.uuid ? undefined : entityIdForText(text);
     // A bare feed URL wraps into the link form so the name is free from
     // the start — text is yours, identity lives in the parentheses.
-    const feedUrl =
-      tree.uuid || entityId ? undefined : bareFeedUrlIn(tree.spans);
+    const feedUrl = tree.uuid || thing ? undefined : bareFeedUrlIn(tree.spans);
     const feedWrap =
       feedUrl !== undefined ? { spans: feedLinkSpans(feedUrl) } : undefined;
     return {
       ...tree,
-      ...(entityId
-        ? {
-            spans: [linkSpan(entityId, home ? nodeText(home) : text.trim())],
-          }
+      ...(thing
+        ? { spans: [{ kind: "link" as const, href: thing, text: text.trim() }] }
         : feedWrap),
-      ...((entityId || feedWrap) && {
+      ...(feedWrap && {
         extraAttrs: { ...tree.extraAttrs, embed: "true" },
       }),
       children: entityLinkedTrees(plan, tree.children),

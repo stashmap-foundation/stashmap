@@ -16,7 +16,7 @@ import {
   planAddTopTargetsToDocument,
   planMaterializeComputedRow,
 } from "../core/plan";
-import { getDocumentByIdOrFilePath } from "../core/Document";
+import { documentKeyOf } from "../core/Document";
 import { spansToMarkdown } from "../core/nodeSpans";
 
 export type EditorInfo = {
@@ -67,12 +67,7 @@ function planUpdateOneMetadata(
   const paneIndex = row.viewPath[0];
   const pane = acc.panes[paneIndex];
   const document = pane.documentId
-    ? getDocumentByIdOrFilePath(
-        acc.documents,
-        acc.documentByFilePath,
-        pane.sourceId,
-        pane.documentId
-      )
+    ? acc.documents.get(documentKeyOf(pane.sourceId, pane.documentId))
     : undefined;
   if (row.materialize?.take && !row.parentRef && document) {
     return planAddTopTargetsToDocument(

@@ -25,7 +25,7 @@ import userEvent from "@testing-library/user-event";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 import { sha256 } from "@noble/hashes/sha256";
 import { schnorr } from "@noble/curves/secp256k1";
-import { LOCAL } from "./core/nodeRef";
+import { LOCAL, pathOf } from "./core/nodeRef";
 import { ApiProvider, Apis, FinalizeEvent } from "./Apis";
 import { Backend } from "./BackendContext";
 import { NostrBackendProvider } from "./infra/nostr/NostrBackendProvider";
@@ -248,7 +248,6 @@ const DEFAULT_DATA_CONTEXT_PROPS: TestDataProps = {
   knowledgeDBs: Map<SourceId, KnowledgeData>(),
   graphIndex: createEmptyGraphIndex(),
   documents: Map(),
-  documentByFilePath: Map(),
   computedNodes: Map(),
   publishEventsStatus: {
     isLoading: false,
@@ -374,11 +373,7 @@ function normalizeTestInitialRoute(
   // A foreign source needs the capability a share link would carry: the
   // one handed in (obtained through the audience chip), or — for tests
   // exercising other features — the storage key dug from the relay shadow.
-  const rootNode =
-    targetNode.id === targetNode.root
-      ? targetNode
-      : nodes?.get(targetNode.root);
-  const docId = rootNode?.docId ?? rootNode?.id;
+  const docId = pathOf(targetNode.id);
   const capability =
     options.capabilityKey ??
     options.relayPool

@@ -3,9 +3,9 @@ import { useApis } from "./Apis";
 import { useData } from "./DataContext";
 import { isCalendarEntryId } from "./core/ical";
 import { graphLookupFromData, resolveAuthoredFirst } from "./core/graphLookup";
-import { isEntityId } from "./core/linkPath";
+import { classifyLinkHref } from "./core/linkPath";
 import { LOCAL } from "./core/nodeRef";
-import { nodeText, spansText } from "./core/nodeSpans";
+import { nodeText } from "./core/nodeSpans";
 import {
   EntityPickerCandidate,
   browserEntityLabelLanguages,
@@ -28,9 +28,7 @@ const EntityLabelContext = React.createContext<{
 });
 
 function entityIdFromHref(href: string): string | undefined {
-  return href.startsWith("#") && isEntityId(href.slice(1))
-    ? href.slice(1)
-    : undefined;
+  return classifyLinkHref(href) === "thing" ? href : undefined;
 }
 
 function normalizedSearch(value: string): string {
@@ -69,14 +67,6 @@ function localEntityCandidateList(
   }
   const candidatesById = new Map<string, LocalEntityPickerCandidate>();
   local.nodes.forEach((node) => {
-    if (isEntityId(node.id)) {
-      addLocalEntityCandidate(candidatesById, {
-        id: node.id,
-        label: spansText(node.spans) || node.id,
-        description: "local entity",
-        source: "local",
-      });
-    }
     node.spans.forEach((span) => {
       if (span.kind !== "link") {
         return;

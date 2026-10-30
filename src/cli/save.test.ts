@@ -3,6 +3,7 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { nip19 } from "nostr-tools";
 import {
   expectMarkdown,
   knowstrInit,
@@ -44,53 +45,54 @@ test.each(saveModes)(
 
 test("shared save reports document-shape lints without rejecting", async () => {
   const { path: workspaceDir } = knowstrInit();
+  const alice = nip19.npubEncode("b".repeat(64));
+  write(workspaceDir, "empty.md", "");
   write(
     workspaceDir,
-    "asset.md",
-    [
-      "---",
-      "knowstr_doc_id: asset-entry",
-      "---",
-      "# Asset <!-- id:rgb:contract -->",
-      "# Extra <!-- id:extra -->",
-      "",
-    ].join("\n")
+    `${alice}/pizza.md`,
+    `# ![Pizza](//${alice}/pasta.md) <!-- id:a1 -->\n`
   );
   write(
     workspaceDir,
-    "arrangement.md",
-    [
-      "---",
-      "knowstr_doc_id: arr:source",
-      "---",
-      "- ![Wrong](#other) <!-- id:a1 -->",
-      "",
-    ].join("\n")
+    `${alice}/soup.md`,
+    `# ![Soup](//${alice}/soup.md) <!-- id:a1 -->\n`
   );
 
   const result = await knowstrSave(workspaceDir);
 
   expect(result.warnings).toEqual([
-    "arrangement.md: arr:source must have one root embedding source",
-    "asset.md: asset entry documents need exactly one asset root",
+    "empty.md: shared documents need a root",
+    `${alice}/pizza.md: an arrangement must have one root embedding //${alice}/pizza.md`,
   ]);
-  expect(result.changed_paths).toHaveLength(2);
+  expect(result.changed_paths).toEqual([]);
 });
 
-test("save rejects an organic document id using the arrangement prefix", async () => {
+test("save rejects paths that differ only in case", async () => {
   const { path: workspaceDir } = knowstrInit();
-  write(
-    workspaceDir,
-    "organic.md",
-    "---\nknowstr_doc_id: arr:reserved\n---\n# Organic <!-- id:root -->\n"
-  );
+  write(workspaceDir, "notes/Trip.md", "# Trip\n");
+  write(workspaceDir, "notes/sub/trip.md", "# Trip\n");
+  write(workspaceDir, "Notes.md", "# Notes\n");
+  const caseSensitive = !fs.existsSync(path.join(workspaceDir, "notes.md"));
+  write(workspaceDir, "notes.md", "# Lower\n");
+
+  const saving = knowstrSave(workspaceDir);
+  await (caseSensitive
+    ? expect(saving).rejects.toThrow(
+        /^Workspace paths differ only in case: (Notes\.md and notes\.md|notes\.md and Notes\.md)$/u
+      )
+    : expect(saving).resolves.toBeDefined());
+});
+
+test("save rejects a path with a character that addresses can't name", async () => {
+  const { path: workspaceDir } = knowstrInit();
+  write(workspaceDir, "50% off.md", "# Sale\n");
 
   await expect(knowstrSave(workspaceDir)).rejects.toThrow(
-    "arr: is reserved for arrangement documents"
+    "Workspace paths must never contain :, #, ? or %: 50% off.md"
   );
 });
 
-test("save assigns knowstr_doc_id and node ids in place", async () => {
+test("save assigns node ids in place and adds no frontmatter", async () => {
   const { path: workspaceDir } = knowstrInit();
   write(
     workspaceDir,
@@ -122,10 +124,10 @@ test("save assigns knowstr_doc_id and node ids in place", async () => {
     path.join(workspaceDir, "notes/nested/project.md"),
     "utf8"
   );
-  expect(raw).toMatch(/^---\nknowstr_doc_id:\s.+\n/u);
+  expect(raw).toMatch(/^# Project <!-- id:\S+ -->\n/u);
 });
 
-test("save preserves existing frontmatter and only adds knowstr_doc_id", async () => {
+test("save preserves existing frontmatter and adds nothing to it", async () => {
   const { path: workspaceDir } = knowstrInit();
   write(
     workspaceDir,
@@ -146,7 +148,8 @@ custom: yes
   const raw = fs.readFileSync(path.join(workspaceDir, "doc.md"), "utf8");
   expect(raw).toContain("title: Doc");
   expect(raw).toContain("custom: yes");
-  expect(raw).toContain("knowstr_doc_id:");
+  expect(raw).not.toContain("knowstr_doc_id");
+  expect(raw).not.toContain("editing:");
   await expectMarkdown(
     workspaceDir,
     "doc.md",
@@ -156,33 +159,6 @@ custom: yes
 - one <!-- id:... -->
 `
   );
-});
-
-test("save names the source of a generated view in its editing hint", async () => {
-  const { path: workspaceDir } = knowstrInit();
-  write(
-    workspaceDir,
-    "view.md",
-    `---
-generated_from: scripts/render-views.py
----
-
-# View
-
-- one
-`
-  );
-
-  await knowstrSave(workspaceDir);
-  const second = await knowstrSave(workspaceDir);
-
-  const raw = fs.readFileSync(path.join(workspaceDir, "view.md"), "utf8");
-  expect(raw).toContain("generated_from: scripts/render-views.py");
-  expect(raw).toContain(
-    "editing: |\n  Generated view from scripts/render-views.py; edit the source there and regenerate.\n"
-  );
-  expect(raw).not.toContain("knowstr save will reject");
-  expect(second.changed_paths).toEqual([]);
 });
 
 test("save round-trips knowstr_vote_id frontmatter unchanged", async () => {
@@ -345,50 +321,24 @@ test("save succeeds when a previously saved node id is removed", async () => {
   );
 });
 
-test("save rejects duplicate node ids across documents", async () => {
+test("save accepts the same row id in two files", async () => {
   const { path: workspaceDir } = knowstrInit();
-  write(workspaceDir, "a.md", "# Alpha\n- item one\n");
-  write(workspaceDir, "b.md", "# Beta\n- item two\n");
-
-  await knowstrSave(workspaceDir);
-
-  const itemOneLine = fs
-    .readFileSync(path.join(workspaceDir, "a.md"), "utf8")
-    .split("\n")
-    .find((l) => l.includes("- item one")) as string;
-
-  fs.appendFileSync(path.join(workspaceDir, "b.md"), `${itemOneLine}\n`);
-
-  await expect(knowstrSave(workspaceDir)).rejects.toMatchObject({
-    message: expect.stringMatching(
-      /a\.md and b\.md both contain id:.+\n {2}- if a file is a variant, give it fresh IDs\n {2}- if it's a backup, move it out or add it to \.knowstrignore/u
-    ),
-  });
-});
-
-test("save reports every duplicate node id with its file paths", async () => {
-  const { path: workspaceDir } = knowstrInit();
-  write(workspaceDir, "a.md", "# Alpha\n- item one\n- item two\n");
-  await knowstrSave(workspaceDir);
-
-  const lines = fs
-    .readFileSync(path.join(workspaceDir, "a.md"), "utf8")
-    .split("\n");
-  const itemOneLine = lines.find((l) => l.includes("- item one")) as string;
-  const itemTwoLine = lines.find((l) => l.includes("- item two")) as string;
-
-  write(workspaceDir, "b.md", `# Beta\n${itemOneLine}\n`);
-  write(workspaceDir, "c.md", `# Gamma\n${itemTwoLine}\n`);
-
-  const error = await knowstrSave(workspaceDir).then(
-    () => undefined,
-    (reason: Error) => reason
+  write(
+    workspaceDir,
+    "a.md",
+    "# Alpha <!-- id:root -->\n\n- item one <!-- id:item -->\n"
   );
-  if (!error) {
-    throw new Error("save should have rejected duplicate node ids");
-  }
-  expect(error.message).toMatch(/a\.md and b\.md both contain id:/u);
-  expect(error.message).toMatch(/a\.md and c\.md both contain id:/u);
+  write(
+    workspaceDir,
+    "b.md",
+    "# Beta <!-- id:root -->\n\n- item two <!-- id:item -->\n"
+  );
+
+  const result = await knowstrSave(workspaceDir);
+
+  expect(result).toEqual({ changed_paths: [], warnings: [] });
+  expect(readNodeId(workspaceDir, "a.md", "- item one")).toBe("item");
+  expect(readNodeId(workspaceDir, "b.md", "- item two")).toBe("item");
 });
 
 test("save rejects a node id repeated within one file", async () => {
@@ -429,7 +379,6 @@ test("save preserves safe explicit markdown ids exactly", async () => {
     [
       "# Project <!-- id:foo_bar -->",
       "- dash <!-- id:foo-bar -->",
-      "- colon <!-- id:foo:bar -->",
       "- dot <!-- id:custom.id -->",
       "",
     ].join("\n")
@@ -441,19 +390,21 @@ test("save preserves safe explicit markdown ids exactly", async () => {
     "foo_bar"
   );
   expect(readNodeId(workspaceDir, "custom-ids.md", "- dash")).toBe("foo-bar");
-  expect(readNodeId(workspaceDir, "custom-ids.md", "- colon")).toBe("foo:bar");
   expect(readNodeId(workspaceDir, "custom-ids.md", "- dot")).toBe("custom.id");
   expect((await knowstrSave(workspaceDir)).changed_paths).toEqual([]);
 });
 
-test("save rejects unsafe explicit markdown ids", async () => {
-  const { path: workspaceDir } = knowstrInit();
-  write(workspaceDir, "bad-id.md", '# Bad <!-- id:bad"id -->\n');
+test.each(['bad"id', "foo:bar", "double--dash", "wd:Q29"])(
+  "save rejects the explicit markdown id %s",
+  async (id) => {
+    const { path: workspaceDir } = knowstrInit();
+    write(workspaceDir, "bad-id.md", `# Bad <!-- id:${id} -->\n`);
 
-  await expect(knowstrSave(workspaceDir)).rejects.toMatchObject({
-    message: expect.stringContaining('Invalid markdown node id: bad"id'),
-  });
-});
+    await expect(knowstrSave(workspaceDir)).rejects.toMatchObject({
+      message: expect.stringContaining(`Invalid markdown node id: ${id}`),
+    });
+  }
+);
 
 test("save preserves heading levels", async () => {
   const { path: workspaceDir } = knowstrInit();
@@ -965,50 +916,6 @@ test("save ignores .git, node_modules, and .knowstr directories", async () => {
   expect(
     fs.readFileSync(path.join(workspaceDir, ".git", "ignored.md"), "utf8")
   ).toBe("# Ignore\n");
-});
-
-test("save writes editing instructions into the frontmatter", async () => {
-  const { path: workspaceDir } = knowstrInit();
-  write(workspaceDir, "notes.md", "# Notes\n- one\n");
-
-  await knowstrSave(workspaceDir);
-
-  const raw = fs.readFileSync(path.join(workspaceDir, "notes.md"), "utf8");
-  expect(raw).toContain("editing: |");
-  expect(raw).toContain(
-    "Edit text freely. Never modify <!-- id:... --> comments."
-  );
-  expect(raw).toContain("Save changes with: knowstr save");
-  expect((await knowstrSave(workspaceDir)).changed_paths).toEqual([]);
-});
-
-test("save refreshes a stale editing block next to existing user frontmatter", async () => {
-  const { path: workspaceDir } = knowstrInit();
-  write(
-    workspaceDir,
-    "doc.md",
-    `---
-title: "Doc"
-editing: |
-  stale instructions that should be overwritten
-  second stale line
-custom: yes
----
-
-# Doc
-- one
-`
-  );
-
-  await knowstrSave(workspaceDir);
-
-  const raw = fs.readFileSync(path.join(workspaceDir, "doc.md"), "utf8");
-  expect(raw).toContain("title: Doc");
-  expect(raw).toContain("custom: yes");
-  expect(raw).not.toContain("stale instructions");
-  expect(raw).not.toContain("second stale line");
-  expect(raw).toContain("Save changes with: knowstr save");
-  expect((await knowstrSave(workspaceDir)).changed_paths).toEqual([]);
 });
 
 test("save preserves HTML-comment-looking content inside inline code spans", async () => {

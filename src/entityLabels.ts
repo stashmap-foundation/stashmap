@@ -14,7 +14,7 @@ export type WikidataSearchCandidate = {
   description: string;
 };
 
-const WIKIDATA_ENTITY_RE = /^wd:(Q\d+)$/u;
+const WIKIDATA_ENTITY_RE = /^wikidata:(Q\d+)$/u;
 const WIKIDATA_QID_RE = /^Q\d+$/u;
 const WIKIDATA_API = "https://www.wikidata.org/w/api.php";
 const WIKIDATA_PROXY_PATH = "/.netlify/functions/wikidata-proxy";

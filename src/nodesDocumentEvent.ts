@@ -1,6 +1,13 @@
 import { Event, UnsignedEvent } from "nostr-tools";
 import type { Document } from "./core/Document";
-import { documentAudienceTags } from "./core/Document";
+import { parseToDocument } from "./core/Document";
+import {
+  authorPubkeyOf,
+  isThingAddress,
+  resolveLink,
+  thingTagOf,
+} from "./core/linkPath";
+import { pathOf } from "./core/nodeRef";
 import { newStorageKey } from "./storageEncryption";
 import { getEventMs } from "./nostrEvents";
 import {
@@ -29,8 +36,53 @@ export function buildDocumentEvent(
   };
 }
 
-export function depositEntityTags(document: Document): string[] {
-  return documentAudienceTags(document);
+function compareUtf8(left: string, right: string): number {
+  const encoder = new TextEncoder();
+  const leftBytes = encoder.encode(left);
+  const rightBytes = encoder.encode(right);
+  const differenceIndex = leftBytes.findIndex(
+    (byte, index) => byte !== rightBytes[index]
+  );
+  if (differenceIndex >= 0 && differenceIndex < rightBytes.length) {
+    return leftBytes[differenceIndex] - rightBytes[differenceIndex];
+  }
+  return leftBytes.length - rightBytes.length;
+}
+
+function sortedUnique(values: readonly string[]): string[] {
+  return [...new Set(values)].sort(compareUtf8);
+}
+
+export function depositLinkTags(
+  path: string,
+  pubkey: PublicKey,
+  content: string
+): string[][] {
+  const links = parseToDocument(pubkey, content, { path })
+    .nodes.valueSeq()
+    .toArray()
+    .flatMap((node) =>
+      node.spans.flatMap((span) =>
+        span.kind === "link" ? [{ href: span.href, from: node.id }] : []
+      )
+    );
+  const files = links.flatMap(({ href, from }) => {
+    const target = resolveLink(href, { sourceId: pubkey, id: from });
+    const author = target ? authorPubkeyOf(target.sourceId) : undefined;
+    if (!target || !author || isThingAddress(target.id)) return [];
+    const targetPath = pathOf(target.id);
+    return author === pubkey && targetPath === path
+      ? []
+      : [`${KIND_KNOWLEDGE_DEPOSIT}:${author}:${targetPath}`];
+  });
+  const things = links.flatMap(({ href }) => {
+    const tag = thingTagOf(href);
+    return tag ? [tag] : [];
+  });
+  return [
+    ...sortedUnique(files).map((value) => ["a", value]),
+    ...sortedUnique(things).map((value) => ["i", value]),
+  ];
 }
 
 export function buildDepositEvent(
@@ -48,7 +100,7 @@ export function buildDepositEvent(
     created_at: createdAt,
     tags: [
       ["d", document.docId],
-      ...depositEntityTags(document).map((tag) => ["S", tag]),
+      ...depositLinkTags(document.docId, pubkey, content),
       msTag(),
     ],
     content,

@@ -88,7 +88,7 @@ B
   const reverseLink = await screen.findByRole("link", {
     name: "Navigate to A",
   });
-  expect(reverseLink.getAttribute("data-href")).toMatch(/^#/u);
+  expect(reverseLink.getAttribute("data-href")).toMatch(/^a\.md#/u);
 
   await userEvent.click(reverseLink);
 
@@ -135,7 +135,7 @@ test("Mixed node-links and file-links all render", async () => {
   write(
     workspacePath,
     "links.md",
-    `# Links\n\n- [Holiday / France](#${franceID})\n- [Hello Doc](#${helloRootID})\n- [Hello](./hello.md)\n`
+    `# Links\n\n- [Holiday / France](destinations.md#${franceID})\n- [Hello Doc](hello.md#${helloRootID})\n- [Hello](./hello.md)\n`
   );
   await knowstrSave(workspacePath);
   await renderAppTree({ path: workspacePath, search: "Links" });
@@ -164,13 +164,13 @@ test("Cross-document node links survive a save round-trip", async () => {
   write(
     workspacePath,
     "links.md",
-    `# Links\n\n- [Holiday / France](#${franceID})\n- [Hello Doc](#${helloRootID})\n- [Hello](./hello.md)\n`
+    `# Links\n\n- [Holiday / France](destinations.md#${franceID})\n- [Hello Doc](hello.md#${helloRootID})\n- [Hello](./hello.md)\n`
   );
   await knowstrSave(workspacePath);
 
   const after = fs.readFileSync(path.join(workspacePath, "links.md"), "utf8");
-  expect(after).toContain(`[Holiday / France](#${franceID})`);
-  expect(after).toContain(`[Hello Doc](#${helloRootID})`);
+  expect(after).toContain(`[Holiday / France](destinations.md#${franceID})`);
+  expect(after).toContain(`[Hello Doc](hello.md#${helloRootID})`);
   expect(after).toContain("[Hello](./hello.md)");
 });
 
@@ -189,7 +189,7 @@ test("Cross-document node links survive an app reload", async () => {
   write(
     workspacePath,
     "links.md",
-    `# Links\n\n- [Holiday / France](#${franceID})\n- [Hello](./hello.md)\n`
+    `# Links\n\n- [Holiday / France](destinations.md#${franceID})\n- [Hello](./hello.md)\n`
   );
   await knowstrSave(workspacePath);
 

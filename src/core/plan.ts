@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-use-before-define, functional/no-let, functional/immutable-data, no-continue, no-nested-ternary */
 import { List, Map, Set as ImmutableSet } from "immutable";
-import { v4 } from "uuid";
 import { ensureNodeNativeFields, isSearchId } from "./connections";
 import type {
   DocumentLinkTargetSeed,
@@ -11,21 +10,18 @@ import {
   createDocumentFromRootNode,
   Document,
   documentKeyOf,
+  newDocumentPath,
   workspaceDocumentKey,
 } from "./Document";
-import { entityIdForText, isCanonicalId } from "./entityRecognition";
+import { entityIdForText } from "./entityRecognition";
 import { feedLinkSpans, isBareIcalFeedUrl } from "./ical";
-import { documentLinkHref } from "./linkPath";
+import { isThingAddress } from "./linkPath";
 import { getWorkspaceNode, withWorkspace, workspaceOf } from "./knowledge";
-import { newGraphNode } from "./nodeFactory";
+import { newGraphNode, newRowKey } from "./nodeFactory";
+import { LOCAL, pathOf, rowIdOf, rowKey } from "./nodeRef";
+import { getAllLinks, linkSpan, nodeText, plainSpans } from "./nodeSpans";
 import {
-  fileLinkSpan,
-  getAllLinks,
-  linkSpan,
-  nodeText,
-  plainSpans,
-} from "./nodeSpans";
-import {
+  LOG_ROOT_FILE,
   LOG_ROOT_ROLE,
   getOwnSystemRoot,
   getSystemRoleText,
@@ -41,7 +37,7 @@ export type CoreOutboundEvent = {
 
 type GraphPlanData = Pick<
   Data,
-  "user" | "knowledgeDBs" | "graphIndex" | "documents" | "documentByFilePath"
+  "user" | "knowledgeDBs" | "graphIndex" | "documents"
 >;
 
 export type GraphPlan = GraphPlanData & {
@@ -59,11 +55,10 @@ function planEnsureSystemRoot<T extends GraphPlan>(
     return [plan, existing];
   }
 
-  const node = withDocumentRoot(
-    newGraphNode(plainSpans(getSystemRoleText(systemRole)), {
-      systemRole,
-    })
-  );
+  const node = newGraphNode(plainSpans(getSystemRoleText(systemRole)), {
+    id: newRowKey(LOG_ROOT_FILE),
+    systemRole,
+  });
 
   return [upsertNodesCore(plan, node), node];
 }
@@ -72,10 +67,10 @@ export function planUpsertRootDocument<T extends GraphPlan>(
   plan: T,
   rootNode: GraphNode
 ): T {
-  if (rootNode.parent || !rootNode.docId) {
+  if (rootNode.parent) {
     return plan;
   }
-  const key = workspaceDocumentKey(rootNode.docId);
+  const key = workspaceDocumentKey(pathOf(rootNode.id));
   const existing = plan.documents.get(key);
   const next = existing
     ? {
@@ -89,31 +84,14 @@ export function planUpsertRootDocument<T extends GraphPlan>(
   return { ...plan, documents: plan.documents.set(key, next) };
 }
 
-export function withDocumentRoot(
-  node: GraphNode,
-  docId: string = v4()
-): GraphNode {
-  if (node.parent) {
-    throw new Error("Only top-level nodes can become document roots");
-  }
-  return { ...node, docId };
-}
-
-export function getNodeDocumentId(
-  plan: Pick<GraphPlan, "knowledgeDBs">,
-  node: GraphNode
-): string | undefined {
-  return node.docId ?? getWorkspaceNode(plan.knowledgeDBs, node.root)?.docId;
-}
-
 export function planMarkDocumentAffected<T extends GraphPlan>(
   plan: T,
   node: GraphNode
 ): T {
-  const docId = getNodeDocumentId(plan, node);
-  return docId
-    ? { ...plan, affectedDocuments: plan.affectedDocuments.add(docId) }
-    : plan;
+  return {
+    ...plan,
+    affectedDocuments: plan.affectedDocuments.add(pathOf(node.id)),
+  };
 }
 
 export function upsertNodesCore<T extends GraphPlan>(
@@ -121,11 +99,7 @@ export function upsertNodesCore<T extends GraphPlan>(
   nodes: GraphNode
 ): T {
   const userDB = workspaceOf(plan.knowledgeDBs);
-  const normalized = ensureNodeNativeFields(userDB, nodes);
-  const node: GraphNode =
-    !normalized.parent && !normalized.docId
-      ? { ...normalized, docId: v4() }
-      : normalized;
+  const node = ensureNodeNativeFields(userDB, nodes);
   const updatedDB = {
     ...userDB,
     nodes: userDB.nodes.set(node.id, node),
@@ -148,10 +122,17 @@ function addCrefToLog<T extends GraphPlan>(plan: T, nodeID: ID): T {
   const [planWithLog, nodes] = planEnsureSystemRoot(plan, LOG_ROOT_ROLE);
   const targetNode = getWorkspaceNode(planWithLog.knowledgeDBs, nodeID);
   const crefNode = newGraphNode(
-    [linkSpan(nodeID, targetNode ? nodeText(targetNode) : "")],
+    [
+      linkSpan(
+        { sourceId: LOCAL, id: nodeID },
+        { sourceId: LOCAL, id: nodes.id },
+        targetNode ? nodeText(targetNode) : ""
+      ),
+    ],
     {
-      root: nodes.root as ID,
-      parent: nodes.id as ID,
+      id: newRowKey(pathOf(nodes.id)),
+      root: nodes.root,
+      parent: nodes.id,
     }
   );
   const planWithCref = upsertNodesCore(planWithLog, crefNode);
@@ -269,37 +250,6 @@ export function planMoveDescendantNodes<T extends GraphPlan>(
   }, plan);
 }
 
-function withDocumentInFilePathIndex<T extends GraphPlan>(
-  plan: T,
-  document: Document
-): T {
-  return document.filePath
-    ? {
-        ...plan,
-        documentByFilePath: plan.documentByFilePath.set(
-          document.filePath,
-          document
-        ),
-      }
-    : plan;
-}
-
-function withoutDocumentInFilePathIndex<T extends GraphPlan>(
-  plan: T,
-  document: Document | undefined
-): T {
-  if (!document?.filePath) {
-    return plan;
-  }
-  const current = plan.documentByFilePath.get(document.filePath);
-  return current?.docId === document.docId
-    ? {
-        ...plan,
-        documentByFilePath: plan.documentByFilePath.remove(document.filePath),
-      }
-    : plan;
-}
-
 function planDeleteDocumentRoot<T extends GraphPlan>(
   plan: T,
   node: GraphNode,
@@ -317,28 +267,22 @@ function planDeleteDocumentRoot<T extends GraphPlan>(
       topNodeShortIds: remainingTopNodeShortIds,
       updatedMs: Date.now(),
     };
-    return withDocumentInFilePathIndex(
-      {
-        ...plan,
-        knowledgeDBs: nextKnowledgeDBs,
-        documents: plan.documents.set(key, nextDocument),
-        affectedDocuments: plan.affectedDocuments.add(docId),
-        deletedDocs: plan.deletedDocs.remove(docId),
-      },
-      nextDocument
-    );
-  }
-
-  return withoutDocumentInFilePathIndex(
-    {
+    return {
       ...plan,
       knowledgeDBs: nextKnowledgeDBs,
-      documents: plan.documents.remove(key),
-      affectedDocuments: plan.affectedDocuments.remove(docId),
-      deletedDocs: plan.deletedDocs.add(docId),
-    },
-    document
-  );
+      documents: plan.documents.set(key, nextDocument),
+      affectedDocuments: plan.affectedDocuments.add(docId),
+      deletedDocs: plan.deletedDocs.remove(docId),
+    };
+  }
+
+  return {
+    ...plan,
+    knowledgeDBs: nextKnowledgeDBs,
+    documents: plan.documents.remove(key),
+    affectedDocuments: plan.affectedDocuments.remove(docId),
+    deletedDocs: plan.deletedDocs.add(docId),
+  };
 }
 
 export function planDeleteNodes<T extends GraphPlan>(plan: T, nodeID: ID): T {
@@ -353,9 +297,13 @@ export function planDeleteNodes<T extends GraphPlan>(plan: T, nodeID: ID): T {
   if (!node) {
     return { ...plan, knowledgeDBs: nextKnowledgeDBs };
   }
-  const { docId } = node;
-  if (!node.parent && docId) {
-    return planDeleteDocumentRoot(plan, node, nextKnowledgeDBs, docId);
+  if (!node.parent) {
+    return planDeleteDocumentRoot(
+      plan,
+      node,
+      nextKnowledgeDBs,
+      pathOf(node.id)
+    );
   }
   return {
     ...plan,
@@ -427,7 +375,7 @@ function materializeInsertIndex(
     if (childId === anchor) return true;
     const child = getWorkspaceNode(plan.knowledgeDBs, childId);
     return child
-      ? getAllLinks(child).some((link) => link.targetID === anchor)
+      ? getAllLinks(child, LOCAL).some((link) => link.target.id === anchor)
       : false;
   };
   const children = parentNode.children.toArray();
@@ -439,7 +387,9 @@ function materializeInsertIndex(
   return found !== undefined ? found + 1 : 0;
 }
 
-export function planMaterializeComputedRow<T extends GraphPlan>(
+export function planMaterializeComputedRow<
+  T extends GraphPlan & Pick<Data, "panes"> & { paneUpdate: boolean }
+>(
   plan: T,
   row: MaterializableRow,
   metadata?: { relevance?: Relevance; argument?: Argument },
@@ -449,19 +399,30 @@ export function planMaterializeComputedRow<T extends GraphPlan>(
     return [plan, row.node, false];
   }
   if (row.materialize.root) {
-    const existingRoot = getWorkspaceNode(plan.knowledgeDBs, row.node.id);
-    if (existingRoot) {
-      return [plan, existingRoot, false];
-    }
     const rootNode: GraphNode = {
-      ...row.node,
-      parent: undefined,
-      root: row.node.id,
-      updated: Date.now(),
+      ...newGraphNode(row.node.spans, {
+        id: newRowKey(newDocumentPath(plan.documents, nodeText(row.node))),
+      }),
       relevance: metadata?.relevance,
       argument: metadata?.argument,
     };
-    const planWithRoot = planUpsertNodes(plan, rootNode);
+    const planWithRoot = planUpsertNodes(
+      {
+        ...plan,
+        paneUpdate: true,
+        panes: plan.panes.map((pane) =>
+          pane.sourceId === LOCAL && pane.rootNodeId === row.node.id
+            ? {
+                ...pane,
+                rootNodeId: rootNode.id,
+                documentId: pathOf(rootNode.id),
+                fallbackLabel: undefined,
+              }
+            : pane
+        ),
+      },
+      rootNode
+    );
     const materializedRoot = getWorkspaceNode(
       planWithRoot.knowledgeDBs,
       rootNode.id
@@ -493,7 +454,7 @@ export function planMaterializeComputedRow<T extends GraphPlan>(
     }
     const child = getWorkspaceNode(plan.knowledgeDBs, childId);
     return child
-      ? getAllLinks(child).some((link) => link.targetID === row.node.id)
+      ? getAllLinks(child, LOCAL).some((link) => link.target.id === row.node.id)
       : false;
   });
   if (placedChildId !== undefined) {
@@ -515,11 +476,14 @@ export function planMaterializeComputedRow<T extends GraphPlan>(
     const takenNode = getWorkspaceNode(planWithTake.knowledgeDBs, ids[0]);
     return [planWithTake, takenNode ?? row.node, true];
   }
-  if (isCanonicalId(row.node.id)) {
+  if (isThingAddress(row.node.id)) {
     const [planWithPlacement, ids] = planAddTargetsToNode(
       plan,
       parentID,
-      { targetID: row.node.id, linkText: nodeText(row.node) },
+      {
+        target: { sourceId: LOCAL, id: row.node.id },
+        linkText: nodeText(row.node),
+      },
       insertIndex,
       metadata?.relevance ?? row.materialize.defaults?.relevance,
       metadata?.argument ?? row.materialize.defaults?.argument
@@ -538,7 +502,10 @@ export function planMaterializeComputedRow<T extends GraphPlan>(
     const [planWithLink, ids] = planAddTargetsToNode(
       plan,
       parentID,
-      { targetID: row.node.id, linkText: nodeText(existing) },
+      {
+        target: { sourceId: LOCAL, id: row.node.id },
+        linkText: nodeText(existing),
+      },
       insertIndex,
       metadata?.relevance,
       metadata?.argument
@@ -550,6 +517,7 @@ export function planMaterializeComputedRow<T extends GraphPlan>(
   // projection rows enter the file unjudged.
   const minted: GraphNode = {
     ...row.node,
+    id: rowKey(pathOf(parentID), rowIdOf(row.node.id)),
     parent: parentID,
     root: parentNode.root,
     updated: Date.now(),
@@ -574,12 +542,9 @@ export function planMaterializeComputedRow<T extends GraphPlan>(
 export function planRecordKnowstrSource<T extends GraphPlan>(
   plan: T,
   targetNode: GraphNode,
-  source: { author: string; doc: string; relays: string[] }
+  source: { author: string; path: string; relays: string[] }
 ): T {
-  const docId = getNodeDocumentId(plan, targetNode);
-  if (!docId) {
-    return plan;
-  }
+  const docId = pathOf(targetNode.id);
   const key = workspaceDocumentKey(docId);
   const document = plan.documents.get(key);
   if (!document) {
@@ -593,8 +558,8 @@ export function planRecordKnowstrSource<T extends GraphPlan>(
       entry !== null &&
       "author" in entry &&
       entry.author === source.author &&
-      "doc" in entry &&
-      entry.doc === source.doc
+      "path" in entry &&
+      entry.path === source.path
   );
   if (alreadyRecorded) {
     return plan;
@@ -606,14 +571,11 @@ export function planRecordKnowstrSource<T extends GraphPlan>(
       knowstr_sources: [...existing, source],
     },
   };
-  return withDocumentInFilePathIndex(
-    {
-      ...plan,
-      documents: plan.documents.set(key, nextDocument),
-      affectedDocuments: plan.affectedDocuments.add(docId),
-    },
-    nextDocument
-  );
+  return {
+    ...plan,
+    documents: plan.documents.set(key, nextDocument),
+    affectedDocuments: plan.affectedDocuments.add(docId),
+  };
 }
 
 export type AddToParentTarget =
@@ -640,12 +602,19 @@ export function planAddTargetsToNode<T extends GraphPlan>(
     return [plan, []];
   }
 
+  const parentRef = { sourceId: LOCAL, id: parentNode.id };
+  const childOptions = {
+    root: parentNode.root,
+    parent: parentNode.id,
+    relevance,
+    argument,
+  };
   const [planWithChildren, nodeItemPayload] = targetsArray.reduce<
     [T, ChildPayload[]]
   >(
     ([accPlan, accItems], objectOrID) => {
       const refTarget =
-        typeof objectOrID !== "string" && "targetID" in objectOrID
+        typeof objectOrID !== "string" && "target" in objectOrID
           ? objectOrID
           : undefined;
       const documentLinkTarget =
@@ -655,89 +624,64 @@ export function planAddTargetsToNode<T extends GraphPlan>(
       if (documentLinkTarget) {
         const childNode = newGraphNode(
           [
-            fileLinkSpan(
-              documentLinkHref(
-                documentLinkTarget.docId,
-                documentLinkTarget.filePath
-              ),
+            linkSpan(
+              {
+                sourceId: documentLinkTarget.sourceId,
+                id: documentLinkTarget.docId,
+              },
+              parentRef,
               documentLinkTarget.linkText || ""
             ),
           ],
-          {
-            root: parentNode.root,
-            parent: parentNode.id,
-            relevance,
-            argument,
-          }
+          { ...childOptions, id: newRowKey(pathOf(parentNode.id)) }
         );
         return [
           planUpsertNodes(accPlan, childNode),
-          [
-            ...accItems,
-            {
-              childID: childNode.id,
-            },
-          ],
+          [...accItems, { childID: childNode.id }],
         ];
       }
-      const objectID =
-        typeof objectOrID === "string"
-          ? objectOrID
-          : "targetID" in objectOrID
-          ? objectOrID.targetID
-          : "docId" in objectOrID
-          ? objectOrID.docId
-          : undefined;
-      const objectText =
-        typeof objectOrID !== "string" && "text" in objectOrID
-          ? objectOrID.text
-          : undefined;
-      if (refTarget || (objectID !== undefined && isSearchId(objectID))) {
-        const childNode = refTarget
-          ? {
-              ...newGraphNode(
-                [linkSpan(refTarget.targetID, refTarget.linkText || "")],
-                {
-                  root: parentNode.root,
-                  parent: parentNode.id,
-                  relevance,
-                  argument,
-                }
-              ),
-              extraAttrs: { embed: "true" },
-            }
-          : ({
-              children: List<ID>(),
-              id: objectID,
-              spans: plainSpans(""),
-              parent: parentNode.id,
-              updated: Date.now(),
-              root: parentNode.root,
-              relevance,
-              argument,
-            } as GraphNode);
+      if (refTarget) {
+        const childNode = {
+          ...newGraphNode(
+            [linkSpan(refTarget.target, parentRef, refTarget.linkText || "")],
+            { ...childOptions, id: newRowKey(pathOf(parentNode.id)) }
+          ),
+          extraAttrs: { embed: "true" },
+        };
         const planWithChild = planUpsertNodes(accPlan, childNode);
-        const sourceNode = refTarget
-          ? getWorkspaceNode(planWithChild.knowledgeDBs, refTarget.targetID)
-          : undefined;
-        const planWithSourceRoot = sourceNode
-          ? planMarkDocumentAffected(planWithChild, sourceNode)
-          : planWithChild;
+        const sourceNode =
+          refTarget.target.sourceId === LOCAL
+            ? getWorkspaceNode(planWithChild.knowledgeDBs, refTarget.target.id)
+            : undefined;
         return [
-          planWithSourceRoot,
-          [
-            ...accItems,
-            {
-              childID: childNode.id,
-            },
-          ],
+          sourceNode
+            ? planMarkDocumentAffected(planWithChild, sourceNode)
+            : planWithChild,
+          [...accItems, { childID: childNode.id }],
+        ];
+      }
+      if (typeof objectOrID === "string" && isSearchId(objectOrID)) {
+        const searchNode: GraphNode = {
+          children: List<ID>(),
+          id: objectOrID,
+          spans: plainSpans(""),
+          parent: parentNode.id,
+          updated: Date.now(),
+          root: parentNode.root,
+          relevance,
+          argument,
+        };
+        return [
+          planUpsertNodes(accPlan, searchNode),
+          [...accItems, { childID: searchNode.id }],
         ];
       }
 
-      const existingNode = objectID
-        ? getWorkspaceNode(accPlan.knowledgeDBs, objectID)
-        : undefined;
-      if (existingNode && existingNode.id === objectID) {
+      const existingNode =
+        typeof objectOrID === "string"
+          ? getWorkspaceNode(accPlan.knowledgeDBs, objectOrID)
+          : undefined;
+      if (existingNode) {
         const updatedChild = {
           ...existingNode,
           parent: parentNode.id,
@@ -748,54 +692,32 @@ export function planAddTargetsToNode<T extends GraphPlan>(
         };
         return [
           planUpsertNodes(accPlan, updatedChild),
-          [
-            ...accItems,
-            {
-              childID: updatedChild.id,
-            },
-          ],
+          [...accItems, { childID: updatedChild.id }],
         ];
       }
 
-      // Mint or link: recognized entity text created UNDER a parent is
-      // always a link row targeting the entity (dangling allowed, no page
-      // is created) — the entity's home, if any, lends its text.
-      const entityId = entityIdForText(objectText || "");
-      const entityHome = entityId
-        ? getWorkspaceNode(accPlan.knowledgeDBs, entityId as ID)
-        : undefined;
+      const objectText =
+        typeof objectOrID !== "string" && "text" in objectOrID
+          ? objectOrID.text
+          : "";
+      const thing = entityIdForText(objectText);
       const feedSpans =
-        !entityId && isBareIcalFeedUrl(objectText || "")
-          ? feedLinkSpans(objectText || "")
+        !thing && isBareIcalFeedUrl(objectText)
+          ? feedLinkSpans(objectText)
           : undefined;
-      const childSpans = entityId
-        ? [
-            linkSpan(
-              entityId as ID,
-              entityHome ? nodeText(entityHome) : (objectText || "").trim()
-            ),
-          ]
-        : feedSpans ?? plainSpans(objectText || "");
-      const childNode = newGraphNode(childSpans, {
-        root: parentNode.root,
-        parent: parentNode.id,
-      });
-      const nodeWithMetadata = {
-        ...childNode,
-        relevance,
-        argument,
-        ...((entityId || feedSpans) && {
-          extraAttrs: { embed: "true" },
+      const childSpans: InlineSpan[] = thing
+        ? [{ kind: "link", href: thing, text: objectText.trim() }]
+        : feedSpans ?? plainSpans(objectText);
+      const childNode = {
+        ...newGraphNode(childSpans, {
+          ...childOptions,
+          id: newRowKey(pathOf(parentNode.id)),
         }),
+        ...(feedSpans && { extraAttrs: { embed: "true" } }),
       };
       return [
-        planUpsertNodes(accPlan, nodeWithMetadata),
-        [
-          ...accItems,
-          {
-            childID: nodeWithMetadata.id,
-          },
-        ],
+        planUpsertNodes(accPlan, childNode),
+        [...accItems, { childID: childNode.id }],
       ];
     },
     [plan, []]
@@ -845,29 +767,28 @@ export function planAddTopTargetsToDocument<T extends GraphPlan>(
       const documentLinkTarget =
         typeof target !== "string" && "docId" in target ? target : undefined;
       const refTarget =
-        typeof target !== "string" && "targetID" in target ? target : undefined;
+        typeof target !== "string" && "target" in target ? target : undefined;
+      const id = newRowKey(document.docId);
+      const from = { sourceId: LOCAL, id };
       const topNodeSpans = documentLinkTarget
         ? [
-            fileLinkSpan(
-              documentLinkHref(
-                documentLinkTarget.docId,
-                documentLinkTarget.filePath
-              ),
+            linkSpan(
+              {
+                sourceId: documentLinkTarget.sourceId,
+                id: documentLinkTarget.docId,
+              },
+              from,
               documentLinkTarget.linkText || ""
             ),
           ]
         : refTarget
-        ? [linkSpan(refTarget.targetID, refTarget.linkText || "")]
+        ? [linkSpan(refTarget.target, from, refTarget.linkText || "")]
         : [];
       if (topNodeSpans.length === 0) {
         return [accPlan, accIds];
       }
       const topNode = {
-        ...newGraphNode(topNodeSpans, {
-          docId: document.docId,
-          relevance,
-          argument,
-        }),
+        ...newGraphNode(topNodeSpans, { id, relevance, argument }),
         ...(refTarget && { extraAttrs: { embed: "true" } }),
       };
       return [planUpsertNodes(accPlan, topNode), [...accIds, topNode.id]];

@@ -3,22 +3,15 @@ import path from "path";
 import { List, Map as ImmutableMap } from "immutable";
 import ignore, { Ignore } from "ignore";
 import { LOCAL } from "../../core/nodeRef";
-import {
-  Document,
-  documentKeyOf,
-  parseToDocumentPreservingExplicitIds,
-  withRealWorldEntitiesForDocuments,
-} from "../../core/Document";
+import { Document, fileNameTitle, parseToDocument } from "../../core/Document";
+import { isValidPath } from "../../core/linkPath";
 import { WalkContext } from "../../core/markdownNodes";
-import { MarkdownTreeNode, parseMarkdown } from "../../core/markdownTree";
 
 export type WorkspaceSaveProfile = {
   workspaceDir: string;
 };
 
 export type ScannedWorkspaceDocument = Document & {
-  filePath: string;
-  relativePath: string;
   currentContent: string;
   nodes: ImmutableMap<string, GraphNode>;
 };
@@ -90,6 +83,17 @@ async function collectMarkdownFiles(
   return nested.flat();
 }
 
+export function workspacePath(
+  workspaceDir: string,
+  absolutePath: string
+): string {
+  return path
+    .relative(workspaceDir, absolutePath)
+    .split(path.sep)
+    .join("/")
+    .normalize("NFC");
+}
+
 export async function collectWorkspaceMarkdownFiles(
   workspaceDir: string,
   ignoredPatterns?: string[]
@@ -98,68 +102,29 @@ export async function collectWorkspaceMarkdownFiles(
   return collectMarkdownFiles(workspaceDir, ig);
 }
 
-function checkDuplicateDocIds(
-  documents: ReadonlyArray<{ docId: string }>
-): void {
-  const counts = documents.reduce(
-    (acc, doc) => ({ ...acc, [doc.docId]: (acc[doc.docId] || 0) + 1 }),
-    {} as Record<string, number>
-  );
-  const duplicates = Object.entries(counts)
-    .filter(([, count]) => count > 1)
-    .map(([docId]) => docId)
-    .sort();
-  if (duplicates.length > 0) {
+function checkPaths(paths: readonly string[]): void {
+  const invalid = paths.filter((candidate) => !isValidPath(candidate));
+  if (invalid.length > 0) {
     throw new Error(
-      `Workspace contains duplicate knowstr_doc_id values: ${duplicates.join(
-        ", "
-      )}`
+      `Workspace paths must never contain :, #, ? or %: ${invalid.join(", ")}`
     );
   }
-}
-
-function collectExplicitNodeIds(trees: MarkdownTreeNode[]): string[] {
-  return trees.flatMap((tree) => [
-    ...(tree.uuid !== undefined ? [tree.uuid] : []),
-    ...collectExplicitNodeIds(tree.children),
-  ]);
-}
-
-function describeDuplicate(id: string, paths: string[]): string {
-  const uniquePaths = [...new Set(paths)].sort();
-  if (uniquePaths.length === 1) {
-    return `${uniquePaths[0]} contains id:${id} more than once`;
-  }
-  return `${uniquePaths.join(" and ")} both contain id:${id}`;
-}
-
-function checkDuplicateNodeIds(
-  files: ReadonlyArray<{ relativePath: string; tree: MarkdownTreeNode[] }>
-): void {
-  const pathsById = files.reduce((acc, file) => {
-    collectExplicitNodeIds(file.tree).forEach((id) => {
-      acc.set(id, [...(acc.get(id) ?? []), file.relativePath]);
-    });
-    return acc;
-  }, new Map<string, string[]>());
-
-  const duplicates = [...pathsById.entries()]
-    .filter(([, paths]) => paths.length > 1)
-    .sort(([left], [right]) => left.localeCompare(right));
-  if (duplicates.length === 0) {
-    return;
-  }
-
-  const conflictLines = duplicates.map(([id, paths]) =>
-    describeDuplicate(id, paths)
+  const byFolded = paths.reduce(
+    (acc, candidate) =>
+      acc.set(candidate.toLowerCase(), [
+        ...(acc.get(candidate.toLowerCase()) ?? []),
+        candidate,
+      ]),
+    new Map<string, string[]>()
   );
-  throw new Error(
-    [
-      ...conflictLines,
-      "  - if a file is a variant, give it fresh IDs",
-      "  - if it's a backup, move it out or add it to .knowstrignore",
-    ].join("\n")
-  );
+  const clashes = [...byFolded.values()].filter((group) => group.length > 1);
+  if (clashes.length > 0) {
+    throw new Error(
+      `Workspace paths differ only in case: ${clashes
+        .map((group) => group.join(" and "))
+        .join(", ")}`
+    );
+  }
 }
 
 type ScanAcc = {
@@ -172,18 +137,14 @@ function parseFile(
   context: WalkContext | undefined
 ): { scanned: ScannedWorkspaceDocument; context: WalkContext } {
   const { relativePath, content: currentContent } = file;
-  const fallbackTitle = path.basename(relativePath, ".md") || undefined;
-  const parsed = parseToDocumentPreservingExplicitIds(LOCAL, currentContent, {
-    filePath: relativePath,
-    relativePath,
-    ...(fallbackTitle !== undefined ? { fallbackTitle } : {}),
+  const parsed = parseToDocument(LOCAL, currentContent, {
+    path: relativePath,
+    fallbackTitle: fileNameTitle(relativePath),
     ...(context !== undefined ? { context } : {}),
   });
   return {
     scanned: {
       ...parsed.document,
-      filePath: relativePath,
-      relativePath,
       currentContent,
       nodes: parsed.nodes,
     },
@@ -204,16 +165,11 @@ export async function scanWorkspaceDocuments(
 
   const files = await Promise.all(
     markdownFiles.map(async (absolutePath) => ({
-      relativePath: path.relative(profile.workspaceDir, absolutePath),
+      relativePath: workspacePath(profile.workspaceDir, absolutePath),
       content: await fs.readFile(absolutePath, "utf8"),
     }))
   );
-
-  const parsedTrees = files.map((file) => ({
-    relativePath: file.relativePath,
-    tree: parseMarkdown(file.content).tree,
-  }));
-  checkDuplicateNodeIds(parsedTrees);
+  checkPaths(files.map((file) => file.relativePath));
 
   const final = files.reduce<ScanAcc>(
     (acc, file) => {
@@ -225,34 +181,9 @@ export async function scanWorkspaceDocuments(
     },
     { documents: List<ScannedWorkspaceDocument>(), context: undefined }
   );
-  const scannedDocuments = final.documents.toArray();
-
-  checkDuplicateDocIds(scannedDocuments);
-
-  const knowledgeDBs =
-    final.context?.knowledgeDBs ?? ImmutableMap<SourceId, KnowledgeData>();
-  const documents = ImmutableMap<string, Document>(
-    scannedDocuments.map((document) => [
-      documentKeyOf(document.sourceId, document.docId),
-      document,
-    ])
-  );
-  const documentByFilePath = scannedDocuments.reduce(
-    (acc, document) => acc.set(document.filePath, document),
-    ImmutableMap<string, Document>()
-  );
-  const derived = withRealWorldEntitiesForDocuments(
-    knowledgeDBs,
-    documents,
-    documentByFilePath
-  );
   return {
-    documents: scannedDocuments.map((document) => ({
-      ...document,
-      realWorldEntities:
-        derived.documents.get(documentKeyOf(document.sourceId, document.docId))
-          ?.realWorldEntities ?? [],
-    })),
-    knowledgeDBs,
+    documents: final.documents.toArray(),
+    knowledgeDBs:
+      final.context?.knowledgeDBs ?? ImmutableMap<SourceId, KnowledgeData>(),
   };
 }

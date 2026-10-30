@@ -1,18 +1,8 @@
 import { Map as ImmutableMap } from "immutable";
-import { LOCAL } from "./nodeRef";
-import { getNode } from "./connections";
-import { ensureKnowstrDocId } from "./knowstrFrontmatter";
-import { isCanonicalId } from "./entityRecognition";
-import { docLinkId, documentLinkHref, resolveLinkPath } from "./linkPath";
-import { MarkdownTreeNode, parseMarkdown } from "./markdownTree";
-import {
-  MaterializeOptions,
-  MaterializeResult,
-  WalkContext,
-  materializeTree,
-  materializeTreePreservingExplicitIds,
-} from "./markdownNodes";
-import { getAllFileLinks, getAllLinks, nodeText, spansText } from "./nodeSpans";
+import { LOCAL, pathOf } from "./nodeRef";
+import { parseMarkdown } from "./markdownTree";
+import { WalkContext, materializeTree } from "./markdownNodes";
+import { nodeText, spansText } from "./nodeSpans";
 import { LOG_ROOT_FILE, LOG_ROOT_ROLE } from "./systemRoots";
 
 export type Document = {
@@ -22,10 +12,7 @@ export type Document = {
   updatedMs: number;
   title: string;
   frontMatter?: FrontMatter;
-  filePath?: string;
-  relativePath?: string;
   systemRole?: RootSystemRole;
-  realWorldEntities: string[];
   // Per-document storage encryption key (nostr storage only; filesystem
   // documents never carry one). Absent until the document first rides a
   // storage event.
@@ -44,14 +31,8 @@ export type DocumentDelete = {
 };
 
 export type ParseToDocumentOptions = {
-  filePath?: string;
-  relativePath?: string;
+  path: string;
   fallbackTitle?: string;
-  // Used when the parsed content has no knowstr_doc_id in frontmatter.
-  // The filesystem watcher passes the existing doc's id so that an edit
-  // which strips the frontmatter does not change the document's identity.
-  // If frontmatter already has knowstr_doc_id, it wins.
-  docIdFallback?: string;
   updatedMsOverride?: number;
   systemRoleOverride?: RootSystemRole;
   context?: WalkContext;
@@ -71,246 +52,61 @@ export function workspaceDocumentKey(docId: string): string {
   return documentKeyOf(LOCAL, docId);
 }
 
-export function getDocumentByIdOrFilePath(
-  documents: ImmutableMap<string, Document>,
-  documentByFilePath: ImmutableMap<string, Document>,
-  author: SourceId,
-  idOrFilePath: string
-): Document | undefined {
-  const documentById = documents.get(documentKeyOf(author, idOrFilePath));
-  if (documentById) {
-    return documentById;
-  }
-  const documentByPath = documentByFilePath.get(idOrFilePath);
-  return documentByPath?.sourceId === author ? documentByPath : undefined;
-}
-
 export function getDocumentForNode(
-  knowledgeDBs: KnowledgeDBs,
   documents: ImmutableMap<string, Document>,
   node: GraphNode,
   sourceId: SourceId
 ): Document | undefined {
-  const rootNode =
-    node.id === node.root ? node : getNode(knowledgeDBs, node.root, sourceId);
-  const docId = node.docId ?? rootNode?.docId;
-  return docId ? documents.get(documentKeyOf(sourceId, docId)) : undefined;
+  return documents.get(documentKeyOf(sourceId, pathOf(node.id)));
 }
 
-function compareUtf8(left: string, right: string): number {
-  const encoder = new TextEncoder();
-  const leftBytes = encoder.encode(left);
-  const rightBytes = encoder.encode(right);
-  const differenceIndex = leftBytes.findIndex(
-    (byte, index) => byte !== rightBytes[index]
-  );
-  if (differenceIndex >= 0 && differenceIndex < rightBytes.length) {
-    return leftBytes[differenceIndex] - rightBytes[differenceIndex];
-  }
-  return leftBytes.length - rightBytes.length;
-}
-
-function sortedUnique(values: readonly string[]): string[] {
-  return [...new Set(values)].sort(compareUtf8);
-}
-
-function linkDocumentPath(path: string): string {
-  const hashIndex = path.lastIndexOf("#");
-  return hashIndex < 0 ? path : path.slice(0, hashIndex);
-}
-
-function sourceFilePath(
-  knowledgeDBs: KnowledgeDBs,
-  documents: ImmutableMap<string, Document>,
-  source: GraphNode,
-  sourceId: SourceId
-): string | undefined {
-  return getDocumentForNode(knowledgeDBs, documents, source, sourceId)
-    ?.filePath;
-}
-
-export function resolveDocumentTarget(
-  data: Pick<Data, "knowledgeDBs" | "documents" | "documentByFilePath">,
-  source: GraphNode,
-  sourceId: SourceId,
-  path: string
-): Document | undefined {
-  const documentPath = linkDocumentPath(path);
-  const docId = docLinkId(documentPath);
-  if (docId !== undefined) {
-    return data.documents.get(documentKeyOf(sourceId, docId));
-  }
-  const resolvedPath = resolveLinkPath(
-    documentPath,
-    sourceFilePath(data.knowledgeDBs, data.documents, source, sourceId)
-  );
-  return data.documentByFilePath.get(resolvedPath);
-}
-
-function linkTargetContainerRoot(
-  knowledgeDBs: KnowledgeDBs,
-  targetID: ID,
-  sourceId: SourceId
-): ID | undefined {
-  const target = getNode(knowledgeDBs, targetID, sourceId);
-  if (target) {
-    return target.root;
-  }
-  return isCanonicalId(targetID) ? targetID : undefined;
-}
-
-export function nodeLinkContainerTags(
-  knowledgeDBs: KnowledgeDBs,
-  documents: ImmutableMap<string, Document>,
-  documentByFilePath: ImmutableMap<string, Document>,
-  node: GraphNode,
-  sourceId: SourceId
-): string[] {
-  return sortedUnique([
-    ...getAllLinks(node).flatMap((link) => {
-      const root = linkTargetContainerRoot(
-        knowledgeDBs,
-        link.targetID,
-        sourceId
-      );
-      return root ? [root] : [];
-    }),
-    ...getAllFileLinks(node).flatMap((link) => {
-      const target = resolveDocumentTarget(
-        { knowledgeDBs, documents, documentByFilePath },
-        node,
-        sourceId,
-        link.path
-      );
-      return target ? target.topNodeShortIds : [];
-    }),
-  ]);
-}
-
-export function documentRealWorldEntities(
-  knowledgeDBs: KnowledgeDBs,
-  documents: ImmutableMap<string, Document>,
-  documentByFilePath: ImmutableMap<string, Document>,
-  document: Document
-): string[] {
-  const nodes = knowledgeDBs.get(document.sourceId)?.nodes;
-  if (!nodes) {
-    return [];
-  }
-  const rootIds = new Set(document.topNodeShortIds);
-  const walk = (nodeId: ID): string[] => {
-    const node = nodes.get(nodeId);
-    if (!node) {
-      return [];
-    }
-    return [
-      ...nodeLinkContainerTags(
-        knowledgeDBs,
-        documents,
-        documentByFilePath,
-        node,
-        document.sourceId
-      ).filter((tag) => !rootIds.has(tag)),
-      ...node.children.toArray().flatMap((childId) => walk(childId)),
-    ];
-  };
-  return sortedUnique(document.topNodeShortIds.flatMap((id) => walk(id)));
-}
-
-export function documentAudienceTags(document: Document): string[] {
-  return sortedUnique([
-    ...document.topNodeShortIds,
-    ...document.realWorldEntities,
-  ]);
-}
-
-export function withDocumentRealWorldEntities(
-  knowledgeDBs: KnowledgeDBs,
-  documents: ImmutableMap<string, Document>,
-  documentByFilePath: ImmutableMap<string, Document>,
-  document: Document
-): Document {
-  return {
-    ...document,
-    realWorldEntities: documentRealWorldEntities(
-      knowledgeDBs,
-      documents,
-      documentByFilePath,
-      document
-    ),
-  };
-}
-
-export function withRealWorldEntitiesForDocuments(
-  knowledgeDBs: KnowledgeDBs,
-  documents: ImmutableMap<string, Document>,
-  documentByFilePath: ImmutableMap<string, Document>
-): {
-  documents: ImmutableMap<string, Document>;
-  documentByFilePath: ImmutableMap<string, Document>;
-} {
-  const nextDocuments = documents
-    .entrySeq()
-    .reduce(
-      (acc, [key, document]) =>
-        acc.set(
-          key,
-          withDocumentRealWorldEntities(
-            knowledgeDBs,
-            documents,
-            documentByFilePath,
-            document
-          )
-        ),
-      ImmutableMap<string, Document>()
-    );
-  const nextDocumentByFilePath = nextDocuments
-    .valueSeq()
-    .reduce(
-      (acc, document) =>
-        document.filePath ? acc.set(document.filePath, document) : acc,
-      ImmutableMap<string, Document>()
-    );
-  return {
-    documents: nextDocuments,
-    documentByFilePath: nextDocumentByFilePath,
-  };
-}
-
-function basenameWithoutMarkdownExtension(path: string): string {
-  const pieces = path.split(/[\\/]/u);
+export function fileNameTitle(path: string): string {
+  const pieces = path.split("/");
   const filename = pieces[pieces.length - 1] ?? path;
   return filename.endsWith(".md") ? filename.slice(0, -3) : filename;
 }
 
 export function documentDisplayName(document: Document): string {
-  const title = document.title.trim();
-  if (title) {
-    return title;
-  }
-  const filePathName = document.filePath
-    ? basenameWithoutMarkdownExtension(document.filePath)
-    : undefined;
-  if (filePathName) {
-    return filePathName;
-  }
-  return `Document ${document.docId.slice(0, 8)}`;
+  return document.title.trim() || fileNameTitle(document.docId);
 }
 
-export function documentLinkPath(document: Document): string {
-  return documentLinkHref(document.docId, document.filePath);
+function slugify(text: string): string {
+  const slug = text
+    .normalize("NFC")
+    .toLowerCase()
+    .replace(/<!--.*?-->/gu, "")
+    .replace(/[^\p{Letter}\p{Number}\s-]/gu, "")
+    .trim()
+    .replace(/\s+/gu, "-");
+  return slug.length > 0 ? slug : "document";
+}
+
+export function newDocumentPath(
+  documents: ImmutableMap<string, Document>,
+  title: string
+): string {
+  const taken = new Set(
+    documents
+      .valueSeq()
+      .filter((document) => document.sourceId === LOCAL)
+      .map((document) => document.docId.toLowerCase())
+      .toArray()
+  );
+  const slug = slugify(title);
+  const candidate = (suffix: number): string =>
+    suffix === 1 ? `${slug}.md` : `${slug}-${suffix}.md`;
+  const firstFree = (suffix: number): string =>
+    taken.has(candidate(suffix)) ? firstFree(suffix + 1) : candidate(suffix);
+  return firstFree(1);
 }
 
 export function createDocumentFromRootNode(rootNode: GraphNode): Document {
-  const docId = rootNode.docId ?? rootNode.id;
   return {
     sourceId: LOCAL,
-    docId,
+    docId: pathOf(rootNode.id),
     topNodeShortIds: [rootNode.id],
     updatedMs: rootNode.updated,
     title: nodeText(rootNode) || "Untitled",
-    realWorldEntities: [],
-    frontMatter: { knowstr_doc_id: docId },
     ...(rootNode.systemRole !== undefined && {
       systemRole: rootNode.systemRole,
     }),
@@ -318,7 +114,7 @@ export function createDocumentFromRootNode(rootNode: GraphNode): Document {
 }
 
 export function systemRoleFromFilePath(
-  filePath: string | undefined
+  filePath: string
 ): RootSystemRole | undefined {
   return filePath === LOG_ROOT_FILE ? LOG_ROOT_ROLE : undefined;
 }
@@ -332,29 +128,20 @@ function firstTopLevelNodeText(
   return text || undefined;
 }
 
-type TreeMaterializer = (
-  trees: MarkdownTreeNode[],
-  author: SourceId,
-  options: MaterializeOptions
-) => MaterializeResult;
-
-function parseToDocumentWithMaterializer(
+export function parseToDocument(
   author: SourceId,
   content: string,
-  options: ParseToDocumentOptions,
-  materialize: TreeMaterializer
+  options: ParseToDocumentOptions
 ): ParseToDocumentResult {
   const parsed = parseMarkdown(content);
-  const ensured = ensureKnowstrDocId(parsed.frontMatter, options.docIdFallback);
-  const { frontMatter } = ensured;
-
+  const { path } = options;
   const updatedMs = options.updatedMsOverride ?? Date.now();
-  const systemRole =
-    options.systemRoleOverride ?? systemRoleFromFilePath(options.filePath);
+  const systemRole = options.systemRoleOverride ?? systemRoleFromFilePath(path);
 
+  const frontMatterTitleValue = parsed.frontMatter?.title;
   const frontMatterTitle =
-    typeof parsed.frontMatter?.title === "string"
-      ? (parsed.frontMatter.title as string)
+    typeof frontMatterTitleValue === "string"
+      ? frontMatterTitleValue
       : undefined;
   const title =
     frontMatterTitle ??
@@ -362,40 +149,27 @@ function parseToDocumentWithMaterializer(
     firstTopLevelNodeText(parsed.tree) ??
     "Untitled";
 
-  const visibleRoots = parsed.tree;
-  const trees = visibleRoots.map((tree, index) => ({
+  const trees = parsed.tree.map((tree, index) => ({
     ...tree,
-    docId: ensured.docId,
     ...(index === 0 && systemRole !== undefined && { systemRole }),
   }));
 
-  const result = materialize(trees, author, {
+  const result = materializeTree(trees, author, path, {
     context: options.context,
     updatedMs,
   });
-  const topNodeLongIds = result.topNodeIds;
-  const topNodeShortIds = topNodeLongIds;
   const allNodes =
     result.context.knowledgeDBs.get(author)?.nodes ??
     ImmutableMap<string, GraphNode>();
-  const topNodeLongIdSet = new Set(topNodeLongIds);
-  const nodes =
-    topNodeLongIdSet.size > 0
-      ? allNodes.filter((node) => topNodeLongIdSet.has(node.root))
-      : ImmutableMap<string, GraphNode>();
+  const nodes = allNodes.filter((node) => pathOf(node.id) === path);
 
   const document: Document = {
     sourceId: author,
-    docId: ensured.docId,
-    topNodeShortIds,
+    docId: path,
+    topNodeShortIds: result.topNodeIds,
     updatedMs,
     title,
-    realWorldEntities: [],
-    ...(frontMatter && { frontMatter }),
-    ...(options.filePath !== undefined && { filePath: options.filePath }),
-    ...(options.relativePath !== undefined && {
-      relativePath: options.relativePath,
-    }),
+    ...(parsed.frontMatter && { frontMatter: parsed.frontMatter }),
     ...(systemRole !== undefined && { systemRole }),
   };
 
@@ -404,30 +178,4 @@ function parseToDocumentWithMaterializer(
     nodes,
     context: result.context,
   };
-}
-
-export function parseToDocument(
-  author: SourceId,
-  content: string,
-  options: ParseToDocumentOptions = {}
-): ParseToDocumentResult {
-  return parseToDocumentWithMaterializer(
-    author,
-    content,
-    options,
-    materializeTree
-  );
-}
-
-export function parseToDocumentPreservingExplicitIds(
-  author: SourceId,
-  content: string,
-  options: ParseToDocumentOptions
-): ParseToDocumentResult {
-  return parseToDocumentWithMaterializer(
-    author,
-    content,
-    options,
-    materializeTreePreservingExplicitIds
-  );
 }

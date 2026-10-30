@@ -75,6 +75,7 @@ test("runCli dispatches knowstr publish with a relay pool", async () => {
     changed_paths: [],
     accepted_paths: ["/tmp/doc.md"],
     unaccepted_paths: [],
+    retracted_paths: [],
     rejections: [],
     warnings: [],
   });
@@ -94,6 +95,7 @@ test("runCli dispatches knowstr publish with a relay pool", async () => {
         changed_paths: [],
         accepted_paths: ["/tmp/doc.md"],
         unaccepted_paths: [],
+        retracted_paths: [],
         rejections: [],
         warnings: [],
       },
@@ -112,6 +114,7 @@ test("runCli fails knowstr publish when no relay accepted a document", async () 
     changed_paths: [],
     accepted_paths: ["/tmp/a.md"],
     unaccepted_paths: ["/tmp/b.md"],
+    retracted_paths: [],
     rejections: [
       { path: "/tmp/b.md", relay: "wss://room.example/", reason: "too large" },
     ],

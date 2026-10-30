@@ -1,5 +1,5 @@
 import { nip19 } from "nostr-tools";
-import { LOCAL } from "./core/nodeRef";
+import { LOCAL, rowIdOf } from "./core/nodeRef";
 import {
   decodePublicKeyInputSync,
   encodePublicKeyAddress,
@@ -85,7 +85,7 @@ export function buildCoordinateRouteUrl(
   });
   const params = new URLSearchParams();
   if (at !== undefined) {
-    params.set("at", at);
+    params.set("at", rowIdOf(at));
   }
   const query = params.toString();
   const fragment = storageKey ? `#key=${encodeURIComponent(storageKey)}` : "";

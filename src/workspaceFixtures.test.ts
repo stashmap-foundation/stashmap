@@ -2,27 +2,20 @@
 
 import fs from "fs";
 import path from "path";
-import { Map as ImmutableMap } from "immutable";
-import { Event, finalizeEvent, validateEvent, verifyEvent } from "nostr-tools";
-import { hexToBytes } from "@noble/hashes/utils";
+import { nip19 } from "nostr-tools";
 import {
   expectMarkdown,
   knowstrInit,
   knowstrSave,
   write,
 } from "./testFixtures/workspace";
-import {
-  documentKeyOf,
-  parseToDocumentPreservingExplicitIds,
-  withDocumentRealWorldEntities,
-} from "./core/Document";
+import { parseToDocument } from "./core/Document";
 import { LOCAL } from "./core/nodeRef";
 import {
   buildDepositEvent,
   selectLatestDepositEvents,
 } from "./nodesDocumentEvent";
 import { loadCliProfile } from "./cli/config";
-import { decodePublicKeyInputSync } from "./infra/nostr/publicKeys";
 import { loadWorkspaceAsDocuments } from "./infra/filesystem/workspaceBackend";
 
 test("knowstrInit creates a temp workspace with a fresh identity", () => {
@@ -64,133 +57,30 @@ test("knowstrInit + write + knowstrSave assigns ids and normalizes markdown", as
   );
 });
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function fixtureEvent(value: unknown): Event {
-  if (!isRecord(value)) {
-    throw new Error("Invalid signed event fixture");
-  }
-  const { id, sig } = value;
-  if (
-    !validateEvent(value) ||
-    typeof id !== "string" ||
-    typeof sig !== "string"
-  ) {
-    throw new Error("Invalid signed event fixture");
-  }
-  return { ...value, id, sig };
-}
-
-function fixtureCorpus(): Record<string, unknown> {
-  const corpusPath = path.resolve(
-    __dirname,
-    "../test/corpus/events/deposits.json"
-  );
-  const parsed: unknown = JSON.parse(fs.readFileSync(corpusPath, "utf8"));
-  if (!isRecord(parsed)) {
-    throw new Error("Invalid deposit fixture corpus");
-  }
-  return parsed;
-}
-
-function fixtureRecords(): Array<Record<string, unknown>> {
-  const { events } = fixtureCorpus();
-  if (!Array.isArray(events)) {
-    throw new Error("Invalid deposit fixture cases");
-  }
-  return events.map((fixture) => {
-    if (!isRecord(fixture)) {
-      throw new Error("Invalid deposit fixture case");
-    }
-    return fixture;
-  });
-}
-
-const signedDepositFixtures = fixtureRecords();
-
-signedDepositFixtures.forEach((fixture) => {
-  const { name } = fixture;
-  if (typeof name !== "string") {
-    throw new Error("Deposit fixture name is missing");
-  }
-  test(`signed deposit fixture: ${name}`, () => {
-    const event = fixtureEvent(fixture.event);
-    if (typeof fixture.secretKey !== "string") {
-      throw new Error(`${name}: secret key is missing`);
-    }
-    const parsed = parseToDocumentPreservingExplicitIds(LOCAL, event.content, {
-      updatedMsOverride: 0,
-    });
-    const documents = ImmutableMap([
-      [documentKeyOf(LOCAL, parsed.document.docId), parsed.document],
-    ]);
-    const document = withDocumentRealWorldEntities(
-      parsed.context.knowledgeDBs,
-      documents,
-      ImmutableMap(),
-      parsed.document
-    );
-    const pubkey = decodePublicKeyInputSync(event.pubkey);
-    if (!pubkey) {
-      throw new Error(`${name}: pubkey is invalid`);
-    }
-    const ms = event.tags.find((tag) => tag[0] === "ms")?.[1];
-    if (!ms) {
-      throw new Error(`${name}: ms tag is missing`);
-    }
-    const dateNow = jest.spyOn(Date, "now").mockReturnValue(Number(ms));
-    const rebuilt = finalizeEvent(
-      buildDepositEvent(document, pubkey, event.content, event.created_at),
-      hexToBytes(fixture.secretKey)
-    );
-    dateNow.mockRestore();
-    expect({
-      kind: rebuilt.kind,
-      pubkey: rebuilt.pubkey,
-      created_at: rebuilt.created_at,
-      tags: rebuilt.tags,
-      content: rebuilt.content,
-      id: rebuilt.id,
-    }).toEqual({
-      kind: event.kind,
-      pubkey: event.pubkey,
-      created_at: event.created_at,
-      tags: event.tags,
-      content: event.content,
-      id: event.id,
-    });
-    expect(rebuilt.sig).toHaveLength(event.sig.length);
-    expect(verifyEvent(event)).toBe(true);
-  });
-});
-
-test("deposit construction derives every ordered S tag from the workspace graph", async () => {
+test("deposit construction derives one ordered a tag per linked file and i tag per linked thing", async () => {
   const { path: workspaceDir } = knowstrInit();
+  const alice = nip19.npubEncode("b".repeat(64));
   write(
     workspaceDir,
     "source.md",
-    "# Source <!-- id: -->\n- Target <!-- id:target -->\n"
+    "# Source <!-- id:source -->\n- Target <!-- id:target -->\n"
   );
   write(
     workspaceDir,
-    "main.md",
+    "notes/main.md",
     [
-      "---",
-      "knowstr_doc_id: multi-root",
-      "---",
-      "",
       "# First <!-- id:a-root -->",
       "",
-      "- See [target](#target) and [asset](#rgb:contract) <!-- id:links -->",
-      "- [Target](#target) <!-- id:block -->",
-      "- ![Target](#target) <!-- id:embed -->",
-      "- My target ~~[Target](#target)~~ <!-- id:reword -->",
+      "- See [target](../source.md#target) and [asset](rgb:contract) <!-- id:links -->",
+      "- [Target](../source.md#target) <!-- id:block -->",
+      "- ![Target](../source.md) <!-- id:embed -->",
+      "- My target ~~[Target](../source.md#target)~~ <!-- id:reword -->",
+      `- ![Her pizza](//${alice}/pizza.md#dough) <!-- id:foreign -->`,
       "- ![feed](webcal://example.com/feed) <!-- id:feed -->",
-      "- [web](https://example.com/) <!-- id:web -->",
+      "- [web](https://example.com/#top) <!-- id:web -->",
+      "- [self](#a-root) <!-- id:self -->",
       "",
-      "# Second <!-- id:😀 -->",
+      "# Second <!-- id:second -->",
       "",
     ].join("\n")
   );
@@ -201,12 +91,15 @@ test("deposit construction derives every ordered S tag from the workspace graph"
   }
   const documents = await loadWorkspaceAsDocuments({ workspaceDir });
   const document = documents.find(
-    (candidate) => candidate.docId === "multi-root"
+    (candidate) => candidate.docId === "notes/main.md"
   );
   if (!document) {
-    throw new Error("Missing multi-root fixture document");
+    throw new Error("Missing notes/main.md fixture document");
   }
-  const content = fs.readFileSync(path.join(workspaceDir, "main.md"), "utf8");
+  const content = fs.readFileSync(
+    path.join(workspaceDir, "notes/main.md"),
+    "utf8"
+  );
   const dateNow = jest.spyOn(Date, "now").mockReturnValue(1234000);
   const event = buildDepositEvent(document, profile.pubkey, content, 1234);
   dateNow.mockRestore();
@@ -216,11 +109,16 @@ test("deposit construction derives every ordered S tag from the workspace graph"
     pubkey: profile.pubkey,
     created_at: 1234,
     tags: [
-      ["d", "multi-root"],
-      ["S", "a-root"],
-      ["S", "rgb:contract"],
-      ["S", ""],
-      ["S", "😀"],
+      ["d", "notes/main.md"],
+      ...[
+        `34774:${"b".repeat(64)}:pizza.md`,
+        `34774:${profile.pubkey}:source.md`,
+      ]
+        .sort()
+        .map((value) => ["a", value]),
+      ["i", "https://example.com/"],
+      ["i", "rgb:contract"],
+      ["i", "webcal://example.com/feed"],
       ["ms", "1234000"],
     ],
     content,
@@ -228,63 +126,54 @@ test("deposit construction derives every ordered S tag from the workspace graph"
 });
 
 test("replacement ordering chooses the latest timestamp then ms", () => {
-  const base = fixtureEvent(signedDepositFixtures[0]?.event);
+  const { path: workspaceDir } = knowstrInit();
+  const profile = loadCliProfile({ cwd: workspaceDir });
+  if (!profile.pubkey) {
+    throw new Error("Missing test workspace pubkey");
+  }
+  const { document } = parseToDocument(LOCAL, "# Notes <!-- id:notes -->\n", {
+    path: "notes.md",
+  });
+  const base = {
+    ...buildDepositEvent(document, profile.pubkey, "# Notes\n", 100),
+    sig: "0".repeat(128),
+  };
   const older = {
     ...base,
     id: "0".repeat(64),
     created_at: 99,
     tags: [
-      ["d", "replacement"],
+      ["d", "notes.md"],
       ["ms", "99000"],
     ],
   };
   const lowerMs = {
     ...base,
     id: "f".repeat(64),
-    created_at: 100,
     tags: [
-      ["d", "replacement"],
+      ["d", "notes.md"],
       ["ms", "100000"],
     ],
   };
   const higherMs = {
     ...base,
     id: "a".repeat(64),
-    created_at: 100,
     tags: [
-      ["d", "replacement"],
+      ["d", "notes.md"],
       ["ms", "100001"],
     ],
   };
+  const otherPath = {
+    ...base,
+    id: "b".repeat(64),
+    created_at: 1,
+    tags: [
+      ["d", "other.md"],
+      ["ms", "1000"],
+    ],
+  };
 
-  expect(selectLatestDepositEvents([older, lowerMs, higherMs])).toEqual([
-    higherMs,
-  ]);
-});
-
-test("signed deposit fixture selection uses production replacement ordering", () => {
-  const events = signedDepositFixtures.map((fixture) =>
-    fixtureEvent(fixture.event)
-  );
-  const selected = selectLatestDepositEvents(events);
-  const { selection } = fixtureCorpus();
-  if (!Array.isArray(selection)) {
-    throw new Error("Invalid deposit fixture selection");
-  }
-  const winnerNames = selection.map((entry) => {
-    if (!isRecord(entry) || typeof entry.winner !== "string") {
-      throw new Error("Invalid deposit fixture winner");
-    }
-    return entry.winner;
-  });
-  const namesById = new Map(
-    signedDepositFixtures.map((fixture) => {
-      if (typeof fixture.name !== "string") {
-        throw new Error("Invalid fixture name");
-      }
-      return [fixtureEvent(fixture.event).id, fixture.name];
-    })
-  );
-
-  expect(selected.map((event) => namesById.get(event.id))).toEqual(winnerNames);
+  expect(
+    selectLatestDepositEvents([older, lowerMs, higherMs, otherPath])
+  ).toEqual([higherMs, otherPath]);
 });

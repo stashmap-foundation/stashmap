@@ -3,7 +3,7 @@ import os from "os";
 import path from "path";
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { BOB, expectTree, renderApp, setup, type } from "../utils.test";
+import { BOB, expectTree, renderApp, setup } from "../utils.test";
 import { renderAppTree } from "../appTestUtils.test";
 import {
   expectMarkdown,
@@ -13,6 +13,7 @@ import {
 } from "../testFixtures/workspace";
 import { LOCAL } from "../core/nodeRef";
 import { KIND_KNOWLEDGE_DEPOSIT } from "../nostr";
+import { depositLinkTags } from "../nodesDocumentEvent";
 import { loadWorkspaceAsDocuments } from "../infra/filesystem/workspaceBackend";
 import {
   buildCoordinateRouteUrl,
@@ -63,18 +64,7 @@ async function fixedWorkspaceWithDocument(
   return workspacePath;
 }
 
-function austriaDocument(): string {
-  return [
-    "---",
-    "knowstr_doc_id: austria-doc",
-    "---",
-    "# Austria <!-- id:wd:Q40 -->",
-    "",
-  ].join("\n");
-}
-
 function fergusonDocument(
-  docId: string,
   rootId: string,
   title: string,
   quotePrefix: string,
@@ -84,32 +74,18 @@ function fergusonDocument(
     const n = index + 1;
     return [
       `- Quote ${n} <!-- id:${quotePrefix}-quote-${n} -->`,
-      `  - [Austria](#wd:Q40) <!-- id:${quotePrefix}-austria-link-${n} -->`,
+      `  - [Austria](wikidata:Q40) <!-- id:${quotePrefix}-austria-link-${n} -->`,
     ];
   }).flat();
-  return [
-    "---",
-    `knowstr_doc_id: ${docId}`,
-    "---",
-    `# ${title} <!-- id:${rootId} -->`,
-    ...quoteLines,
-    "",
-  ].join("\n");
+  return [`# ${title} <!-- id:${rootId} -->`, ...quoteLines, ""].join("\n");
 }
 
 async function groupingWorkspace(quoteCount: number): Promise<string> {
   const workspacePath = fixedWorkspace(BOB);
-  write(workspacePath, "austria.md", austriaDocument());
   write(
     workspacePath,
     "ferguson.md",
-    fergusonDocument(
-      "ferguson-doc",
-      "isbn:ferguson-book",
-      "Ferguson",
-      "ferguson",
-      quoteCount
-    )
+    fergusonDocument("ferguson-book", "Ferguson", "ferguson", quoteCount)
   );
   await knowstrSave(workspacePath);
   return workspacePath;
@@ -117,28 +93,15 @@ async function groupingWorkspace(quoteCount: number): Promise<string> {
 
 async function multiSourceGroupingWorkspace(): Promise<string> {
   const workspacePath = fixedWorkspace(BOB);
-  write(workspacePath, "austria.md", austriaDocument());
   write(
     workspacePath,
     "ferguson-a.md",
-    fergusonDocument(
-      "ferguson-a-doc",
-      "isbn:ferguson-a",
-      "Ferguson A",
-      "ferguson-a",
-      2
-    )
+    fergusonDocument("ferguson-a", "Ferguson A", "ferguson-a", 2)
   );
   write(
     workspacePath,
     "ferguson-b.md",
-    fergusonDocument(
-      "ferguson-b-doc",
-      "isbn:ferguson-b",
-      "Ferguson B",
-      "ferguson-b",
-      2
-    )
+    fergusonDocument("ferguson-b", "Ferguson B", "ferguson-b", 2)
   );
   await knowstrSave(workspacePath);
   return workspacePath;
@@ -160,7 +123,6 @@ function depositEvents(
 async function publishDepositFixture(
   relayPool: MockRelayPool,
   workspacePath: string,
-  relativePath: string,
   dTag: string,
   contentNeedle: string
 ): Promise<void> {
@@ -170,10 +132,7 @@ async function publishDepositFixture(
   if (!document) {
     throw new Error(`Missing fixture document ${dTag}`);
   }
-  const content = fs.readFileSync(
-    path.join(workspacePath, relativePath),
-    "utf8"
-  );
+  const content = fs.readFileSync(path.join(workspacePath, dTag), "utf8");
   const ms = Date.now();
   expect(content).toContain(contentNeedle);
   await Promise.all(
@@ -184,12 +143,11 @@ async function publishDepositFixture(
       kind: KIND_KNOWLEDGE_DEPOSIT,
       tags: [
         ["d", dTag],
-        ...[
-          ...new Set([
-            ...document.topNodeShortIds,
-            ...document.realWorldEntities,
-          ]),
-        ].map((id) => ["S", id]),
+        ...depositLinkTags(
+          document.docId,
+          profilePubkey(workspacePath),
+          content
+        ),
         ["ms", `${ms}`],
       ],
       content,
@@ -213,7 +171,7 @@ async function removeDepositFixture(
       id: `${dTag}-removed-${ms}`.padEnd(64, "0").slice(0, 64),
       created_at: Math.floor(ms / 1000),
       tags: [
-        ...previous.tags.filter(([name]) => name === "S"),
+        ...previous.tags.filter(([name]) => name === "a" || name === "i"),
         ["d", dTag],
         ["ms", `${ms}`],
       ],
@@ -236,11 +194,8 @@ test("two strangers find each other through an entity", async () => {
   const alicePath = await workspaceWithDocument(
     "barcelona.md",
     [
-      "---",
-      "knowstr_doc_id: alice-barcelona",
-      "---",
       "# Alice Barcelona <!-- id:alice-root -->",
-      "- [Barcelona](#wd:Q1492) <!-- id:alice-link -->",
+      "- [Barcelona](wikidata:Q1492) <!-- id:alice-link -->",
       "",
     ].join("\n")
   );
@@ -248,14 +203,13 @@ test("two strangers find each other through an entity", async () => {
   renderApp({
     ...bob(),
     roomRelays: [RELAY_URL],
-    initialRoute: "/local/n/wd%3AQ1492?label=Barcelona",
+    initialRoute: "/local/n/wikidata%3AQ1492?label=Barcelona",
   });
 
   await publishDepositFixture(
     relayPool,
     alicePath,
     "barcelona.md",
-    "alice-barcelona",
     "Alice Barcelona"
   );
 
@@ -291,11 +245,8 @@ test("a feed present only in a pulled document projects its entries", async () =
   const alicePath = await workspaceWithDocument(
     "salon.md",
     [
-      "---",
-      "knowstr_doc_id: alice-salon",
-      "---",
       "# Alice Salon <!-- id:alice-root -->",
-      "- [Barcelona](#wd:Q1492) <!-- id:alice-link -->",
+      "- [Barcelona](wikidata:Q1492) <!-- id:alice-link -->",
       `- ![${url}](${url.replace(
         "https://",
         "webcal://"
@@ -321,17 +272,11 @@ test("a feed present only in a pulled document projects its entries", async () =
   renderApp({
     ...bob(),
     roomRelays: [RELAY_URL],
-    initialRoute: "/local/n/wd%3AQ1492?label=Barcelona",
+    initialRoute: "/local/n/wikidata%3AQ1492?label=Barcelona",
     fetchCalendarFeed,
   });
 
-  await publishDepositFixture(
-    relayPool,
-    alicePath,
-    "salon.md",
-    "alice-salon",
-    "Alice Salon"
-  );
+  await publishDepositFixture(relayPool, alicePath, "salon.md", "Alice Salon");
 
   const incomingLink = await screen.findByRole("link", {
     name: /Navigate to Alice Salon/u,
@@ -345,166 +290,14 @@ test("a feed present only in a pulled document projects its entries", async () =
   expect(fetchCalendarFeed).toHaveBeenCalledWith(url);
 });
 
-test("a pulled authored node shadows its computed event on the entity surface", async () => {
-  const relayPool = mockRelayPool();
-  const url = "https://scholarium.at/salon.ics";
-  const alicePath = await workspaceWithDocument(
-    "salon.md",
-    [
-      "---",
-      "knowstr_doc_id: alice-salon",
-      "---",
-      "# Alice Salon <!-- id:alice-root -->",
-      "- [Barcelona](#wd:Q1492) <!-- id:alice-link -->",
-      "- Sommerfest planning <!-- id:ical:sommerfest@scholarium.at -->",
-      "",
-    ].join("\n")
-  );
-  const fetchCalendarFeed = jest.fn(() =>
-    Promise.resolve(
-      [
-        "BEGIN:VCALENDAR",
-        "VERSION:2.0",
-        "BEGIN:VEVENT",
-        "UID:sommerfest@scholarium.at",
-        "DTSTART;VALUE=DATE:20300714",
-        "SUMMARY:Sommerfest",
-        "END:VEVENT",
-        "END:VCALENDAR",
-      ].join("\r\n")
-    )
-  );
-  const readText = jest.fn(() =>
-    Promise.resolve("[event](#ical:sommerfest@scholarium.at)")
-  );
-  // eslint-disable-next-line functional/immutable-data
-  Object.defineProperty(navigator, "clipboard", {
-    value: { readText },
-    writable: true,
-    configurable: true,
-  });
-  const [bob] = setup([BOB], { relayPool });
-  renderApp({
-    ...bob(),
-    roomRelays: [RELAY_URL],
-    initialRoute: "/local/n/wd%3AQ1492?label=Barcelona",
-    fetchCalendarFeed,
-  });
-
-  await publishDepositFixture(
-    relayPool,
-    alicePath,
-    "salon.md",
-    "alice-salon",
-    "Alice Salon"
-  );
-  await screen.findByRole("link", { name: /Navigate to Alice Salon/u });
-
-  await userEvent.click(screen.getByLabelText("Open new pane"));
-  await type("Mine{Enter}{Tab}https://scholarium.at/salon.ics{Escape}");
-  await waitFor(() => expect(fetchCalendarFeed).toHaveBeenCalledWith(url));
-  await userEvent.click(screen.getByRole("treeitem", { name: "Mine" }));
-  await userEvent.keyboard("{Meta>}v{/Meta}");
-  await userEvent.click(await screen.findByRole("link", { name: "event" }));
-
-  await screen.findByRole("textbox", { name: "edit Sommerfest planning" });
-  expect(screen.queryByText("14.07.2030 Sommerfest")).toBeNull();
-});
-
-test("a direct embed in a pulled document yields to the reader's authored node", async () => {
-  const relayPool = mockRelayPool();
-  const url = "https://scholarium.at/salon.ics";
-  const bobPath = await fixedWorkspaceWithDocument(
-    BOB,
-    "bob-notes.md",
-    [
-      "# Bob Notes <!-- id:bob-notes -->",
-      "- Sommerfest planning <!-- id:ical:sommerfest@scholarium.at -->",
-      "  - Bob detail <!-- id:bob-detail -->",
-      "",
-    ].join("\n")
-  );
-  const alicePath = await workspaceWithDocument(
-    "salon.md",
-    [
-      "---",
-      "knowstr_doc_id: alice-salon",
-      "---",
-      "# Alice Salon <!-- id:alice-root -->",
-      "- [Barcelona](#wd:Q1492) <!-- id:alice-link -->",
-      `- ![cal](${url.replace(
-        "https://",
-        "webcal://"
-      )}) <!-- id:alice-feed -->`,
-      "- ![event](#ical:sommerfest@scholarium.at) <!-- id:alice-event -->",
-      "",
-    ].join("\n")
-  );
-  const fetchCalendarFeed = jest.fn(() =>
-    Promise.resolve(
-      [
-        "BEGIN:VCALENDAR",
-        "VERSION:2.0",
-        "BEGIN:VEVENT",
-        "UID:sommerfest@scholarium.at",
-        "DTSTART;VALUE=DATE:20300714",
-        "SUMMARY:Sommerfest",
-        "END:VEVENT",
-        "END:VCALENDAR",
-      ].join("\r\n")
-    )
-  );
-  await renderAppTree({
-    path: bobPath,
-    relayPool,
-    initialRoute: "/local/n/wd%3AQ1492?label=Barcelona",
-    fetchCalendarFeed,
-  });
-
-  await publishDepositFixture(
-    relayPool,
-    alicePath,
-    "salon.md",
-    "alice-salon",
-    "Alice Salon"
-  );
-
-  const incomingLink = await screen.findByRole("link", {
-    name: /Navigate to Alice Salon/u,
-  });
-  await userEvent.click(incomingLink);
-  await screen.findByText("READONLY");
-  await waitFor(() => expect(fetchCalendarFeed).toHaveBeenCalledWith(url));
-
-  await userEvent.click(await screen.findByLabelText(`expand ${url}`));
-  await userEvent.click(
-    await screen.findByLabelText("expand Sommerfest planning")
-  );
-
-  await expectTree(`
-[O] Alice Salon
-  [O] Barcelona
-  [O] ${url}
-    Sommerfest planning
-      Bob detail
-      [OI] Alice Salon ↩
-  [O] event
-  `);
-  expect(screen.queryByLabelText("expand event")).toBeNull();
-  expect(screen.queryByText("14.07.2030 Sommerfest")).toBeNull();
-});
-
 test("accepting remote incoming on an unmaterialized entity keeps bidirectional arrow", async () => {
   const relayPool = mockRelayPool();
   const bobPath = fixedWorkspace(BOB);
   const alicePath = await workspaceWithDocument(
     "barcelona.md",
     [
-      "---",
-      "knowstr_doc_id: alice-barcelona",
-      "---",
       "# Alice Barcelona <!-- id:alice-root -->",
-      "- [Barcelona](#wd:Q1492) <!-- id:alice-link -->",
+      "- [Barcelona](wikidata:Q1492) <!-- id:alice-link -->",
       "",
     ].join("\n")
   );
@@ -512,13 +305,12 @@ test("accepting remote incoming on an unmaterialized entity keeps bidirectional 
     relayPool,
     alicePath,
     "barcelona.md",
-    "alice-barcelona",
     "Alice Barcelona"
   );
   await renderAppTree({
     path: bobPath,
     relayPool,
-    initialRoute: "/local/n/wd%3AQ1492?label=Barcelona",
+    initialRoute: "/local/n/wikidata%3AQ1492?label=Barcelona",
   });
 
   await expectTree(`
@@ -546,18 +338,15 @@ test("entity page merges local and pulled incoming wikidata mentions", async () 
     "bob-notes.md",
     [
       "# Bob Notes <!-- id:bob-notes -->",
-      "- [Ludwig von Mises](#wd:Q7242) <!-- id:bob-mises-link -->",
+      "- [Ludwig von Mises](wikidata:Q7242) <!-- id:bob-mises-link -->",
       "",
     ].join("\n")
   );
   const alicePath = await workspaceWithDocument(
     "alice-notes.md",
     [
-      "---",
-      "knowstr_doc_id: alice-notes",
-      "---",
       "# Alice Notes <!-- id:alice-notes-root -->",
-      "- [Ludwig von Mises](#wd:Q7242) <!-- id:alice-mises-link -->",
+      "- [Ludwig von Mises](wikidata:Q7242) <!-- id:alice-mises-link -->",
       "",
     ].join("\n")
   );
@@ -571,7 +360,6 @@ test("entity page merges local and pulled incoming wikidata mentions", async () 
     relayPool,
     alicePath,
     "alice-notes.md",
-    "alice-notes",
     "Alice Notes"
   );
   await userEvent.click(
@@ -585,7 +373,7 @@ Ludwig von Mises
   `);
 });
 
-test("same-id local and pulled incoming entity refs deduplicate", async () => {
+test("same-path same-id local and pulled incoming entity refs stay apart without key clashes", async () => {
   const relayPool = mockRelayPool();
   const renderErrors = jest
     .spyOn(console, "error")
@@ -595,39 +383,31 @@ test("same-id local and pulled incoming entity refs deduplicate", async () => {
       BOB,
       "bitcoin.md",
       [
-        "# Bitcoin <!-- id:wd:Q131723 -->",
-        "- [Ludwig von Mises](#wd:Q7242) <!-- id:bob-mises-link -->",
+        "# Bitcoin <!-- id:bitcoin -->",
+        "- [Ludwig von Mises](wikidata:Q7242) <!-- id:bob-mises-link -->",
         "",
       ].join("\n")
     );
     const alicePath = await workspaceWithDocument(
-      "alice-bitcoin.md",
+      "bitcoin.md",
       [
-        "---",
-        "knowstr_doc_id: alice-bitcoin",
-        "---",
-        "# Bitcoin <!-- id:wd:Q131723 -->",
-        "- [Ludwig von Mises](#wd:Q7242) <!-- id:alice-mises-link -->",
+        "# Bitcoin <!-- id:bitcoin -->",
+        "- [Ludwig von Mises](wikidata:Q7242) <!-- id:bob-mises-link -->",
         "",
       ].join("\n")
     );
     await renderAppTree({
       path: bobPath,
       relayPool,
-      initialRoute: "/local/n/wd%3AQ7242?label=Ludwig%20von%20Mises",
+      initialRoute: "/local/n/wikidata%3AQ7242?label=Ludwig%20von%20Mises",
     });
 
-    await publishDepositFixture(
-      relayPool,
-      alicePath,
-      "alice-bitcoin.md",
-      "alice-bitcoin",
-      "Bitcoin"
-    );
+    await publishDepositFixture(relayPool, alicePath, "bitcoin.md", "Bitcoin");
 
     await expectTree(`
 Ludwig von Mises
   [I] Bitcoin ↩
+  [OI] Bitcoin ↩
   `);
     expect(
       renderErrors.mock.calls.some((call) =>
@@ -648,11 +428,8 @@ test("remote entity incoming refs open the remote deposit", async () => {
   const alicePath = await workspaceWithDocument(
     "alice-bitcoin.md",
     [
-      "---",
-      "knowstr_doc_id: alice-bitcoin",
-      "---",
-      "# Bitcoin <!-- id:wd:Q131723 -->",
-      "- [Ludwig von Mises](#wd:Q7242) <!-- id:alice-mises-link -->",
+      "# Bitcoin <!-- id:bitcoin -->",
+      "- [Ludwig von Mises](wikidata:Q7242) <!-- id:alice-mises-link -->",
       "",
     ].join("\n")
   );
@@ -660,14 +437,13 @@ test("remote entity incoming refs open the remote deposit", async () => {
   renderApp({
     ...bob(),
     roomRelays: [RELAY_URL],
-    initialRoute: "/local/n/wd%3AQ7242?label=Ludwig%20von%20Mises",
+    initialRoute: "/local/n/wikidata%3AQ7242?label=Ludwig%20von%20Mises",
   });
 
   await publishDepositFixture(
     relayPool,
     alicePath,
     "alice-bitcoin.md",
-    "alice-bitcoin",
     "Bitcoin"
   );
   await expectTree(`
@@ -681,7 +457,7 @@ Ludwig von Mises
   await waitFor(() => {
     expect(window.location.pathname).toMatch(/^\/deposit\//u);
     expect(new URLSearchParams(window.location.search).get("at")).toBe(
-      "wd:Q131723"
+      "bitcoin"
     );
   });
   await screen.findByText("READONLY");
@@ -691,7 +467,7 @@ test("incoming refs stay individual below the document grouping threshold", asyn
   const workspacePath = await groupingWorkspace(2);
   await renderAppTree({
     path: workspacePath,
-    initialRoute: "/local/n/wd%3AQ40?label=Austria",
+    initialRoute: "/local/n/wikidata%3AQ40?label=Austria",
   });
 
   await expectTree(`
@@ -706,7 +482,7 @@ test("incoming refs group by source root at threshold and expand with short labe
   const workspacePath = await groupingWorkspace(3);
   await renderAppTree({
     path: workspacePath,
-    initialRoute: "/local/n/wd%3AQ40?label=Austria",
+    initialRoute: "/local/n/wikidata%3AQ40?label=Austria",
   });
 
   await expectTree(`
@@ -731,7 +507,7 @@ test("accepting grouped incoming source writes one root link and suppresses its 
   const workspacePath = await groupingWorkspace(3);
   await renderAppTree({
     path: workspacePath,
-    initialRoute: "/local/n/wd%3AQ40?label=Austria",
+    initialRoute: "/local/n/wikidata%3AQ40?label=Austria",
   });
 
   await userEvent.click(
@@ -749,9 +525,8 @@ Austria
     workspacePath,
     "austria.md",
     [
-      "# Austria <!-- id:... -->",
-      "",
-      "- (!) ![Ferguson](#isbn:ferguson-book) <!-- id:... -->",
+      "- [Austria](wikidata:Q40) <!-- id:... -->",
+      "  - (!) ![Ferguson](ferguson.md#ferguson-book) <!-- id:... -->",
     ].join("\n")
   );
 });
@@ -760,7 +535,7 @@ test("accepting one grouped child writes that ref and dissolves the remaining pa
   const workspacePath = await groupingWorkspace(3);
   await renderAppTree({
     path: workspacePath,
-    initialRoute: "/local/n/wd%3AQ40?label=Austria",
+    initialRoute: "/local/n/wikidata%3AQ40?label=Austria",
   });
 
   await userEvent.click(await screen.findByLabelText("expand Ferguson ↩"));
@@ -781,9 +556,8 @@ Austria
     workspacePath,
     "austria.md",
     [
-      "# Austria <!-- id:... -->",
-      "",
-      "- (!) ![Quote 1](#ferguson-quote-1) <!-- id:... -->",
+      "- [Austria](wikidata:Q40) <!-- id:... -->",
+      "  - (!) ![Quote 1](ferguson.md#ferguson-quote-1) <!-- id:... -->",
     ].join("\n")
   );
 });
@@ -792,7 +566,7 @@ test("incoming grouping does not merge different source documents", async () => 
   const workspacePath = await multiSourceGroupingWorkspace();
   await renderAppTree({
     path: workspacePath,
-    initialRoute: "/local/n/wd%3AQ40?label=Austria",
+    initialRoute: "/local/n/wikidata%3AQ40?label=Austria",
   });
 
   await expectTree(`
@@ -808,28 +582,16 @@ test("remote incoming groups open the source root and expanded child source rows
   const relayPool = mockRelayPool();
   const alicePath = await workspaceWithDocument(
     "ferguson.md",
-    fergusonDocument(
-      "alice-ferguson",
-      "isbn:ferguson-book",
-      "Ferguson",
-      "alice-ferguson",
-      3
-    )
+    fergusonDocument("ferguson-book", "Ferguson", "alice-ferguson", 3)
   );
   const [bob] = setup([BOB], { relayPool });
   renderApp({
     ...bob(),
     roomRelays: [RELAY_URL],
-    initialRoute: "/local/n/wd%3AQ40?label=Austria",
+    initialRoute: "/local/n/wikidata%3AQ40?label=Austria",
   });
 
-  await publishDepositFixture(
-    relayPool,
-    alicePath,
-    "ferguson.md",
-    "alice-ferguson",
-    "Ferguson"
-  );
+  await publishDepositFixture(relayPool, alicePath, "ferguson.md", "Ferguson");
   await expectTree(`
 Austria
   [OI] Ferguson ↩
@@ -849,7 +611,7 @@ Austria
   await waitFor(() => {
     expect(window.location.pathname).toMatch(/^\/deposit\//u);
     expect(new URLSearchParams(window.location.search).get("at")).toBe(
-      "isbn:ferguson-book"
+      "ferguson-book"
     );
   });
 
@@ -857,7 +619,7 @@ Austria
   renderApp({
     ...bob(),
     roomRelays: [RELAY_URL],
-    initialRoute: "/local/n/wd%3AQ40?label=Austria",
+    initialRoute: "/local/n/wikidata%3AQ40?label=Austria",
   });
   await expectTree(`
 Austria
@@ -882,11 +644,8 @@ test("nonmatching and self-authored deposits do not render", async () => {
   const alicePath = await workspaceWithDocument(
     "madrid.md",
     [
-      "---",
-      "knowstr_doc_id: alice-madrid",
-      "---",
       "# Alice Madrid <!-- id:alice-madrid-root -->",
-      "- [Madrid](#wd:Q2807) <!-- id:alice-madrid-link -->",
+      "- [Madrid](wikidata:Q2807) <!-- id:alice-madrid-link -->",
       "",
     ].join("\n")
   );
@@ -894,11 +653,8 @@ test("nonmatching and self-authored deposits do not render", async () => {
     BOB,
     "barcelona.md",
     [
-      "---",
-      "knowstr_doc_id: bob-barcelona",
-      "---",
       "# Bob Barcelona <!-- id:bob-root -->",
-      "- [Barcelona](#wd:Q1492) <!-- id:bob-link -->",
+      "- [Barcelona](wikidata:Q1492) <!-- id:bob-link -->",
       "",
     ].join("\n")
   );
@@ -906,21 +662,19 @@ test("nonmatching and self-authored deposits do not render", async () => {
   renderApp({
     ...bob(),
     roomRelays: [RELAY_URL],
-    initialRoute: "/local/n/wd%3AQ1492?label=Barcelona",
+    initialRoute: "/local/n/wikidata%3AQ1492?label=Barcelona",
   });
 
   await publishDepositFixture(
     relayPool,
     alicePath,
     "madrid.md",
-    "alice-madrid",
     "Alice Madrid"
   );
   await publishDepositFixture(
     relayPool,
     bobPath,
     "barcelona.md",
-    "bob-barcelona",
     "Bob Barcelona"
   );
 
@@ -934,11 +688,8 @@ test("live replacement removes visible remote rows and stale events stay ignored
   const alicePath = await workspaceWithDocument(
     "live.md",
     [
-      "---",
-      "knowstr_doc_id: alice-live",
-      "---",
       "# Alice Barcelona <!-- id:alice-live-root -->",
-      "- [Barcelona](#wd:Q1492) <!-- id:alice-live-link -->",
+      "- [Barcelona](wikidata:Q1492) <!-- id:alice-live-link -->",
       "",
     ].join("\n")
   );
@@ -946,36 +697,24 @@ test("live replacement removes visible remote rows and stale events stay ignored
   renderApp({
     ...bob(),
     roomRelays: [RELAY_URL],
-    initialRoute: "/local/n/wd%3AQ1492?label=Barcelona",
+    initialRoute: "/local/n/wikidata%3AQ1492?label=Barcelona",
   });
 
   await withNow(10_000, () =>
-    publishDepositFixture(
-      relayPool,
-      alicePath,
-      "live.md",
-      "alice-live",
-      "Alice Barcelona"
-    )
+    publishDepositFixture(relayPool, alicePath, "live.md", "Alice Barcelona")
   );
   await expectTree(`
 Barcelona
   [OI] Alice Barcelona ↩
   `);
 
-  await withNow(20_000, () => removeDepositFixture(relayPool, "alice-live"));
+  await withNow(20_000, () => removeDepositFixture(relayPool, "live.md"));
   await expectTree(`
 Barcelona
   `);
 
   await withNow(5_000, () =>
-    publishDepositFixture(
-      relayPool,
-      alicePath,
-      "live.md",
-      "alice-live",
-      "Alice Barcelona"
-    )
+    publishDepositFixture(relayPool, alicePath, "live.md", "Alice Barcelona")
   );
   await expectTree(`
 Barcelona
@@ -988,7 +727,7 @@ test("tag subscriptions close when local attention navigates away", async () => 
   renderApp({
     ...bob(),
     roomRelays: [RELAY_URL],
-    initialRoute: "/local/n/wd%3AQ1492?label=Barcelona",
+    initialRoute: "/local/n/wikidata%3AQ1492?label=Barcelona",
   });
   await waitFor(() => {
     const subscription = relayPool
@@ -1020,11 +759,8 @@ test("deposit routes render Loading until the exact source arrives", async () =>
   const alicePath = await workspaceWithDocument(
     "route.md",
     [
-      "---",
-      "knowstr_doc_id: route-doc",
-      "---",
       "# Alice Barcelona <!-- id:route-root -->",
-      "- [Barcelona](#wd:Q1492) <!-- id:route-link -->",
+      "- [Barcelona](wikidata:Q1492) <!-- id:route-link -->",
       "",
     ].join("\n")
   );
@@ -1033,7 +769,7 @@ test("deposit routes render Loading until the exact source arrives", async () =>
     {
       eventKind: KIND_KNOWLEDGE_DEPOSIT,
       pubkey: profilePubkey(alicePath),
-      dTag: "route-doc",
+      dTag: "route.md",
       relays: [RELAY_URL],
     },
     undefined,
@@ -1053,7 +789,7 @@ test("deposit routes render Loading until the exact source arrives", async () =>
         candidate.filters.some(
           (filter) =>
             filter.kinds?.includes(KIND_KNOWLEDGE_DEPOSIT) &&
-            filter["#d"]?.includes("route-doc")
+            filter["#d"]?.includes("route.md")
         )
       );
     expect(subscription?.relays).toEqual([RELAY_URL]);
@@ -1063,7 +799,6 @@ test("deposit routes render Loading until the exact source arrives", async () =>
     relayPool,
     alicePath,
     "route.md",
-    "route-doc",
     "Alice Barcelona"
   );
   await expectTree(`
@@ -1077,9 +812,6 @@ test("a demoted link in a pulled document drills down on the exact route", async
   const alicePath = await workspaceWithDocument(
     "dup.md",
     [
-      "---",
-      "knowstr_doc_id: dup-doc",
-      "---",
       "# Alice Doc <!-- id:dup-root -->",
       "- Shared <!-- id:shared -->",
       "  - Insight <!-- id:shared-i -->",
@@ -1090,7 +822,7 @@ test("a demoted link in a pulled document drills down on the exact route", async
   const coordinate: RouteCoordinate = {
     eventKind: KIND_KNOWLEDGE_DEPOSIT,
     pubkey: profilePubkey(alicePath),
-    dTag: "dup-doc",
+    dTag: "dup.md",
     relays: [RELAY_URL],
   };
   const [bob] = setup([BOB], { relayPool });
@@ -1104,13 +836,7 @@ test("a demoted link in a pulled document drills down on the exact route", async
       undefined
     ),
   });
-  await publishDepositFixture(
-    relayPool,
-    alicePath,
-    "dup.md",
-    "dup-doc",
-    "Alice Doc"
-  );
+  await publishDepositFixture(relayPool, alicePath, "dup.md", "Alice Doc");
   const [depositRoot] = await screen.findAllByRole("treeitem");
   await userEvent.click(depositRoot);
   await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");

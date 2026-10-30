@@ -1,11 +1,12 @@
 import { LOCAL } from "../core/nodeRef";
-import { resolveDocumentTarget } from "../core/Document";
+import { documentKeyOf } from "../core/Document";
 import {
   getNodeInSource,
   graphLookupFromData,
   lookupNode,
+  resolveRef,
 } from "../core/graphLookup";
-import { classifyLinkHref } from "../core/linkPath";
+import { classifyLinkHref, resolveLink } from "../core/linkPath";
 import { buildDocumentRouteUrl, buildNodeRouteUrl } from "../navigationUrl";
 
 export type EditorNavigationTarget = {
@@ -83,6 +84,18 @@ function localTargetToHref(data: Data, targetID: ID): string | undefined {
   });
 }
 
+export function rowRouteHref(data: Data, target: NodeRef): string | undefined {
+  return (
+    inlineTargetToHref(data, target.id, target.sourceId) ??
+    (target.sourceId === LOCAL
+      ? undefined
+      : buildNodeRouteUrl(target.id, target.sourceId, {
+          scrollToId: undefined,
+          fallbackLabel: undefined,
+        }))
+  );
+}
+
 export function isDeadLinkTarget(
   data: Data,
   href: string,
@@ -91,16 +104,12 @@ export function isDeadLinkTarget(
 ): boolean {
   if (sourceId !== LOCAL) return false;
   const targetClass = classifyLinkHref(href);
-  if (targetClass === "node") {
-    return (
-      lookupNode(graphLookupFromData(data), href.slice(1), sourceId) ===
-      undefined
-    );
-  }
-  if (targetClass !== "document" && targetClass !== "file") return false;
-  const hashIndex = href.lastIndexOf("#");
-  const path = hashIndex < 0 ? href : href.slice(0, hashIndex);
-  return resolveDocumentTarget(data, source, sourceId, path) === undefined;
+  if (targetClass !== "node" && targetClass !== "file") return false;
+  const target = resolveLink(href, { sourceId, id: source.id });
+  return (
+    target === undefined ||
+    resolveRef(graphLookupFromData(data), target) === undefined
+  );
 }
 
 export function inlineLinkToHref(
@@ -111,48 +120,35 @@ export function inlineLinkToHref(
   fallbackLabel?: string
 ): string | undefined {
   const targetClass = classifyLinkHref(href);
-  if (
-    targetClass === "entity" ||
-    targetClass === "calendar" ||
-    targetClass === "thing"
-  ) {
-    const targetID = targetClass === "thing" ? href : href.slice(1);
+  const target = resolveLink(href, { sourceId, id: source.id });
+  if (!target) {
+    return undefined;
+  }
+  if (targetClass === "calendar" || targetClass === "thing") {
     return sourceId === LOCAL
-      ? localTargetToHref(data, targetID) ??
-          buildNodeRouteUrl(targetID, LOCAL, {
+      ? localTargetToHref(data, target.id) ??
+          buildNodeRouteUrl(target.id, LOCAL, {
             scrollToId: undefined,
             fallbackLabel,
           })
-      : inlineTargetToHref(data, targetID, sourceId) ??
-          localTargetToHref(data, targetID) ??
-          buildNodeRouteUrl(targetID, LOCAL, {
+      : inlineTargetToHref(data, target.id, sourceId) ??
+          localTargetToHref(data, target.id) ??
+          buildNodeRouteUrl(target.id, LOCAL, {
             scrollToId: undefined,
             fallbackLabel,
           });
   }
   if (targetClass === "node") {
-    return (
-      inlineTargetToHref(data, href.slice(1), sourceId) ??
-      (sourceId === LOCAL
-        ? undefined
-        : buildNodeRouteUrl(href.slice(1), sourceId, {
-            scrollToId: undefined,
-            fallbackLabel: undefined,
-          }))
-    );
+    return rowRouteHref(data, target);
   }
-  if (targetClass !== "document" && targetClass !== "file") {
-    return undefined;
-  }
-  const hashIndex = href.lastIndexOf("#");
-  const path = hashIndex < 0 ? href : href.slice(0, hashIndex);
-  const scrollToId = hashIndex < 0 ? undefined : href.slice(hashIndex + 1);
-  const document = resolveDocumentTarget(data, source, sourceId, path);
+  const document = data.documents.get(
+    documentKeyOf(target.sourceId, target.id)
+  );
   return document
     ? buildDocumentRouteUrl(
         document.sourceId,
         document.docId,
-        scrollToId || undefined,
+        undefined,
         data.pull?.coordinatesBySourceId.get(document.sourceId)
       )
     : undefined;

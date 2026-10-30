@@ -1,6 +1,6 @@
 import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react";
 import { List, Map, Set, OrderedSet } from "immutable";
-import { LOCAL } from "./core/nodeRef";
+import { LOCAL, rowKey } from "./core/nodeRef";
 import { generatePaneId } from "./SplitPanesContext";
 import {
   jsonToPanes,
@@ -139,7 +139,7 @@ function getUrlPanes(myPublicKey: PublicKey | undefined): Pane[] | undefined {
         routeCoordinate: storageRoute,
         ...(at === undefined
           ? { documentId: storageRoute.dTag }
-          : { rootNodeId: at }),
+          : { rootNodeId: rowKey(storageRoute.dTag, at) }),
         ...(storageKey !== undefined && { storageKey }),
       },
     ];
@@ -157,7 +157,7 @@ function getUrlPanes(myPublicKey: PublicKey | undefined): Pane[] | undefined {
         routeCoordinate: depositRoute,
         ...(at === undefined
           ? { documentId: depositRoute.dTag }
-          : { rootNodeId: at }),
+          : { rootNodeId: rowKey(depositRoute.dTag, at) }),
       },
     ];
   }

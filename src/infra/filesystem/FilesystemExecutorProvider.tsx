@@ -3,102 +3,34 @@ import { Map as ImmutableMap } from "immutable";
 import { finalizeEvent } from "nostr-tools";
 import { LOCAL } from "../../core/nodeRef";
 import { useBackend } from "../../BackendContext";
-import { useDocumentStore, useDocuments } from "../../DocumentStore";
+import { useDocumentStore } from "../../DocumentStore";
 import { ExecutorProvider } from "../../ExecutorContext";
 import { buildDocumentWrites, Plan } from "../../planner";
 import {
   Document,
   DocumentDelete,
   ParsedDocument,
-  documentKeyOf,
+  fileNameTitle,
   parseToDocument,
 } from "../../core/Document";
-import { LOG_ROOT_FILE } from "../../core/systemRoots";
 import { isUserLoggedInWithSeed } from "../../NostrAuthContext";
 import { buildDepositEvent } from "../../nodesDocumentEvent";
 import type { WorkspaceConfig } from "../../workspaceConfig";
 import type { WritePublisher } from "./writeSupport";
 
-function slugify(text: string): string {
-  const slug = text
-    .toLowerCase()
-    .replace(/<!--.*?-->/gu, "")
-    .replace(/[^\p{Letter}\p{Number}\s-]/gu, "")
-    .trim()
-    .replace(/\s+/gu, "-");
-  return slug.length > 0 ? slug : "document";
-}
-
-function uniqueSlugPath(baseSlug: string, taken: ReadonlySet<string>): string {
-  const candidate = (suffix: number): string =>
-    suffix === 1 ? `${baseSlug}.md` : `${baseSlug}-${suffix}.md`;
-  const firstFree = (suffix: number): string =>
-    taken.has(candidate(suffix)) ? firstFree(suffix + 1) : candidate(suffix);
-  return firstFree(1);
-}
-
-function collectTakenPaths(
-  documents: ImmutableMap<string, Document>
-): ReadonlySet<string> {
-  return documents.reduce(
-    (paths, doc) => (doc.filePath ? new Set([...paths, doc.filePath]) : paths),
-    new Set<string>()
-  );
-}
-
-function lookupFilePath(
-  documents: ImmutableMap<string, Document>,
-  docId: string
-): string | undefined {
-  return documents.get(documentKeyOf(LOCAL, docId))?.filePath;
-}
-
-type EnrichedWrite = {
-  parsed: ParsedDocument;
-  filePath: string;
+function parsedWrite(write: {
+  document: Document;
   content: string;
-};
-
-function enrichWithFilePath(
-  write: { document: Document; content: string },
-  documents: ImmutableMap<string, Document>,
-  taken: ReadonlySet<string>
-): EnrichedWrite {
-  const existing = lookupFilePath(documents, write.document.docId);
-  const filePath =
-    write.document.systemRole === "log"
-      ? LOG_ROOT_FILE
-      : existing ??
-        uniqueSlugPath(
-          slugify(write.document.title || write.document.docId),
-          taken
-        );
-  // Same title rule as the initial load (workspaceScan): on a file
-  // workspace the filename is the identity, so it beats content-derived
-  // titles. Without this, the first save silently renamed the document.
-  const filePathParts = filePath.split("/");
-  const fallbackTitle =
-    filePathParts[filePathParts.length - 1]?.replace(/\.md$/u, "") || undefined;
+}): ParsedDocument {
   const parsed = parseToDocument(LOCAL, write.content, {
+    path: write.document.docId,
+    fallbackTitle: fileNameTitle(write.document.docId),
     updatedMsOverride: Date.now(),
-    docIdFallback: write.document.docId,
-    ...(fallbackTitle !== undefined ? { fallbackTitle } : {}),
     ...(write.document.systemRole !== undefined
       ? { systemRoleOverride: write.document.systemRole }
       : {}),
   });
-  return {
-    parsed: {
-      document: {
-        ...parsed.document,
-        filePath,
-        realWorldEntities: write.document.realWorldEntities,
-      },
-      nodes: parsed.nodes,
-    },
-    filePath,
-    content: write.content,
-  };
+  return { document: parsed.document, nodes: parsed.nodes };
 }
 
 function publishDocument(
@@ -139,7 +71,6 @@ export function FilesystemExecutorProvider({
   children: React.ReactNode;
 }): JSX.Element {
   const store = useDocumentStore();
-  const documents = useDocuments();
   const backend = useBackend();
   const { workspace } = backend;
 
@@ -156,51 +87,40 @@ export function FilesystemExecutorProvider({
     }));
 
     const writes = buildDocumentWrites(plan);
-    const deletions = plan.deletedDocs
-      .toArray()
-      .map((docId): { del: DocumentDelete; filePath?: string } => ({
-        del: { sourceId: LOCAL, docId, deletedAt: Date.now() },
-        filePath: lookupFilePath(documents, docId),
-      }));
+    const deletions = plan.deletedDocs.toArray().map(
+      (docId): DocumentDelete => ({
+        sourceId: LOCAL,
+        docId,
+        deletedAt: Date.now(),
+      })
+    );
 
     if (writes.length === 0 && deletions.length === 0) return;
 
     const saveMs = Date.now();
-    const enriched = writes.reduce<{
-      items: EnrichedWrite[];
-      taken: ReadonlySet<string>;
-    }>(
-      (acc, write) => {
-        const result = enrichWithFilePath(write, documents, acc.taken);
-        return {
-          items: [...acc.items, result],
-          taken: new Set([...acc.taken, result.filePath]),
-        };
-      },
-      { items: [], taken: collectTakenPaths(documents) }
-    );
+    const parsedWrites = writes.map((write) => ({
+      parsed: parsedWrite(write),
+      content: write.content,
+    }));
 
     if (store) {
-      enriched.items.forEach((write) => store.upsertDocument(write.parsed));
-      deletions.forEach(({ del }) => store.deleteDocument(del));
+      parsedWrites.forEach((write) => store.upsertDocument(write.parsed));
+      deletions.forEach((del) => store.deleteDocument(del));
     }
 
     if (workspace) {
-      const deletedPaths = deletions
-        .map((item) => item.filePath)
-        .filter((p): p is string => p !== undefined);
       await workspace.save(
-        enriched.items.map((write) => ({
-          relativePath: write.filePath,
+        parsedWrites.map((write) => ({
+          relativePath: write.parsed.document.docId,
           content: write.content,
         })),
-        deletedPaths
+        deletions.map((del) => del.docId)
       );
       const { workspaceConfig, user } = backend;
       if (workspaceConfig && user) {
         const publishResults = (
           await Promise.all(
-            enriched.items.map((write) =>
+            parsedWrites.map((write) =>
               publishDocument(
                 write.parsed.document,
                 write.content,

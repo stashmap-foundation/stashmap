@@ -1,11 +1,10 @@
-import { v4 } from "uuid";
-import { LOCAL } from "./core/nodeRef";
+import { LOCAL, pathOf } from "./core/nodeRef";
 import { getNode } from "./core/connections";
 import {
   MarkdownImportFile,
   parseMarkdownImportFiles,
 } from "./core/markdownImport";
-import { materializeTree, WalkContext } from "./core/markdownNodes";
+import { materializeTree } from "./core/markdownNodes";
 import { MarkdownTreeNode } from "./core/markdownTree";
 import {
   GraphPlan,
@@ -14,53 +13,65 @@ import {
   planMoveDescendantNodes,
   planUpsertNodes,
 } from "./planner";
-import { planUpsertRootDocument, withDocumentRoot } from "./core/plan";
-import { newGraphNode } from "./core/nodeFactory";
-import { plainSpans } from "./core/nodeSpans";
+import { planUpsertRootDocument } from "./core/plan";
+import { newGraphNode, newRowKey } from "./core/nodeFactory";
+import { plainSpans, spansText } from "./core/nodeSpans";
+import { newDocumentPath } from "./core/Document";
+
+function planMaterializeTrees<T extends GraphPlan>(
+  plan: T,
+  trees: MarkdownTreeNode[],
+  path: string
+): [T, ID[]] {
+  const result = materializeTree(trees, LOCAL, path, {
+    context: {
+      knowledgeDBs: plan.knowledgeDBs,
+      sourceId: LOCAL,
+      affectedDocuments: plan.affectedDocuments,
+    },
+  });
+  return [
+    {
+      ...plan,
+      knowledgeDBs: result.context.knowledgeDBs,
+      affectedDocuments: result.context.affectedDocuments,
+    },
+    result.topNodeIds,
+  ];
+}
 
 export function planCreateNodesFromMarkdownTrees<T extends GraphPlan>(
   plan: T,
-  trees: MarkdownTreeNode[],
-  options: { createDocuments?: boolean } = {}
-): [T, topItemIDs: ID[], topNodeIDs: ID[]] {
-  const createDocuments = options.createDocuments ?? true;
-  const walkContext: WalkContext = {
-    knowledgeDBs: plan.knowledgeDBs,
-    sourceId: LOCAL,
-    affectedDocuments: plan.affectedDocuments,
-  };
-  const treesWithDocIds = createDocuments
-    ? trees.map((tree) => ({
-        ...tree,
-        docId: tree.docId ?? v4(),
-      }))
-    : trees;
-  const result = materializeTree(treesWithDocIds, LOCAL, {
-    context: walkContext,
-  });
-  const planWithNodes: T = {
-    ...plan,
-    knowledgeDBs: result.context.knowledgeDBs,
-    affectedDocuments: result.context.affectedDocuments,
-  };
-  if (!createDocuments) {
-    return [planWithNodes, result.topNodeIds, result.topNodeIds];
-  }
-  const userNodes = result.context.knowledgeDBs.get(LOCAL)?.nodes;
-  const planWithDocs = result.topNodeIds.reduce<T>((acc, longId) => {
-    const rootNode = userNodes?.get(longId);
-    return rootNode ? planUpsertRootDocument(acc, rootNode) : acc;
-  }, planWithNodes);
-  return [planWithDocs, result.topNodeIds, result.topNodeIds];
+  trees: MarkdownTreeNode[]
+): [T, topNodeIDs: ID[]] {
+  return trees.reduce<[T, ID[]]>(
+    ([accPlan, accIds], tree) => {
+      const path = newDocumentPath(accPlan.documents, spansText(tree.spans));
+      const [planWithNodes, [topNodeId]] = planMaterializeTrees(
+        accPlan,
+        [tree],
+        path
+      );
+      const rootNode = getNode(planWithNodes.knowledgeDBs, topNodeId, LOCAL);
+      return rootNode
+        ? [
+            planUpsertRootDocument(planWithNodes, rootNode),
+            [...accIds, topNodeId],
+          ]
+        : [planWithNodes, accIds];
+    },
+    [plan, []]
+  );
 }
 
 export function planCreateNodesFromMarkdownFiles<T extends GraphPlan>(
   plan: T,
   files: MarkdownImportFile[]
 ): [T, topItemIDs: ID[]] {
-  const trees = parseMarkdownImportFiles(files);
-  const [nextPlan, topItemIDs] = planCreateNodesFromMarkdownTrees(plan, trees);
-  return [nextPlan, topItemIDs];
+  return planCreateNodesFromMarkdownTrees(
+    plan,
+    parseMarkdownImportFiles(files)
+  );
 }
 
 export function planCreateNodesFromMarkdown<T extends GraphPlan>(
@@ -76,7 +87,9 @@ export function planCreateNodesFromMarkdown<T extends GraphPlan>(
   }
 
   const fallbackText = "Imported Markdown";
-  const fallbackNode = withDocumentRoot(newGraphNode(plainSpans(fallbackText)));
+  const fallbackNode = newGraphNode(plainSpans(fallbackText), {
+    id: newRowKey(newDocumentPath(nextPlan.documents, fallbackText)),
+  });
   return [planUpsertNodes(nextPlan, fallbackNode), fallbackNode.id];
 }
 
@@ -133,10 +146,11 @@ function planInsertMarkdownTreesByParentId<T extends GraphPlan>(
     };
   }
 
-  const [planWithNodes, topItemIDs, topNodeIDs] =
-    planCreateNodesFromMarkdownTrees(plan, trees, {
-      createDocuments: false,
-    });
+  const [planWithNodes, topNodeIDs] = planMaterializeTrees(
+    plan,
+    trees,
+    pathOf(parentNode.id)
+  );
   const movedPlan = moveCreatedTreesToParent(
     planWithNodes,
     topNodeIDs,
@@ -153,7 +167,7 @@ function planInsertMarkdownTreesByParentId<T extends GraphPlan>(
 
   return {
     plan: planWithAdded,
-    topItemIDs,
+    topItemIDs: topNodeIDs,
     topNodeIDs,
     actualItemIDs,
   };

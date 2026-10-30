@@ -159,7 +159,7 @@ My Notes
       if (!event) throw new Error("Missing Log event");
 
       expect(event.content).toContain("[\\[First Note\\]");
-      expect(event.content).toMatch(/\]\(#[^)]+\) <!-- id:/u);
+      expect(event.content).toMatch(/\]\(first-notefake\.md#[^)]+\) <!-- id:/u);
       expect(event.content).not.toContain("[[First Note]");
     });
 

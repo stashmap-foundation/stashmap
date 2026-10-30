@@ -21,7 +21,7 @@ import {
 
 function interestFilter(interest: PullInterest): Filter {
   if (interest.kind === "tag") {
-    return { kinds: [KIND_KNOWLEDGE_DEPOSIT], "#S": interest.tags };
+    return { kinds: [KIND_KNOWLEDGE_DEPOSIT], "#i": interest.tags };
   }
   return {
     kinds: [KIND_KNOWLEDGE_DEPOSIT],
@@ -56,7 +56,7 @@ function buildOverlayGraphIndex(records: PullRecordMap): GraphIndex {
     if (record.status !== "available") {
       return acc;
     }
-    return addNodesToGraphIndex(acc, record.nodes, undefined, record.sourceId);
+    return addNodesToGraphIndex(acc, record.nodes, record.sourceId);
   }, createEmptyGraphIndex());
 }
 
@@ -202,7 +202,6 @@ export function PullSourceProvider({
       knowledgeDBs={mergedKnowledgeDBs}
       graphIndex={mergeGraphIndexes(data.graphIndex, overlayGraphIndex)}
       documents={data.documents.merge(overlayDocuments)}
-      documentByFilePath={data.documentByFilePath}
       publishEventsStatus={data.publishEventsStatus}
       pull={pull}
       views={data.views}

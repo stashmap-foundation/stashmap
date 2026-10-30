@@ -18,7 +18,7 @@ import {
   nodePathLabel as nodePathLabelOf,
 } from "./core/connections";
 import { linkSpan, nodeText, plainSpans } from "./core/nodeSpans";
-import { getDocumentByIdOrFilePath, type Document } from "./core/Document";
+import { documentKeyOf, type Document } from "./core/Document";
 import { DEFAULT_TYPE_FILTERS } from "./core/constants";
 import { getIncomingCrefsForNode } from "./semanticProjection";
 import { buildReferenceItem } from "./buildReferenceRow";
@@ -183,12 +183,7 @@ function createIncomingRow(
   const { viewPath, node, sourceId, parentRef } = input;
   const pane = data.panes[viewPath[0]];
   const document = pane.documentId
-    ? getDocumentByIdOrFilePath(
-        data.documents,
-        data.documentByFilePath,
-        pane.sourceId,
-        pane.documentId
-      )
+    ? data.documents.get(documentKeyOf(pane.sourceId, pane.documentId))
     : undefined;
   const topNodeID = document?.topNodeShortIds[0];
   const documentRoot =
@@ -309,7 +304,8 @@ function createVirtualRowNode(
       id: rowRef.id,
       spans: [
         linkSpan(
-          rowRef.id,
+          rowRef,
+          rowRef,
           nodePathLabel(data.knowledgeDBs, incomingRow) ?? ""
         ),
       ],
@@ -337,7 +333,7 @@ function incomingTakeTarget(
     id: sourceNodeID,
   })?.node;
   return createRefTarget(
-    sourceNodeID,
+    { sourceId, id: sourceNodeID },
     sourceRow ? nodeText(sourceRow) : undefined
   );
 }
@@ -422,7 +418,8 @@ function createVirtualRow(
       projected:
         input.parentRow !== undefined &&
         (input.parentRow.projected === true ||
-          embedTargetOf(input.parentRow.node) !== undefined),
+          embedTargetOf(input.parentRow.node, input.parentRow.sourceId) !==
+            undefined),
       parentRow: input.parentRow,
       parentNode: input.parentRow?.node,
       parentRef,
@@ -544,7 +541,13 @@ function createIncomingGroupChildRow(
   const node: GraphNode = {
     children: List<ID>(),
     id: childID,
-    spans: [linkSpan(childID, nodeText(sourceNode))],
+    spans: [
+      linkSpan(
+        { sourceId: parentRow.sourceId, id: childID },
+        { sourceId: parentRow.sourceId, id: childID },
+        nodeText(sourceNode)
+      ),
+    ],
     parent: parentRow.parentRef.id,
     updated: sourceNode.updated ?? parentRow.node.updated,
     root: sourceNode.root ?? parentRow.node.root,
@@ -967,7 +970,7 @@ export function getNodesInDocument(
     document.sourceId,
     expansionPathOf(documentRootPath),
     topNodes,
-    document.filePath
+    document.docId
   );
 
   const footer = appendVirtualFooterRows(data, graph, {

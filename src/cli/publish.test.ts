@@ -15,13 +15,9 @@ import { sha256 } from "@noble/hashes/sha256";
 import { bytesToHex } from "@noble/hashes/utils";
 import { KIND_KNOWLEDGE_DEPOSIT } from "../nostr";
 import { PUBLISH_TIMEOUT } from "../infra/nostr/nostrPublish";
-import {
-  knowstrInit,
-  knowstrPublish,
-  readNodeId,
-  write,
-} from "../testFixtures/workspace";
+import { knowstrInit, knowstrPublish, write } from "../testFixtures/workspace";
 import { runInitCommand } from "./init";
+import { decodePublicKeyInputSync } from "../infra/nostr/publicKeys";
 
 const ROOM = "wss://room.example/";
 const MIRROR = "wss://mirror.example/";
@@ -107,16 +103,6 @@ function readFile(workspaceDir: string, relativePath: string): string {
   return fs.readFileSync(path.join(workspaceDir, relativePath), "utf8");
 }
 
-function readDocId(workspaceDir: string, relativePath: string): string {
-  const match = readFile(workspaceDir, relativePath).match(
-    /^---\nknowstr_doc_id: (\S+)\n/u
-  );
-  if (!match?.[1]) {
-    throw new Error(`readDocId: no knowstr_doc_id in ${relativePath}`);
-  }
-  return match[1];
-}
-
 function readPublished(workspaceDir: string): unknown {
   return JSON.parse(readFile(workspaceDir, ".knowstr/published.json"));
 }
@@ -134,8 +120,8 @@ function fingerprintOf(event: UnsignedEvent): string {
   );
 }
 
-function sTags(event: Event): string[] {
-  return event.tags.filter((tag) => tag[0] === "S").map((tag) => tag[1]);
+function linkTags(event: Event): string[][] {
+  return event.tags.filter((tag) => tag[0] === "a" || tag[0] === "i");
 }
 
 function publishedEvents(
@@ -180,6 +166,7 @@ test("publish saves, signs one deposit per document, and records each relay that
     changed_paths: paths,
     accepted_paths: paths,
     unaccepted_paths: [],
+    retracted_paths: [],
     rejections: paths.map((docPath) => ({
       path: docPath,
       relay: MIRROR,
@@ -207,17 +194,13 @@ test("publish saves, signs one deposit per document, and records each relay that
   });
   expect(events[0].event.content).toBe(readFile(workspaceDir, "a.md"));
   expect(events[1].event.content).toBe(readFile(workspaceDir, "notes/b.md"));
-  expect(events[0].event.tags).toContainEqual([
-    "d",
-    readDocId(workspaceDir, "a.md"),
-  ]);
-  expect(sTags(events[0].event)).toEqual([
-    readNodeId(workspaceDir, "a.md", "# Alpha"),
-  ]);
+  expect(events[0].event.tags).toContainEqual(["d", "a.md"]);
+  expect(events[1].event.tags).toContainEqual(["d", "notes/b.md"]);
+  expect(linkTags(events[0].event)).toEqual([]);
   expect(readPublished(workspaceDir)).toEqual({
     [ROOM]: {
-      [readDocId(workspaceDir, "a.md")]: fingerprintOf(events[0].event),
-      [readDocId(workspaceDir, "notes/b.md")]: fingerprintOf(events[1].event),
+      "a.md": fingerprintOf(events[0].event),
+      "notes/b.md": fingerprintOf(events[1].event),
     },
   });
   expect(close).toHaveBeenCalledWith([ROOM, MIRROR]);
@@ -247,8 +230,8 @@ test("publish retries only the relays that did not accept a document", async () 
     [MIRROR],
   ]);
   const fingerprints = {
-    [readDocId(workspaceDir, "a.md")]: fingerprintOf(events[0].event),
-    [readDocId(workspaceDir, "b.md")]: fingerprintOf(events[1].event),
+    "a.md": fingerprintOf(events[0].event),
+    "b.md": fingerprintOf(events[1].event),
   };
   expect(readPublished(workspaceDir)).toEqual({
     [ROOM]: fingerprints,
@@ -261,6 +244,7 @@ test("publish retries only the relays that did not accept a document", async () 
     changed_paths: [],
     accepted_paths: [],
     unaccepted_paths: [],
+    retracted_paths: [],
     rejections: [],
     warnings: [],
   });
@@ -289,6 +273,7 @@ test("publish keeps a document held by one relay when the other keeps rejecting 
     changed_paths: [],
     accepted_paths: [],
     unaccepted_paths: [],
+    retracted_paths: [],
     rejections: [
       {
         path: path.join(workspaceDir, "a.md"),
@@ -330,56 +315,135 @@ test("publish backfills a relay added after the first publication", async () => 
   ]);
 });
 
-test("publish republishes a document whose tags change without its bytes changing", async () => {
-  const { path: workspaceDir } = knowstrInit();
+test("publish tags a deposit with the files and things it links to", async () => {
+  const { path: workspaceDir, npub } = knowstrInit();
+  const pubkey = decodePublicKeyInputSync(npub);
+  const alice = nip19.npubEncode("b".repeat(64));
   write(
     workspaceDir,
-    "a.md",
-    "# Alpha <!-- id:a -->\n- [see x](#x) <!-- id:a1 -->\n"
+    "notes/a.md",
+    [
+      "# Alpha <!-- id:a -->",
+      "",
+      "- [Here](#a1) <!-- id:a1 -->",
+      "- [Beta](../b.md) <!-- id:a2 -->",
+      "- ![Sauce](sauce.md#x) <!-- id:a3 -->",
+      `- Ask [Alice](//${alice}) about [her pizza](//${alice}/pizza.md#dough) <!-- id:a4 -->`,
+      "- [Spain](wikidata:Q29) and [trains](https://example.org/trains#today) <!-- id:a5 -->",
+      "- ![Holidays](webcal://example.org/holidays.ics) <!-- id:a6 -->",
+      "",
+    ].join("\n")
   );
-  write(workspaceDir, "b.md", "# Beta <!-- id:b -->\n- x <!-- id:x -->\n");
-  write(workspaceDir, "c.md", "# Gamma <!-- id:c -->\n");
-  const first = recordingPool();
-  await knowstrPublish(workspaceDir, first.pool);
-  expect(sTags(publishedEvents(first.publish)[0].event)).toEqual(["a", "b"]);
-  const alpha = readFile(workspaceDir, "a.md");
-
   write(workspaceDir, "b.md", "# Beta <!-- id:b -->\n");
-  write(workspaceDir, "c.md", "# Gamma <!-- id:c -->\n- x <!-- id:x -->\n");
-  const second = recordingPool();
+  const { pool, publish } = recordingPool();
+
+  await knowstrPublish(workspaceDir, pool);
+
+  const [, deposit] = publishedEvents(publish).map(({ event }) => event);
+  expect(deposit.tags.slice(0, -1)).toEqual([
+    ["d", "notes/a.md"],
+    ["a", `34774:${pubkey}:b.md`],
+    ["a", `34774:${pubkey}:notes/sauce.md`],
+    ["a", `34774:${"b".repeat(64)}:pizza.md`],
+    ["i", "https://example.org/trains"],
+    ["i", "webcal://example.org/holidays.ics"],
+    ["i", "wikidata:Q29"],
+  ]);
+});
+
+test("publish deletes the deposit of a renamed file and publishes it under its new path", async () => {
+  const { path: workspaceDir, npub } = knowstrInit({ relays: [ROOM, MIRROR] });
+  const pubkey = decodePublicKeyInputSync(npub);
+  write(workspaceDir, "a.md", "# Alpha <!-- id:a -->\n");
+  write(workspaceDir, "b.md", "# Beta <!-- id:b -->\n");
+  await knowstrPublish(workspaceDir, recordingPool().pool);
+  fs.renameSync(
+    path.join(workspaceDir, "b.md"),
+    path.join(workspaceDir, "c.md")
+  );
+
+  stderr.mockClear();
+  const second = recordingPool({ answer: rejecting(MIRROR) });
   const result = await knowstrPublish(workspaceDir, second.pool);
 
-  expect(readFile(workspaceDir, "a.md")).toBe(alpha);
+  expect(result.accepted_paths).toEqual([path.join(workspaceDir, "c.md")]);
+  expect(result.retracted_paths).toEqual([path.join(workspaceDir, "b.md")]);
+  const [deposit, retraction] = publishedEvents(second.publish).map(
+    ({ event }) => event
+  );
+  expect(deposit.tags).toContainEqual(["d", "c.md"]);
+  expect(retraction.kind).toBe(kinds.EventDeletion);
+  expect(retraction.tags.slice(0, -1)).toEqual([
+    ["a", `34774:${pubkey}:b.md`],
+    ["k", "34774"],
+  ]);
+  expect(progress()).toEqual([
+    "Saved 2 documents. Publishing 1 to 2 relays, 1 unchanged, 0 with warnings.",
+    `[1/2] c.md  1/2 relays  ${MIRROR}: blocked`,
+    `[2/2] deleted b.md  1/2 relays  ${MIRROR}: blocked`,
+    "Published 1 documents. Deleted 1 old paths. Relay rejections: 2 (retried on the next run).",
+  ]);
+  expect(readPublished(workspaceDir)).toEqual({
+    [ROOM]: {
+      "a.md": expect.any(String),
+      "c.md": fingerprintOf(deposit),
+    },
+    [MIRROR]: {
+      "a.md": expect.any(String),
+      "b.md": expect.any(String),
+    },
+  });
+
+  const third = recordingPool();
+  const retry = await knowstrPublish(workspaceDir, third.pool);
+
+  expect(retry.retracted_paths).toEqual([path.join(workspaceDir, "b.md")]);
+  expect(
+    publishedEvents(third.publish).map(({ relayUrls }) => relayUrls)
+  ).toEqual([[MIRROR], [MIRROR]]);
+  expect(Object.keys(readPublished(workspaceDir) as object)).toEqual([
+    ROOM,
+    MIRROR,
+  ]);
+  expect(readPublished(workspaceDir)).toEqual({
+    [ROOM]: { "a.md": expect.any(String), "c.md": expect.any(String) },
+    [MIRROR]: { "a.md": expect.any(String), "c.md": expect.any(String) },
+  });
+});
+
+test("publish accepts the same row id in two files", async () => {
+  const { path: workspaceDir } = knowstrInit();
+  write(workspaceDir, "a.md", "# Alpha <!-- id:root -->\n");
+  write(workspaceDir, "b.md", "# Beta <!-- id:root -->\n");
+  const { pool, publish } = recordingPool();
+
+  const result = await knowstrPublish(workspaceDir, pool);
+
   expect(result.accepted_paths).toEqual([
     path.join(workspaceDir, "a.md"),
     path.join(workspaceDir, "b.md"),
-    path.join(workspaceDir, "c.md"),
   ]);
-  const republished = publishedEvents(second.publish)[0].event;
-  expect(republished.content).toBe(alpha);
-  expect(sTags(republished)).toEqual(["a", "c"]);
+  expect(publishedEvents(publish).map(({ event }) => event.content)).toEqual([
+    "# Alpha <!-- id:root -->\n",
+    "# Beta <!-- id:root -->\n",
+  ]);
 });
 
 test("publish leaves documents with save warnings unpublished", async () => {
   const { path: workspaceDir } = knowstrInit();
+  const alice = nip19.npubEncode("b".repeat(64));
   write(workspaceDir, "a.md", "# Alpha\n- one\n");
   write(
     workspaceDir,
-    "arrangement.md",
-    [
-      "---",
-      "knowstr_doc_id: arr:source",
-      "---",
-      "- ![Wrong](#other) <!-- id:a1 -->",
-      "",
-    ].join("\n")
+    `${alice}/pizza.md`,
+    `# ![Wrong](//${alice}/pasta.md) <!-- id:a1 -->\n`
   );
   const { pool, publish } = recordingPool();
 
   const result = await knowstrPublish(workspaceDir, pool);
 
   expect(result.warnings).toEqual([
-    "arrangement.md: arr:source must have one root embedding source",
+    `${alice}/pizza.md: an arrangement must have one root embedding //${alice}/pizza.md`,
   ]);
   expect(result.accepted_paths).toEqual([path.join(workspaceDir, "a.md")]);
   expect(progress()[0]).toBe(
@@ -389,7 +453,7 @@ test("publish leaves documents with save warnings unpublished", async () => {
     readFile(workspaceDir, "a.md"),
   ]);
   expect(readPublished(workspaceDir)).toEqual({
-    [ROOM]: { [readDocId(workspaceDir, "a.md")]: expect.any(String) },
+    [ROOM]: { "a.md": expect.any(String) },
   });
 });
 
@@ -550,8 +614,8 @@ test("publish continues past a document no relay accepts and reports it", async 
   ]);
   expect(readPublished(workspaceDir)).toEqual({
     [ROOM]: {
-      [readDocId(workspaceDir, "a.md")]: expect.any(String),
-      [readDocId(workspaceDir, "c.md")]: expect.any(String),
+      "a.md": expect.any(String),
+      "c.md": expect.any(String),
     },
   });
   expect(close).toHaveBeenCalledWith([ROOM]);
@@ -598,6 +662,7 @@ test("publish logs in when a relay demands it and retries the deposit", async ()
     changed_paths: paths,
     accepted_paths: paths,
     unaccepted_paths: [],
+    retracted_paths: [],
     rejections: [],
     warnings: [],
   });
@@ -625,12 +690,12 @@ test("publish logs in when a relay demands it and retries the deposit", async ()
   ]);
   expect(readPublished(workspaceDir)).toEqual({
     [ROOM]: {
-      [readDocId(workspaceDir, "a.md")]: fingerprintOf(events[0].event),
-      [readDocId(workspaceDir, "b.md")]: fingerprintOf(events[2].event),
+      "a.md": fingerprintOf(events[0].event),
+      "b.md": fingerprintOf(events[2].event),
     },
     [MIRROR]: {
-      [readDocId(workspaceDir, "a.md")]: fingerprintOf(events[0].event),
-      [readDocId(workspaceDir, "b.md")]: fingerprintOf(events[2].event),
+      "a.md": fingerprintOf(events[0].event),
+      "b.md": fingerprintOf(events[2].event),
     },
   });
 });
@@ -657,6 +722,7 @@ test("publish leaves out a relay that refuses the workspace key after login", as
     changed_paths: paths,
     accepted_paths: paths,
     unaccepted_paths: [],
+    retracted_paths: [],
     rejections: paths.map((docPath) => ({
       path: docPath,
       relay: ROOM,

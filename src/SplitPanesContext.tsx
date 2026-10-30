@@ -1,5 +1,5 @@
 import React, { createContext, useContext } from "react";
-import { LOCAL } from "./core/nodeRef";
+import { LOCAL, rowKey } from "./core/nodeRef";
 import { planUpdatePanes, usePlanner } from "./planner";
 import { useData } from "./DataContext";
 import {
@@ -151,7 +151,7 @@ export function useNavigatePane(): (url: string) => void {
         routeCoordinate: storageRoute,
         ...(at === undefined
           ? { documentId: storageRoute.dTag }
-          : { rootNodeId: at }),
+          : { rootNodeId: rowKey(storageRoute.dTag, at) }),
         ...(storageKey !== undefined && { storageKey }),
       });
       return;
@@ -164,7 +164,7 @@ export function useNavigatePane(): (url: string) => void {
         routeCoordinate: depositRoute,
         ...(at === undefined
           ? { documentId: depositRoute.dTag }
-          : { rootNodeId: at }),
+          : { rootNodeId: rowKey(depositRoute.dTag, at) }),
       });
       return;
     }

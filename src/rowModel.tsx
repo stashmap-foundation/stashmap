@@ -10,7 +10,7 @@ import {
   EMPTY_NODE_ID,
   getRefTargetInfo,
 } from "./core/connections";
-import { isCanonicalId } from "./core/entityRecognition";
+import { isThingAddress } from "./core/linkPath";
 import { nodeText, spansText } from "./core/nodeSpans";
 import { EditorNavigationTarget } from "./editor/linkOperations";
 import { searchTargetID } from "./localSearch";
@@ -160,7 +160,7 @@ export function buildPaneTarget(
     : {
         sourceId: row.sourceId,
         rootNodeId: row.node.id,
-        ...(isCanonicalId(row.node.id) && {
+        ...(isThingAddress(row.node.id) && {
           fallbackLabel: nodeText(row.node),
         }),
       };

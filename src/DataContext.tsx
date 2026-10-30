@@ -7,7 +7,6 @@ import {
   useDocumentKnowledgeDBs,
   useDocumentGraphIndex,
   useDocuments,
-  useDocumentByFilePath,
 } from "./DocumentStore";
 import { mergeGraphIndexes } from "./graphIndex";
 import { loadedFeedUrls } from "./core/ical";
@@ -77,14 +76,12 @@ export function MergeKnowledgeDB({
   knowledgeDBs,
   graphIndex,
   documents,
-  documentByFilePath,
   pull,
 }: {
   children: React.ReactNode;
   knowledgeDBs?: KnowledgeDBs;
   graphIndex?: GraphIndex;
   documents?: Map<string, KnowstrDocument>;
-  documentByFilePath?: Map<string, KnowstrDocument>;
   pull?: PullOverlayData;
 }): JSX.Element {
   const data = useData();
@@ -93,7 +90,6 @@ export function MergeKnowledgeDB({
   const documentDBs = useDocumentKnowledgeDBs();
   const documentGraphIndex = useDocumentGraphIndex();
   const documentRecords = useDocuments();
-  const documentsByPath = useDocumentByFilePath();
   const mergedDataDBs = mergeKnowledgeDBs(data.knowledgeDBs, documentDBs);
   const baseDBs = knowledgeDBs
     ? mergeKnowledgeDBs(knowledgeDBs, mergedDataDBs)
@@ -107,9 +103,6 @@ export function MergeKnowledgeDB({
   const mergedDocuments = documents
     ? documentRecords.merge(data.documents).merge(documents)
     : documentRecords.merge(data.documents);
-  const mergedDocumentByFilePath = documentByFilePath
-    ? documentsByPath.merge(data.documentByFilePath).merge(documentByFilePath)
-    : documentsByPath.merge(data.documentByFilePath);
   const injectedDBs = injectEmptyNodesIntoKnowledgeDBs(
     baseDBs,
     temporaryEvents,
@@ -123,7 +116,6 @@ export function MergeKnowledgeDB({
         knowledgeDBs: injectedDBs,
         graphIndex: mergedGraphIndex,
         documents: mergedDocuments,
-        documentByFilePath: mergedDocumentByFilePath,
         pull: pull ?? data.pull,
       }}
     >

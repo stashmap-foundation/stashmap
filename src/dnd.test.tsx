@@ -281,7 +281,7 @@ Target
     const placements = [
       ...targetContent.matchAll(
         new RegExp(
-          `- !\\[Source\\]\\(#${sourceId}\\) <!-- id:([^ ]+) -->`,
+          `- !\\[Source\\]\\(source-document\\.md#${sourceId}\\) <!-- id:([^ ]+) -->`,
           "gu"
         )
       ),

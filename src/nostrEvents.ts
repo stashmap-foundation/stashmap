@@ -77,8 +77,8 @@ export function eventToParsed(
   if (!dTag) return undefined;
   const systemRole = findTag(event, "s");
   const parsed = parseToDocument(event.pubkey as PublicKey, event.content, {
+    path: dTag,
     updatedMsOverride: getEventMs(event),
-    docIdFallback: dTag,
     ...(systemRole === "log"
       ? { systemRoleOverride: "log" as RootSystemRole }
       : {}),

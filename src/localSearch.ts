@@ -4,9 +4,9 @@ import {
   createRefTarget,
   getNodeText,
 } from "./core/connections";
-import { getDocumentByIdOrFilePath } from "./core/Document";
 import { AddToParentTarget } from "./planner";
-import { classifyLinkHref } from "./core/linkPath";
+import { classifyLinkHref, resolveLink } from "./core/linkPath";
+import { LOCAL } from "./core/nodeRef";
 
 function normalizeSearchText(input: string): string {
   return input.toLowerCase().replace(/\n/g, "");
@@ -19,50 +19,36 @@ function searchLink(
   return span?.kind === "link" ? span : undefined;
 }
 
-export function searchTargetID(node: GraphNode): ID | undefined {
+function searchTargetRef(node: GraphNode): NodeRef | undefined {
   const span = searchLink(node);
   if (!span) return undefined;
   const targetClass = classifyLinkHref(span.href);
-  return targetClass === "entity" ||
-    targetClass === "node" ||
+  return targetClass === "node" ||
+    targetClass === "thing" ||
     targetClass === "calendar"
-    ? span.href.slice(1)
+    ? resolveLink(span.href, { sourceId: LOCAL, id: node.id })
     : undefined;
 }
 
+export function searchTargetID(node: GraphNode): ID | undefined {
+  return searchTargetRef(node)?.id;
+}
+
 export function searchInsertTarget(
-  data: Data,
-  node: GraphNode,
-  sourceId: SourceId
+  node: GraphNode
 ): AddToParentTarget | undefined {
   const span = searchLink(node);
   if (!span) return undefined;
-  const targetClass = classifyLinkHref(span.href);
-  if (
-    targetClass === "entity" ||
-    targetClass === "node" ||
-    targetClass === "calendar"
-  ) {
-    return createRefTarget(span.href.slice(1), span.text);
+  const target = searchTargetRef(node);
+  if (target) {
+    return createRefTarget(target, span.text);
   }
-  if (targetClass !== "document" && targetClass !== "file") {
-    return undefined;
-  }
-  const hashIndex = span.href.lastIndexOf("#");
-  const path = hashIndex < 0 ? span.href : span.href.slice(0, hashIndex);
-  const document = getDocumentByIdOrFilePath(
-    data.documents,
-    data.documentByFilePath,
-    sourceId,
-    path
-  );
-  return document
-    ? createDocumentLinkTarget(
-        document.sourceId,
-        document.docId,
-        span.href,
-        span.text
-      )
+  const file =
+    classifyLinkHref(span.href) === "file"
+      ? resolveLink(span.href, { sourceId: LOCAL, id: node.id })
+      : undefined;
+  return file
+    ? createDocumentLinkTarget(file.sourceId, file.id, span.text)
     : undefined;
 }
 

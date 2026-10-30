@@ -12,9 +12,9 @@ import { findRefsToNode } from "./semanticProjection";
 import { useCurrentPane } from "./SplitPanesContext";
 import { newDB } from "./core/knowledge";
 import { getLocalSearchResultIDs } from "./localSearch";
-import { documentKeyOf, documentLinkPath } from "./core/Document";
-import { newGraphNode } from "./core/nodeFactory";
-import { fileLinkSpan, linkSpan, plainSpans } from "./core/nodeSpans";
+import { getDocumentForNode } from "./core/Document";
+import { newGraphNode, newRowKey } from "./core/nodeFactory";
+import { linkSpan, plainSpans } from "./core/nodeSpans";
 import { graphLookupFromData, lookupNode } from "./core/graphLookup";
 
 function SearchCrefBuilder({
@@ -36,11 +36,7 @@ function SearchCrefBuilder({
     .sortBy((ref) => -ref.updated)
     .map((ref) => ref.nodeID);
 
-  const searchNodeBase = {
-    ...newGraphNode(plainSpans("")),
-    id: searchId,
-    root: searchId,
-  };
+  const searchNodeBase = newGraphNode(plainSpans(""), { id: searchId });
   const childNodes = crefItems
     .toSet()
     .toList()
@@ -48,44 +44,36 @@ function SearchCrefBuilder({
       const target = lookupNode(graph, nodeID, LOCAL);
       const targetNode = target?.node;
       if (!target || !targetNode) return [];
-      const targetDocument =
-        targetNode.docId && !targetNode.parent
-          ? documents.get(documentKeyOf(target.ref.sourceId, targetNode.docId))
-          : undefined;
+      const targetDocument = targetNode.parent
+        ? undefined
+        : getDocumentForNode(documents, targetNode, target.ref.sourceId);
       const primaryTargetDocument =
         target.ref.sourceId === LOCAL &&
         targetDocument?.topNodeShortIds[0] === targetNode.id
           ? targetDocument
           : undefined;
-      const node = primaryTargetDocument
-        ? newGraphNode(
-            [
-              fileLinkSpan(
-                documentLinkPath(primaryTargetDocument),
+      const id = newRowKey("search");
+      const from = { sourceId: LOCAL, id };
+      const node = newGraphNode(
+        [
+          primaryTargetDocument
+            ? linkSpan(
+                { sourceId: LOCAL, id: primaryTargetDocument.docId },
+                from,
                 getNodeText(targetNode) ?? primaryTargetDocument.title
-              ),
-            ],
-            {
-              root: searchId,
-              parent: searchId,
-            }
-          )
-        : newGraphNode(
-            [
-              linkSpan(
-                nodeID,
+              )
+            : linkSpan(
+                target.ref,
+                from,
                 nodePathLabel(
                   data.knowledgeDBs,
                   target.node,
                   target.ref.sourceId
                 )
               ),
-            ],
-            {
-              root: searchId,
-              parent: searchId,
-            }
-          );
+        ],
+        { id, root: searchId, parent: searchId }
+      );
       return [
         {
           ...node,

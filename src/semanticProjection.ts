@@ -5,8 +5,8 @@ import {
   getNode,
   nodePathLabel,
 } from "./core/connections";
-import { getAllLinks } from "./core/nodeSpans";
-import { fileLinkIndexKey } from "./core/linkPath";
+import { getAllLinks, soleThingAddress } from "./core/nodeSpans";
+import { isThingAddress } from "./core/linkPath";
 import { LOG_ROOT_ROLE } from "./core/systemRoots";
 import { findReciprocalLinkItem } from "./buildReferenceRow";
 import {
@@ -104,12 +104,15 @@ function isInSystemRoot(
 
 function incomingFileLinkSourceRefs(
   graphIndex: GraphIndex,
-  rootFilePath: string | undefined,
-  rootAuthor: SourceId | undefined
+  documentPath: string | undefined,
+  author: SourceId
 ): NodeRef[] {
-  if (!rootFilePath || !rootAuthor) return [];
-  const key = fileLinkIndexKey(rootAuthor, rootFilePath);
-  return graphIndex.incomingFileLinks.get(key) ?? [];
+  if (!documentPath) return [];
+  return (
+    graphIndex.incomingCrefsByTarget.get(
+      nodeRefKey({ sourceId: author, id: documentPath })
+    ) ?? []
+  );
 }
 
 function uniqueNodes(nodes: ResolvedNode[]): ResolvedNode[] {
@@ -149,8 +152,10 @@ function localChildLinksTo(
     }
     return child
       ? judged &&
-          getAllLinks(child).some(
-            (link) => link.targetID === sourceRoot.node.id
+          getAllLinks(child, target.ref.sourceId).some(
+            (link) =>
+              link.target.id === sourceRoot.node.id &&
+              link.target.sourceId === sourceRoot.ref.sourceId
           )
       : false;
   });
@@ -184,8 +189,8 @@ export function getIncomingCrefsForNode(
   currentNodeID: ID | undefined,
   itemsSourceId: SourceId,
   expansionPath: readonly ID[],
-  currentItems?: List<GraphNode>,
-  currentNodeFilePath?: string
+  currentItems: List<GraphNode> | undefined,
+  currentDocumentPath: string | undefined
 ): List<NodeRef> {
   const graph = graphLookupFromData(data);
   const { graphIndex, knowledgeDBs } = graph;
@@ -208,15 +213,18 @@ export function getIncomingCrefsForNode(
       graphIndex.incomingCrefsByTarget.get(
         nodeRefKey({ sourceId: itemsSourceId, id: currentNodeID })
       ) ?? [];
-    const unscopedRefs = graphIndex.incomingCrefs.get(currentNodeID) ?? [];
-    return uniqueRefs([...sourceScopedRefs, ...unscopedRefs]);
+    const thing = isThingAddress(currentNodeID)
+      ? currentNodeID
+      : target && soleThingAddress(target.node);
+    const thingRefs = thing ? graphIndex.incomingCrefs.get(thing) ?? [] : [];
+    return uniqueRefs([...sourceScopedRefs, ...thingRefs]);
   })();
   const graphLinkSourceNodes = graphLinkRefs
     .map((ref) => getNodeInSource(graph, ref))
     .filter((node): node is ResolvedNode => node !== undefined);
   const fileLinkSourceNodes = incomingFileLinkSourceRefs(
     graphIndex,
-    currentNodeFilePath,
+    currentDocumentPath,
     itemsSourceId
   )
     .map((ref) => getNodeInSource(graph, ref))
@@ -235,7 +243,6 @@ export function getIncomingCrefsForNode(
     )
     .map((source) => linkSpeaker(graph, source))
     .filter((source) => !sourceRootCoveredByTarget(graph, source, target));
-  const seenIncomingIds = new globalThis.Set<ID>();
   const visibleSourceNodes = uniqueNodes(sourceNodes)
     .filter(({ ref }) => visibleAuthors.has(ref.sourceId))
     .filter(
@@ -268,13 +275,6 @@ export function getIncomingCrefsForNode(
       ).localeCompare(
         nodePathLabel(knowledgeDBs, right.node, right.ref.sourceId)
       );
-    })
-    .filter(({ ref }) => {
-      if (seenIncomingIds.has(ref.id)) {
-        return false;
-      }
-      seenIncomingIds.add(ref.id);
-      return true;
     });
 
   return List(

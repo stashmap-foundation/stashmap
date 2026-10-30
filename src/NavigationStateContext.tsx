@@ -6,7 +6,7 @@ import React, {
   useState,
 } from "react";
 import { useData } from "./DataContext";
-import { LOCAL } from "./core/nodeRef";
+import { LOCAL, rowKey } from "./core/nodeRef";
 import {
   buildCoordinateRouteUrl,
   buildDocumentRouteUrl,
@@ -112,7 +112,7 @@ function urlToPane(
       routeCoordinate: storageRoute,
       ...(at === undefined
         ? { documentId: storageRoute.dTag }
-        : { rootNodeId: at }),
+        : { rootNodeId: rowKey(storageRoute.dTag, at) }),
       ...(storageKey !== undefined && { storageKey }),
     };
   }
@@ -124,7 +124,7 @@ function urlToPane(
       routeCoordinate: depositRoute,
       ...(at === undefined
         ? { documentId: depositRoute.dTag }
-        : { rootNodeId: at }),
+        : { rootNodeId: rowKey(depositRoute.dTag, at) }),
     };
   }
   const nodeID = parseNodeRouteUrl(pathname);

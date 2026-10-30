@@ -108,43 +108,12 @@ https://www.wikidata.org/wiki/Q131723
     const { relayPool } = renderApp({
       ...alice(),
       fetchEntityMetadata,
-      initialRoute: "/local/n/wd%3AQ999",
+      initialRoute: "/local/n/wikidata%3AQ999",
     });
 
-    await screen.findByRole("treeitem", { name: "Entity wd:Q999" });
+    await screen.findByRole("treeitem", { name: "Entity wikidata:Q999" });
     expect(relayPool.getDecryptedEvents()).toHaveLength(0);
     await waitFor(() => expect(fetchEntityMetadata).toHaveBeenCalledTimes(1));
-  });
-
-  test("Existing local entity home opens without label request", async () => {
-    const [alice] = setup([ALICE]);
-    const fetchEntityMetadata = jest.fn(() =>
-      Promise.resolve(new Response("", { status: 503 }))
-    );
-    renderApp({ ...alice(), fetchEntityMetadata });
-
-    await type("https://www.wikidata.org/wiki/Q1492{Escape}");
-    await expectTree(`
-https://www.wikidata.org/wiki/Q1492
-    `);
-
-    await userEvent.click(await screen.findByLabelText("Create new note"));
-    await type("Trip{Escape}");
-    Reflect.defineProperty(navigator, "clipboard", {
-      value: {
-        readText: jest.fn(() => Promise.resolve("[Barcelona](#wd:Q1492)")),
-      },
-      configurable: true,
-    });
-    await userEvent.click(screen.getByRole("treeitem", { name: "Trip" }));
-    await userEvent.keyboard("{Meta>}v{/Meta}");
-
-    await userEvent.click(screen.getByRole("link", { name: "Barcelona" }));
-    await expectTree(`
-https://www.wikidata.org/wiki/Q1492
-  [I] Trip ↩
-    `);
-    expect(fetchEntityMetadata).not.toHaveBeenCalled();
   });
 
   test("Differently labelled entity links keep their own route titles", async () => {
@@ -158,7 +127,9 @@ https://www.wikidata.org/wiki/Q1492
     Reflect.defineProperty(navigator, "clipboard", {
       value: {
         readText: jest.fn(() =>
-          Promise.resolve("[Barcelona](#wd:Q1492)\n[Barna](#wd:Q1492)")
+          Promise.resolve(
+            "[Barcelona](wikidata:Q1492)\n[Barna](wikidata:Q1492)"
+          )
         ),
       },
       configurable: true,
@@ -210,7 +181,9 @@ Barna
     Reflect.defineProperty(navigator, "clipboard", {
       value: {
         readText: jest.fn(() =>
-          Promise.resolve("[Barcelona](#wd:Q1492)\n[Madrid](#wd:Q2807)")
+          Promise.resolve(
+            "[Barcelona](wikidata:Q1492)\n[Madrid](wikidata:Q2807)"
+          )
         ),
       },
       configurable: true,
@@ -262,7 +235,7 @@ Madrid
     renderApp({
       ...alice(),
       fetchEntityMetadata,
-      initialRoute: "/local/n/wd%3AQ1492?label=Local%20Name",
+      initialRoute: "/local/n/wikidata%3AQ1492?label=Local%20Name",
     });
 
     screen.getByRole("treeitem", { name: "Local Name" });
@@ -280,7 +253,7 @@ Madrid
     });
   });
 
-  test("First write on a dangling entity surface creates one canonical root", async () => {
+  test("First write on a dangling entity surface creates one document about the thing", async () => {
     const [alice] = setup([ALICE]);
     const asset = "rgb:AAAABBBBCCCCDDDDEEEE12345";
     const { relayPool } = renderApp({
@@ -309,7 +282,7 @@ Asset Label
           .getDecryptedEvents()
           .some(
             (event) =>
-              event.content.includes(`Asset Label <!-- id:${asset} -->`) &&
+              event.content.includes(`[Asset Label](${asset}) <!-- id:`) &&
               event.content.includes("Child")
           )
       ).toBe(true);

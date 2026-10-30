@@ -22,16 +22,19 @@ import {
   planBatchOutdent,
 } from "./batchOperations";
 import { isEmptyNodeID, computeEmptyNodeMetadata } from "../core/connections";
-import { isFileLinkHref, spansText, spansToMarkdown } from "../core/nodeSpans";
 import {
-  classifyLinkHref,
-  externalLinkUrl,
-  isEntityId,
-} from "../core/linkPath";
+  isInternalLinkHref,
+  spansText,
+  spansToMarkdown,
+} from "../core/nodeSpans";
+import { externalLinkUrl, resolveLink } from "../core/linkPath";
 import { embedTargetOf } from "../showings";
 import { feedUrlInSpans, isCalendarEntryId } from "../core/ical";
-import { resolveDocumentTarget } from "../core/Document";
-import { inlineLinkToHref, isDeadLinkTarget } from "./linkOperations";
+import {
+  inlineLinkToHref,
+  isDeadLinkTarget,
+  rowRouteHref,
+} from "./linkOperations";
 import { buildNodeRouteUrl } from "../navigationUrl";
 import { IncomingPart, ReferenceDisplay } from "./referenceDisplay";
 import { MiniEditor, ReciprocalLink, preventEditorBlur } from "./AddNode";
@@ -68,7 +71,7 @@ import {
   ResolvedNode,
   getNodeInSource,
   graphLookupFromData,
-  lookupNode,
+  resolveRef,
 } from "../core/graphLookup";
 import { findReciprocalLinkItem } from "../buildReferenceRow";
 
@@ -140,15 +143,11 @@ function ReferenceContent({
   };
 }): JSX.Element {
   const data = useData();
-  const row = useRow();
   const navigatePane = useNavigatePane();
-  const href = inlineLinkToHref(
-    data,
-    `#${reference.id}`,
-    row.node,
-    reference.sourceId,
-    reference.targetLabel || reference.text
-  );
+  const href = rowRouteHref(data, {
+    sourceId: reference.sourceId,
+    id: reference.id,
+  });
   if (!href) return <ReferenceDisplay reference={reference} />;
   return (
     <a
@@ -172,25 +171,10 @@ function reciprocalTarget(
   sourceId: SourceId,
   href: string
 ): ResolvedNode | undefined {
-  const graph = graphLookupFromData(data);
-  const targetClass = classifyLinkHref(href);
-  if (
-    targetClass === "entity" ||
-    targetClass === "node" ||
-    targetClass === "calendar"
-  ) {
-    return lookupNode(graph, href.slice(1), sourceId);
-  }
-  if (!isFileLinkHref(href)) {
-    return undefined;
-  }
-  const hashIndex = href.lastIndexOf("#");
-  const path = hashIndex < 0 ? href : href.slice(0, hashIndex);
-  const document = resolveDocumentTarget(data, node, sourceId, path);
-  const rootID = document?.topNodeShortIds[0];
-  return rootID && document
-    ? getNodeInSource(graph, { sourceId: document.sourceId, id: rootID })
+  const target = isInternalLinkHref(href)
+    ? resolveLink(href, { sourceId, id: node.id })
     : undefined;
+  return target ? resolveRef(graphLookupFromData(data), target) : undefined;
 }
 
 function reciprocalLinks(
@@ -233,11 +217,12 @@ function priorRowRootHref(
   row: Row,
   href: string
 ): string | undefined {
-  const targetID = embedTargetOf(row.node);
+  const embedSpan = row.node.spans[0];
   if (
     (!row.demoted && !row.cycle) ||
-    targetID === undefined ||
-    href !== `#${targetID}`
+    embedTargetOf(row.node, row.sourceId) === undefined ||
+    embedSpan?.kind !== "link" ||
+    href !== embedSpan.href
   ) {
     return undefined;
   }
@@ -276,7 +261,7 @@ function InlineLinkSpan({
   const displayedText =
     row.standsFor !== undefined &&
     row.presentedSpans !== undefined &&
-    embedTargetOf(node) === row.standsFor.id
+    embedTargetOf(node, sourceId) !== undefined
       ? spansText(row.presentedSpans)
       : span.text;
   const externalUrl = externalLinkUrl(span.href);
@@ -885,9 +870,8 @@ function InteractiveNodeContent({ rows }: { rows: List<Row> }): JSX.Element {
     return <ErrorContent />;
   }
 
-  const embedTargetID = embedTargetOf(row.node);
   const displaysLiveTarget =
-    embedTargetID !== undefined && !isEntityId(embedTargetID);
+    embedTargetOf(row.node, row.sourceId) !== undefined;
 
   if (isEditableNode(currentNode) && !isReadonly && !displaysLiveTarget) {
     return <EditableContent rows={rows} />;

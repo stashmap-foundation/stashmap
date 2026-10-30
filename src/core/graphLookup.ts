@@ -1,6 +1,8 @@
 import { Map } from "immutable";
-import { LOCAL } from "./nodeRef";
+import { LOCAL, pathOf, sourceAuthor } from "./nodeRef";
 import { isInternalLinkHref } from "./nodeSpans";
+import { isValidPath } from "./linkPath";
+import { Document, documentKeyOf } from "./Document";
 
 export type ResolvedNode = {
   ref: NodeRef;
@@ -11,6 +13,7 @@ export type ResolvedNode = {
 export type GraphLookup = {
   knowledgeDBs: KnowledgeDBs;
   graphIndex: GraphIndex;
+  documents: Map<string, Document>;
   localSourceId: SourceId;
   sourceOrder: readonly SourceId[];
   computedNodes: Map<ID, GraphNode>;
@@ -29,15 +32,9 @@ export function allKnownNodes(
   return [...fromDBs, ...fromIndex];
 }
 
-const UNSAFE_MARKDOWN_ID_RE = /\s|["'<>]|-->/u;
-
-export function isSafeMarkdownNodeId(id: string): boolean {
-  return id.length > 0 && id.trim() === id && !UNSAFE_MARKDOWN_ID_RE.test(id);
-}
-
 type GraphLookupData = Pick<
   Data,
-  "user" | "knowledgeDBs" | "graphIndex" | "computedNodes"
+  "user" | "knowledgeDBs" | "graphIndex" | "computedNodes" | "documents"
 >;
 
 function sourceOrderFromData(data: GraphLookupData): SourceId[] {
@@ -54,6 +51,7 @@ export function graphLookupFromData(data: GraphLookupData): GraphLookup {
   return {
     knowledgeDBs: data.knowledgeDBs,
     graphIndex: data.graphIndex,
+    documents: data.documents,
     localSourceId: LOCAL,
     sourceOrder: sourceOrderFromData(data),
     computedNodes: data.computedNodes,
@@ -83,15 +81,32 @@ function getNodeFromGraphIndex(
   return sourceNodes.get(ref.id);
 }
 
+function authorSources(ref: NodeRef): SourceId[] {
+  const author = sourceAuthor(ref.sourceId);
+  return /^[0-9a-f]{64}$/u.test(author)
+    ? [...new Set([ref.sourceId, author, `34774:${author}:${pathOf(ref.id)}`])]
+    : [ref.sourceId];
+}
+
 export function getNodeInSource(
   graph: GraphLookup,
   ref: NodeRef
 ): ResolvedNode | undefined {
-  const node =
-    getNodeFromKnowledgeDBs(graph, ref) ?? getNodeFromGraphIndex(graph, ref);
-  return node
-    ? { ref: nodeRef(ref.sourceId, node), node, origin: "authored" }
-    : undefined;
+  return authorSources(ref).reduce<ResolvedNode | undefined>(
+    (found, sourceId) => {
+      if (found) {
+        return found;
+      }
+      const sourceRef = { sourceId, id: ref.id };
+      const node =
+        getNodeFromKnowledgeDBs(graph, sourceRef) ??
+        getNodeFromGraphIndex(graph, sourceRef);
+      return node
+        ? { ref: nodeRef(sourceId, node), node, origin: "authored" }
+        : undefined;
+    },
+    undefined
+  );
 }
 
 function sourceRank(graph: GraphLookup, sourceId: SourceId): number {
@@ -175,6 +190,38 @@ export function resolveAuthoredFirst(
       origin: "computed",
     }
   );
+}
+
+export function fileTopRowRef(graph: GraphLookup, ref: NodeRef): NodeRef {
+  if (!isValidPath(ref.id)) {
+    return ref;
+  }
+  const document = authorSources(ref)
+    .map((sourceId) => graph.documents.get(documentKeyOf(sourceId, ref.id)))
+    .find((candidate) => candidate !== undefined);
+  const topRow = document?.topNodeShortIds[0];
+  return document && topRow !== undefined
+    ? { sourceId: document.sourceId, id: topRow }
+    : ref;
+}
+
+export function resolveRef(
+  graph: GraphLookup,
+  ref: NodeRef
+): ResolvedNode | undefined {
+  const target = fileTopRowRef(graph, ref);
+  const authored = getNodeInSource(graph, target);
+  if (authored) {
+    return authored;
+  }
+  const computed = graph.computedNodes.get(target.id);
+  return computed
+    ? {
+        node: computed,
+        ref: { sourceId: graph.localSourceId, id: target.id },
+        origin: "computed",
+      }
+    : undefined;
 }
 
 export function resolveChildOf(

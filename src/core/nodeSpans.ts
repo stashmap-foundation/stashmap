@@ -1,4 +1,4 @@
-import { classifyLinkHref } from "./linkPath";
+import { classifyLinkHref, linkHref, resolveLink } from "./linkPath";
 
 export const plainSpans = (text: string): InlineSpan[] => [
   { kind: "text", text },
@@ -10,60 +10,51 @@ export const nodeText = (node: GraphNode): string =>
 export const spansText = (spans: InlineSpan[]): string =>
   spans.map((span) => span.text).join("");
 
-export const isFileLinkHref = (href: string): boolean => {
-  const targetClass = classifyLinkHref(href);
-  return targetClass === "document" || targetClass === "file";
-};
+export const isFileLinkHref = (href: string): boolean =>
+  classifyLinkHref(href) === "file";
 
-export const isInternalLinkHref = (href: string): boolean => {
-  const targetClass = classifyLinkHref(href);
-  return (
-    targetClass === "entity" ||
-    targetClass === "node" ||
-    targetClass === "calendar" ||
-    targetClass === "document" ||
-    targetClass === "file"
-  );
-};
+const LINK_TARGET_CLASSES = ["node", "file", "thing", "calendar"];
+
+export const isInternalLinkHref = (href: string): boolean =>
+  LINK_TARGET_CLASSES.includes(classifyLinkHref(href));
 
 export const isWebsiteLinkHref = (href: string): boolean => {
   const targetClass = classifyLinkHref(href);
   return targetClass === "website" || targetClass === "feed";
 };
 
-export const embeddedTarget = (node: GraphNode | undefined): ID | undefined => {
+export const soleThingAddress = (node: GraphNode): string | undefined => {
+  const span = node.spans.length === 1 ? node.spans[0] : undefined;
+  return span?.kind === "link" && classifyLinkHref(span.href) === "thing"
+    ? span.href
+    : undefined;
+};
+
+export const embeddedTarget = (
+  node: GraphNode | undefined,
+  sourceId: SourceId
+): NodeRef | undefined => {
+  const span = node?.spans.length === 1 ? node.spans[0] : undefined;
   if (
-    node?.extraAttrs?.embed !== "true" ||
-    node.spans.length !== 1 ||
-    node.spans[0]?.kind !== "link" ||
-    !node.spans[0].href.startsWith("#")
+    !node ||
+    node.extraAttrs?.embed !== "true" ||
+    span?.kind !== "link" ||
+    !["node", "file", "calendar"].includes(classifyLinkHref(span.href))
   ) {
     return undefined;
   }
-  return node.spans[0].href.slice(1);
+  return resolveLink(span.href, { sourceId, id: node.id });
 };
 
 export const getAllLinks = (
-  node: GraphNode
-): { targetID: ID; text: string }[] =>
+  node: GraphNode,
+  sourceId: SourceId
+): { target: NodeRef; text: string }[] =>
   node.spans.flatMap((span) => {
-    if (span.kind !== "link") return [];
-    const targetClass = classifyLinkHref(span.href);
-    return targetClass === "entity" ||
-      targetClass === "node" ||
-      targetClass === "calendar"
-      ? [{ targetID: span.href.slice(1), text: span.text }]
-      : [];
+    if (span.kind !== "link" || !isInternalLinkHref(span.href)) return [];
+    const target = resolveLink(span.href, { sourceId, id: node.id });
+    return target ? [{ target, text: span.text }] : [];
   });
-
-export const getAllFileLinks = (
-  node: GraphNode
-): { path: string; text: string }[] =>
-  node.spans.flatMap((span) =>
-    span.kind === "link" && isFileLinkHref(span.href)
-      ? [{ path: span.href, text: span.text }]
-      : []
-  );
 
 function escapeLinkText(text: string): string {
   return text.replace(/([\\[\]])/gu, "\\$1");
@@ -78,14 +69,12 @@ export const spansToMarkdown = (spans: InlineSpan[]): string =>
     )
     .join("");
 
-export const linkSpan = (targetID: ID, text: string): InlineSpan => ({
+export const linkSpan = (
+  target: NodeRef,
+  from: NodeRef,
+  text: string
+): InlineSpan => ({
   kind: "link",
-  href: `#${targetID}`,
-  text,
-});
-
-export const fileLinkSpan = (path: string, text: string): InlineSpan => ({
-  kind: "link",
-  href: path,
+  href: linkHref(target, from),
   text,
 });

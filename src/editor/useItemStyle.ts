@@ -1,6 +1,6 @@
 import { CSSProperties } from "react";
 import { useIsViewingOtherUserContent, useRow } from "../rowModel";
-import { ENTITY_SCHEME_RE } from "../core/linkPath";
+import { isThingAddress } from "../core/linkPath";
 import { TYPE_COLORS } from "../core/constants";
 
 type ItemStyle = {
@@ -78,7 +78,7 @@ export function useItemStyle(): ItemStyle {
   const argument = currentRow?.argument;
   const normalizedRelevance =
     relevance === ("" as string) ? undefined : relevance;
-  const isEntityNode = !!currentRow && ENTITY_SCHEME_RE.test(currentRow.id);
+  const isEntityNode = !!currentRow && isThingAddress(currentRow.id);
 
   return {
     cardStyle: {},

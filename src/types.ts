@@ -157,7 +157,6 @@ declare global {
     knowledgeDBs: KnowledgeDBs;
     graphIndex: GraphIndex;
     documents: Map<string, DocumentType>;
-    documentByFilePath: Map<string, DocumentType>;
     publishEventsStatus: EventState;
     computedNodes: Map<ID, GraphNode>;
     pull?: PullOverlayData;
@@ -267,7 +266,6 @@ declare global {
     children: List<ID>;
     id: ID;
     spans: InlineSpan[];
-    docId?: string;
     parent?: ID;
     systemRole?: RootSystemRole;
     updated: number;
@@ -300,7 +298,6 @@ declare global {
     sourceCandidatesById: globalThis.Map<ID, NodeRef[]>;
     incomingCrefs: globalThis.Map<ID, NodeRef[]>;
     incomingCrefsByTarget: globalThis.Map<string, NodeRef[]>;
-    incomingFileLinks: globalThis.Map<string, NodeRef[]>;
   };
 
   // Temporary UI state (not persisted to Nostr)

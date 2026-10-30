@@ -1,17 +1,13 @@
 import { useEffect } from "react";
-import { Map as ImmutableMap } from "immutable";
 import { LOCAL } from "../../core/nodeRef";
 import { useBackend } from "../../BackendContext";
 import { useDocumentStore, useDocuments } from "../../DocumentStore";
-import { Document, parseToDocument } from "../../core/Document";
+import {
+  documentKeyOf,
+  fileNameTitle,
+  parseToDocument,
+} from "../../core/Document";
 import { FsEvent } from "./workspaceWatcher";
-
-function findExistingByFilePath(
-  documents: ImmutableMap<string, Document>,
-  filePath: string
-): Document | undefined {
-  return documents.valueSeq().find((doc) => doc.filePath === filePath);
-}
 
 function logFilesystemWatcherDebug(
   label: string,
@@ -40,43 +36,29 @@ export function FilesystemWatcher(): null {
         content: event.type === "change" ? event.content : undefined,
         knownDocs: documents
           .valueSeq()
-          .map((doc) => ({
-            filePath: doc.filePath,
-            docId: doc.docId,
-            updatedMs: doc.updatedMs,
-          }))
+          .map((doc) => ({ docId: doc.docId, updatedMs: doc.updatedMs }))
           .toArray(),
       });
       if (event.type === "unlink") {
-        const existing = findExistingByFilePath(documents, event.relativePath);
-        if (existing) {
+        if (documents.has(documentKeyOf(LOCAL, event.relativePath))) {
           logFilesystemWatcherDebug("delete", {
             relativePath: event.relativePath,
-            docId: existing.docId,
           });
           store.deleteDocument({
-            sourceId: existing.sourceId,
-            docId: existing.docId,
+            sourceId: LOCAL,
+            docId: event.relativePath,
             deletedAt: Date.now(),
           });
         }
         return;
       }
-      const existing = findExistingByFilePath(documents, event.relativePath);
-      // Filename beats content-derived titles, same as the initial scan.
-      const pathParts = event.relativePath.split("/");
-      const fallbackTitle =
-        pathParts[pathParts.length - 1]?.replace(/\.md$/u, "") || undefined;
       const parsed = parseToDocument(LOCAL, event.content, {
-        filePath: event.relativePath,
-        relativePath: event.relativePath,
+        path: event.relativePath,
+        fallbackTitle: fileNameTitle(event.relativePath),
         updatedMsOverride: Date.now(),
-        ...(fallbackTitle !== undefined ? { fallbackTitle } : {}),
-        ...(existing && { docIdFallback: existing.docId }),
       });
       logFilesystemWatcherDebug("upsert", {
         relativePath: event.relativePath,
-        docId: parsed.document.docId,
         updatedMs: parsed.document.updatedMs,
       });
       store.upsertDocument(parsed);

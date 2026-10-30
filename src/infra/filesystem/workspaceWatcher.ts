@@ -1,7 +1,7 @@
 import fsp from "fs/promises";
 import path from "path";
 import chokidar, { FSWatcher } from "chokidar";
-import { loadIgnorePatterns } from "./workspaceScan";
+import { loadIgnorePatterns, workspacePath } from "./workspaceScan";
 
 export type FsEvent =
   | { type: "add"; relativePath: string; content: string }
@@ -41,7 +41,11 @@ export async function watchWorkspace(
   ): Promise<void> => {
     const content = await fsp.readFile(absolute, "utf8").catch(() => undefined);
     if (content === undefined) return;
-    emit({ type, relativePath: toRelative(absolute), content });
+    emit({
+      type,
+      relativePath: workspacePath(workspaceDir, absolute),
+      content,
+    });
   };
 
   watcher.on("add", (absolute) => {
@@ -51,7 +55,10 @@ export async function watchWorkspace(
     readAndEmit("change", absolute);
   });
   watcher.on("unlink", (absolute) => {
-    emit({ type: "unlink", relativePath: toRelative(absolute) });
+    emit({
+      type: "unlink",
+      relativePath: workspacePath(workspaceDir, absolute),
+    });
   });
 
   const ready = new Promise<void>((resolve) => {

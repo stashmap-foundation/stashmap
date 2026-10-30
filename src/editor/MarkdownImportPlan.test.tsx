@@ -1,7 +1,7 @@
 import { List, Map as ImmutableMap } from "immutable";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { LOCAL } from "../core/nodeRef";
+import { LOCAL, pathOf } from "../core/nodeRef";
 import { createPlan, buildDocumentEvents } from "../planner";
 import { getChildNodes, getNode } from "../core/connections";
 import { isStandaloneRoot } from "../core/systemRoots";
@@ -29,7 +29,7 @@ import {
 } from "../markdownPlan";
 import { MarkdownTreeNode, parseMarkdown } from "../core/markdownTree";
 import {
-  getAllFileLinks,
+  getAllLinks,
   nodeText,
   plainSpans,
   spansText,
@@ -237,16 +237,14 @@ test("Empty-root markdown file drop opens one document with all roots from the f
     const node = nodes?.get(id);
     return node ? nodeText(node) : undefined;
   });
-  const rootDocIds = document?.topNodeShortIds.map(
-    (id) => nodes?.get(id)?.docId
-  );
-
   expect(pane.rootNodeId).toBeUndefined();
   expect(document?.title).toBe("source");
-  expect(document?.filePath).toBe("source.md");
-  expect(document?.relativePath).toBe("source.md");
+  expect(document?.docId).toBe("source.md");
   expect(topTexts).toEqual(["First Root", "Second Root"]);
-  expect(rootDocIds).toEqual([document?.docId, document?.docId]);
+  expect(document?.topNodeShortIds.map(pathOf)).toEqual([
+    "source.md",
+    "source.md",
+  ]);
 });
 
 test("Empty-root markdown file drop creates a wrapper document for multiple files", () => {
@@ -328,7 +326,7 @@ test("Empty-root markdown file drop creates a wrapper document for multiple file
     "first",
     "second",
   ]);
-  expect(importedDocuments.map((document) => document.filePath)).toEqual([
+  expect(importedDocuments.map((document) => document.docId)).toEqual([
     "first.md",
     "second.md",
   ]);
@@ -340,12 +338,18 @@ test("Empty-root markdown file drop creates a wrapper document for multiple file
     "first",
     "second",
   ]);
-  expect(wrapperLinks.map((node) => getAllFileLinks(node)[0]?.path)).toEqual(
-    importedDocuments.map((document) => `doc:${document.docId}`)
-  );
+  expect(wrapperLinks.map((node) => node.spans)).toEqual([
+    [{ kind: "link", href: "first.md", text: "first" }],
+    [{ kind: "link", href: "second.md", text: "second" }],
+  ]);
   expect(
-    parsedWrapperLinks.map((node) => getAllFileLinks(node)[0]?.path)
-  ).toEqual(importedDocuments.map((document) => `doc:${document.docId}`));
+    parsedWrapperLinks.map((node) => getAllLinks(node, LOCAL)[0]?.target)
+  ).toEqual(
+    importedDocuments.map((document) => ({
+      sourceId: LOCAL,
+      id: document.docId,
+    }))
+  );
 });
 
 test("planCreateNodesFromMarkdownTrees creates only standalone nodes", () => {
@@ -358,11 +362,8 @@ test("planCreateNodesFromMarkdownTrees creates only standalone nodes", () => {
       markdown: "# Parent\n\n## Child\n\n### Grandchild",
     },
   ]);
-  const [plan, topItemIDs, topNodeIDs] = planCreateNodesFromMarkdownTrees(
-    basePlan,
-    trees
-  );
-  const parentItemID = topItemIDs[0];
+  const [plan, topNodeIDs] = planCreateNodesFromMarkdownTrees(basePlan, trees);
+  const parentItemID = topNodeIDs[0];
   const parentNodeID = topNodeIDs[0];
   const parentNode = getNode(plan.knowledgeDBs, parentNodeID, LOCAL);
   const childNodeID = nodeChildren(plan.knowledgeDBs, parentNode, LOCAL).first()
@@ -642,29 +643,29 @@ test("parseMarkdownHierarchy parses .md path as a link span", () => {
   ]);
 });
 
-test("parseMarkdownHierarchy parses doc: links; bare ids are text", () => {
+test("parseMarkdownHierarchy parses addresses; doc: links and bare ids are text", () => {
   const docId = "123e4567-e89b-12d3-a456-426614174000";
-  const trees = parseTree(`# Root\n- [Imported](doc:${docId})\n`);
+  const alice = "npub1alice";
+  const trees = parseTree(
+    [
+      "# Root",
+      "- [Trip](trip.md)",
+      "- [Packing](../trip.md#packing)",
+      `- [Alice](//${alice})`,
+      `- [Imported](doc:${docId})`,
+      `- [Bare](${docId})`,
+      "",
+    ].join("\n")
+  );
   expect(trees).toEqual([
     expect.objectContaining({
       children: [
-        expect.objectContaining({
-          spans: [{ kind: "link", href: `doc:${docId}`, text: "Imported" }],
-          blockKind: "list_item",
-        }),
-      ],
-    }),
-  ]);
-
-  const bare = parseTree(`# Root\n- [Imported](${docId})\n`);
-  expect(bare).toEqual([
-    expect.objectContaining({
-      children: [
-        expect.objectContaining({
-          spans: [{ kind: "text", text: `[Imported](${docId})` }],
-          blockKind: "list_item",
-        }),
-      ],
+        [{ kind: "link", href: "trip.md", text: "Trip" }],
+        [{ kind: "link", href: "../trip.md#packing", text: "Packing" }],
+        [{ kind: "link", href: `//${alice}`, text: "Alice" }],
+        [{ kind: "text", text: `[Imported](doc:${docId})` }],
+        [{ kind: "text", text: `[Bare](${docId})` }],
+      ].map((spans) => expect.objectContaining({ spans })),
     }),
   ]);
 });

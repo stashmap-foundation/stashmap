@@ -2,9 +2,12 @@ import { Map as ImmutableMap } from "immutable";
 import { Event } from "nostr-tools";
 import {
   Document as KnowstrDocument,
-  parseToDocumentPreservingExplicitIds,
+  documentKeyOf,
+  parseToDocument,
 } from "./core/Document";
-import { isCanonicalId } from "./core/entityRecognition";
+import { getNode } from "./core/connections";
+import { soleThingAddress } from "./core/nodeSpans";
+import { thingTagOf } from "./core/linkPath";
 import { KIND_KNOWLEDGE_DEPOSIT } from "./nostr";
 import { findTag } from "./nostrEvents";
 import { normalizeRelayHintUrl } from "./workspaceConfig";
@@ -35,7 +38,7 @@ export type PullSourceRecord =
       latestEventId: string;
       createdAt: number;
       ms: number;
-      sTags: string[];
+      linkTags: string[];
       relays: string[];
       matchedInterestKeys: string[];
       document: KnowstrDocument;
@@ -110,10 +113,22 @@ export function derivePullInterests(
       ];
     }
 
-    if (!pane.rootNodeId || !isCanonicalId(pane.rootNodeId)) {
+    const rootRowId =
+      pane.rootNodeId ??
+      (pane.documentId
+        ? data.documents.get(documentKeyOf(LOCAL, pane.documentId))
+            ?.topNodeShortIds[0]
+        : undefined);
+    const rootRow = rootRowId
+      ? getNode(data.knowledgeDBs, rootRowId, LOCAL)
+      : undefined;
+    const thing =
+      (rootRowId && thingTagOf(rootRowId)) ||
+      (rootRow && soleThingAddress(rootRow));
+    if (!thing) {
       return [];
     }
-    const tags = [pane.rootNodeId];
+    const tags = [thing];
     const relays = normalizedRelayUrls(roomRelays);
     if (relays.length === 0) {
       return [];
@@ -168,7 +183,7 @@ export function matchedInterestKeys(
       if (record.status !== "available") {
         return false;
       }
-      return interest.tags.some((tag) => record.sTags.includes(tag));
+      return interest.tags.some((tag) => record.linkTags.includes(tag));
     })
     .map((interest) => interest.interestKey);
 }
@@ -229,25 +244,20 @@ export function recordFromDepositEvent(
     relays,
     matchedInterestKeys: [...(matchedKeysOverride ?? [])],
   });
-  const sTags = sortedUnique(
-    event.tags.filter((tag) => tag[0] === "S" && tag[1]).map((tag) => tag[1])
+  const linkTags = sortedUnique(
+    event.tags
+      .filter((tag) => (tag[0] === "i" || tag[0] === "a") && tag[1])
+      .map((tag) => tag[1])
   );
-  if (event.content.trim() === "" || sTags.length === 0) {
+  if (event.content.trim() === "") {
     return unavailable();
   }
   try {
-    const parsed = parseToDocumentPreservingExplicitIds(
-      sourceId,
-      event.content,
-      {
-        docIdFallback: dTag,
-        updatedMsOverride: ms,
-      }
-    );
-    if (
-      parsed.document.docId !== dTag ||
-      parsed.document.topNodeShortIds.length === 0
-    ) {
+    const parsed = parseToDocument(sourceId, event.content, {
+      path: dTag,
+      updatedMsOverride: ms,
+    });
+    if (parsed.document.topNodeShortIds.length === 0) {
       return unavailable();
     }
     const record: PullSourceRecord = {
@@ -257,7 +267,7 @@ export function recordFromDepositEvent(
       latestEventId: event.id,
       createdAt,
       ms,
-      sTags,
+      linkTags,
       relays,
       matchedInterestKeys: [],
       document: parsed.document,

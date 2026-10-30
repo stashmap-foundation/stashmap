@@ -1,5 +1,6 @@
-import { type Document, withDocumentRealWorldEntities } from "./core/Document";
+import { type Document } from "./core/Document";
 import { LOCAL } from "./core/nodeRef";
+import { buildDepositEvent } from "./nodesDocumentEvent";
 import { getAllLinks, plainSpans } from "./core/nodeSpans";
 import { EMPTY_NODE_ID } from "./core/connections";
 import { parseInlineSpans } from "./core/markdownTree";
@@ -49,13 +50,13 @@ function documentByRoot(plan: Plan, rootId: ID): Document {
   return document;
 }
 
-function realWorldEntities(plan: Plan, document: Document): string[] {
-  return withDocumentRealWorldEntities(
-    plan.knowledgeDBs,
-    plan.documents,
-    plan.documentByFilePath,
-    document
-  ).realWorldEntities;
+function linkTags(plan: Plan, document: Document): string[][] {
+  return buildDepositEvent(
+    document,
+    ALICE.publicKey,
+    renderDocumentMarkdown(plan.knowledgeDBs, document),
+    0
+  ).tags.filter((tag) => tag[0] === "a" || tag[0] === "i");
 }
 
 test("document writes emit storage events only", () => {
@@ -73,9 +74,9 @@ const CONTRACT_ID = "rgb:cdtFZh2Q-YTY1rYW-yBdMlZb-GbkThw~-ArYpJ72-eXiti5Y";
 test("entity recognizers: rgb markers and wikidata urls", () => {
   expect(entityIdForText(`  ${CONTRACT_ID}\n`)).toBe(`${CONTRACT_ID}`);
   expect(entityIdForText("https://www.wikidata.org/wiki/Q1492")).toBe(
-    "wd:Q1492"
+    "wikidata:Q1492"
   );
-  expect(entityIdForText("http://wikidata.org/wiki/Q42")).toBe("wd:Q42");
+  expect(entityIdForText("http://wikidata.org/wiki/Q42")).toBe("wikidata:Q42");
   expect(entityIdForText("just some text")).toBeUndefined();
   expect(entityIdForText("rgb:short")).toBeUndefined();
 });
@@ -84,10 +85,11 @@ test("clipboard Markdown survives empty-row materialization and document renderi
   const { plan, docId, rootId } = planWithEssay();
   const root = plan.knowledgeDBs.get(LOCAL)?.nodes.get(rootId);
   if (!root) throw new Error("Missing root");
-  const emptyNode = {
-    ...newGraphNode(plainSpans(""), { root: rootId, parent: rootId }),
+  const emptyNode = newGraphNode(plainSpans(""), {
     id: EMPTY_NODE_ID,
-  };
+    root: rootId,
+    parent: rootId,
+  });
   const markdown = `[A link to Hello](#e834645e-8bb5-44f7-89b2-41d5054746af)`;
   const result = planSaveNodeAndEnsureNodes(
     plan,
@@ -109,16 +111,14 @@ test("clipboard Markdown survives empty-row materialization and document renderi
   );
 });
 
-test("marker as new document root mints the entity node, idempotently", () => {
+test("marker as new document root becomes a row about the thing, never its id", () => {
   const { plan } = planWithEssay();
   const first = planCreateNoteAtRoot(plan, plainSpans(CONTRACT_ID), 0);
-  expect(first.node.id).toBe(`${CONTRACT_ID}`);
-  const countAfterFirst = first.plan.knowledgeDBs.get(LOCAL)?.nodes.size;
-
-  const second = planCreateNoteAtRoot(first.plan, plainSpans(CONTRACT_ID), 0);
-  expect(second.node.id).toBe(`${CONTRACT_ID}`);
-  expect(second.plan.knowledgeDBs.get(LOCAL)?.nodes.size).toBe(countAfterFirst);
-  expect(second.plan.panes[0].rootNodeId).toBe(`${CONTRACT_ID}`);
+  expect(first.node.id).not.toContain(CONTRACT_ID);
+  expect(first.node.spans).toEqual([
+    { kind: "link", href: CONTRACT_ID, text: CONTRACT_ID },
+  ]);
+  expect(first.plan.panes[0].rootNodeId).toBe(first.node.id);
 });
 
 test("marker created under a parent becomes a link row, never a duplicate", () => {
@@ -143,7 +143,7 @@ test("marker created under a parent becomes a link row, never a duplicate", () =
     .get(LOCAL)
     ?.nodes.valueSeq()
     .find((node) =>
-      getAllLinks(node).some((link) => link.targetID === `${CONTRACT_ID}`)
+      getAllLinks(node, LOCAL).some((link) => link.target.id === CONTRACT_ID)
     );
   expect(linkRow).toBeDefined();
   expect(linkRow?.parent).toBe(rootId);
@@ -154,7 +154,7 @@ test("marker created under a parent becomes a link row, never a duplicate", () =
     .get(LOCAL)
     ?.nodes.valueSeq()
     .filter((node) =>
-      getAllLinks(node).some((link) => link.targetID === `${CONTRACT_ID}`)
+      getAllLinks(node, LOCAL).some((link) => link.target.id === CONTRACT_ID)
     )
     .toArray();
   expect(links?.length).toBe(2);
@@ -197,7 +197,7 @@ test("a bare feed url becomes a real feed link row on every write path", () => {
   });
 });
 
-test("link placements contribute real-world entities", () => {
+test("link placements tag the deposit with the thing", () => {
   const { plan, docId, rootId } = planWithEssay();
   const parent = plan.knowledgeDBs.get(LOCAL)?.nodes.get(rootId);
   if (!parent) {
@@ -213,19 +213,20 @@ test("link placements contribute real-world entities", () => {
   if (!document) {
     throw new Error("document missing");
   }
-  expect(realWorldEntities(pasted, document)).toContain(`${CONTRACT_ID}`);
+  expect(linkTags(pasted, document)).toEqual([["i", CONTRACT_ID]]);
 });
 
-test("real-world entities derive through link targets", () => {
+test("deposit tags derive through link targets and dedupe", () => {
   const [alice] = setup([ALICE]);
   const [plan] = planCreateNodesFromMarkdown(
     createPlan(alice()),
     [
       "# Travel",
       "",
-      "- [Barcelona](#wd:Q1492)",
-      "  - [Sagrada Familia](#wd:Q48435)",
+      "- [Barcelona](wikidata:Q1492)",
+      "  - [Sagrada Familia](wikidata:Q48435)",
       "    - I want to see it",
+      "  - [Barcelona again](wikidata:Q1492)",
       "  - Book flights",
     ].join("\n")
   );
@@ -233,28 +234,13 @@ test("real-world entities derive through link targets", () => {
   if (!document) {
     throw new Error("document missing");
   }
-  expect(realWorldEntities(plan, document)).toEqual(["wd:Q1492", "wd:Q48435"]);
+  expect(linkTags(plan, document)).toEqual([
+    ["i", "wikidata:Q1492"],
+    ["i", "wikidata:Q48435"],
+  ]);
 });
 
-test("repeated entities dedupe", () => {
-  const [alice] = setup([ALICE]);
-  const [plan] = planCreateNodesFromMarkdown(
-    createPlan(alice()),
-    [
-      "# Notes",
-      "",
-      "- [Barcelona](#wd:Q1492)",
-      "  - [Barcelona again](#wd:Q1492)",
-    ].join("\n")
-  );
-  const document = plan.documents.first(undefined);
-  if (!document) {
-    throw new Error("document missing");
-  }
-  expect(realWorldEntities(plan, document)).toEqual(["wd:Q1492"]);
-});
-
-test("deep links include the target container root", () => {
+test("deep links tag the file holding the target", () => {
   const [alice] = setup([ALICE]);
   const [targetPlan] = planCreateNodesFromMarkdown(
     createPlan(alice()),
@@ -266,7 +252,7 @@ test("deep links include the target container root", () => {
   );
   const [plan] = planCreateNodesFromMarkdown(
     targetPlan,
-    ["# Notes", "", "- [Childhood](#lviv-childhood)"].join("\n")
+    ["# Notes", "", "- [Childhood](life-in-lviv.md#lviv-childhood)"].join("\n")
   );
   const document = plan.documents
     .valueSeq()
@@ -275,18 +261,20 @@ test("deep links include the target container root", () => {
     throw new Error("document missing");
   }
 
-  expect(realWorldEntities(plan, document)).toEqual(["lviv-life"]);
+  expect(linkTags(plan, document)).toEqual([
+    ["a", `34774:${ALICE.publicKey}:life-in-lviv.md`],
+  ]);
 });
 
-test("direct link entities are source-local and directional", () => {
+test("file tags are directional: a document tags what it links to, never what links to it", () => {
   const [alice] = setup([ALICE]);
   const [misesPlan] = planCreateNodesFromMarkdown(
     createPlan(alice()),
-    ["# Mises <!-- id:mises -->", "", "- [Hayek](#hayek)"].join("\n")
+    ["# Mises <!-- id:mises -->", "", "- [Hayek](hayek.md)"].join("\n")
   );
   const [hayekPlan] = planCreateNodesFromMarkdown(
     misesPlan,
-    ["# Hayek <!-- id:hayek -->", "", "- [Wittgenstein](#wittgenstein)"].join(
+    ["# Hayek <!-- id:hayek -->", "", "- [Wittgenstein](wittgenstein.md)"].join(
       "\n"
     )
   );
@@ -294,10 +282,13 @@ test("direct link entities are source-local and directional", () => {
     hayekPlan,
     "# Wittgenstein <!-- id:wittgenstein -->"
   );
-  expect(realWorldEntities(plan, documentByRoot(plan, "mises"))).toEqual([
-    "hayek",
+  expect(linkTags(plan, documentByRoot(plan, "mises.md#mises"))).toEqual([
+    ["a", `34774:${ALICE.publicKey}:hayek.md`],
   ]);
-  expect(realWorldEntities(plan, documentByRoot(plan, "hayek"))).toEqual([
-    "wittgenstein",
+  expect(linkTags(plan, documentByRoot(plan, "hayek.md#hayek"))).toEqual([
+    ["a", `34774:${ALICE.publicKey}:wittgenstein.md`],
   ]);
+  expect(
+    linkTags(plan, documentByRoot(plan, "wittgenstein.md#wittgenstein"))
+  ).toEqual([]);
 });

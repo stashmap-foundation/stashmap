@@ -4,7 +4,7 @@ import { buildReferenceItem } from "./buildReferenceRow";
 import { graphLookupFromData } from "./core/graphLookup";
 import { buildPaneTarget, ViewPath } from "./rowModel";
 import { getNodesInTree } from "./treeTraversal";
-import { linkSpan, plainSpans } from "./core/nodeSpans";
+import { plainSpans } from "./core/nodeSpans";
 
 const LOCAL = "local" as PublicKey;
 const SOURCE_A = "source-a" as PublicKey;
@@ -44,7 +44,6 @@ function indexedData(entries: ReadonlyArray<[PublicKey, GraphNode[]]>): Data {
       addNodesToGraphIndex(
         index,
         Map<ID, GraphNode>(nodes.map((node) => [node.id, node])),
-        undefined,
         sourceId
       ),
     createEmptyGraphIndex()
@@ -54,7 +53,6 @@ function indexedData(entries: ReadonlyArray<[PublicKey, GraphNode[]]>): Data {
     knowledgeDBs,
     graphIndex,
     documents: Map(),
-    documentByFilePath: Map(),
     computedNodes: Map(),
     publishEventsStatus: {
       isLoading: false,
@@ -76,43 +74,43 @@ function indexedData(entries: ReadonlyArray<[PublicKey, GraphNode[]]>): Data {
       {
         id: "pane-0",
         sourceId: SOURCE_B,
-        rootNodeId: "root",
+        rootNodeId: "doc.md#root",
       },
     ],
   };
 }
 
 function duplicateSourceData(): Data {
-  const rootA = testNode(SOURCE_A, "root", "Root A", {
-    children: List<ID>(["child", "link"]),
+  const rootA = testNode(SOURCE_A, "doc.md#root", "Root A", {
+    children: List<ID>(["doc.md#child", "doc.md#link"]),
   });
-  const childA = testNode(SOURCE_A, "child", "Child A", {
-    parent: "root",
-    root: "root",
+  const childA = testNode(SOURCE_A, "doc.md#child", "Child A", {
+    parent: "doc.md#root",
+    root: "doc.md#root",
   });
-  const targetA = testNode(SOURCE_A, "target", "Target A", {
-    root: "root",
+  const targetA = testNode(SOURCE_A, "doc.md#target", "Target A", {
+    root: "doc.md#root",
   });
-  const linkA = testNode(SOURCE_A, "link", "", {
-    parent: "root",
-    root: "root",
-    spans: [linkSpan("target", "")],
+  const linkA = testNode(SOURCE_A, "doc.md#link", "", {
+    parent: "doc.md#root",
+    root: "doc.md#root",
+    spans: [{ kind: "link", href: "#target", text: "" }],
   });
 
-  const rootB = testNode(SOURCE_B, "root", "Root B", {
-    children: List<ID>(["child", "link"]),
+  const rootB = testNode(SOURCE_B, "doc.md#root", "Root B", {
+    children: List<ID>(["doc.md#child", "doc.md#link"]),
   });
-  const childB = testNode(SOURCE_B, "child", "Child B", {
-    parent: "root",
-    root: "root",
+  const childB = testNode(SOURCE_B, "doc.md#child", "Child B", {
+    parent: "doc.md#root",
+    root: "doc.md#root",
   });
-  const targetB = testNode(SOURCE_B, "target", "Target B", {
-    root: "root",
+  const targetB = testNode(SOURCE_B, "doc.md#target", "Target B", {
+    root: "doc.md#root",
   });
-  const linkB = testNode(SOURCE_B, "link", "", {
-    parent: "root",
-    root: "root",
-    spans: [linkSpan("target", "")],
+  const linkB = testNode(SOURCE_B, "doc.md#link", "", {
+    parent: "doc.md#root",
+    root: "doc.md#root",
+    spans: [{ kind: "link", href: "#target", text: "" }],
   });
 
   return indexedData([
@@ -123,35 +121,35 @@ function duplicateSourceData(): Data {
 
 test("tree rows and fullscreen targets stay in the pane source for duplicate ids", () => {
   const data = duplicateSourceData();
-  const rootPath: ViewPath = [0, "root"];
+  const rootPath: ViewPath = [0, "doc.md#root"];
 
   const treeRows = getNodesInTree(
     data,
     List<ViewPath>([rootPath]),
-    "root",
+    "doc.md#root",
     SOURCE_B,
     undefined
   ).rows;
   const childRow = treeRows.get(1);
 
-  expect(childRow?.viewPath).toEqual([0, "root", "child"]);
+  expect(childRow?.viewPath).toEqual([0, "doc.md#root", "doc.md#child"]);
   expect(childRow ? buildPaneTarget(data, childRow).sourceId : undefined).toBe(
     SOURCE_B
   );
   expect(
     childRow ? buildPaneTarget(data, childRow).rootNodeId : undefined
-  ).toBe("child");
+  ).toBe("doc.md#child");
 });
 
 test("incoming rows keep their source identity in the current source", () => {
   const data = duplicateSourceData();
-  const parentNode = data.knowledgeDBs.get(SOURCE_B)?.nodes.get("root");
+  const parentNode = data.knowledgeDBs.get(SOURCE_B)?.nodes.get("doc.md#root");
   if (!parentNode) {
     throw new Error("Missing parent node");
   }
   const reference = buildReferenceItem(
     graphLookupFromData(data),
-    "link",
+    "doc.md#link",
     data,
     SOURCE_B,
     "incoming",
@@ -167,28 +165,28 @@ test("incoming rows keep their source identity in the current source", () => {
 });
 
 function incomingDuplicateData(): Data {
-  const rootA = testNode(SOURCE_A, "root-a", "Root A", {
-    children: List<ID>(["link-a"]),
+  const rootA = testNode(SOURCE_A, "doc.md#root-a", "Root A", {
+    children: List<ID>(["doc.md#link-a"]),
   });
-  const targetA = testNode(SOURCE_A, "target", "Target A", {
-    root: "root-a",
+  const targetA = testNode(SOURCE_A, "doc.md#target", "Target A", {
+    root: "doc.md#root-a",
   });
-  const linkA = testNode(SOURCE_A, "link-a", "", {
-    parent: "root-a",
-    root: "root-a",
-    spans: [linkSpan("target", "")],
+  const linkA = testNode(SOURCE_A, "doc.md#link-a", "", {
+    parent: "doc.md#root-a",
+    root: "doc.md#root-a",
+    spans: [{ kind: "link", href: "#target", text: "" }],
   });
 
-  const rootB = testNode(SOURCE_B, "root-b", "Root B", {
-    children: List<ID>(["link-b"]),
+  const rootB = testNode(SOURCE_B, "doc.md#root-b", "Root B", {
+    children: List<ID>(["doc.md#link-b"]),
   });
-  const targetB = testNode(SOURCE_B, "target", "Target B", {
-    root: "root-b",
+  const targetB = testNode(SOURCE_B, "doc.md#target", "Target B", {
+    root: "doc.md#root-b",
   });
-  const linkB = testNode(SOURCE_B, "link-b", "", {
-    parent: "root-b",
-    root: "root-b",
-    spans: [linkSpan("target", "")],
+  const linkB = testNode(SOURCE_B, "doc.md#link-b", "", {
+    parent: "doc.md#root-b",
+    root: "doc.md#root-b",
+    spans: [{ kind: "link", href: "#target", text: "" }],
   });
 
   return indexedData([
@@ -201,44 +199,44 @@ test("incoming refs for duplicate ids stay scoped to the target source", () => {
   const baseData = incomingDuplicateData();
   const data = {
     ...baseData,
-    panes: [{ ...baseData.panes[0], rootNodeId: "target" }],
+    panes: [{ ...baseData.panes[0], rootNodeId: "doc.md#target" }],
   };
   const incomingRows = getNodesInTree(
     data,
-    List<ViewPath>([[0, "target"]]),
-    "target",
+    List<ViewPath>([[0, "doc.md#target"]]),
+    "doc.md#target",
     SOURCE_B,
     undefined
   ).rows.rest();
 
   expect(incomingRows.map((row) => row.viewPath).toArray()).toEqual([
-    [0, "target", "incoming:source-b:root-b"],
+    [0, "doc.md#target", "incoming:source-b:doc.md#root-b"],
   ]);
 });
 
 test("incoming ref owner rows keep source identity when owner ids also collide", () => {
-  const rootA = testNode(SOURCE_A, "root", "Root A", {
-    children: List<ID>(["link"]),
+  const rootA = testNode(SOURCE_A, "doc.md#root", "Root A", {
+    children: List<ID>(["doc.md#link"]),
   });
-  const targetA = testNode(SOURCE_A, "target", "Target A", {
-    root: "root",
+  const targetA = testNode(SOURCE_A, "doc.md#target", "Target A", {
+    root: "doc.md#root",
   });
-  const linkA = testNode(SOURCE_A, "link", "", {
-    parent: "root",
-    root: "root",
-    spans: [linkSpan("target", "")],
+  const linkA = testNode(SOURCE_A, "doc.md#link", "", {
+    parent: "doc.md#root",
+    root: "doc.md#root",
+    spans: [{ kind: "link", href: "#target", text: "" }],
   });
 
-  const rootB = testNode(SOURCE_B, "root", "Root B", {
-    children: List<ID>(["link"]),
+  const rootB = testNode(SOURCE_B, "doc.md#root", "Root B", {
+    children: List<ID>(["doc.md#link"]),
   });
-  const targetB = testNode(SOURCE_B, "target", "Target B", {
-    root: "root",
+  const targetB = testNode(SOURCE_B, "doc.md#target", "Target B", {
+    root: "doc.md#root",
   });
-  const linkB = testNode(SOURCE_B, "link", "", {
-    parent: "root",
-    root: "root",
-    spans: [linkSpan("target", "")],
+  const linkB = testNode(SOURCE_B, "doc.md#link", "", {
+    parent: "doc.md#root",
+    root: "doc.md#root",
+    spans: [{ kind: "link", href: "#target", text: "" }],
   });
 
   const baseData = indexedData([
@@ -247,18 +245,18 @@ test("incoming ref owner rows keep source identity when owner ids also collide",
   ]);
   const data = {
     ...baseData,
-    panes: [{ ...baseData.panes[0], rootNodeId: "target" }],
+    panes: [{ ...baseData.panes[0], rootNodeId: "doc.md#target" }],
   };
   const incomingRows = getNodesInTree(
     data,
-    List<ViewPath>([[0, "target"]]),
-    "target",
+    List<ViewPath>([[0, "doc.md#target"]]),
+    "doc.md#target",
     SOURCE_B,
     undefined
   ).rows.rest();
 
   expect(incomingRows.map((row) => row.sourceId).toArray()).toEqual([SOURCE_B]);
   expect(incomingRows.map((row) => row.node.spans).toArray()).toEqual([
-    [linkSpan("root", "Root B")],
+    [{ kind: "link", href: "#root", text: "Root B" }],
   ]);
 });

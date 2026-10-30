@@ -35,7 +35,7 @@ function planUpdateDocumentTopNodeMetadata(
   editorSpans: InlineSpan[] | undefined
 ): Plan {
   const { node, nodeID, viewPath, paneIndex, documentId } = input;
-  if (documentId === undefined || node.parent || !node.docId) {
+  if (documentId === undefined || node.parent) {
     return plan;
   }
 

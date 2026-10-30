@@ -93,7 +93,9 @@ export function derivePullInterests(
       if (!coordinate || coordinate.eventKind !== KIND_KNOWLEDGE_DEPOSIT) {
         return [];
       }
-      const relays = normalizedRelayUrls(coordinate.relays);
+      const relays = normalizedRelayUrls(
+        coordinate.relays.length > 0 ? coordinate.relays : roomRelays
+      );
       if (relays.length === 0) {
         return [];
       }

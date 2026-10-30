@@ -2,6 +2,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { cleanup, screen, waitFor } from "@testing-library/react";
+import { nip19 } from "nostr-tools";
 import userEvent from "@testing-library/user-event";
 import { BOB, expectTree, renderApp, setup } from "../utils.test";
 import { renderAppTree } from "../appTestUtils.test";
@@ -237,6 +238,51 @@ Barcelona
   expect(
     relayPool.getEvents().filter((event) => event.pubkey === BOB.publicKey)
   ).toHaveLength(0);
+});
+
+test("a link to another author's row opens that row of that file", async () => {
+  const relayPool = mockRelayPool();
+  const alicePath = await workspaceWithDocument(
+    "trips/rome.md",
+    [
+      "# Rome <!-- id:rome -->",
+      "",
+      "- Where to eat <!-- id:tips -->",
+      "  - Trastevere <!-- id:trastevere -->",
+      "- Museums <!-- id:museums -->",
+      "",
+    ].join("\n")
+  );
+  const aliceNpub = nip19.npubEncode(profilePubkey(alicePath));
+  const bobPath = await fixedWorkspaceWithDocument(
+    BOB,
+    "rome.md",
+    [
+      "# Trip to Rome <!-- id:trip -->",
+      "",
+      `- Read [her tips](//${aliceNpub}/trips/rome.md#tips) first <!-- id:read -->`,
+      "",
+    ].join("\n")
+  );
+  await publishDepositFixture(relayPool, alicePath, "trips/rome.md", "Rome");
+  await renderAppTree({
+    path: bobPath,
+    relayPool,
+    initialRoute: buildDocumentRouteUrl(LOCAL, "rome.md"),
+  });
+
+  await userEvent.click(await screen.findByRole("link", { name: "her tips" }));
+
+  await waitFor(() => {
+    expect(window.location.pathname).toMatch(/^\/deposit\//u);
+    expect(new URLSearchParams(window.location.search).get("at")).toBe("tips");
+  });
+  await screen.findByText("READONLY");
+  await expectTree(`
+[O] Where to eat
+  [O] Trastevere
+  [I] Trip to Rome / Read her tips first ↩
+  `);
 });
 
 test("a feed present only in a pulled document projects its entries", async () => {

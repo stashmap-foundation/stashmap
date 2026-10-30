@@ -1,5 +1,6 @@
 import { nip19 } from "nostr-tools";
-import { LOCAL, rowIdOf } from "./core/nodeRef";
+import { LOCAL, pathOf, rowIdOf, rowKey } from "./core/nodeRef";
+import { isThingAddress } from "./core/linkPath";
 import {
   decodePublicKeyInputSync,
   encodePublicKeyAddress,
@@ -108,87 +109,74 @@ function storageCoordinate(
   };
 }
 
+function fileCoordinate(
+  author: SourceId,
+  path: string,
+  routeCoordinate: RouteCoordinate | undefined
+): RouteCoordinate | undefined {
+  const known = routeCoordinate ?? sourceCoordinate(author);
+  if (known) {
+    return { ...known, dTag: path };
+  }
+  const pubkey = decodePublicKeyInputSync(author);
+  return pubkey
+    ? { eventKind: KIND_KNOWLEDGE_DEPOSIT, pubkey, dTag: path, relays: [] }
+    : undefined;
+}
+
+function coordinatePrefix(coordinate: RouteCoordinate): "deposit" | "storage" {
+  return coordinate.eventKind === KIND_KNOWLEDGE_DEPOSIT
+    ? "deposit"
+    : "storage";
+}
+
+export function buildDocumentRouteUrl(
+  author: SourceId,
+  docId: string,
+  routeCoordinate?: RouteCoordinate
+): string {
+  const coordinate =
+    author === LOCAL
+      ? undefined
+      : fileCoordinate(author, docId, routeCoordinate);
+  return coordinate
+    ? buildCoordinateRouteUrl(
+        coordinatePrefix(coordinate),
+        coordinate,
+        undefined,
+        undefined
+      )
+    : `/local/d/${encodeURIComponent(docId)}`;
+}
+
 export function buildNodeRouteUrl(
   rootNode: ID,
   sourceId: SourceId,
   options: NodeRouteOptions,
   routeCoordinate?: RouteCoordinate
 ): string {
-  if (sourceId === LOCAL) {
-    const params = new URLSearchParams();
-    if (options.scrollToId !== undefined) {
-      params.set("at", options.scrollToId);
-    }
-    if (options.fallbackLabel !== undefined && options.fallbackLabel !== "") {
-      params.set("label", options.fallbackLabel);
-    }
-    const query = params.toString();
-    return `/local/n/${encodeURIComponent(rootNode)}${
-      query ? `?${query}` : ""
-    }`;
+  if (isThingAddress(rootNode)) {
+    const label =
+      options.fallbackLabel !== undefined && options.fallbackLabel !== ""
+        ? `?${new URLSearchParams({ label: options.fallbackLabel }).toString()}`
+        : "";
+    return `/local/n/${encodeURIComponent(rootNode)}${label}`;
   }
   const coordinate =
-    routeCoordinate ??
-    sourceCoordinate(sourceId) ??
-    storageCoordinate(sourceId, rootNode);
+    sourceId === LOCAL
+      ? undefined
+      : fileCoordinate(sourceId, pathOf(rootNode), routeCoordinate);
   if (!coordinate) {
-    return `/local/n/${encodeURIComponent(rootNode)}`;
+    return `/local/d/${encodeURIComponent(
+      pathOf(rootNode)
+    )}?${new URLSearchParams({ at: rowIdOf(rootNode) }).toString()}`;
   }
-  const prefix =
-    coordinate.eventKind === KIND_KNOWLEDGE_DEPOSIT ? "deposit" : "storage";
   return buildCoordinateRouteUrl(
-    prefix,
+    coordinatePrefix(coordinate),
     coordinate,
     options.scrollToId ?? rootNode,
     undefined
   );
-}
-
-export function buildDocumentRouteUrl(
-  author: SourceId,
-  docId: string,
-  scrollToId?: string,
-  routeCoordinate?: RouteCoordinate
-): string {
-  if (author === LOCAL) {
-    const params = new URLSearchParams();
-    if (scrollToId !== undefined) {
-      params.set("at", scrollToId);
-    }
-    const query = params.toString();
-    return `/local/d/${encodeURIComponent(docId)}${query ? `?${query}` : ""}`;
-  }
-  const coordinate =
-    routeCoordinate ??
-    sourceCoordinate(author) ??
-    storageCoordinate(author, docId);
-  if (!coordinate) {
-    return `/local/d/${encodeURIComponent(docId)}`;
-  }
-  const prefix =
-    coordinate.eventKind === KIND_KNOWLEDGE_DEPOSIT ? "deposit" : "storage";
-  return buildCoordinateRouteUrl(prefix, coordinate, scrollToId, undefined);
-}
-
-export function parseNodeRouteUrl(pathname: string): ID | undefined {
-  const match = pathname.match(/^\/local\/n\/(.+)$/u);
-  if (!match) {
-    return undefined;
-  }
-  return decodeURIComponent(match[1]);
-}
-
-export function parseDocumentRouteUrl(
-  pathname: string
-): { address: SourceId; docId: string } | undefined {
-  const match = pathname.match(/^\/local\/d\/(.+)$/u);
-  if (!match) {
-    return undefined;
-  }
-  return {
-    address: LOCAL,
-    docId: decodeURIComponent(match[1]),
-  };
 }
 
 export function parseCoordinateRouteUrl(
@@ -222,10 +210,6 @@ export function parseCoordinateRouteUrl(
   } catch {
     return undefined;
   }
-}
-
-export function parseSourceFromSearch(search: string): SourceId | undefined {
-  return search === "" ? undefined : undefined;
 }
 
 export function parseFallbackLabelFromSearch(
@@ -263,4 +247,72 @@ export function buildShareRouteUrl(
     )}`;
   }
   return buildCoordinateRouteUrl("storage", coordinate, undefined, storageKey);
+}
+
+function parseThingRouteUrl(pathname: string): ID | undefined {
+  const match = pathname.match(/^\/local\/n\/(.+)$/u);
+  const thing = match ? decodeURIComponent(match[1]) : undefined;
+  return thing !== undefined && isThingAddress(thing) ? thing : undefined;
+}
+
+function parseDocumentRouteUrl(pathname: string): string | undefined {
+  const match = pathname.match(/^\/local\/d\/(.+)$/u);
+  return match ? decodeURIComponent(match[1]) : undefined;
+}
+
+function coordinatePane(
+  coordinate: RouteCoordinate,
+  sourceId: SourceId,
+  at: string | undefined
+): Omit<Pane, "id"> {
+  return {
+    sourceId,
+    routeCoordinate: coordinate,
+    ...(at === undefined
+      ? { documentId: coordinate.dTag }
+      : { rootNodeId: rowKey(coordinate.dTag, at) }),
+  };
+}
+
+export function routePane(
+  url: { pathname: string; search: string; hash: string },
+  myPublicKey: PublicKey | undefined
+): Omit<Pane, "id"> | undefined {
+  const at = parseAtFromSearch(url.search);
+  const path = parseDocumentRouteUrl(url.pathname);
+  if (path !== undefined) {
+    return at === undefined
+      ? { sourceId: LOCAL, documentId: path }
+      : { sourceId: LOCAL, rootNodeId: rowKey(path, at) };
+  }
+  const storageRoute = parseCoordinateRouteUrl(url.pathname, "storage");
+  if (storageRoute) {
+    const storageKey = parseStorageKeyFromHash(url.hash);
+    return {
+      ...coordinatePane(
+        storageRoute,
+        resolveAddress(storageRoute.pubkey, myPublicKey),
+        at
+      ),
+      ...(storageKey !== undefined && { storageKey }),
+    };
+  }
+  const depositRoute = parseCoordinateRouteUrl(url.pathname, "deposit");
+  if (depositRoute) {
+    return coordinatePane(
+      depositRoute,
+      routeCoordinateSourceId(depositRoute),
+      at
+    );
+  }
+  const thing = parseThingRouteUrl(url.pathname);
+  if (thing !== undefined) {
+    const fallbackLabel = parseFallbackLabelFromSearch(url.search);
+    return {
+      sourceId: LOCAL,
+      rootNodeId: thing,
+      ...(fallbackLabel !== undefined && { fallbackLabel }),
+    };
+  }
+  return undefined;
 }

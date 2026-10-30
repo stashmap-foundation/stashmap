@@ -272,7 +272,6 @@ function Breadcrumbs(): JSX.Element {
             return buildDocumentRouteUrl(
               target.sourceId,
               target.documentId,
-              target.scrollToId,
               data.pull?.coordinatesBySourceId.get(target.sourceId) ??
                 (target.sourceId === pane.sourceId
                   ? pane.routeCoordinate

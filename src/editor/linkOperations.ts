@@ -21,11 +21,7 @@ export function navigationTargetToHref(
   target: EditorNavigationTarget
 ): string | undefined {
   if (target.documentId) {
-    return buildDocumentRouteUrl(
-      target.sourceId,
-      target.documentId,
-      target.scrollToId
-    );
+    return buildDocumentRouteUrl(target.sourceId, target.documentId);
   }
   return target.rootNodeId
     ? buildNodeRouteUrl(target.rootNodeId, target.sourceId, {
@@ -108,7 +104,8 @@ export function isDeadLinkTarget(
   const target = resolveLink(href, { sourceId, id: source.id });
   return (
     target === undefined ||
-    resolveRef(graphLookupFromData(data), target) === undefined
+    (target.sourceId === LOCAL &&
+      resolveRef(graphLookupFromData(data), target) === undefined)
   );
 }
 
@@ -141,15 +138,12 @@ export function inlineLinkToHref(
   if (targetClass === "node") {
     return rowRouteHref(data, target);
   }
-  const document = data.documents.get(
-    documentKeyOf(target.sourceId, target.id)
-  );
-  return document
+  return target.sourceId !== LOCAL ||
+    data.documents.has(documentKeyOf(target.sourceId, target.id))
     ? buildDocumentRouteUrl(
-        document.sourceId,
-        document.docId,
-        undefined,
-        data.pull?.coordinatesBySourceId.get(document.sourceId)
+        target.sourceId,
+        target.id,
+        data.pull?.coordinatesBySourceId.get(target.sourceId)
       )
     : undefined;
 }

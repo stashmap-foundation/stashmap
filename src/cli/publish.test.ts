@@ -342,9 +342,13 @@ test("publish tags a deposit with the files and things it links to", async () =>
   const [, deposit] = publishedEvents(publish).map(({ event }) => event);
   expect(deposit.tags.slice(0, -1)).toEqual([
     ["d", "notes/a.md"],
-    ["a", `34774:${pubkey}:b.md`],
-    ["a", `34774:${pubkey}:notes/sauce.md`],
-    ["a", `34774:${"b".repeat(64)}:pizza.md`],
+    ...[
+      `34774:${pubkey}:b.md`,
+      `34774:${pubkey}:notes/sauce.md`,
+      `34774:${"b".repeat(64)}:pizza.md`,
+    ]
+      .sort()
+      .map((value) => ["a", value]),
     ["i", "https://example.org/trains"],
     ["i", "webcal://example.org/holidays.ics"],
     ["i", "wikidata:Q29"],

@@ -6,19 +6,12 @@ import React, {
   useState,
 } from "react";
 import { useData } from "./DataContext";
-import { LOCAL, rowKey } from "./core/nodeRef";
+import { LOCAL } from "./core/nodeRef";
 import {
   buildCoordinateRouteUrl,
   buildDocumentRouteUrl,
   buildNodeRouteUrl,
-  parseAtFromSearch,
-  parseCoordinateRouteUrl,
-  parseDocumentRouteUrl,
-  parseFallbackLabelFromSearch,
-  parseNodeRouteUrl,
-  parseStorageKeyFromHash,
-  resolveAddress,
-  routeCoordinateSourceId,
+  routePane,
 } from "./navigationUrl";
 import { usePlanner } from "./planner";
 import { generatePaneId } from "./SplitPanesContext";
@@ -67,11 +60,7 @@ function paneToUrl(activePane: Pane): string | undefined {
   }
   if (activePane.documentId) {
     return withStorageKey(
-      buildDocumentRouteUrl(
-        activePane.sourceId,
-        activePane.documentId,
-        activePane.scrollToId
-      )
+      buildDocumentRouteUrl(activePane.sourceId, activePane.documentId)
     );
   }
   if (activePane.rootNodeId) {
@@ -92,54 +81,11 @@ function urlToPane(
   hash: string,
   myPublicKey: PublicKey | undefined
 ): Pane {
-  const fallbackLabel = parseFallbackLabelFromSearch(search);
-  const at = parseAtFromSearch(search);
-  const storageKey = parseStorageKeyFromHash(hash);
-  const documentRoute = parseDocumentRouteUrl(pathname);
-  if (documentRoute) {
-    return {
-      id: generatePaneId(),
-      sourceId: LOCAL,
-      documentId: documentRoute.docId,
-      scrollToId: at,
-    };
-  }
-  const storageRoute = parseCoordinateRouteUrl(pathname, "storage");
-  if (storageRoute) {
-    return {
-      id: generatePaneId(),
-      sourceId: resolveAddress(storageRoute.pubkey, myPublicKey),
-      routeCoordinate: storageRoute,
-      ...(at === undefined
-        ? { documentId: storageRoute.dTag }
-        : { rootNodeId: rowKey(storageRoute.dTag, at) }),
-      ...(storageKey !== undefined && { storageKey }),
-    };
-  }
-  const depositRoute = parseCoordinateRouteUrl(pathname, "deposit");
-  if (depositRoute) {
-    return {
-      id: generatePaneId(),
-      sourceId: routeCoordinateSourceId(depositRoute),
-      routeCoordinate: depositRoute,
-      ...(at === undefined
-        ? { documentId: depositRoute.dTag }
-        : { rootNodeId: rowKey(depositRoute.dTag, at) }),
-    };
-  }
-  const nodeID = parseNodeRouteUrl(pathname);
-  if (nodeID) {
-    return {
-      id: generatePaneId(),
-      sourceId: LOCAL,
-      rootNodeId: nodeID,
-      scrollToId: at,
-      ...(fallbackLabel !== undefined && { fallbackLabel }),
-    };
-  }
   return {
     id: generatePaneId(),
-    sourceId: LOCAL,
+    ...(routePane({ pathname, search, hash }, myPublicKey) ?? {
+      sourceId: LOCAL,
+    }),
   };
 }
 

@@ -15,6 +15,7 @@ export type GraphLookup = {
   graphIndex: GraphIndex;
   documents: Map<string, Document>;
   localSourceId: SourceId;
+  localPubkey: PublicKey | undefined;
   sourceOrder: readonly SourceId[];
   computedNodes: Map<ID, GraphNode>;
 };
@@ -53,6 +54,7 @@ export function graphLookupFromData(data: GraphLookupData): GraphLookup {
     graphIndex: data.graphIndex,
     documents: data.documents,
     localSourceId: LOCAL,
+    localPubkey: data.user?.publicKey,
     sourceOrder: sourceOrderFromData(data),
     computedNodes: data.computedNodes,
   };

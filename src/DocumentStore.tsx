@@ -40,7 +40,8 @@ const DocumentStoreContext = React.createContext<
 >(undefined);
 
 function createInitialState(
-  records: ReadonlyArray<ParsedDocument>
+  records: ReadonlyArray<ParsedDocument>,
+  localPubkey: PublicKey | undefined
 ): DocumentState {
   const documents = ImmutableMap<string, Document>(
     records.map((parsed) => [
@@ -63,7 +64,8 @@ function createInitialState(
       records.map((parsed) => ({
         sourceId: parsed.document.sourceId,
         nodes: parsed.nodes,
-      }))
+      })),
+      localPubkey
     ),
   };
 }
@@ -103,7 +105,8 @@ function withDocNodes(
 
 function applyDocumentToState(
   state: DocumentState,
-  parsed: ParsedDocument
+  parsed: ParsedDocument,
+  localPubkey: PublicKey | undefined
 ): DocumentState {
   const doc = parsed.document;
   const key = documentKeyOf(doc.sourceId, doc.docId);
@@ -129,7 +132,8 @@ function applyDocumentToState(
       ? removeNodesFromGraphIndex(
           state.graphIndex,
           existingNodes,
-          existingDocument.sourceId
+          existingDocument.sourceId,
+          localPubkey
         )
       : state.graphIndex;
   const knowledgeDBsAfterRemove = withoutDocumentNodes(
@@ -148,14 +152,16 @@ function applyDocumentToState(
     graphIndex: addNodesToGraphIndex(
       withoutExistingNodes,
       parsed.nodes,
-      doc.sourceId
+      doc.sourceId,
+      localPubkey
     ),
   };
 }
 
 function applyDeleteToState(
   state: DocumentState,
-  deletion: DocumentDelete
+  deletion: DocumentDelete,
+  localPubkey: PublicKey | undefined
 ): DocumentState {
   const key = documentKeyOf(deletion.sourceId, deletion.docId);
   const existingDocument = state.documents.get(key);
@@ -180,7 +186,8 @@ function applyDeleteToState(
         ? removeNodesFromGraphIndex(
             state.graphIndex,
             existingNodes,
-            existingDocument.sourceId
+            existingDocument.sourceId,
+            localPubkey
           )
         : state.graphIndex,
   };
@@ -189,14 +196,15 @@ function applyDeleteToState(
 function applyRecordsToState(
   state: DocumentState,
   records: ReadonlyArray<ParsedDocument>,
-  deletes: ReadonlyArray<DocumentDelete>
+  deletes: ReadonlyArray<DocumentDelete>,
+  localPubkey: PublicKey | undefined
 ): DocumentState {
   const withDocuments = records.reduce(
-    (acc, parsed) => applyDocumentToState(acc, parsed),
+    (acc, parsed) => applyDocumentToState(acc, parsed, localPubkey),
     state
   );
   return deletes.reduce(
-    (acc, deletion) => applyDeleteToState(acc, deletion),
+    (acc, deletion) => applyDeleteToState(acc, deletion, localPubkey),
     withDocuments
   );
 }
@@ -248,15 +256,25 @@ export function DocumentStoreProvider({
   initialDocuments?: ReadonlyArray<ParsedDocument>;
 }): JSX.Element {
   const [storedState, setStoredState] = React.useState<DocumentState>(() =>
-    createInitialState(initialDocuments)
+    createInitialState(initialDocuments, localPubkey)
   );
-  const upsertDocument = React.useCallback((parsed: ParsedDocument) => {
-    setStoredState((current) => applyDocumentToState(current, parsed));
-  }, []);
+  const upsertDocument = React.useCallback(
+    (parsed: ParsedDocument) => {
+      setStoredState((current) =>
+        applyDocumentToState(current, parsed, localPubkey)
+      );
+    },
+    [localPubkey]
+  );
 
-  const deleteDocument = React.useCallback((del: DocumentDelete) => {
-    setStoredState((current) => applyDeleteToState(current, del));
-  }, []);
+  const deleteDocument = React.useCallback(
+    (del: DocumentDelete) => {
+      setStoredState((current) =>
+        applyDeleteToState(current, del, localPubkey)
+      );
+    },
+    [localPubkey]
+  );
 
   const addEvents = React.useCallback(
     (events: ImmutableMap<string, Event | UnsignedEvent>) => {
@@ -268,7 +286,7 @@ export function DocumentStoreProvider({
       }
 
       setStoredState((current) =>
-        applyRecordsToState(current, records, deletes)
+        applyRecordsToState(current, records, deletes, localPubkey)
       );
     },
     [localPubkey]
@@ -277,7 +295,7 @@ export function DocumentStoreProvider({
   const activeState = React.useMemo(() => {
     const eventList = unpublishedEvents.toArray();
     const { records, deletes } = eventsToParsed(eventList, localPubkey);
-    return applyRecordsToState(storedState, records, deletes);
+    return applyRecordsToState(storedState, records, deletes, localPubkey);
   }, [storedState, unpublishedEvents, localPubkey]);
 
   const contextValue = React.useMemo(

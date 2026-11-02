@@ -165,7 +165,7 @@ function createShowingRow(
     ...(standsFor && { standsFor }),
     presentedSpans: presentedLineOf(showing).node.spans,
     ...(closesCycle(showing) && { cycle: true }),
-    ...(leavesDangling(showing) && { dangling: true }),
+    ...(leavesDangling(showing, data.user?.publicKey) && { dangling: true }),
     ...(presentedLineOf(showing).demoted && { demoted: true }),
   };
 }
@@ -418,8 +418,11 @@ function createVirtualRow(
       projected:
         input.parentRow !== undefined &&
         (input.parentRow.projected === true ||
-          embedTargetOf(input.parentRow.node, input.parentRow.sourceId) !==
-            undefined),
+          embedTargetOf(
+            input.parentRow.node,
+            input.parentRow.sourceId,
+            data.user?.publicKey
+          ) !== undefined),
       parentRow: input.parentRow,
       parentNode: input.parentRow?.node,
       parentRef,

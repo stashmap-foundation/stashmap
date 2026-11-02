@@ -113,7 +113,7 @@ export function LoadSearchData({
   children: React.ReactNode;
   itemIDs: ID[];
 }): JSX.Element {
-  const { knowledgeDBs } = useData();
+  const { knowledgeDBs, user } = useData();
   const pane = useCurrentPane();
 
   const searchEntries = itemIDs
@@ -132,7 +132,7 @@ export function LoadSearchData({
   const foundNodeIDs =
     pane.searchQuery === query && pane.searchResultIDs
       ? List(pane.searchResultIDs)
-      : getLocalSearchResultIDs(knowledgeDBs, query);
+      : getLocalSearchResultIDs(knowledgeDBs, query, user?.publicKey);
 
   return (
     <SearchCrefBuilder searchId={searchId} foundNodeIDs={foundNodeIDs}>

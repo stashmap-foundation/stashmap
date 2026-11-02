@@ -152,7 +152,7 @@ function localChildLinksTo(
     }
     return child
       ? judged &&
-          getAllLinks(child, target.ref.sourceId).some(
+          getAllLinks(child, target.ref.sourceId, graph.localPubkey).some(
             (link) =>
               link.target.id === sourceRoot.node.id &&
               link.target.sourceId === sourceRoot.ref.sourceId

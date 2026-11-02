@@ -19,46 +19,57 @@ function searchLink(
   return span?.kind === "link" ? span : undefined;
 }
 
-function searchTargetRef(node: GraphNode): NodeRef | undefined {
+function searchTargetRef(
+  node: GraphNode,
+  localPubkey: PublicKey | undefined
+): NodeRef | undefined {
   const span = searchLink(node);
   if (!span) return undefined;
   const targetClass = classifyLinkHref(span.href);
   return targetClass === "node" ||
     targetClass === "thing" ||
     targetClass === "calendar"
-    ? resolveLink(span.href, { sourceId: LOCAL, id: node.id })
+    ? resolveLink(span.href, { sourceId: LOCAL, id: node.id }, localPubkey)
     : undefined;
 }
 
-export function searchTargetID(node: GraphNode): ID | undefined {
-  return searchTargetRef(node)?.id;
+export function searchTargetID(
+  node: GraphNode,
+  localPubkey: PublicKey | undefined
+): ID | undefined {
+  return searchTargetRef(node, localPubkey)?.id;
 }
 
 export function searchInsertTarget(
-  node: GraphNode
+  node: GraphNode,
+  localPubkey: PublicKey | undefined
 ): AddToParentTarget | undefined {
   const span = searchLink(node);
   if (!span) return undefined;
-  const target = searchTargetRef(node);
+  const target = searchTargetRef(node, localPubkey);
   if (target) {
     return createRefTarget(target, span.text);
   }
   const file =
     classifyLinkHref(span.href) === "file"
-      ? resolveLink(span.href, { sourceId: LOCAL, id: node.id })
+      ? resolveLink(span.href, { sourceId: LOCAL, id: node.id }, localPubkey)
       : undefined;
   return file
     ? createDocumentLinkTarget(file.sourceId, file.id, span.text)
     : undefined;
 }
 
-function searchContribution(node: GraphNode): ID {
-  return searchTargetID(node) ?? node.id;
+function searchContribution(
+  node: GraphNode,
+  localPubkey: PublicKey | undefined
+): ID {
+  return searchTargetID(node, localPubkey) ?? node.id;
 }
 
 export function getLocalSearchResultIDs(
   knowledgeDBs: KnowledgeDBs,
-  query: string
+  query: string,
+  localPubkey: PublicKey | undefined
 ): List<ID> {
   if (query === "") {
     return List<ID>();
@@ -71,7 +82,7 @@ export function getLocalSearchResultIDs(
     if (normalizeSearchText(text).indexOf(searchStr) === -1) {
       return results;
     }
-    return results.add(searchContribution(node));
+    return results.add(searchContribution(node, localPubkey));
   }, Set<ID>());
 
   return resultIDs.toList();

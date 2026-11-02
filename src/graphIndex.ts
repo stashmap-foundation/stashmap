@@ -160,10 +160,11 @@ function removeNodeSourceEntries(
 function addNodeLinkEntries(
   graphIndex: GraphIndex,
   node: GraphNode,
-  sourceId: SourceId
+  sourceId: SourceId,
+  localPubkey: PublicKey | undefined
 ): void {
   const ref = { sourceId, id: node.id };
-  getAllLinks(node, sourceId).forEach(({ target }) => {
+  getAllLinks(node, sourceId, localPubkey).forEach(({ target }) => {
     if (isThingAddress(target.id)) {
       addRefToNodeMap(graphIndex.incomingCrefs, target.id, ref);
       return;
@@ -175,10 +176,11 @@ function addNodeLinkEntries(
 function removeNodeLinkEntries(
   graphIndex: GraphIndex,
   node: GraphNode,
-  sourceId: SourceId
+  sourceId: SourceId,
+  localPubkey: PublicKey | undefined
 ): void {
   const ref = { sourceId, id: node.id };
-  getAllLinks(node, sourceId).forEach(({ target }) => {
+  getAllLinks(node, sourceId, localPubkey).forEach(({ target }) => {
     if (isThingAddress(target.id)) {
       removeRefFromNodeMap(graphIndex.incomingCrefs, target.id, ref);
       return;
@@ -219,7 +221,8 @@ function cloneIndex(graphIndex: GraphIndex): GraphIndex {
 export function addNodesToGraphIndex(
   graphIndex: GraphIndex,
   nodes: ImmutableMap<string, GraphNode>,
-  sourceId: SourceId
+  sourceId: SourceId,
+  localPubkey: PublicKey | undefined
 ): GraphIndex {
   if (nodes.size === 0) {
     return graphIndex;
@@ -232,7 +235,7 @@ export function addNodesToGraphIndex(
   });
 
   nodes.valueSeq().forEach((node) => {
-    addNodeLinkEntries(nextIndex, node, sourceId);
+    addNodeLinkEntries(nextIndex, node, sourceId, localPubkey);
   });
   return nextIndex;
 }
@@ -240,7 +243,8 @@ export function addNodesToGraphIndex(
 export function removeNodesFromGraphIndex(
   graphIndex: GraphIndex,
   nodes: ImmutableMap<string, GraphNode>,
-  sourceId: SourceId
+  sourceId: SourceId,
+  localPubkey: PublicKey | undefined
 ): GraphIndex {
   if (nodes.size === 0) {
     return graphIndex;
@@ -249,7 +253,7 @@ export function removeNodesFromGraphIndex(
   const nextIndex = cloneIndex(graphIndex);
 
   nodes.valueSeq().forEach((node) => {
-    removeNodeLinkEntries(nextIndex, node, sourceId);
+    removeNodeLinkEntries(nextIndex, node, sourceId, localPubkey);
   });
   nodes.valueSeq().forEach((node) => {
     removeNodeSourceEntries(nextIndex, node, sourceId);
@@ -293,7 +297,8 @@ export function buildGraphIndexFromDocuments(
   documents: ReadonlyArray<{
     sourceId: SourceId;
     nodes: ImmutableMap<string, GraphNode>;
-  }>
+  }>,
+  localPubkey: PublicKey | undefined
 ): GraphIndex {
   const graphIndex = createEmptyGraphIndex();
   documents.forEach(({ nodes, sourceId }) => {
@@ -303,7 +308,7 @@ export function buildGraphIndexFromDocuments(
   });
   documents.forEach(({ nodes, sourceId }) => {
     nodes.valueSeq().forEach((node) => {
-      addNodeLinkEntries(graphIndex, node, sourceId);
+      addNodeLinkEntries(graphIndex, node, sourceId, localPubkey);
     });
   });
   return graphIndex;

@@ -375,7 +375,9 @@ function materializeInsertIndex(
     if (childId === anchor) return true;
     const child = getWorkspaceNode(plan.knowledgeDBs, childId);
     return child
-      ? getAllLinks(child, LOCAL).some((link) => link.target.id === anchor)
+      ? getAllLinks(child, LOCAL, plan.user?.publicKey).some(
+          (link) => link.target.id === anchor
+        )
       : false;
   };
   const children = parentNode.children.toArray();
@@ -454,7 +456,9 @@ export function planMaterializeComputedRow<
     }
     const child = getWorkspaceNode(plan.knowledgeDBs, childId);
     return child
-      ? getAllLinks(child, LOCAL).some((link) => link.target.id === row.node.id)
+      ? getAllLinks(child, LOCAL, plan.user?.publicKey).some(
+          (link) => link.target.id === row.node.id
+        )
       : false;
   });
   if (placedChildId !== undefined) {

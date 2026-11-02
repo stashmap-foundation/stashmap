@@ -330,6 +330,7 @@ test("publish tags a deposit with the files and things it links to", async () =>
       "- ![Sauce](sauce.md#x) <!-- id:a3 -->",
       `- Ask [Alice](/@${alice}) about [her pizza](../@${alice}/pizza.md#dough) <!-- id:a4 -->`,
       `- [Her sauce](/@${alice}/sauce.md), [mine](/notes/sauce.md) and [not an address](//${alice}/x.md) <!-- id:a7 -->`,
+      `- [Gamma](/@${npub}/c.md) <!-- id:a8 -->`,
       "- [Spain](wikidata:Q29) and [trains](https://example.org/trains#today) <!-- id:a5 -->",
       "- ![Holidays](webcal://example.org/holidays.ics) <!-- id:a6 -->",
       "",
@@ -345,6 +346,7 @@ test("publish tags a deposit with the files and things it links to", async () =>
     ["d", "notes/a.md"],
     ...[
       `34774:${pubkey}:b.md`,
+      `34774:${pubkey}:c.md`,
       `34774:${pubkey}:notes/sauce.md`,
       `34774:${"b".repeat(64)}:pizza.md`,
       `34774:${"b".repeat(64)}:sauce.md`,

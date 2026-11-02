@@ -32,7 +32,8 @@ export const soleThingAddress = (node: GraphNode): string | undefined => {
 
 export const embeddedTarget = (
   node: GraphNode | undefined,
-  sourceId: SourceId
+  sourceId: SourceId,
+  localPubkey: PublicKey | undefined
 ): NodeRef | undefined => {
   const span = node?.spans.length === 1 ? node.spans[0] : undefined;
   if (
@@ -43,16 +44,21 @@ export const embeddedTarget = (
   ) {
     return undefined;
   }
-  return resolveLink(span.href, { sourceId, id: node.id });
+  return resolveLink(span.href, { sourceId, id: node.id }, localPubkey);
 };
 
 export const getAllLinks = (
   node: GraphNode,
-  sourceId: SourceId
+  sourceId: SourceId,
+  localPubkey: PublicKey | undefined
 ): { target: NodeRef; text: string }[] =>
   node.spans.flatMap((span) => {
     if (span.kind !== "link" || !isInternalLinkHref(span.href)) return [];
-    const target = resolveLink(span.href, { sourceId, id: node.id });
+    const target = resolveLink(
+      span.href,
+      { sourceId, id: node.id },
+      localPubkey
+    );
     return target ? [{ target, text: span.text }] : [];
   });
 

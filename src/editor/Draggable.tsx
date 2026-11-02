@@ -11,6 +11,7 @@ import {
 } from "../rowModel";
 import { isEmptyNodeID } from "../core/connections";
 import { searchInsertTarget } from "../localSearch";
+import { useData } from "../DataContext";
 import { NOTE_TYPE, Node } from "./Node";
 import { useDroppable, clearDropIndent } from "./DroppableContainer";
 import {
@@ -70,6 +71,7 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
     const row = useRow();
     const paneIndex = usePaneIndex();
     const { selection } = useTemporaryView();
+    const { user } = useData();
     const isNodeBeeingEdited = useIsEditingOn();
     const node = useCurrentNode();
     const { virtualType, viewKey } = row;
@@ -98,7 +100,7 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
           insertTarget:
             row.materialize?.take ??
             (virtualType === "search"
-              ? searchInsertTarget(row.node)
+              ? searchInsertTarget(row.node, user?.publicKey)
               : undefined),
         };
       },

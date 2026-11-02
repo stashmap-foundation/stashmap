@@ -44,6 +44,42 @@ test("Cross-directory link resolves and is clickable to target root", async () =
   await screen.findByText("B-child");
 });
 
+test("A link with my own key opens my own row", async () => {
+  const { path: workspacePath, npub } = knowstrInit();
+  write(
+    workspacePath,
+    "topics.md",
+    "# Topics <!-- id:topics -->\n\n- Cantillon <!-- id:cantillon -->\n"
+  );
+  write(
+    workspacePath,
+    "notes/today.md",
+    `# Today <!-- id:today -->\n\n- Read [Cantillon](/@${npub}/topics.md#cantillon) again <!-- id:read -->\n`
+  );
+
+  await knowstrSave(workspacePath);
+  await renderAppTree({ path: workspacePath, search: "Today" });
+
+  await expectTree(`
+Today
+  Read Cantillon again
+  `);
+  await userEvent.click(await screen.findByRole("link", { name: "Cantillon" }));
+
+  expect(
+    (await screen.findByRole("treeitem", { name: "Cantillon" })).getAttribute(
+      "data-node-id"
+    )
+  ).toBe("topics.md#cantillon");
+  await userEvent.click(await screen.findByLabelText("expand Cantillon"));
+  await expectTree(`
+Topics
+  Cantillon
+    [I] Today / Read Cantillon again ↩
+  `);
+  expect(screen.queryByText("READONLY")).toBeNull();
+});
+
 test("File link surfaces as incoming reference on target's root", async () => {
   const { path: workspacePath } = knowstrInit();
   write(workspacePath, "a.md", "# A\n\n- [Open B](./b.md)\n");

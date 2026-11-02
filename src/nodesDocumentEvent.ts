@@ -7,7 +7,7 @@ import {
   resolveLink,
   thingTagOf,
 } from "./core/linkPath";
-import { pathOf } from "./core/nodeRef";
+import { LOCAL, pathOf } from "./core/nodeRef";
 import { newStorageKey } from "./storageEncryption";
 import { getEventMs } from "./nostrEvents";
 import {
@@ -58,7 +58,7 @@ export function depositLinkTags(
   pubkey: PublicKey,
   content: string
 ): string[][] {
-  const links = parseToDocument(pubkey, content, { path })
+  const links = parseToDocument(LOCAL, content, { path })
     .nodes.valueSeq()
     .toArray()
     .flatMap((node) =>
@@ -67,8 +67,11 @@ export function depositLinkTags(
       )
     );
   const files = links.flatMap(({ href, from }) => {
-    const target = resolveLink(href, { sourceId: pubkey, id: from });
-    const author = target ? authorPubkeyOf(target.sourceId) : undefined;
+    const target = resolveLink(href, { sourceId: LOCAL, id: from }, pubkey);
+    const author =
+      target?.sourceId === LOCAL
+        ? pubkey
+        : target && authorPubkeyOf(target.sourceId);
     if (!target || !author || isThingAddress(target.id)) return [];
     const targetPath = pathOf(target.id);
     return author === pubkey && targetPath === path

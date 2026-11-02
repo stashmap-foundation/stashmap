@@ -172,7 +172,7 @@ function reciprocalTarget(
   href: string
 ): ResolvedNode | undefined {
   const target = isInternalLinkHref(href)
-    ? resolveLink(href, { sourceId, id: node.id })
+    ? resolveLink(href, { sourceId, id: node.id }, data.user?.publicKey)
     : undefined;
   return target ? resolveRef(graphLookupFromData(data), target) : undefined;
 }
@@ -220,7 +220,7 @@ function priorRowRootHref(
   const embedSpan = row.node.spans[0];
   if (
     (!row.demoted && !row.cycle) ||
-    embedTargetOf(row.node, row.sourceId) === undefined ||
+    embedTargetOf(row.node, row.sourceId, data.user?.publicKey) === undefined ||
     embedSpan?.kind !== "link" ||
     href !== embedSpan.href
   ) {
@@ -261,7 +261,7 @@ function InlineLinkSpan({
   const displayedText =
     row.standsFor !== undefined &&
     row.presentedSpans !== undefined &&
-    embedTargetOf(node, sourceId) !== undefined
+    embedTargetOf(node, sourceId, data.user?.publicKey) !== undefined
       ? spansText(row.presentedSpans)
       : span.text;
   const externalUrl = externalLinkUrl(span.href);
@@ -850,6 +850,7 @@ function InteractiveNodeContent({ rows }: { rows: List<Row> }): JSX.Element {
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
   const isEmptyNode = isEmptyNodeID(row.node.id);
   const displayText = useDisplayText();
+  const { user } = useData();
 
   const isReadonly =
     isInSearchView ||
@@ -871,7 +872,7 @@ function InteractiveNodeContent({ rows }: { rows: List<Row> }): JSX.Element {
   }
 
   const displaysLiveTarget =
-    embedTargetOf(row.node, row.sourceId) !== undefined;
+    embedTargetOf(row.node, row.sourceId, user?.publicKey) !== undefined;
 
   if (isEditableNode(currentNode) && !isReadonly && !displaysLiveTarget) {
     return <EditableContent rows={rows} />;

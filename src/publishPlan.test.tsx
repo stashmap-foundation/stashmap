@@ -143,7 +143,9 @@ test("marker created under a parent becomes a link row, never a duplicate", () =
     .get(LOCAL)
     ?.nodes.valueSeq()
     .find((node) =>
-      getAllLinks(node, LOCAL).some((link) => link.target.id === CONTRACT_ID)
+      getAllLinks(node, LOCAL, ALICE.publicKey).some(
+        (link) => link.target.id === CONTRACT_ID
+      )
     );
   expect(linkRow).toBeDefined();
   expect(linkRow?.parent).toBe(rootId);
@@ -154,7 +156,9 @@ test("marker created under a parent becomes a link row, never a duplicate", () =
     .get(LOCAL)
     ?.nodes.valueSeq()
     .filter((node) =>
-      getAllLinks(node, LOCAL).some((link) => link.target.id === CONTRACT_ID)
+      getAllLinks(node, LOCAL, ALICE.publicKey).some(
+        (link) => link.target.id === CONTRACT_ID
+      )
     )
     .toArray();
   expect(links?.length).toBe(2);

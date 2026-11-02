@@ -138,17 +138,23 @@ function authorNpub(pubkey: string): string {
 function authorSourceId(
   author: string,
   from: NodeRef,
-  path: string
+  path: string,
+  localPubkey: PublicKey | undefined
 ): SourceId | undefined {
   if (author === SAME_AUTHOR) {
     return path === pathOf(from.id)
       ? from.sourceId
       : sourceAuthor(from.sourceId);
   }
-  return npubAuthor(author);
+  const key = npubAuthor(author);
+  return key !== undefined && key === localPubkey ? LOCAL : key;
 }
 
-export function resolveLink(href: string, from: NodeRef): NodeRef | undefined {
+export function resolveLink(
+  href: string,
+  from: NodeRef,
+  localPubkey: PublicKey | undefined
+): NodeRef | undefined {
   const targetClass = classifyLinkHref(href);
   if (targetClass === "thing" || targetClass === "calendar") {
     return { sourceId: LOCAL, id: href };
@@ -165,7 +171,7 @@ export function resolveLink(href: string, from: NodeRef): NodeRef | undefined {
   const url = parseAddress(href, pathOf(from.id));
   const parts = url ? addressParts(url) : undefined;
   if (!parts) return undefined;
-  const sourceId = authorSourceId(parts.author, from, parts.path);
+  const sourceId = authorSourceId(parts.author, from, parts.path, localPubkey);
   if (!sourceId) return undefined;
   return {
     sourceId,

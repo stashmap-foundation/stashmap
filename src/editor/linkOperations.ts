@@ -101,7 +101,11 @@ export function isDeadLinkTarget(
   if (sourceId !== LOCAL) return false;
   const targetClass = classifyLinkHref(href);
   if (targetClass !== "node" && targetClass !== "file") return false;
-  const target = resolveLink(href, { sourceId, id: source.id });
+  const target = resolveLink(
+    href,
+    { sourceId, id: source.id },
+    data.user?.publicKey
+  );
   return (
     target === undefined ||
     (target.sourceId === LOCAL &&
@@ -117,7 +121,11 @@ export function inlineLinkToHref(
   fallbackLabel?: string
 ): string | undefined {
   const targetClass = classifyLinkHref(href);
-  const target = resolveLink(href, { sourceId, id: source.id });
+  const target = resolveLink(
+    href,
+    { sourceId, id: source.id },
+    data.user?.publicKey
+  );
   if (!target) {
     return undefined;
   }

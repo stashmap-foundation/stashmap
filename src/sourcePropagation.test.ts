@@ -44,7 +44,8 @@ function indexedData(entries: ReadonlyArray<[PublicKey, GraphNode[]]>): Data {
       addNodesToGraphIndex(
         index,
         Map<ID, GraphNode>(nodes.map((node) => [node.id, node])),
-        sourceId
+        sourceId,
+        LOCAL
       ),
     createEmptyGraphIndex()
   );

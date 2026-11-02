@@ -26,11 +26,12 @@ export type Showing = {
 
 export function embedTargetOf(
   node: GraphNode,
-  sourceId: SourceId
+  sourceId: SourceId,
+  localPubkey: PublicKey | undefined
 ): NodeRef | undefined {
   const url = embeddedFeedUrl(node);
   return (
-    embeddedTarget(node, sourceId) ??
+    embeddedTarget(node, sourceId, localPubkey) ??
     (url !== undefined ? { sourceId: LOCAL, id: calendarIdOf(url) } : undefined)
   );
 }
@@ -39,7 +40,11 @@ function embedTargetKey(
   graph: GraphLookup,
   resolved: ResolvedNode
 ): string | undefined {
-  const target = embedTargetOf(resolved.node, resolved.ref.sourceId);
+  const target = embedTargetOf(
+    resolved.node,
+    resolved.ref.sourceId,
+    graph.localPubkey
+  );
   return target ? nodeRefKey(fileTopRowRef(graph, target)) : undefined;
 }
 
@@ -116,7 +121,8 @@ function sourceChain(
     winners = winners.add(nodeRefKey(current.resolved.ref));
     const targetRef = embedTargetOf(
       current.resolved.node,
-      current.resolved.ref.sourceId
+      current.resolved.ref.sourceId,
+      graph.localPubkey
     );
     const prior =
       targetRef !== undefined
@@ -287,10 +293,14 @@ export function closesCycle(showing: Showing): boolean {
 }
 /* eslint-enable functional/no-let */
 
-export function leavesDangling(showing: Showing): boolean {
+export function leavesDangling(
+  showing: Showing,
+  localPubkey: PublicKey | undefined
+): boolean {
   const presented = presentedLineOf(showing);
   return (
-    embedTargetOf(presented.node, presented.ref.sourceId) !== undefined &&
+    embedTargetOf(presented.node, presented.ref.sourceId, localPubkey) !==
+      undefined &&
     presented.target === undefined &&
     !presented.cycle &&
     !presented.demoted

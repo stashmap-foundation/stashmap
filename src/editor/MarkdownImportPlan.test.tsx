@@ -343,7 +343,9 @@ test("Empty-root markdown file drop creates a wrapper document for multiple file
     [{ kind: "link", href: "second.md", text: "second" }],
   ]);
   expect(
-    parsedWrapperLinks.map((node) => getAllLinks(node, LOCAL)[0]?.target)
+    parsedWrapperLinks.map(
+      (node) => getAllLinks(node, LOCAL, ALICE.publicKey)[0]?.target
+    )
   ).toEqual(
     importedDocuments.map((document) => ({
       sourceId: LOCAL,

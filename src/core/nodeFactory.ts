@@ -1,33 +1,31 @@
 import { List } from "immutable";
 import { v4 } from "uuid";
+import { rowKey } from "./nodeRef";
 
 export type NewGraphNodeOptions = {
+  id: ID;
   root?: ID;
   parent?: ID;
-  docId?: string;
   relevance?: Relevance;
   argument?: Argument;
   systemRole?: RootSystemRole;
-  uuid?: string;
 };
 
-function graphNodeId(uuid?: string): ID {
-  return uuid ?? v4();
+export function newRowKey(path: string): ID {
+  return rowKey(path, v4());
 }
 
 export function newGraphNode(
   spans: InlineSpan[],
-  options: NewGraphNodeOptions = {}
+  options: NewGraphNodeOptions
 ): GraphNode {
-  const id = graphNodeId(options.uuid);
-  const { parent } = options;
+  const { id, parent } = options;
   const root = options.root ?? id;
   return {
     children: List<ID>(),
     id,
     spans,
     parent,
-    ...(options.docId !== undefined ? { docId: options.docId } : {}),
     ...(options.systemRole !== undefined && !parent
       ? { systemRole: options.systemRole }
       : {}),

@@ -84,10 +84,6 @@ type EntityPickerPosition = {
 
 const ENTITY_PICKER_DEBOUNCE_MS = 200;
 
-function entityLinkHref(id: string): string {
-  return `#${id}`;
-}
-
 function responseOk(response: Response): boolean {
   return !(response.status < 200 || response.status >= 300);
 }
@@ -109,7 +105,7 @@ async function fetchWikidataCandidates(
   return wikidataSearchCandidatesFromResponse(
     await responsePayload(searchResponse)
   ).map((hit) => ({
-    id: `wd:${hit.qid}`,
+    id: `wikidata:${hit.qid}`,
     label: hit.label,
     description: hit.description || hit.qid,
     source: "wikidata",
@@ -470,7 +466,7 @@ export function MiniEditor({
       [
         {
           kind: "link",
-          href: entityLinkHref(candidate.id),
+          href: candidate.id,
           text: candidate.label,
         },
         { kind: "text", text: " " },

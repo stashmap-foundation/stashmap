@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { List, OrderedSet } from "immutable";
-import { LOCAL } from "../core/nodeRef";
+import { LOCAL, pathOf } from "../core/nodeRef";
 import { isUserLoggedIn } from "../NostrAuthContext";
-import { getNodeDocumentId } from "../core/plan";
 import { TemporaryViewProvider, useTemporaryView } from "./temporaryViewState";
 
 import {
@@ -53,7 +52,7 @@ import {
 } from "../planner";
 import { parseTextToTrees, planPasteMarkdownTrees } from "./FileDropZone";
 import { getNodeText } from "../core/connections";
-import { isCanonicalId } from "../core/entityRecognition";
+import { isThingAddress } from "../core/linkPath";
 import { getOwnLogRoot } from "../core/systemRoots";
 import {
   addressForSource,
@@ -68,7 +67,7 @@ import {
 } from "../core/graphLookup";
 import {
   documentDisplayName,
-  getDocumentByIdOrFilePath,
+  documentKeyOf,
   getDocumentForNode,
   type Document,
 } from "../core/Document";
@@ -252,22 +251,12 @@ function Breadcrumbs(): JSX.Element {
     ? resolveAuthoredFirst(graph, pane.rootNodeId, pane.sourceId)?.node
     : undefined;
   const paneDocument = pane.documentId
-    ? getDocumentByIdOrFilePath(
-        data.documents,
-        data.documentByFilePath,
-        pane.sourceId,
-        pane.documentId
-      )
+    ? data.documents.get(documentKeyOf(pane.sourceId, pane.documentId))
     : undefined;
   const document =
     paneDocument ??
     (rootNode
-      ? getDocumentForNode(
-          data.knowledgeDBs,
-          data.documents,
-          rootNode,
-          pane.sourceId
-        )
+      ? getDocumentForNode(data.documents, rootNode, pane.sourceId)
       : undefined);
   const nodeEntries: BreadcrumbEntry[] = rootNode
     ? buildAnchoredLineageEntries(data, graph, rootNode, pane.sourceId)
@@ -283,7 +272,6 @@ function Breadcrumbs(): JSX.Element {
             return buildDocumentRouteUrl(
               target.sourceId,
               target.documentId,
-              target.scrollToId,
               data.pull?.coordinatesBySourceId.get(target.sourceId) ??
                 (target.sourceId === pane.sourceId
                   ? pane.routeCoordinate
@@ -489,17 +477,9 @@ function SecretLinkButton(): JSX.Element | null {
         ?.node
     : undefined;
   const docId =
-    currentPane.documentId ??
-    (rootNode
-      ? getNodeDocumentId({ knowledgeDBs: data.knowledgeDBs }, rootNode)
-      : undefined);
+    currentPane.documentId ?? (rootNode ? pathOf(rootNode.id) : undefined);
   const document = docId
-    ? getDocumentByIdOrFilePath(
-        data.documents,
-        data.documentByFilePath,
-        LOCAL,
-        docId
-      )
+    ? data.documents.get(documentKeyOf(LOCAL, docId))
     : undefined;
   const authorAddress = addressForSource(LOCAL, data.user.publicKey);
   const storageKey = document?.storageKey;
@@ -557,12 +537,7 @@ function CurrentNodeName(): JSX.Element {
   const data = useData();
   const pane = useCurrentPane();
   const document = pane.documentId
-    ? getDocumentByIdOrFilePath(
-        data.documents,
-        data.documentByFilePath,
-        pane.sourceId,
-        pane.documentId
-      )
+    ? data.documents.get(documentKeyOf(pane.sourceId, pane.documentId))
     : undefined;
   const graph = graphLookupFromData(data);
   const rootNode = pane.rootNodeId
@@ -575,7 +550,7 @@ function CurrentNodeName(): JSX.Element {
     if (rootNode) {
       return nodeText(rootNode);
     }
-    if (pane.rootNodeId && isCanonicalId(pane.rootNodeId)) {
+    if (pane.rootNodeId && isThingAddress(pane.rootNodeId)) {
       return pane.fallbackLabel ?? defaultEntitySurfaceTitle(pane.rootNodeId);
     }
     return "";
@@ -880,12 +855,7 @@ function planSetSubtreeExpanded(
   const paneIndex = row.viewPath[0];
   const rootPath: ViewPath = [paneIndex, getPaneRootItemID(pane)];
   const paneDocument = pane.documentId
-    ? getDocumentByIdOrFilePath(
-        data.documents,
-        data.documentByFilePath,
-        pane.sourceId,
-        pane.documentId
-      )
+    ? data.documents.get(documentKeyOf(pane.sourceId, pane.documentId))
     : undefined;
   const allRows = paneDocument
     ? getNodesInDocument(data, rootPath, paneDocument, pane.typeFilters, {

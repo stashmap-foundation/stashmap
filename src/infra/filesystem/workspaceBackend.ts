@@ -5,6 +5,7 @@ import {
   ScannedWorkspaceDocument,
   scanWorkspaceDocuments,
   WorkspaceSaveProfile,
+  workspacePath,
 } from "./workspaceScan";
 
 export type WorkspaceMarkdownFile = {
@@ -30,7 +31,7 @@ export async function loadWorkspaceFiles(
   const filePaths = await collectWorkspaceMarkdownFiles(profile.workspaceDir);
   return Promise.all(
     filePaths.map(async (filePath) => ({
-      relativePath: path.relative(profile.workspaceDir, filePath),
+      relativePath: workspacePath(profile.workspaceDir, filePath),
       currentContent: await fs.readFile(filePath, "utf8"),
     }))
   );

@@ -13,7 +13,7 @@ import { useExecutor } from "./ExecutorContext";
 import {
   Document as KnowstrDocument,
   documentKeyOf,
-  withDocumentRealWorldEntities,
+  newDocumentPath,
 } from "./core/Document";
 import { renderDocumentMarkdown } from "./documentRenderer";
 import { buildDocumentEvent } from "./nodesDocumentEvent";
@@ -31,7 +31,6 @@ import {
   createGraphPlan,
   planAddTargetsToNode,
   planUpsertNodes,
-  withDocumentRoot,
 } from "./core/plan";
 import {
   newGraphNode,
@@ -43,9 +42,10 @@ import {
 import { plainSpans, spansText, spansToMarkdown } from "./core/nodeSpans";
 import { bareFeedUrlIn, feedLinkSpans } from "./core/ical";
 import { isEmbeddableHref } from "./core/linkPath";
-import { LOCAL } from "./core/nodeRef";
-import { entityIdForText } from "./core/entityRecognition";
+import { LOCAL, pathOf } from "./core/nodeRef";
+import { newRowKey } from "./core/nodeFactory";
 import { getWorkspaceNode } from "./core/knowledge";
+import { entityIdForText } from "./core/entityRecognition";
 import {
   MultiSelectionState,
   clearSelection,
@@ -350,6 +350,7 @@ export function planAddSpansToParent(
   }
   const node = {
     ...newGraphNode(spans, {
+      id: newRowKey(pathOf(parentNode.id)),
       root: parentNode.root,
       parent: parentNode.id,
       relevance,
@@ -409,43 +410,17 @@ export function planCreateNoteAtRoot(
   rawSpans: InlineSpan[],
   paneIndex: number
 ): SaveNodeResult {
-  const spans = firstPartySpans(rawSpans);
-  const text = spansText(spans);
-  // Mint or link, root case: recognized entity text as a new document's
-  // root mints the entity node — idempotently. If the entity already has
-  // a home, nothing is created: the pane opens the existing document.
-  const entityId = spans.every((span) => span.kind === "text")
-    ? entityIdForText(text)
+  const typed = firstPartySpans(rawSpans);
+  const thing = typed.every((span) => span.kind === "text")
+    ? entityIdForText(spansText(typed))
     : undefined;
-  const existingHome = entityId
-    ? getWorkspaceNode(plan.knowledgeDBs, entityId as ID)
-    : undefined;
-  if (entityId && existingHome) {
-    const panesAtExisting = plan.panes.map((p, i) =>
-      i === paneIndex
-        ? {
-            ...p,
-            author: LOCAL,
-            sourceId: LOCAL,
-            documentId: undefined,
-            rootNodeId: existingHome.root,
-            fallbackLabel: undefined,
-            searchQuery: undefined,
-            searchResultIDs: undefined,
-          }
-        : p
-    );
-    return {
-      plan: planUpdatePanes(plan, panesAtExisting),
-      viewPath: [paneIndex, existingHome.root],
-      node: existingHome,
-    };
-  }
-
+  const spans: InlineSpan[] = thing
+    ? [{ kind: "link", href: thing, text: spansText(typed).trim() }]
+    : typed;
   const createdNode = {
-    ...withDocumentRoot(
-      newGraphNode(spans, entityId ? { uuid: entityId } : {})
-    ),
+    ...newGraphNode(spans, {
+      id: newRowKey(newDocumentPath(plan.documents, spansText(spans))),
+    }),
     ...(isStandaloneEmbedLink(spans) && {
       extraAttrs: { embed: "true" },
     }),
@@ -584,16 +559,10 @@ export function buildDocumentWrites(plan: GraphPlan): {
   content: string;
 }[] {
   return plan.affectedDocuments.toArray().flatMap((docId) => {
-    const rawDocument = plan.documents.get(documentKeyOf(LOCAL, docId));
-    if (!rawDocument) {
+    const document = plan.documents.get(documentKeyOf(LOCAL, docId));
+    if (!document) {
       return [];
     }
-    const document = withDocumentRealWorldEntities(
-      plan.knowledgeDBs,
-      plan.documents,
-      plan.documentByFilePath,
-      rawDocument
-    );
     return [
       {
         document,

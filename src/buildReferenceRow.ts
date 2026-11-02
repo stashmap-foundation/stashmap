@@ -1,8 +1,7 @@
 import { List, Set } from "immutable";
-import { nodeText } from "./core/nodeSpans";
+import { nodeText, soleThingAddress } from "./core/nodeSpans";
 import { getDocumentForNode } from "./core/Document";
-import { isCanonicalId } from "./core/entityRecognition";
-import { fileLinkIndexKey } from "./core/linkPath";
+import { isThingAddress } from "./core/linkPath";
 import { nodeRefKey } from "./core/nodeRef";
 import { referenceToText } from "./editor/referenceText";
 import {
@@ -89,7 +88,7 @@ function buildReference(
 }
 
 function sameRef(left: NodeRef, right: NodeRef): boolean {
-  return left.id === right.id && left.sourceId === right.sourceId;
+  return nodeRefKey(left) === nodeRefKey(right);
 }
 
 function uniqueRefs(refs: readonly NodeRef[]): NodeRef[] {
@@ -103,26 +102,26 @@ function uniqueRefs(refs: readonly NodeRef[]): NodeRef[] {
 function incomingGraphRefs(data: Data, target: ResolvedNode): NodeRef[] {
   const exact =
     data.graphIndex.incomingCrefsByTarget.get(nodeRefKey(target.ref)) ?? [];
-  const unscoped = data.graphIndex.incomingCrefs.get(target.node.id) ?? [];
-  if (isCanonicalId(target.node.id)) {
-    return uniqueRefs([...exact, ...unscoped]);
-  }
-  if (exact.length > 0) {
-    return exact;
-  }
-  return unscoped;
+  const thing = isThingAddress(target.node.id)
+    ? target.node.id
+    : soleThingAddress(target.node);
+  return thing
+    ? uniqueRefs([
+        ...exact,
+        ...(data.graphIndex.incomingCrefs.get(thing) ?? []),
+      ])
+    : exact;
 }
 
 function incomingFileRefs(data: Data, target: ResolvedNode): NodeRef[] {
   const document = getDocumentForNode(
-    data.knowledgeDBs,
     data.documents,
     target.node,
     target.ref.sourceId
   );
-  return document?.filePath && document.topNodeShortIds[0] === target.node.id
-    ? data.graphIndex.incomingFileLinks.get(
-        fileLinkIndexKey(document.sourceId, document.filePath)
+  return document && document.topNodeShortIds[0] === target.node.id
+    ? data.graphIndex.incomingCrefsByTarget.get(
+        nodeRefKey({ sourceId: document.sourceId, id: document.docId })
       ) ?? []
     : [];
 }

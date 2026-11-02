@@ -10,36 +10,29 @@ export type TextSeed = {
 };
 
 export type RefTargetSeed = {
-  targetID: ID;
+  target: NodeRef;
   linkText?: string;
 };
 
 export type DocumentLinkTargetSeed = {
   sourceId: SourceId;
   docId: string;
-  filePath?: string;
   linkText?: string;
 };
 
 export function createRefTarget(
-  targetID: ID,
+  target: NodeRef,
   linkText?: string
 ): RefTargetSeed {
-  return { targetID, linkText };
+  return { target, linkText };
 }
 
 export function createDocumentLinkTarget(
   sourceId: SourceId,
   docId: string,
-  filePath?: string,
   linkText?: string
 ): DocumentLinkTargetSeed {
-  return {
-    sourceId,
-    docId,
-    ...(filePath !== undefined ? { filePath } : {}),
-    linkText,
-  };
+  return { sourceId, docId, linkText };
 }
 
 export function isSearchId(id: ID): boolean {

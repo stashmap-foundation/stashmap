@@ -54,13 +54,13 @@ function addFallbackLinkText(
   target: AddToParentTarget,
   text: string | undefined
 ): AddToParentTarget {
-  if (typeof target === "string" || !("targetID" in target)) {
+  if (typeof target === "string" || !("target" in target)) {
     return target;
   }
   if (target.linkText || !text) {
     return target;
   }
-  return createRefTarget(target.targetID, text);
+  return createRefTarget(target.target, text);
 }
 
 // Dragging a row from another user's document records that document in
@@ -83,18 +83,17 @@ function planRecordForeignSource(
     return plan;
   }
   const sourceDocument = getDocumentForNode(
-    plan.knowledgeDBs,
     plan.documents,
     sourceRow.node,
     sourceRow.sourceId
   );
-  const doc = sourceDocument?.docId ?? coordinate?.dTag;
-  if (!doc) {
+  const sourcePath = sourceDocument?.docId ?? coordinate?.dTag;
+  if (!sourcePath) {
     return plan;
   }
   return planRecordKnowstrSource(plan, targetNode, {
     author: nip19.npubEncode(pubkey),
-    doc,
+    path: sourcePath,
     relays: coordinate?.relays ?? [],
   });
 }
@@ -341,7 +340,6 @@ export function dnd(
     return plan;
   }
   const sourceDocument = getDocumentForNode(
-    plan.knowledgeDBs,
     plan.documents,
     sourceDrag.row.node,
     sourceDrag.row.sourceId
@@ -350,7 +348,6 @@ export function dnd(
     ? LOCAL
     : targetParentRow.sourceId;
   const targetDocument = getDocumentForNode(
-    plan.knowledgeDBs,
     plan.documents,
     targetParentNode,
     targetSourceId
@@ -427,7 +424,7 @@ export function dnd(
     }
     return planAddToParent(
       accPlan,
-      createRefTarget(sourceRow.node.id, nodeText(sourceRow.node)),
+      createRefTarget(sourceRow.ref, nodeText(sourceRow.node)),
       targetParentNode.id,
       insertAt
     )[0];
@@ -503,7 +500,7 @@ export function dnd(
     : planExpandNode(plan, targetParentRow.view, targetParentRow.viewPath);
 
   const toReferenceTarget = (sourceRow: Row): AddToParentTarget =>
-    createRefTarget(sourceRow.node.id, nodeText(sourceRow.node));
+    createRefTarget(sourceRow.ref, nodeText(sourceRow.node));
 
   return independentRows.reduce((accPlan: Plan, sourceRow, idx) => {
     const sourceNode = sourceRow.node;
@@ -533,7 +530,10 @@ export function dnd(
     if (dragTargetID) {
       return planAddToParent(
         planWithSource,
-        createRefTarget(dragTargetID, nodeText(sourceNode)),
+        createRefTarget(
+          { sourceId: sourceRow.sourceId, id: dragTargetID },
+          nodeText(sourceNode)
+        ),
         targetNode.id,
         insertAt,
         sourceEdgeRelevance,

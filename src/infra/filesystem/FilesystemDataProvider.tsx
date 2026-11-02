@@ -11,66 +11,36 @@ import { FilesystemExecutorProvider } from "./FilesystemExecutorProvider";
 import { NavigationStateProvider } from "../../NavigationStateContext";
 import { createEmptyGraphIndex } from "../../graphIndex";
 import { FilesystemWatcher } from "./FilesystemWatcher";
-import { parseToDocument } from "../../core/Document";
+import { fileNameTitle, parseToDocument } from "../../core/Document";
 import { WalkContext } from "../../core/markdownNodes";
 import { WorkspaceMarkdownFile } from "./workspaceBackend";
 import { PullSourceProvider } from "../../PullSourceContext";
 
-function fallbackTitleFromRelativePath(relativePath: string): string {
-  const pieces = relativePath.split(/[\\/]/);
-  const filename = pieces[pieces.length - 1] ?? relativePath;
-  return filename.endsWith(".md") ? filename.slice(0, -3) : filename;
-}
-
-function assertUniqueDocIds(documents: ReadonlyArray<ParsedDocument>): void {
-  const counts = documents.reduce(
-    (acc, parsed) =>
-      acc.set(parsed.document.docId, (acc.get(parsed.document.docId) ?? 0) + 1),
-    Map<string, number>()
-  );
-  const duplicates = counts
-    .entrySeq()
-    .filter(([, count]) => count > 1)
-    .map(([docId]) => docId)
-    .sort()
-    .toArray();
-  if (duplicates.length > 0) {
-    throw new Error(
-      `Workspace contains duplicate knowstr_doc_id values: ${duplicates.join(
-        ", "
-      )}`
-    );
-  }
-}
-
 function parseWorkspaceFiles(
   files: ReadonlyArray<WorkspaceMarkdownFile>
 ): ReadonlyArray<ParsedDocument> {
-  const result = files.reduce<{
-    documents: List<ParsedDocument>;
-    context: WalkContext | undefined;
-  }>(
-    (acc, file) => {
-      const fallbackTitle = fallbackTitleFromRelativePath(file.relativePath);
-      const parsed = parseToDocument(LOCAL, file.currentContent, {
-        filePath: file.relativePath,
-        relativePath: file.relativePath,
-        ...(fallbackTitle !== "" ? { fallbackTitle } : {}),
-        ...(acc.context !== undefined ? { context: acc.context } : {}),
-      });
-      return {
-        documents: acc.documents.push({
-          document: parsed.document,
-          nodes: parsed.nodes,
-        }),
-        context: parsed.context,
-      };
-    },
-    { documents: List<ParsedDocument>(), context: undefined }
-  );
-  const documents = result.documents.toArray();
-  assertUniqueDocIds(documents);
-  return documents;
+  return files
+    .reduce<{
+      documents: List<ParsedDocument>;
+      context: WalkContext | undefined;
+    }>(
+      (acc, file) => {
+        const parsed = parseToDocument(LOCAL, file.currentContent, {
+          path: file.relativePath,
+          fallbackTitle: fileNameTitle(file.relativePath),
+          ...(acc.context !== undefined ? { context: acc.context } : {}),
+        });
+        return {
+          documents: acc.documents.push({
+            document: parsed.document,
+            nodes: parsed.nodes,
+          }),
+          context: parsed.context,
+        };
+      },
+      { documents: List<ParsedDocument>(), context: undefined }
+    )
+    .documents.toArray();
 }
 
 export function FilesystemDataProvider({
@@ -93,7 +63,6 @@ export function FilesystemDataProvider({
       knowledgeDBs={Map<SourceId, KnowledgeData>()}
       graphIndex={createEmptyGraphIndex()}
       documents={Map()}
-      documentByFilePath={Map()}
       publishEventsStatus={session.publishStatus}
       views={session.views}
       panes={session.panes}

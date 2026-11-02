@@ -1,6 +1,8 @@
 import fs from "fs/promises";
 import path from "path";
 import { embeddedTarget } from "../../core/nodeSpans";
+import { LOCAL, rowKey } from "../../core/nodeRef";
+import { resolveLink } from "../../core/linkPath";
 import { renderDocumentMarkdown } from "../../documentRenderer";
 import {
   ScannedWorkspaceDocument,
@@ -35,52 +37,44 @@ export async function applyWorkspaceChanges(
   };
 }
 
+function arrangementWarnings(
+  document: ScannedWorkspaceDocument,
+  roots: readonly (GraphNode | undefined)[],
+  pubkey: PublicKey | undefined
+): string[] {
+  const [folder] = document.docId.split("/");
+  if (!folder.startsWith("@")) {
+    return [];
+  }
+  const from = { sourceId: LOCAL, id: rowKey(document.docId, "root") };
+  const source = resolveLink(`/${document.docId}`, from, pubkey);
+  const target =
+    roots.length === 1 ? embeddedTarget(roots[0], LOCAL, pubkey) : undefined;
+  return source &&
+    target?.sourceId === source.sourceId &&
+    target.id === source.id
+    ? []
+    : [
+        `${document.docId}: a file in ${folder}/ must have one root embedding /${document.docId}`,
+      ];
+}
+
 function documentWarnings(
   knowledgeDBs: KnowledgeDBs,
-  document: ScannedWorkspaceDocument
+  document: ScannedWorkspaceDocument,
+  pubkey: PublicKey | undefined
 ): string[] {
   const nodes = knowledgeDBs.get(document.sourceId)?.nodes;
   const roots = document.topNodeShortIds.map((id) => nodes?.get(id));
-  const arrangementRoots = roots.filter(
-    (root) => embeddedTarget(root) !== undefined
-  );
-
-  if (document.docId.startsWith("arr:") && arrangementRoots.length === 0) {
-    throw new Error(
-      `${document.relativePath}: arr: is reserved for arrangement documents`
-    );
-  }
-
   const rootWarnings =
     roots.length === 0
-      ? [`${document.relativePath}: shared documents need a root`]
+      ? [`${document.docId}: shared documents need a root`]
       : [];
-  const assetRoots = roots.filter((root) => root?.id.startsWith("rgb:"));
-  const validAssetRoots = assetRoots.filter(
-    (root) => root && /^rgb:.+/u.test(root.id)
-  );
-  const assetWarnings =
-    assetRoots.length > 0 &&
-    (roots.length !== 1 || validAssetRoots.length !== 1)
-      ? [
-          `${document.relativePath}: asset entry documents need exactly one asset root`,
-        ]
-      : [];
-  if (!document.docId.startsWith("arr:")) {
-    return [...rootWarnings, ...assetWarnings];
-  }
-  const sourceRoot = document.docId.slice("arr:".length);
-  const arrangementWarnings =
-    roots.length !== 1 || embeddedTarget(roots[0]) !== sourceRoot
-      ? [
-          `${document.relativePath}: ${document.docId} must have one root embedding ${sourceRoot}`,
-        ]
-      : [];
-  return [...rootWarnings, ...assetWarnings, ...arrangementWarnings];
+  return [...rootWarnings, ...arrangementWarnings(document, roots, pubkey)];
 }
 
 export async function saveEditedWorkspaceDocuments(
-  profile: WorkspaceSaveProfile
+  profile: WorkspaceSaveProfile & { pubkey: PublicKey | undefined }
 ): Promise<{
   documents: SavedWorkspaceDocument[];
   changed_paths: string[];
@@ -91,13 +85,13 @@ export async function saveEditedWorkspaceDocuments(
   const documents = scannedDocuments.map((document) => ({
     document,
     content: renderDocumentMarkdown(knowledgeDBs, document),
-    warnings: documentWarnings(knowledgeDBs, document),
+    warnings: documentWarnings(knowledgeDBs, document, profile.pubkey),
   }));
 
   const writes = documents
     .filter(({ document, content }) => document.currentContent !== content)
     .map(({ document, content }) => ({
-      filePath: path.join(profile.workspaceDir, document.filePath),
+      filePath: path.join(profile.workspaceDir, document.docId),
       content,
     }));
 

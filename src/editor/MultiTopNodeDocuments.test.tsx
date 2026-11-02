@@ -21,7 +21,7 @@ import {
   readNodeId,
   write,
 } from "../testFixtures/workspace";
-import { LOCAL } from "../core/nodeRef";
+import { LOCAL, rowKey } from "../core/nodeRef";
 import { buildDocumentRouteUrl, buildNodeRouteUrl } from "../navigationUrl";
 
 async function renderDocumentRoute(
@@ -52,7 +52,7 @@ function savedNodeId(
   relativePath: string,
   needle: string
 ): ID {
-  return readNodeId(workspacePath, relativePath, needle) as ID;
+  return rowKey(relativePath, readNodeId(workspacePath, relativePath, needle));
 }
 
 const titledMultiRootMarkdown = `---
@@ -681,7 +681,7 @@ test("Graph links under the second top-level root resolve and show incoming refs
   write(
     workspacePath,
     "source.md",
-    `# First\n\n- one\n\n# Second\n\n- [Target](#${targetId})\n`
+    `# First\n\n- one\n\n# Second\n\n- [Target](target.md#${targetId})\n`
   );
   write(
     workspacePath,
@@ -699,7 +699,7 @@ Second
   `);
 
   const targetLink = await screen.findByRole("link", { name: "Target" });
-  expect(targetLink.getAttribute("data-href")).toBe(`#${targetId}`);
+  expect(targetLink.getAttribute("data-href")).toBe(`target.md#${targetId}`);
   await userEvent.click(targetLink);
 
   await expectTree(`
@@ -738,7 +738,7 @@ Holiday Destinations
 test("Top-level graph-link roots render as graph refs and incoming refs", async () => {
   const { path: workspacePath } = knowstrInit();
   const targetId = "22222222-2222-4222-8222-222222222222";
-  write(workspacePath, "links.md", `[Target](#${targetId})\n`);
+  write(workspacePath, "links.md", `[Target](target.md#${targetId})\n`);
   write(
     workspacePath,
     "target.md",
@@ -752,7 +752,7 @@ Target
   `);
 
   const targetLink = await screen.findByRole("link", { name: "Target" });
-  expect(targetLink.getAttribute("data-href")).toBe(`#${targetId}`);
+  expect(targetLink.getAttribute("data-href")).toBe(`target.md#${targetId}`);
   await userEvent.click(targetLink);
 
   await expectTree(`
@@ -795,8 +795,16 @@ test("Mutual graph links show each source row and its incoming edge", async () =
   const { path: workspacePath } = knowstrInit();
   const aId = "11111111-1111-4111-8111-111111111111";
   const bId = "22222222-2222-4222-8222-222222222222";
-  write(workspacePath, "a.md", `# A <!-- id:${aId} -->\n\n- [B](#${bId})\n`);
-  write(workspacePath, "b.md", `# B <!-- id:${bId} -->\n\n- [A](#${aId})\n`);
+  write(
+    workspacePath,
+    "a.md",
+    `# A <!-- id:${aId} -->\n\n- [B](b.md#${bId})\n`
+  );
+  write(
+    workspacePath,
+    "b.md",
+    `# B <!-- id:${bId} -->\n\n- [A](a.md#${aId})\n`
+  );
 
   await renderDocumentRoute(workspacePath, "a.md");
 
@@ -819,7 +827,11 @@ B
 test("Graph incoming refs can become bidirectional from both sides", async () => {
   const { path: workspacePath } = knowstrInit();
   const targetId = "22222222-2222-4222-8222-222222222222";
-  write(workspacePath, "source.md", `# Source\n\n- [Target](#${targetId})\n`);
+  write(
+    workspacePath,
+    "source.md",
+    `# Source\n\n- [Target](target.md#${targetId})\n`
+  );
   write(
     workspacePath,
     "target.md",
@@ -866,7 +878,7 @@ test("Bidirectional graph link labels keep endpoint paths intact", async () => {
   write(
     workspacePath,
     "countries.md",
-    `# Southern European Countries\n\n- [Spain](#${spainId})\n`
+    `# Southern European Countries\n\n- [Spain](holidays.md#${spainId})\n`
   );
 
   await renderDocumentRoute(workspacePath, "countries.md");
@@ -1104,7 +1116,7 @@ Links
 
 Spain <!-- id:... -->
 
-- (!) ![Links](#${sourceRowId}) <!-- id:... -->
+- (!) ![Links](${sourceRowId}) <!-- id:... -->
 
 # Pack List <!-- id:... -->
 
@@ -1170,7 +1182,7 @@ Links
     `
 - Holiday Destinations <!-- id:... -->
   - Spain <!-- id:... -->
-  - (!) ![Links](#${sourceRowId}) <!-- id:... -->
+  - (!) ![Links](${sourceRowId}) <!-- id:... -->
 - Pack List <!-- id:... -->
   - Charger <!-- id:... -->
 `

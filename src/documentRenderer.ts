@@ -1,6 +1,7 @@
 import { EMPTY_NODE_ID, getNode } from "./core/connections";
 import type { Document } from "./core/Document";
 import { spansToMarkdown } from "./core/nodeSpans";
+import { rowIdOf } from "./core/nodeRef";
 import {
   addBlankLinesAroundHeadings,
   formatBulletLine,
@@ -35,7 +36,7 @@ function getSerializableNodeBody(node: GraphNode): string | undefined {
 }
 
 function getSerializableNodeAttrs(node: GraphNode): string {
-  return formatNodeAttrs(node.id, {
+  return formatNodeAttrs(rowIdOf(node.id), {
     extraAttrs: Object.fromEntries(
       Object.entries(node.extraAttrs ?? {}).filter(([key]) => key !== "embed")
     ),

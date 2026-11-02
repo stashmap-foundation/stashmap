@@ -1,8 +1,7 @@
 import { Map as ImmutableMap } from "immutable";
-import { LOCAL, nodeRefKey } from "./core/nodeRef";
-import { EMPTY_NODE_ID } from "./core/connections";
-import { getAllFileLinks, getAllLinks } from "./core/nodeSpans";
-import { fileLinkIndexKey, fileLinkIndexPath } from "./core/linkPath";
+import { nodeRefKey } from "./core/nodeRef";
+import { getAllLinks } from "./core/nodeSpans";
+import { isThingAddress } from "./core/linkPath";
 
 export function createEmptyGraphIndex(): GraphIndex {
   return {
@@ -14,7 +13,6 @@ export function createEmptyGraphIndex(): GraphIndex {
     sourceCandidatesById: new globalThis.Map<ID, NodeRef[]>(),
     incomingCrefs: new globalThis.Map<ID, NodeRef[]>(),
     incomingCrefsByTarget: new globalThis.Map<string, NodeRef[]>(),
-    incomingFileLinks: new globalThis.Map<string, NodeRef[]>(),
   };
 }
 
@@ -163,25 +161,15 @@ function addNodeLinkEntries(
   graphIndex: GraphIndex,
   node: GraphNode,
   sourceId: SourceId,
-  sourceFilePath: string | undefined,
-  fileLinkSourceID: ID
+  localPubkey: PublicKey | undefined
 ): void {
-  getAllLinks(node).forEach(({ targetID }) => {
-    const ref = { sourceId, id: node.id };
-    addRefToNodeMap(graphIndex.incomingCrefs, targetID, ref);
-    addRefToMap(
-      graphIndex.incomingCrefsByTarget,
-      nodeRefKey({ sourceId, id: targetID }),
-      ref
-    );
-  });
-  getAllFileLinks(node).forEach(({ path }) => {
-    const resolved = fileLinkIndexPath(path, sourceFilePath);
-    const key = fileLinkIndexKey(sourceId, resolved);
-    addRefToMap(graphIndex.incomingFileLinks, key, {
-      sourceId,
-      id: fileLinkSourceID,
-    });
+  const ref = { sourceId, id: node.id };
+  getAllLinks(node, sourceId, localPubkey).forEach(({ target }) => {
+    if (isThingAddress(target.id)) {
+      addRefToNodeMap(graphIndex.incomingCrefs, target.id, ref);
+      return;
+    }
+    addRefToMap(graphIndex.incomingCrefsByTarget, nodeRefKey(target), ref);
   });
 }
 
@@ -189,81 +177,15 @@ function removeNodeLinkEntries(
   graphIndex: GraphIndex,
   node: GraphNode,
   sourceId: SourceId,
-  sourceFilePath: string | undefined,
-  fileLinkSourceID: ID
+  localPubkey: PublicKey | undefined
 ): void {
-  getAllLinks(node).forEach(({ targetID }) => {
-    const ref = { sourceId, id: node.id };
-    removeRefFromNodeMap(graphIndex.incomingCrefs, targetID, ref);
-    removeRefFromMap(
-      graphIndex.incomingCrefsByTarget,
-      nodeRefKey({ sourceId, id: targetID }),
-      ref
-    );
-  });
-  getAllFileLinks(node).forEach(({ path }) => {
-    const resolved = fileLinkIndexPath(path, sourceFilePath);
-    const key = fileLinkIndexKey(sourceId, resolved);
-    removeRefFromMap(graphIndex.incomingFileLinks, key, {
-      sourceId,
-      id: fileLinkSourceID,
-    });
-  });
-}
-
-function addNodeIndexEntries(
-  graphIndex: GraphIndex,
-  node: GraphNode,
-  sourceId: SourceId,
-  sourceFilePath: string | undefined
-): void {
-  if (!node.parent) {
-    addNodeLinkEntries(graphIndex, node, sourceId, sourceFilePath, node.id);
-  }
-
-  node.children.forEach((childID) => {
-    if (childID === EMPTY_NODE_ID) {
+  const ref = { sourceId, id: node.id };
+  getAllLinks(node, sourceId, localPubkey).forEach(({ target }) => {
+    if (isThingAddress(target.id)) {
+      removeRefFromNodeMap(graphIndex.incomingCrefs, target.id, ref);
       return;
     }
-    const childNode = getNodeInIndexedSource(graphIndex, sourceId, childID);
-    if (!childNode) {
-      return;
-    }
-    addNodeLinkEntries(
-      graphIndex,
-      childNode,
-      sourceId,
-      sourceFilePath,
-      childNode.id
-    );
-  });
-}
-
-function removeNodeIndexEntries(
-  graphIndex: GraphIndex,
-  node: GraphNode,
-  sourceId: SourceId,
-  sourceFilePath: string | undefined
-): void {
-  if (!node.parent) {
-    removeNodeLinkEntries(graphIndex, node, sourceId, sourceFilePath, node.id);
-  }
-
-  node.children.forEach((childID) => {
-    if (childID === EMPTY_NODE_ID) {
-      return;
-    }
-    const childNode = getNodeInIndexedSource(graphIndex, sourceId, childID);
-    if (!childNode) {
-      return;
-    }
-    removeNodeLinkEntries(
-      graphIndex,
-      childNode,
-      sourceId,
-      sourceFilePath,
-      childNode.id
-    );
+    removeRefFromMap(graphIndex.incomingCrefsByTarget, nodeRefKey(target), ref);
   });
 }
 
@@ -293,20 +215,14 @@ function cloneIndex(graphIndex: GraphIndex): GraphIndex {
         [...refs],
       ])
     ),
-    incomingFileLinks: new globalThis.Map<string, NodeRef[]>(
-      [...graphIndex.incomingFileLinks.entries()].map(([key, refs]) => [
-        key,
-        [...refs],
-      ])
-    ),
   };
 }
 
 export function addNodesToGraphIndex(
   graphIndex: GraphIndex,
   nodes: ImmutableMap<string, GraphNode>,
-  sourceFilePath: string | undefined,
-  sourceId: SourceId
+  sourceId: SourceId,
+  localPubkey: PublicKey | undefined
 ): GraphIndex {
   if (nodes.size === 0) {
     return graphIndex;
@@ -319,7 +235,7 @@ export function addNodesToGraphIndex(
   });
 
   nodes.valueSeq().forEach((node) => {
-    addNodeIndexEntries(nextIndex, node, sourceId, sourceFilePath);
+    addNodeLinkEntries(nextIndex, node, sourceId, localPubkey);
   });
   return nextIndex;
 }
@@ -327,8 +243,8 @@ export function addNodesToGraphIndex(
 export function removeNodesFromGraphIndex(
   graphIndex: GraphIndex,
   nodes: ImmutableMap<string, GraphNode>,
-  sourceFilePath: string | undefined,
-  sourceId: SourceId
+  sourceId: SourceId,
+  localPubkey: PublicKey | undefined
 ): GraphIndex {
   if (nodes.size === 0) {
     return graphIndex;
@@ -337,7 +253,7 @@ export function removeNodesFromGraphIndex(
   const nextIndex = cloneIndex(graphIndex);
 
   nodes.valueSeq().forEach((node) => {
-    removeNodeIndexEntries(nextIndex, node, sourceId, sourceFilePath);
+    removeNodeLinkEntries(nextIndex, node, sourceId, localPubkey);
   });
   nodes.valueSeq().forEach((node) => {
     removeNodeSourceEntries(nextIndex, node, sourceId);
@@ -374,43 +290,26 @@ export function mergeGraphIndexes(
       addRefToMap(nextIndex.incomingCrefsByTarget, key, ref)
     );
   });
-  overlay.incomingFileLinks.forEach((refs, key) => {
-    refs.forEach((ref) => addRefToMap(nextIndex.incomingFileLinks, key, ref));
-  });
   return nextIndex;
 }
 
-function sourceIdFromDocumentKey(documentKey: string): SourceId {
-  const [sourceId] = documentKey.split(":");
-  return sourceId || LOCAL;
-}
-
 export function buildGraphIndexFromDocuments(
-  nodesByDocumentKey: ImmutableMap<string, ImmutableMap<string, GraphNode>>,
-  filePathByDocumentKey: ImmutableMap<string, string> = ImmutableMap(),
-  sourceIdByDocumentKey: ImmutableMap<string, SourceId> = ImmutableMap()
+  documents: ReadonlyArray<{
+    sourceId: SourceId;
+    nodes: ImmutableMap<string, GraphNode>;
+  }>,
+  localPubkey: PublicKey | undefined
 ): GraphIndex {
   const graphIndex = createEmptyGraphIndex();
-  const documents = nodesByDocumentKey
-    .entrySeq()
-    .map(([key, nodes]) => ({
-      nodes,
-      sourceId: sourceIdByDocumentKey.get(key) ?? sourceIdFromDocumentKey(key),
-      sourceFilePath: filePathByDocumentKey.get(key),
-    }))
-    .toArray();
-
   documents.forEach(({ nodes, sourceId }) => {
     nodes.valueSeq().forEach((node) => {
       addNodeSourceEntries(graphIndex, node, sourceId);
     });
   });
-
-  documents.forEach(({ nodes, sourceId, sourceFilePath }) => {
+  documents.forEach(({ nodes, sourceId }) => {
     nodes.valueSeq().forEach((node) => {
-      addNodeIndexEntries(graphIndex, node, sourceId, sourceFilePath);
+      addNodeLinkEntries(graphIndex, node, sourceId, localPubkey);
     });
   });
-
   return graphIndex;
 }

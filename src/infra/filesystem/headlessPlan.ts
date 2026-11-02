@@ -11,6 +11,5 @@ export function createHeadlessPlan(
     knowledgeDBs,
     graphIndex: createEmptyGraphIndex(),
     documents: Map(),
-    documentByFilePath: Map(),
   });
 }

@@ -25,7 +25,6 @@ export function NostrDataProvider({
       knowledgeDBs={Map<SourceId, KnowledgeData>()}
       graphIndex={createEmptyGraphIndex()}
       documents={Map()}
-      documentByFilePath={Map()}
       publishEventsStatus={session.publishStatus}
       views={session.views}
       panes={session.panes}

@@ -1,7 +1,7 @@
 import React from "react";
 import { List, Map as ImmutableMap } from "immutable";
 import { Event, UnsignedEvent } from "nostr-tools";
-import { LOCAL } from "./core/nodeRef";
+import { LOCAL, pathOf } from "./core/nodeRef";
 import {
   addNodesToGraphIndex,
   buildGraphIndexFromDocuments,
@@ -14,7 +14,6 @@ import {
   DocumentDelete,
   ParsedDocument,
   documentKeyOf,
-  withRealWorldEntitiesForDocuments,
 } from "./core/Document";
 import { newDB } from "./core/knowledge";
 
@@ -22,7 +21,6 @@ export type { Document, DocumentDelete, ParsedDocument };
 
 type DocumentState = {
   documents: ImmutableMap<string, Document>;
-  documentByFilePath: ImmutableMap<string, Document>;
   deletes: ImmutableMap<string, DocumentDelete>;
   knowledgeDBs: KnowledgeDBs;
   graphIndex: GraphIndex;
@@ -32,7 +30,6 @@ type DocumentStoreState = {
   knowledgeDBs: KnowledgeDBs;
   graphIndex: GraphIndex;
   documents: ImmutableMap<string, Document>;
-  documentByFilePath: ImmutableMap<string, Document>;
   upsertDocument: (parsed: ParsedDocument) => void;
   deleteDocument: (del: DocumentDelete) => void;
   addEvents: (events: ImmutableMap<string, Event | UnsignedEvent>) => void;
@@ -42,60 +39,14 @@ const DocumentStoreContext = React.createContext<
   DocumentStoreState | undefined
 >(undefined);
 
-function withRealWorldEntities(state: DocumentState): DocumentState {
-  const derived = withRealWorldEntitiesForDocuments(
-    state.knowledgeDBs,
-    state.documents,
-    state.documentByFilePath
-  );
-  return {
-    ...state,
-    documents: derived.documents,
-    documentByFilePath: derived.documentByFilePath,
-  };
-}
-
 function createInitialState(
-  records: ReadonlyArray<ParsedDocument>
+  records: ReadonlyArray<ParsedDocument>,
+  localPubkey: PublicKey | undefined
 ): DocumentState {
   const documents = ImmutableMap<string, Document>(
     records.map((parsed) => [
       documentKeyOf(parsed.document.sourceId, parsed.document.docId),
       parsed.document,
-    ])
-  );
-  const documentByFilePath = records.reduce(
-    (acc, parsed) =>
-      parsed.document.filePath
-        ? acc.set(parsed.document.filePath, parsed.document)
-        : acc,
-    ImmutableMap<string, Document>()
-  );
-  const nodesByDocumentKey = ImmutableMap<
-    string,
-    ImmutableMap<string, GraphNode>
-  >(
-    records.map((parsed) => [
-      documentKeyOf(parsed.document.sourceId, parsed.document.docId),
-      parsed.nodes,
-    ])
-  );
-  const filePathByDocumentKey = ImmutableMap<string, string>(
-    records.flatMap((parsed): [string, string][] =>
-      parsed.document.filePath
-        ? [
-            [
-              documentKeyOf(parsed.document.sourceId, parsed.document.docId),
-              parsed.document.filePath,
-            ],
-          ]
-        : []
-    )
-  );
-  const sourceIdByDocumentKey = ImmutableMap<string, SourceId>(
-    records.map((parsed) => [
-      documentKeyOf(parsed.document.sourceId, parsed.document.docId),
-      parsed.document.sourceId,
     ])
   );
   const knowledgeDBs = records.reduce((acc, parsed) => {
@@ -105,17 +56,18 @@ function createInitialState(
       nodes: db.nodes.merge(parsed.nodes),
     });
   }, ImmutableMap<SourceId, KnowledgeData>());
-  return withRealWorldEntities({
+  return {
     documents,
-    documentByFilePath,
     deletes: ImmutableMap<string, DocumentDelete>(),
     knowledgeDBs,
     graphIndex: buildGraphIndexFromDocuments(
-      nodesByDocumentKey,
-      filePathByDocumentKey,
-      sourceIdByDocumentKey
+      records.map((parsed) => ({
+        sourceId: parsed.document.sourceId,
+        nodes: parsed.nodes,
+      })),
+      localPubkey
     ),
-  });
+  };
 }
 
 function nodesForDocument(
@@ -124,8 +76,7 @@ function nodesForDocument(
 ): ImmutableMap<string, GraphNode> {
   const nodes = knowledgeDBs.get(document.sourceId)?.nodes;
   if (!nodes) return ImmutableMap<string, GraphNode>();
-  const topNodeIds = new Set(document.topNodeShortIds);
-  return nodes.filter((node) => topNodeIds.has(node.root));
+  return nodes.filter((node) => pathOf(node.id) === document.docId);
 }
 
 function withoutDocumentNodes(
@@ -152,28 +103,10 @@ function withDocNodes(
   return knowledgeDBs.set(author, { ...db, nodes: db.nodes.merge(nodes) });
 }
 
-function withDocumentInFilePathIndex(
-  index: ImmutableMap<string, Document>,
-  doc: Document
-): ImmutableMap<string, Document> {
-  return doc.filePath ? index.set(doc.filePath, doc) : index;
-}
-
-function withoutDocumentInFilePathIndex(
-  index: ImmutableMap<string, Document>,
-  doc: Document | undefined
-): ImmutableMap<string, Document> {
-  if (!doc?.filePath) return index;
-  const current = index.get(doc.filePath);
-  if (current && current.docId === doc.docId) {
-    return index.remove(doc.filePath);
-  }
-  return index;
-}
-
 function applyDocumentToState(
   state: DocumentState,
-  parsed: ParsedDocument
+  parsed: ParsedDocument,
+  localPubkey: PublicKey | undefined
 ): DocumentState {
   const doc = parsed.document;
   const key = documentKeyOf(doc.sourceId, doc.docId);
@@ -199,14 +132,10 @@ function applyDocumentToState(
       ? removeNodesFromGraphIndex(
           state.graphIndex,
           existingNodes,
-          existingDocument.filePath,
-          existingDocument.sourceId
+          existingDocument.sourceId,
+          localPubkey
         )
       : state.graphIndex;
-  const documentByFilePathAfterRemove = withoutDocumentInFilePathIndex(
-    state.documentByFilePath,
-    existingDocument
-  );
   const knowledgeDBsAfterRemove = withoutDocumentNodes(
     state.knowledgeDBs,
     existingDocument
@@ -218,24 +147,21 @@ function applyDocumentToState(
   );
   return {
     documents: state.documents.set(key, doc),
-    documentByFilePath: withDocumentInFilePathIndex(
-      documentByFilePathAfterRemove,
-      doc
-    ),
     deletes: nextDeletes,
     knowledgeDBs,
     graphIndex: addNodesToGraphIndex(
       withoutExistingNodes,
       parsed.nodes,
-      doc.filePath,
-      doc.sourceId
+      doc.sourceId,
+      localPubkey
     ),
   };
 }
 
 function applyDeleteToState(
   state: DocumentState,
-  deletion: DocumentDelete
+  deletion: DocumentDelete,
+  localPubkey: PublicKey | undefined
 ): DocumentState {
   const key = documentKeyOf(deletion.sourceId, deletion.docId);
   const existingDocument = state.documents.get(key);
@@ -253,10 +179,6 @@ function applyDeleteToState(
   const existingNodes = nodesForDocument(state.knowledgeDBs, existingDocument);
   return {
     documents: state.documents.remove(key),
-    documentByFilePath: withoutDocumentInFilePathIndex(
-      state.documentByFilePath,
-      existingDocument
-    ),
     deletes: state.deletes.set(key, deletion),
     knowledgeDBs: withoutDocumentNodes(state.knowledgeDBs, existingDocument),
     graphIndex:
@@ -264,8 +186,8 @@ function applyDeleteToState(
         ? removeNodesFromGraphIndex(
             state.graphIndex,
             existingNodes,
-            existingDocument.filePath,
-            existingDocument.sourceId
+            existingDocument.sourceId,
+            localPubkey
           )
         : state.graphIndex,
   };
@@ -274,19 +196,17 @@ function applyDeleteToState(
 function applyRecordsToState(
   state: DocumentState,
   records: ReadonlyArray<ParsedDocument>,
-  deletes: ReadonlyArray<DocumentDelete>
+  deletes: ReadonlyArray<DocumentDelete>,
+  localPubkey: PublicKey | undefined
 ): DocumentState {
   const withDocuments = records.reduce(
-    (acc, parsed) => applyDocumentToState(acc, parsed),
+    (acc, parsed) => applyDocumentToState(acc, parsed, localPubkey),
     state
   );
-  const withDeletes = deletes.reduce(
-    (acc, deletion) => applyDeleteToState(acc, deletion),
+  return deletes.reduce(
+    (acc, deletion) => applyDeleteToState(acc, deletion, localPubkey),
     withDocuments
   );
-  return records.length > 0 || deletes.length > 0
-    ? withRealWorldEntities(withDeletes)
-    : withDeletes;
 }
 
 function parsedWithSource(
@@ -336,15 +256,25 @@ export function DocumentStoreProvider({
   initialDocuments?: ReadonlyArray<ParsedDocument>;
 }): JSX.Element {
   const [storedState, setStoredState] = React.useState<DocumentState>(() =>
-    createInitialState(initialDocuments)
+    createInitialState(initialDocuments, localPubkey)
   );
-  const upsertDocument = React.useCallback((parsed: ParsedDocument) => {
-    setStoredState((current) => applyDocumentToState(current, parsed));
-  }, []);
+  const upsertDocument = React.useCallback(
+    (parsed: ParsedDocument) => {
+      setStoredState((current) =>
+        applyDocumentToState(current, parsed, localPubkey)
+      );
+    },
+    [localPubkey]
+  );
 
-  const deleteDocument = React.useCallback((del: DocumentDelete) => {
-    setStoredState((current) => applyDeleteToState(current, del));
-  }, []);
+  const deleteDocument = React.useCallback(
+    (del: DocumentDelete) => {
+      setStoredState((current) =>
+        applyDeleteToState(current, del, localPubkey)
+      );
+    },
+    [localPubkey]
+  );
 
   const addEvents = React.useCallback(
     (events: ImmutableMap<string, Event | UnsignedEvent>) => {
@@ -356,7 +286,7 @@ export function DocumentStoreProvider({
       }
 
       setStoredState((current) =>
-        applyRecordsToState(current, records, deletes)
+        applyRecordsToState(current, records, deletes, localPubkey)
       );
     },
     [localPubkey]
@@ -365,7 +295,7 @@ export function DocumentStoreProvider({
   const activeState = React.useMemo(() => {
     const eventList = unpublishedEvents.toArray();
     const { records, deletes } = eventsToParsed(eventList, localPubkey);
-    return applyRecordsToState(storedState, records, deletes);
+    return applyRecordsToState(storedState, records, deletes, localPubkey);
   }, [storedState, unpublishedEvents, localPubkey]);
 
   const contextValue = React.useMemo(
@@ -373,7 +303,6 @@ export function DocumentStoreProvider({
       knowledgeDBs: activeState.knowledgeDBs,
       graphIndex: activeState.graphIndex,
       documents: activeState.documents,
-      documentByFilePath: activeState.documentByFilePath,
       upsertDocument,
       deleteDocument,
       addEvents,
@@ -408,12 +337,4 @@ export function useDocuments(): ImmutableMap<string, Document> {
     React.useContext(DocumentStoreContext)?.documents ||
     ImmutableMap<string, Document>()
   );
-}
-
-export function useDocumentByFilePath(): ImmutableMap<string, Document> {
-  const ctx = React.useContext(DocumentStoreContext);
-  if (!ctx) {
-    throw new Error("useDocumentByFilePath used outside DocumentStoreProvider");
-  }
-  return ctx.documentByFilePath;
 }

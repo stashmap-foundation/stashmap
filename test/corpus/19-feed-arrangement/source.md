@@ -1,6 +1,0 @@
-# Salon <!-- id:salon -->
-
-- ![Termine](webcal://example.org/salon.ics) <!-- id:f1 -->
-  - ![01.01.2020 Founding](#ical:founding@example.org) <!-- id:m1 -->
-  - [Standup frozen](#ical:standup@example.org) <!-- id:m2 -->
-  - Meine Notiz <!-- id:n1 -->

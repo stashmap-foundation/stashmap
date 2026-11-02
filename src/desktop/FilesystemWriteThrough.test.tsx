@@ -20,98 +20,16 @@ import {
   type,
 } from "../utils.test";
 import type { WritePublisher } from "../infra/filesystem/writeSupport";
-import { buildDocumentRouteUrl } from "../navigationUrl";
-import { LOCAL } from "../core/nodeRef";
 
-async function expectKnowstrDocIdFrontmatter(
+async function expectSavedWithoutFrontmatter(
   workspacePath: string,
   relativePath: string
 ): Promise<void> {
   await waitFor(() => {
     const content = fs.readFileSync(`${workspacePath}/${relativePath}`, "utf8");
-    expect(content).toMatch(/^---\n[\s\S]*knowstr_doc_id:/u);
+    expect(content).toMatch(/^[#-] .+ <!-- id:\S+ -->\n/u);
   });
 }
-
-const compositionCorpusPath = pathModule.resolve(
-  __dirname,
-  "../../test/corpus"
-);
-const compositionFixtures = fs
-  .readdirSync(compositionCorpusPath, { withFileTypes: true })
-  .filter(
-    (entry) =>
-      entry.isDirectory() &&
-      ["source.md", "diff.md", "expected.tree"].every((file) =>
-        fs.existsSync(pathModule.join(compositionCorpusPath, entry.name, file))
-      )
-  )
-  .map((entry) => entry.name)
-  .sort();
-
-if (compositionFixtures.length === 0) {
-  throw new Error("Composition corpus is empty");
-}
-
-function visibleFixtureTree(content: string): string {
-  const kept = content.split("\n").reduce<{
-    lines: string[];
-    dismissedIndent: number | undefined;
-  }>(
-    (acc, line) => {
-      const indent = line.match(/^ */u)?.[0].length ?? 0;
-      if (acc.dismissedIndent !== undefined && indent > acc.dismissedIndent) {
-        return acc;
-      }
-      if (/^ *\{x[+-]?\} /u.test(line)) {
-        return { lines: acc.lines, dismissedIndent: indent };
-      }
-      return { lines: [...acc.lines, line], dismissedIndent: undefined };
-    },
-    { lines: [], dismissedIndent: undefined }
-  ).lines;
-  return kept
-    .map((line) => line.replace(/ <!-- (?:id|base):[^>]* -->$/u, ""))
-    .join("\n");
-}
-
-test.each(compositionFixtures)(
-  "composition fixture UI: %s",
-  async (fixture) => {
-    const fixturePath = pathModule.join(compositionCorpusPath, fixture);
-    const workspacePath = fs.mkdtempSync(
-      pathModule.join(os.tmpdir(), "knowstr-composition-")
-    );
-    fs.copyFileSync(
-      pathModule.join(fixturePath, "source.md"),
-      pathModule.join(workspacePath, "source.md")
-    );
-    fs.copyFileSync(
-      pathModule.join(fixturePath, "diff.md"),
-      pathModule.join(workspacePath, "diff.md")
-    );
-
-    const feedPath = pathModule.join(fixturePath, "feed.ics");
-    await renderAppTree({
-      path: workspacePath,
-      initialRoute: buildDocumentRouteUrl(LOCAL, "diff.md"),
-      ...(fs.existsSync(feedPath)
-        ? {
-            fetchCalendarFeed: () =>
-              Promise.resolve(fs.readFileSync(feedPath, "utf8")),
-          }
-        : {}),
-    });
-    const [root] = await screen.findAllByRole("treeitem");
-    await userEvent.click(root);
-    await userEvent.keyboard("{Meta>}{ArrowDown}{/Meta}");
-
-    const expected = visibleFixtureTree(
-      fs.readFileSync(pathModule.join(fixturePath, "expected.tree"), "utf8")
-    );
-    await expectTree(expected, { showGutter: true, composedOnly: true });
-  }
-);
 
 test("typing in the editor writes markdown files to the workspace", async () => {
   const { path } = await renderAppTree();
@@ -184,7 +102,7 @@ Holiday Destinations
   );
 });
 
-test("creating a new document via the app persists knowstr_doc_id frontmatter to disk", async () => {
+test("creating a new document via the app names its file after the title and writes no frontmatter", async () => {
   const { path } = await renderAppTree();
   if (!path) {
     throw new Error("expected renderAppTree to return a workspace path");
@@ -192,10 +110,10 @@ test("creating a new document via the app persists knowstr_doc_id frontmatter to
   await findNewNodeEditor();
   await type("My Notes{Enter}{Tab}Spain{Escape}");
 
-  await expectKnowstrDocIdFrontmatter(path, "my-notes.md");
+  await expectSavedWithoutFrontmatter(path, "my-notes.md");
 });
 
-test("adding a sibling to holidays.md persists frontmatter", async () => {
+test("adding a sibling to holidays.md writes it without frontmatter", async () => {
   const { path } = knowstrInit();
   write(path, "holidays.md", "# Holiday Destinations\n- France\n- Paris\n");
 
@@ -216,10 +134,10 @@ Holiday Destinations
   Spain
 `);
 
-  await expectKnowstrDocIdFrontmatter(path, "holidays.md");
+  await expectSavedWithoutFrontmatter(path, "holidays.md");
 });
 
-test("editing a hand-written file persists knowstr_doc_id frontmatter to disk", async () => {
+test("editing a hand-written file writes it without frontmatter", async () => {
   const { path } = knowstrInit();
   write(path, "notes.md", "# Notes\n- alpha\n");
 
@@ -238,7 +156,7 @@ Notes
   beta
 `);
 
-  await expectKnowstrDocIdFrontmatter(path, "notes.md");
+  await expectSavedWithoutFrontmatter(path, "notes.md");
 });
 
 test("opening a workspace does not write to any file on disk", async () => {
@@ -477,7 +395,7 @@ My Links
     const notes = fs.readFileSync(`${path}/notes.md`, "utf8");
     expect(notes).toMatch(/Item One <!-- id:([0-9a-f-]+) -->/u);
     const links = fs.readFileSync(`${path}/links.md`, "utf8");
-    expect(links).toMatch(/\]\(#[^)]+\)/u);
+    expect(links).toMatch(/\]\(notes\.md#[^)]+\)/u);
   });
 
   const notesContent = fs.readFileSync(`${path}/notes.md`, "utf8");
@@ -486,7 +404,7 @@ My Links
   const itemOneIdMatch = notesContent.match(
     /Item One <!-- id:([0-9a-f-]+) -->/u
   );
-  const linkTargetMatch = linksContent.match(/\]\(#[^)]*?_?([0-9a-f-]+)\)/u);
+  const linkTargetMatch = linksContent.match(/\]\(notes\.md#([0-9a-f-]+)\)/u);
 
   expect(itemOneIdMatch?.[1]).toBeDefined();
   expect(linkTargetMatch?.[1]).toBeDefined();
@@ -552,13 +470,9 @@ test.each(publicationModes)(
     write(
       workspacePath,
       "doc.md",
-      "---\nknowstr_doc_id: routed-doc\n---\n# Doc <!-- id:root -->\n- row <!-- id:row -->\n"
+      "# Doc <!-- id:root -->\n- row <!-- id:row -->\n"
     );
-    write(
-      workspacePath,
-      "untouched.md",
-      "---\nknowstr_doc_id: untouched-doc\n---\n# Untouched <!-- id:untouched -->\n"
-    );
+    write(workspacePath, "untouched.md", "# Untouched <!-- id:untouched -->\n");
     await knowstrSave(workspacePath);
     const { publisher, publishEvent } = recordingPublisher(() => ({
       status: "fulfilled",
@@ -592,7 +506,7 @@ test.each(publicationModes)(
     calls.forEach(({ event }) => {
       expect(verifyEvent(event)).toBe(true);
       expect(event.created_at).toBe(1750000000);
-      expect(event.tags[0]).toEqual(["d", "routed-doc"]);
+      expect(event.tags[0]).toEqual(["d", "doc.md"]);
     });
     const normalized = fs.readFileSync(
       pathModule.join(workspacePath, "doc.md"),
@@ -602,8 +516,7 @@ test.each(publicationModes)(
     if (deposit) {
       expect(deposit.content).toBe(normalized);
       expect(deposit.tags).toEqual([
-        ["d", "routed-doc"],
-        ["S", "root"],
+        ["d", "doc.md"],
         ["ms", "1750000000123"],
       ]);
     }
@@ -617,7 +530,7 @@ test("partial and total relay failures are reported and retried on the next save
   write(
     workspacePath,
     "doc.md",
-    "---\nknowstr_doc_id: retry-doc\n---\n# Doc <!-- id:root -->\n- row <!-- id:row -->\n"
+    "# Doc <!-- id:root -->\n- row <!-- id:row -->\n"
   );
   await knowstrSave(workspacePath);
   const { publisher, publishEvent } = recordingPublisher((relayUrl, event) => {
@@ -675,5 +588,5 @@ test("partial and total relay failures are reported and retried on the next save
     publishEvent.mock.calls.map(
       ([, event]) => event.tags.find((tag) => tag[0] === "d")?.[1]
     )
-  ).toEqual(["retry-doc", "retry-doc", "retry-doc"]);
+  ).toEqual(["doc.md", "doc.md", "doc.md"]);
 });

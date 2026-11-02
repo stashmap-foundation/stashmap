@@ -472,7 +472,9 @@ test("a bare feed url as a document root persists the feed link", async () => {
 test("a loaded event surface is read-only", async () => {
   const [alice] = setup([ALICE]);
   const readText = jest.fn(() =>
-    Promise.resolve(`[${dunbarText()}](#ical:dunbar@scholarium.at)`)
+    Promise.resolve(
+      `[${dunbarText()}](webcal://scholarium.at/salon.ics#dunbar@scholarium.at)`
+    )
   );
   // eslint-disable-next-line functional/immutable-data
   Object.defineProperty(navigator, "clipboard", {
@@ -618,7 +620,7 @@ test("an explicit event embed shows the live event and keeps no editor", async (
     [
       "# Salon <!-- id:salon -->",
       "",
-      "- ![Frozen label](#ical:dunbar@scholarium.at) <!-- id:l1 -->",
+      "- ![Frozen label](webcal://scholarium.at/salon.ics#dunbar@scholarium.at) <!-- id:l1 -->",
       "- ![https://scholarium.at/salon.ics](webcal://scholarium.at/salon.ics)" +
         " <!-- id:f1 -->",
       "",
@@ -660,7 +662,7 @@ test("a direct feed embed carries the calendar icon", async () => {
     [
       "# Agenda <!-- id:agenda -->",
       "",
-      "- ![Salon feed](#f1) <!-- id:a1 -->",
+      "- ![Salon feed](salon.md#f1) <!-- id:a1 -->",
       "",
     ].join("\n")
   );
@@ -693,7 +695,7 @@ test("two feeds load side by side and resolve their own events", async () => {
     [
       "# Salon <!-- id:salon -->",
       "",
-      "- ![Retreat](#ical:retreat@example.org) <!-- id:l1 -->",
+      "- ![Retreat](webcal://example.org/retreats.ics#retreat@example.org) <!-- id:l1 -->",
       "- ![https://scholarium.at/salon.ics](webcal://scholarium.at/salon.ics)" +
         " <!-- id:f1 -->",
       "- ![https://example.org/retreats.ics](webcal://example.org/retreats.ics)" +
@@ -729,7 +731,9 @@ test("two feeds load side by side and resolve their own events", async () => {
 test("following a dangling entry link opens the entry surface", async () => {
   const [alice] = setup([ALICE]);
   const readText = jest.fn(() =>
-    Promise.resolve(`[${dunbarText()}](#ical:dunbar@scholarium.at)`)
+    Promise.resolve(
+      `[${dunbarText()}](webcal://scholarium.at/salon.ics#dunbar@scholarium.at)`
+    )
   );
   // eslint-disable-next-line functional/immutable-data
   Object.defineProperty(navigator, "clipboard", {

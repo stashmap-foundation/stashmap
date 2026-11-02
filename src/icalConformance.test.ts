@@ -1,9 +1,3 @@
-/**
- * Conformance: the fixtures under icalFixtures/ are COPIES of the wallet
- * corpus (test/corpus/ical-ids.json and test/corpus/ical/) — two
- * implementations projecting the same feed MUST
- * derive byte-identical ids and entries. When the corpus changes, re-copy.
- */
 import * as fs from "fs";
 import * as path from "path";
 import { icalEntryId } from "./core/icalId";
@@ -57,7 +51,7 @@ describe("parseIcalFeed conformance", () => {
     }[];
   };
 
-  test("sample feed projects per the corpus expectation", () => {
+  test("sample feed projects per the expected entries", () => {
     const entries = parseIcalFeed(sample);
     expect(entries.map((e) => e.id)).toEqual(expected.entries.map((e) => e.id));
     expect(entries.map((e) => e.summary)).toEqual(

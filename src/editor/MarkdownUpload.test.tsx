@@ -7,7 +7,7 @@ import { ALICE, setup, UpdateState, requireUser } from "../utils.test";
 import { planPasteMarkdownTrees } from "./FileDropZone";
 import { parseMarkdown } from "../core/markdownTree";
 
-import { linkSpan, nodeText, plainSpans } from "../core/nodeSpans";
+import { nodeText, plainSpans } from "../core/nodeSpans";
 
 const parseTree = (text: string): ReturnType<typeof parseMarkdown>["tree"] =>
   parseMarkdown(text).tree;
@@ -24,15 +24,9 @@ Python is a programming language
 `;
 
 async function uploadMarkdown(alice: UpdateState): Promise<KnowledgeData> {
-  const wsID = "my-first-workspace" as ID;
-  const workspaceText = "my-first-workspace";
-  const workspaceNode: GraphNode = {
-    ...newGraphNode(plainSpans(workspaceText), {
-      root: wsID,
-    }),
-    id: wsID,
-    root: wsID,
-  };
+  const workspaceNode = newGraphNode(plainSpans("my-first-workspace"), {
+    id: "my-first-workspace.md#root",
+  });
   const basePlan = planUpsertNodes(createPlan(alice()), workspaceNode);
   const plan = planPasteMarkdownTrees(
     basePlan,
@@ -104,7 +98,7 @@ test("Markdown parser extracts ref link whose text contains brackets", () => {
 
   expect(parsed).toEqual([
     {
-      spans: [linkSpan(targetId as ID, linkedText)],
+      spans: [{ kind: "link", href: `#${targetId}`, text: linkedText }],
       blockKind: "list_item",
       children: [],
     },

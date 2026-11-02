@@ -26,7 +26,7 @@ export function PaneSearchButton(): JSX.Element {
   const { setPane } = useSplitPanes();
   const pane = useCurrentPane();
   const paneIndex = usePaneIndex();
-  const { knowledgeDBs } = useData();
+  const { knowledgeDBs, user } = useData();
   const [showInput, setShowInput] = useState(false);
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -42,7 +42,8 @@ export function PaneSearchButton(): JSX.Element {
       const trimmedQuery = query.trim();
       const searchResultIDs = getLocalSearchResultIDs(
         knowledgeDBs,
-        trimmedQuery
+        trimmedQuery,
+        user?.publicKey
       ).toArray();
       setPane({
         ...pane,

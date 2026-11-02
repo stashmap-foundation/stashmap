@@ -2,16 +2,7 @@ import React, { createContext, useContext } from "react";
 import { LOCAL } from "./core/nodeRef";
 import { planUpdatePanes, usePlanner } from "./planner";
 import { useData } from "./DataContext";
-import {
-  parseAtFromSearch,
-  parseCoordinateRouteUrl,
-  parseDocumentRouteUrl,
-  parseFallbackLabelFromSearch,
-  parseNodeRouteUrl,
-  parseStorageKeyFromHash,
-  resolveAddress,
-  routeCoordinateSourceId,
-} from "./navigationUrl";
+import { routePane } from "./navigationUrl";
 import { usePaneHistory } from "./PaneHistoryContext";
 
 const PaneIndexContext = createContext<number>(0);
@@ -129,60 +120,11 @@ export function useNavigatePane(): (url: string) => void {
         : urlWithoutHash;
     const search =
       questionMarkIndex >= 0 ? urlWithoutHash.slice(questionMarkIndex) : "";
-    const fallbackLabel = parseFallbackLabelFromSearch(search);
-    const at = parseAtFromSearch(search);
-    const documentRoute = parseDocumentRouteUrl(pathname);
-    if (documentRoute) {
-      setPane({
-        id: pane.id,
+    setPane({
+      id: pane.id,
+      ...(routePane({ pathname, search, hash }, user?.publicKey) ?? {
         sourceId: LOCAL,
-        documentId: documentRoute.docId,
-        scrollToId: at,
-        fallbackLabel: undefined,
-      });
-      return;
-    }
-    const storageRoute = parseCoordinateRouteUrl(pathname, "storage");
-    if (storageRoute) {
-      const storageKey = parseStorageKeyFromHash(hash);
-      setPane({
-        id: pane.id,
-        sourceId: resolveAddress(storageRoute.pubkey, user?.publicKey),
-        routeCoordinate: storageRoute,
-        ...(at === undefined
-          ? { documentId: storageRoute.dTag }
-          : { rootNodeId: at }),
-        ...(storageKey !== undefined && { storageKey }),
-      });
-      return;
-    }
-    const depositRoute = parseCoordinateRouteUrl(pathname, "deposit");
-    if (depositRoute) {
-      setPane({
-        id: pane.id,
-        sourceId: routeCoordinateSourceId(depositRoute),
-        routeCoordinate: depositRoute,
-        ...(at === undefined
-          ? { documentId: depositRoute.dTag }
-          : { rootNodeId: at }),
-      });
-      return;
-    }
-    const nodeID = parseNodeRouteUrl(pathname);
-    if (nodeID) {
-      setPane({
-        id: pane.id,
-        sourceId: LOCAL,
-        rootNodeId: nodeID,
-        scrollToId: at,
-        fallbackLabel,
-      });
-    } else {
-      setPane({
-        id: pane.id,
-        sourceId: LOCAL,
-        fallbackLabel: undefined,
-      });
-    }
+      }),
+    });
   };
 }

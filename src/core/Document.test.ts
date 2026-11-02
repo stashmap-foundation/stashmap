@@ -1,33 +1,34 @@
 import { Map } from "immutable";
-import {
-  parseToDocument,
-  parseToDocumentPreservingExplicitIds,
-} from "./Document";
+import { parseToDocument } from "./Document";
+import { pathOf } from "./nodeRef";
 import { renderDocumentMarkdown } from "../documentRenderer";
 
 const TEST_PUBKEY = "a".repeat(64) as PublicKey;
 
-test("parseToDocument assigns the document id to every top-level root", () => {
-  const { document, nodes } = parseToDocument(
-    TEST_PUBKEY,
-    "# First\n\n# Second\n",
-    { docIdFallback: "doc-1" }
-  );
+test("parseToDocument names the document and every top-level root by its path", () => {
+  const { document } = parseToDocument(TEST_PUBKEY, "# First\n\n# Second\n", {
+    path: "notes/doc-1.md",
+  });
 
-  const rootDocIds = document.topNodeShortIds.map((id) => nodes.get(id)?.docId);
-
-  expect(rootDocIds).toEqual(["doc-1", "doc-1"]);
+  expect(document.docId).toBe("notes/doc-1.md");
+  expect(document.topNodeShortIds.map(pathOf)).toEqual([
+    "notes/doc-1.md",
+    "notes/doc-1.md",
+  ]);
 });
 
 test("parseToDocument extracts title from frontmatter", () => {
   const markdown = `---\ntitle: "Holiday Destinations"\n---\n# Spain\n`;
-  const { document } = parseToDocument(TEST_PUBKEY, markdown);
+  const { document } = parseToDocument(TEST_PUBKEY, markdown, {
+    path: "doc.md",
+  });
   expect(document.title).toBe("Holiday Destinations");
 });
 
 test("parseToDocument frontmatter title beats fallbackTitle", () => {
   const markdown = `---\ntitle: "Frontmatter Wins"\n---\n# Body Heading\n`;
   const { document } = parseToDocument(TEST_PUBKEY, markdown, {
+    path: "doc.md",
     fallbackTitle: "Fallback Loses",
   });
   expect(document.title).toBe("Frontmatter Wins");
@@ -36,7 +37,7 @@ test("parseToDocument frontmatter title beats fallbackTitle", () => {
 test("parseToDocument falls back to fallbackTitle when no frontmatter title", () => {
   const markdown = "# Body Heading\n- alpha\n";
   const { document } = parseToDocument(TEST_PUBKEY, markdown, {
-    filePath: "notes/projects.md",
+    path: "notes/projects.md",
     fallbackTitle: "projects",
   });
   expect(document.title).toBe("projects");
@@ -52,11 +53,9 @@ test("legacy publish state is ignored and omitted on render", () => {
     "# Notes <!-- id:notes -->",
     "",
   ].join("\n");
-  const { document, nodes } = parseToDocumentPreservingExplicitIds(
-    TEST_PUBKEY,
-    markdown,
-    {}
-  );
+  const { document, nodes } = parseToDocument(TEST_PUBKEY, markdown, {
+    path: "doc.md",
+  });
 
   expect(document.frontMatter).not.toHaveProperty("knowstr_publish");
   const knowledgeDBs = Map<SourceId, KnowledgeData>([[TEST_PUBKEY, { nodes }]]);
@@ -67,12 +66,14 @@ test("legacy publish state is ignored and omitted on render", () => {
 
 test("parseToDocument falls back to first top-level node text", () => {
   const markdown = "# Holiday Destinations\n- Spain\n";
-  const { document } = parseToDocument(TEST_PUBKEY, markdown);
+  const { document } = parseToDocument(TEST_PUBKEY, markdown, {
+    path: "doc.md",
+  });
   expect(document.title).toBe("Holiday Destinations");
 });
 
 test("parseToDocument falls back to 'Untitled' when nothing else is available", () => {
-  const { document } = parseToDocument(TEST_PUBKEY, "");
+  const { document } = parseToDocument(TEST_PUBKEY, "", { path: "doc.md" });
   expect(document.title).toBe("Untitled");
 });
 
@@ -86,17 +87,15 @@ test("legacy basedOn and snapshot attributes survive as generic attributes", () 
     "",
   ].join("\n");
 
-  const { document, nodes } = parseToDocumentPreservingExplicitIds(
-    TEST_PUBKEY,
-    markdown,
-    { docIdFallback: "doc-1" }
-  );
+  const { document, nodes } = parseToDocument(TEST_PUBKEY, markdown, {
+    path: "doc.md",
+  });
 
-  expect(nodes.get("u1")?.extraAttrs).toEqual({
+  expect(nodes.get("doc.md#u1")?.extraAttrs).toEqual({
     basedOn: "a1",
     snapshot: rootSnapshot,
   });
-  expect(nodes.get("u2")?.extraAttrs).toEqual({
+  expect(nodes.get("doc.md#u2")?.extraAttrs).toEqual({
     basedOn: "a2",
     snapshot: childSnapshot,
   });
@@ -118,13 +117,9 @@ test("parseToDocument preserves arbitrary legacy snapshot values", () => {
     "",
   ].join("\n");
 
-  const { nodes } = parseToDocumentPreservingExplicitIds(
-    TEST_PUBKEY,
-    markdown,
-    { docIdFallback: "doc-1" }
-  );
+  const { nodes } = parseToDocument(TEST_PUBKEY, markdown, { path: "doc.md" });
 
-  expect(nodes.get("u1")?.extraAttrs).toEqual({
+  expect(nodes.get("doc.md#u1")?.extraAttrs).toEqual({
     basedOn: "a1",
     snapshot: "garbage",
   });
@@ -138,14 +133,12 @@ test("unknown comment attributes survive parse and render", () => {
     "",
   ].join("\n");
 
-  const { document, nodes } = parseToDocumentPreservingExplicitIds(
-    TEST_PUBKEY,
-    markdown,
-    { docIdFallback: "doc-1" }
-  );
+  const { document, nodes } = parseToDocument(TEST_PUBKEY, markdown, {
+    path: "doc.md",
+  });
 
-  expect(nodes.get("u1")?.extraAttrs).toEqual({ knowstr_vote_id: "v1" });
-  expect(nodes.get("u2")?.extraAttrs).toEqual({
+  expect(nodes.get("doc.md#u1")?.extraAttrs).toEqual({ knowstr_vote_id: "v1" });
+  expect(nodes.get("doc.md#u2")?.extraAttrs).toEqual({
     knowstr_vote_id: "v2",
     custom: "x",
   });
@@ -168,13 +161,11 @@ test("block-link rows keep generic attributes", () => {
     "",
   ].join("\n");
 
-  const { document, nodes } = parseToDocumentPreservingExplicitIds(
-    TEST_PUBKEY,
-    markdown,
-    { docIdFallback: "doc-1" }
-  );
+  const { document, nodes } = parseToDocument(TEST_PUBKEY, markdown, {
+    path: "doc.md",
+  });
 
-  expect(nodes.get("u2")?.extraAttrs).toEqual({
+  expect(nodes.get("doc.md#u2")?.extraAttrs).toEqual({
     basedOn: "a5",
     snapshot,
     knowstr_vote_id: "v1",

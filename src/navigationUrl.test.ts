@@ -8,13 +8,11 @@ import {
   MAX_ROUTE_RELAY_HINTS,
   parseAtFromSearch,
   parseCoordinateRouteUrl,
-  parseDocumentRouteUrl,
   parseFallbackLabelFromSearch,
-  parseNodeRouteUrl,
-  parseSourceFromSearch,
   parseStorageKeyFromHash,
   resolveAddress,
   routeCoordinateSourceId,
+  routePane,
 } from "./navigationUrl";
 import { LOCAL } from "./core/nodeRef";
 import { KIND_KNOWLEDGE_DEPOSIT, KIND_KNOWLEDGE_DOCUMENT } from "./nostr";
@@ -32,41 +30,59 @@ function coordinate(
   return { eventKind, pubkey: OTHER_PUBKEY, dTag, relays };
 }
 
-test("buildNodeRouteUrl creates local node route", () => {
-  expect(
-    buildNodeRouteUrl("some-node-id" as ID, LOCAL, {
-      scrollToId: undefined,
-      fallbackLabel: undefined,
-    })
-  ).toBe("/local/n/some-node-id");
-  expect(
-    buildNodeRouteUrl("encoded/id" as ID, LOCAL, {
-      scrollToId: undefined,
-      fallbackLabel: undefined,
-    })
-  ).toBe("/local/n/encoded%2Fid");
+function paneAt(route: string): Omit<Pane, "id"> | undefined {
+  return routePane(new URL(route, "https://x"), OWN_PUBKEY);
+}
+
+test("a row opens at its file with its id", () => {
+  const route = buildNodeRouteUrl("recipes/my pizza.md#dough" as ID, LOCAL, {
+    scrollToId: undefined,
+    fallbackLabel: undefined,
+  });
+  expect(route).toBe("/local/d/recipes%2Fmy%20pizza.md?at=dough");
+  expect(paneAt(route)).toEqual({
+    sourceId: LOCAL,
+    rootNodeId: "recipes/my pizza.md#dough",
+  });
 });
 
-test("buildNodeRouteUrl includes focus and label queries", () => {
-  expect(
-    buildNodeRouteUrl("wd:Q1492" as ID, LOCAL, {
-      scrollToId: "child/id" as ID,
-      fallbackLabel: "Barcelona / Barna",
-    })
-  ).toBe("/local/n/wd%3AQ1492?at=child%2Fid&label=Barcelona+%2F+Barna");
-});
-
-test("buildDocumentRouteUrl creates local document route", () => {
-  expect(buildDocumentRouteUrl(LOCAL, "doc.md")).toBe("/local/d/doc.md");
+test("a file opens at its path", () => {
   expect(buildDocumentRouteUrl(LOCAL, "docs/file.md")).toBe(
     "/local/d/docs%2Ffile.md"
   );
+  expect(paneAt("/local/d/docs%2Ffile.md")).toEqual({
+    sourceId: LOCAL,
+    documentId: "docs/file.md",
+  });
 });
 
-test("buildDocumentRouteUrl includes focus query", () => {
-  expect(buildDocumentRouteUrl(LOCAL, "doc.md", "child/id" as ID)).toBe(
-    "/local/d/doc.md?at=child%2Fid"
+test("a thing opens its surface with a label hint", () => {
+  const route = buildNodeRouteUrl("wikidata:Q1492" as ID, LOCAL, {
+    scrollToId: undefined,
+    fallbackLabel: "Barcelona / Barna",
+  });
+  expect(route).toBe("/local/n/wikidata%3AQ1492?label=Barcelona+%2F+Barna");
+  expect(paneAt(route)).toEqual({
+    sourceId: LOCAL,
+    rootNodeId: "wikidata:Q1492",
+    fallbackLabel: "Barcelona / Barna",
+  });
+});
+
+test("another author's row opens its deposit at the row's id", () => {
+  const route = buildNodeRouteUrl("rome.md#tips" as ID, OTHER_PUBKEY, {
+    scrollToId: undefined,
+    fallbackLabel: undefined,
+  });
+  const rome = coordinate(KIND_KNOWLEDGE_DEPOSIT, "rome.md");
+  expect(route).toBe(
+    buildCoordinateRouteUrl("deposit", rome, "tips" as ID, undefined)
   );
+  expect(paneAt(route)).toEqual({
+    sourceId: routeCoordinateSourceId(rome),
+    routeCoordinate: rome,
+    rootNodeId: "rome.md#tips",
+  });
 });
 
 test("coordinate routes round-trip and cap relay hints", () => {
@@ -110,24 +126,20 @@ test("route parsers reject retired and mismatched routes", () => {
     undefined,
     undefined
   );
-  expect(parseNodeRouteUrl("/local/n/some-node-id")).toBe("some-node-id");
-  expect(parseNodeRouteUrl("/r/some-node-id")).toBeUndefined();
-  expect(parseDocumentRouteUrl("/local/d/doc.md")).toEqual({
-    address: LOCAL,
-    docId: "doc.md",
-  });
-  expect(parseDocumentRouteUrl("/d/alice/doc.md")).toBeUndefined();
+  expect(paneAt("/local/n/some-node-id")).toBeUndefined();
+  expect(paneAt("/local/n/doc.md%23root")).toBeUndefined();
+  expect(paneAt("/r/some-node-id")).toBeUndefined();
+  expect(paneAt("/d/alice/doc.md")).toBeUndefined();
   expect(
     parseCoordinateRouteUrl(new URL(storage, "https://x").pathname, "deposit")
   ).toBeUndefined();
 });
 
-test("label and source query parsing follows typed routes", () => {
+test("label query parsing follows typed routes", () => {
   expect(parseFallbackLabelFromSearch("?label=Barcelona+%2F+Barna")).toBe(
     "Barcelona / Barna"
   );
   expect(parseFallbackLabelFromSearch("?label=&label=Other")).toBeUndefined();
-  expect(parseSourceFromSearch("?source=abc123")).toBeUndefined();
 });
 
 test("coordinate source ids are stable", () => {

@@ -70,6 +70,7 @@ export async function knowstrPublish(
   changed_paths: string[];
   accepted_paths: string[];
   unaccepted_paths: string[];
+  retracted_paths: string[];
   rejections: Rejection[];
   warnings: string[];
 }> {

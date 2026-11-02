@@ -21,7 +21,7 @@ import {
 
 function interestFilter(interest: PullInterest): Filter {
   if (interest.kind === "tag") {
-    return { kinds: [KIND_KNOWLEDGE_DEPOSIT], "#S": interest.tags };
+    return { kinds: [KIND_KNOWLEDGE_DEPOSIT], "#i": interest.tags };
   }
   return {
     kinds: [KIND_KNOWLEDGE_DEPOSIT],
@@ -51,12 +51,20 @@ function interestsSignature(interests: readonly PullInterest[]): string {
     .join("|");
 }
 
-function buildOverlayGraphIndex(records: PullRecordMap): GraphIndex {
+function buildOverlayGraphIndex(
+  records: PullRecordMap,
+  localPubkey: PublicKey | undefined
+): GraphIndex {
   return [...records.values()].reduce((acc, record) => {
     if (record.status !== "available") {
       return acc;
     }
-    return addNodesToGraphIndex(acc, record.nodes, undefined, record.sourceId);
+    return addNodesToGraphIndex(
+      acc,
+      record.nodes,
+      record.sourceId,
+      localPubkey
+    );
   }, createEmptyGraphIndex());
 }
 
@@ -193,7 +201,10 @@ export function PullSourceProvider({
     (left, right) => ({ nodes: left.nodes.merge(right.nodes) }),
     overlayKnowledgeDBs
   );
-  const overlayGraphIndex = buildOverlayGraphIndex(visibleRecords);
+  const overlayGraphIndex = buildOverlayGraphIndex(
+    visibleRecords,
+    data.user?.publicKey
+  );
   const overlayDocuments = buildOverlayDocuments(visibleRecords);
 
   return (
@@ -202,7 +213,6 @@ export function PullSourceProvider({
       knowledgeDBs={mergedKnowledgeDBs}
       graphIndex={mergeGraphIndexes(data.graphIndex, overlayGraphIndex)}
       documents={data.documents.merge(overlayDocuments)}
-      documentByFilePath={data.documentByFilePath}
       publishEventsStatus={data.publishEventsStatus}
       pull={pull}
       views={data.views}

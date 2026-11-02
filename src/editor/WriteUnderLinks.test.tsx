@@ -68,7 +68,7 @@ async function linkWorkspace(): Promise<{ workspacePath: string }> {
   write(
     workspacePath,
     "notes.md",
-    `# Notes\n\n- [Cantillon](#${targetID})\n- After\n`
+    `# Notes\n\n- [Cantillon](topics.md#${targetID})\n- After\n`
   );
   await knowstrSave(workspacePath);
   return { workspacePath };
@@ -87,7 +87,7 @@ async function multipleLinkWorkspace(): Promise<{
   write(
     workspacePath,
     "notes.md",
-    `# Notes\n\n- Founder of [Cantillon](#${cantillonID}) studied in [Vienna](#${viennaID})\n`
+    `# Notes\n\n- Founder of [Cantillon](topics.md#${cantillonID}) studied in [Vienna](topics.md#${viennaID})\n`
   );
   await knowstrSave(workspacePath);
   return { workspacePath, cantillonID, viennaID };
@@ -102,8 +102,8 @@ test("bare and mixed links use one span-native editor", async () => {
   });
   const marks = within(mixedEditor).getAllByRole("link");
   expect(marks.map((mark) => mark.getAttribute("data-href"))).toEqual([
-    `#${cantillonID}`,
-    `#${viennaID}`,
+    `topics.md#${cantillonID}`,
+    `topics.md#${viennaID}`,
   ]);
   mixedEditor.focus();
   placeCursorAtEnd(mixedEditor);
@@ -111,7 +111,7 @@ test("bare and mixed links use one span-native editor", async () => {
   await waitFor(() => {
     const notes = fs.readFileSync(path.join(workspacePath, "notes.md"), "utf8");
     expect(notes).toContain(
-      `Founder of [Cantillon](#${cantillonID}) studied in [Vienna](#${viennaID}) !`
+      `Founder of [Cantillon](topics.md#${cantillonID}) studied in [Vienna](topics.md#${viennaID}) !`
     );
   });
 });
@@ -123,13 +123,13 @@ test("missing local targets stay editable and carry per-link dead furniture", as
   write(
     workspacePath,
     "notes.md",
-    `# Notes\n\n- [Live](#${liveID}), [Missing](#${missingID}), [Missing file](./gone.md), [Missing document](doc:missing-document), [Barcelona](#wd:Q1492)\n- Live <!-- id:${liveID} -->\n`
+    `# Notes\n\n- [Live](#${liveID}), [Missing](#${missingID}), [Missing file](./gone.md), [Missing row](./gone.md#${missingID}), [Barcelona](wikidata:Q1492)\n- Live <!-- id:${liveID} -->\n`
   );
   await knowstrSave(workspacePath);
 
   await renderAppTree({ path: workspacePath, search: "Notes" });
   const editor = await screen.findByRole("textbox", {
-    name: "edit Live, Missing, Missing file, Missing document, Barcelona",
+    name: "edit Live, Missing, Missing file, Missing row, Barcelona",
   });
   const live = within(editor).getByRole("link", { name: "Live" });
   const missing = within(editor).getByRole("link", {
@@ -138,8 +138,8 @@ test("missing local targets stay editable and carry per-link dead furniture", as
   const missingFile = within(editor).getByRole("link", {
     name: "Missing file. Target no longer exists",
   });
-  const missingDocument = within(editor).getByRole("link", {
-    name: "Missing document. Target no longer exists",
+  const missingRow = within(editor).getByRole("link", {
+    name: "Missing row. Target no longer exists",
   });
   const entity = within(editor).getByRole("link", { name: "Barcelona" });
 
@@ -148,7 +148,7 @@ test("missing local targets stay editable and carry per-link dead furniture", as
   expect(missing.style.textDecorationLine).toBe("");
   expect(missing.style.color).toBe("var(--base01)");
   expect(missingFile.style.cursor).toBe("default");
-  expect(missingDocument.style.cursor).toBe("default");
+  expect(missingRow.style.cursor).toBe("default");
   expect(live.style.cursor).not.toBe("default");
   expect(entity.style.color).toBe("var(--violet)");
 
@@ -212,12 +212,12 @@ Notes
 test("mixed external and entity links keep independent presentation and activation", async () => {
   const { path: workspacePath } = knowstrInit();
   const website = "https://example.com/articles/one#details";
-  const feed = "webcal://example.com/calendar.ics?team=one#events";
+  const feed = "webcal://example.com/calendar.ics?team=one";
   const asset = "rgb:AAAABBBBCCCCDDDDEEEE12345";
   write(
     workspacePath,
     "notes.md",
-    `# Notes\n\n- Visit [Website](${website}) and [Feed](${feed}) near [Barcelona](#wd:Q1492) and [Asset](#${asset})\n`
+    `# Notes\n\n- Visit [Website](${website}) and [Feed](${feed}) near [Barcelona](wikidata:Q1492) and [Asset](${asset})\n`
   );
   await knowstrSave(workspacePath);
   const open = jest.spyOn(window, "open").mockImplementation(() => null);
@@ -259,7 +259,7 @@ test("mixed external and entity links keep independent presentation and activati
 
   await userEvent.click(feedLink);
   expect(open).toHaveBeenLastCalledWith(
-    "https://example.com/calendar.ics?team=one#events",
+    "https://example.com/calendar.ics?team=one",
     "_blank",
     "noopener,noreferrer"
   );
@@ -274,7 +274,7 @@ test("mixed external and entity links keep independent presentation and activati
   );
   await waitFor(() => {
     const notes = fs.readFileSync(path.join(workspacePath, "notes.md"), "utf8");
-    expect(notes).toContain(`[Asset](#${asset}) ! <!-- id:`);
+    expect(notes).toContain(`[Asset](${asset}) ! <!-- id:`);
   });
 });
 
@@ -292,7 +292,7 @@ test("copy serializes complete, partial, and cross-boundary links", async () => 
   fireEvent.copy(editor, { clipboardData: { setData } });
   expect(setData).toHaveBeenLastCalledWith(
     "text/plain",
-    `[Cantillon](#${cantillonID})`
+    `[Cantillon](topics.md#${cantillonID})`
   );
 
   const partial = document.createRange();
@@ -304,7 +304,7 @@ test("copy serializes complete, partial, and cross-boundary links", async () => 
   fireEvent.copy(editor, { clipboardData: { setData } });
   expect(setData).toHaveBeenLastCalledWith(
     "text/plain",
-    `[ant](#${cantillonID})`
+    `[ant](topics.md#${cantillonID})`
   );
 
   const crossing = document.createRange();
@@ -315,7 +315,7 @@ test("copy serializes complete, partial, and cross-boundary links", async () => 
   fireEvent.copy(editor, { clipboardData: { setData } });
   expect(setData).toHaveBeenLastCalledWith(
     "text/plain",
-    `[tillon](#${cantillonID}) studied in [Vie](#${viennaID})`
+    `[tillon](topics.md#${cantillonID}) studied in [Vie](topics.md#${viennaID})`
   );
 });
 
@@ -328,7 +328,7 @@ test("each link in a mixed row contributes its own backlink", async () => {
     screen
       .getByRole("treeitem", { name: "Cantillon" })
       .getAttribute("data-node-id")
-  ).toBe(cantillonID);
+  ).toBe(`topics.md#${cantillonID}`);
   await userEvent.click(await screen.findByLabelText("expand Cantillon"));
   await expectTree(`
 Topics
@@ -344,7 +344,7 @@ Topics
     screen
       .getByRole("treeitem", { name: "Vienna" })
       .getAttribute("data-node-id")
-  ).toBe(viennaID);
+  ).toBe(`topics.md#${viennaID}`);
   await userEvent.click(await screen.findByLabelText("expand Vienna"));
   await expectTree(`
 Topics
@@ -362,7 +362,7 @@ test("sole-link placements close reciprocal relationships through their parent s
   write(
     workspacePath,
     "book-club.md",
-    `# Book Club <!-- id:${bookClubID} -->\n\n- [Favorite Authors](#${favoriteAuthorsID})\n`
+    `# Book Club <!-- id:${bookClubID} -->\n\n- [Favorite Authors](favorite-authors.md#${favoriteAuthorsID})\n`
   );
   write(
     workspacePath,
@@ -387,7 +387,7 @@ Favorite Authors
       "utf8"
     );
     expect(target).toMatch(
-      new RegExp(`- \\(!\\) !\\[Book Club\\]\\(#${bookClubID}\\)`)
+      new RegExp(`- \\(!\\) !\\[Book Club\\]\\(book-club\\.md#${bookClubID}\\)`)
     );
   });
   await expectTree(`
@@ -459,7 +459,7 @@ test("moving a reciprocal placement recomputes both endpoint pairs", async () =>
   write(
     workspacePath,
     "book-club.md",
-    `# Book Club <!-- id:${bookClubID} -->\n\n- [Favorite Authors](#${favoriteAuthorsID})\n`
+    `# Book Club <!-- id:${bookClubID} -->\n\n- [Favorite Authors](favorite-authors.md#${favoriteAuthorsID})\n`
   );
   write(
     workspacePath,
@@ -493,7 +493,7 @@ Favorite Authors
     );
     expect(target).toMatch(
       new RegExp(
-        `- Other[^\\n]*\\n  - \\(!\\) !\\[Book Club\\]\\(#${bookClubID}\\)`
+        `- Other[^\\n]*\\n  - \\(!\\) !\\[Book Club\\]\\(book-club\\.md#${bookClubID}\\)`
       )
     );
   });
@@ -514,7 +514,7 @@ test("repeated links produce one edge and one reciprocal result", async () => {
   write(
     workspacePath,
     "notes.md",
-    `# Notes\n\n- [Favorite Authors](#${favoriteAuthorsID}) and [Favorite Authors again](#${favoriteAuthorsID}) <!-- id:${statementID} -->\n`
+    `# Notes\n\n- [Favorite Authors](favorite-authors.md#${favoriteAuthorsID}) and [Favorite Authors again](favorite-authors.md#${favoriteAuthorsID}) <!-- id:${statementID} -->\n`
   );
   write(
     workspacePath,
@@ -552,7 +552,7 @@ test("mixed rows close directly without losing either statement's links", async 
   write(
     workspacePath,
     "statements.md",
-    `# Statements\n\n- [First](#${firstEntityID}) links [Second statement](#${secondStatementID}) <!-- id:${firstStatementID} -->\n- [Second](#${secondEntityID}) has context <!-- id:${secondStatementID} -->\n`
+    `# Statements\n\n- [First](entities.md#${firstEntityID}) links [Second statement](#${secondStatementID}) <!-- id:${firstStatementID} -->\n- [Second](entities.md#${secondEntityID}) has context <!-- id:${secondStatementID} -->\n`
   );
   write(
     workspacePath,
@@ -582,9 +582,9 @@ Statements
       path.join(workspacePath, "statements.md"),
       "utf8"
     );
-    expect(markdown).toContain(`[First](#${firstEntityID})`);
+    expect(markdown).toContain(`[First](entities.md#${firstEntityID})`);
     expect(markdown).toContain(`[Second statement](#${secondStatementID})`);
-    expect(markdown).toContain(`[Second](#${secondEntityID})`);
+    expect(markdown).toContain(`[Second](entities.md#${secondEntityID})`);
     expect(markdown).toContain(`](#${firstStatementID})`);
   });
 });
@@ -595,7 +595,7 @@ test("link speaker follows sole and mixed shape transitions", async () => {
   const favoriteAuthorsID = "22222222-2222-4222-8222-222222222222";
   const occurrenceID = "33333333-3333-4333-8333-333333333333";
   const source = (prefix: string): string =>
-    `# Book Club <!-- id:${bookClubID} -->\n\n- ${prefix}[Favorite Authors](#${favoriteAuthorsID}) <!-- id:${occurrenceID} -->\n`;
+    `# Book Club <!-- id:${bookClubID} -->\n\n- ${prefix}[Favorite Authors](favorite-authors.md#${favoriteAuthorsID}) <!-- id:${occurrenceID} -->\n`;
   write(workspacePath, "book-club.md", source(""));
   write(
     workspacePath,
@@ -637,7 +637,7 @@ test("mixed statements close on their own speaker and keep other links independe
   write(
     workspacePath,
     "notes.md",
-    `# Notes\n\n- Founder of [Cantillon](#${cantillonID}) studied in [Vienna](#${viennaID}) <!-- id:${statementID} -->\n`
+    `# Notes\n\n- Founder of [Cantillon](topics.md#${cantillonID}) studied in [Vienna](topics.md#${viennaID}) <!-- id:${statementID} -->\n`
   );
   write(
     workspacePath,
@@ -666,7 +666,7 @@ Topics
       path.join(workspacePath, "topics.md"),
       "utf8"
     );
-    expect(topics).toContain(`](#${statementID})`);
+    expect(topics).toContain(`](notes.md#${statementID})`);
   });
   await expectTree(`
 Topics
@@ -696,12 +696,12 @@ Topics
 
 test("rewriting a fully deleted link label preserves its target", async () => {
   const { path: workspacePath } = knowstrInit();
-  const targetID = "wd:Q203411";
+  const targetID = "wikidata:Q203411";
   const original = "Austrian School of Economics";
   write(
     workspacePath,
     "notes.md",
-    `# Notes\n\n- The [${original}](#${targetID}) is from Vienna\n`
+    `# Notes\n\n- The [${original}](${targetID}) is from Vienna\n`
   );
   await knowstrSave(workspacePath);
 
@@ -722,22 +722,22 @@ test("rewriting a fully deleted link label preserves its target", async () => {
       "utf8"
     );
     expect(markdown).toContain(
-      `The [Österreichische Schule](#${targetID}) is from Vienna`
+      `The [Österreichische Schule](${targetID}) is from Vienna`
     );
   });
   const renamed = await screen.findByRole("link", {
     name: "Österreichische Schule",
   });
-  expect(renamed.getAttribute("data-href")).toBe(`#${targetID}`);
+  expect(renamed.getAttribute("data-href")).toBe(targetID);
 });
 
 test("a link label left empty loses its target", async () => {
   const { path: workspacePath } = knowstrInit();
-  const targetID = "wd:Q203411";
+  const targetID = "wikidata:Q203411";
   write(
     workspacePath,
     "notes.md",
-    `# Notes\n\n- The [A](#${targetID}) is from Vienna\n`
+    `# Notes\n\n- The [A](${targetID}) is from Vienna\n`
   );
   await knowstrSave(workspacePath);
 
@@ -755,7 +755,7 @@ test("a link label left empty loses its target", async () => {
       path.join(workspacePath, "notes.md"),
       "utf8"
     );
-    expect(markdown).not.toContain(`#${targetID}`);
+    expect(markdown).not.toContain(targetID);
   });
 });
 
@@ -772,7 +772,7 @@ test("terminal links provide a plain continuation slot", async () => {
 
   await waitFor(() => {
     const notes = fs.readFileSync(path.join(workspacePath, "notes.md"), "utf8");
-    expect(notes).toMatch(/\[Cantillon\]\(#[^)]+\) notes/u);
+    expect(notes).toMatch(/\[Cantillon\]\(topics\.md#[^)]+\) notes/u);
   });
 });
 
@@ -801,7 +801,7 @@ test("bare links expose an editable target-preserving mark", async () => {
   });
   const mark = within(editor).getByRole("link");
   expect(mark.textContent).toBe("Cantillon");
-  expect(mark.getAttribute("data-href")).toMatch(/^#/u);
+  expect(mark.getAttribute("data-href")).toMatch(/^topics\.md#/u);
   expect(mark.style.fontStyle).toBe("");
   expect(mark.style.textDecorationLine).toBe("underline");
   expect(mark.style.textDecorationStyle).toBe("dotted");
@@ -813,7 +813,7 @@ test("bare links expose an editable target-preserving mark", async () => {
   await userEvent.keyboard("!{Escape}");
   await waitFor(() => {
     const notes = fs.readFileSync(path.join(workspacePath, "notes.md"), "utf8");
-    expect(notes).toMatch(/\[Cantillon!\]\(#[^)]+\)/u);
+    expect(notes).toMatch(/\[Cantillon!\]\(topics\.md#[^)]+\)/u);
   });
 });
 
@@ -856,7 +856,7 @@ Notes
   await waitFor(() => {
     const notes = fs.readFileSync(path.join(workspacePath, "notes.md"), "utf8");
     expect(notes).toMatch(
-      /- \[Cantillon\]\(#[^)]+\)[^\n]*\n {2}- Placement note/u
+      /- \[Cantillon\]\(topics\.md#[^)]+\)[^\n]*\n {2}- Placement note/u
     );
   });
   await screen.findByLabelText("collapse Cantillon");

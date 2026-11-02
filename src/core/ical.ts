@@ -11,7 +11,7 @@ const ICAL_URL_RE =
   /(webcal:\/\/[^\s\]()]+|https:\/\/[^\s\]()]+\.ics(\?[^\s\]()]*)?)/iu;
 
 export function isCalendarEntryId(id: string): boolean {
-  return id.startsWith("ical:");
+  return classifyLinkHref(id) === "calendar";
 }
 
 export function feedUrlInSpans(spans: InlineSpan[]): string | undefined {
@@ -285,13 +285,19 @@ export function icalEntryDisplayText(entry: IcalEntry): string {
 }
 
 export function calendarIdOf(url: string): ID {
-  return `feed:${url}`;
+  return calendarFeedHref(url);
+}
+
+function calendarEntryAddress(url: string, entry: IcalEntry): ID {
+  return `${calendarIdOf(url)}#${entry.id}`;
 }
 
 function calendarNode(url: string, entries: IcalEntry[]): GraphNode {
   const id = calendarIdOf(url);
   return {
-    children: List<ID>(entries.map((entry) => entry.id)),
+    children: List<ID>(
+      entries.map((entry) => calendarEntryAddress(url, entry))
+    ),
     id,
     spans: feedLinkSpans(url),
     updated: 0,
@@ -300,14 +306,14 @@ function calendarNode(url: string, entries: IcalEntry[]): GraphNode {
   };
 }
 
-function eventNode(calendarId: ID, entry: IcalEntry): GraphNode {
+function eventNode(url: string, entry: IcalEntry): GraphNode {
   return {
     children: List<ID>(),
-    id: entry.id,
+    id: calendarEntryAddress(url, entry),
     spans: plainSpans(icalEntryDisplayText(entry)),
-    parent: calendarId,
+    parent: calendarIdOf(url),
     updated: 0,
-    root: calendarId,
+    root: calendarIdOf(url),
     relevance: undefined,
   };
 }
@@ -322,8 +328,8 @@ export function computedNodesFromFeeds(
       .flatMap(([url, entries]): [ID, GraphNode][] => [
         [calendarIdOf(url), calendarNode(url, entries)],
         ...entries.map((entry): [ID, GraphNode] => [
-          entry.id,
-          eventNode(calendarIdOf(url), entry),
+          calendarEntryAddress(url, entry),
+          eventNode(url, entry),
         ]),
       ])
   );

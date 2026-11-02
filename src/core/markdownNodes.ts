@@ -5,6 +5,7 @@ import { ensureNodeNativeFields } from "./connections";
 import { newDB } from "./knowledge";
 import { MarkdownTreeNode } from "./markdownTree";
 import { newGraphNode } from "./nodeFactory";
+import { pathOf, rowIdOf, rowKey } from "./nodeRef";
 
 export type WalkContext = {
   knowledgeDBs: KnowledgeDBs;
@@ -22,71 +23,33 @@ function walkUpsertNode(ctx: WalkContext, node: GraphNode): WalkContext {
       ...db,
       nodes: db.nodes.set(normalizedNode.id, normalizedNode),
     }),
-    affectedDocuments: normalizedNode.docId
-      ? ctx.affectedDocuments.add(normalizedNode.docId)
-      : ctx.affectedDocuments,
+    affectedDocuments: ctx.affectedDocuments.add(pathOf(normalizedNode.id)),
   };
 }
 
-function assertUnusedTreeNodeId(
-  ctx: WalkContext,
-  treeNode: MarkdownTreeNode
-): void {
-  if (!treeNode.uuid) {
-    return;
+function assertUnusedNodeId(ctx: WalkContext, id: ID): void {
+  if (ctx.knowledgeDBs.get(ctx.sourceId)?.nodes.has(id)) {
+    throw new Error(`${pathOf(id)} contains id:${rowIdOf(id)} more than once`);
   }
-  const existing = ctx.knowledgeDBs.get(ctx.sourceId)?.nodes.get(treeNode.uuid);
-  if (existing) {
-    throw new Error(`Workspace contains duplicate node ids: ${treeNode.uuid}`);
-  }
-}
-
-type IdMaterializationMode = "default" | "preserve-explicit";
-
-function usesExactTreeNodeId(
-  mode: IdMaterializationMode,
-  treeNode: MarkdownTreeNode
-): boolean {
-  return mode === "preserve-explicit" && treeNode.uuid !== undefined;
-}
-
-function newMarkdownGraphNode(
-  treeNode: MarkdownTreeNode,
-  spans: InlineSpan[],
-  options: Parameters<typeof newGraphNode>[1],
-  mode: IdMaterializationMode
-): GraphNode {
-  const node = newGraphNode(spans, {
-    ...options,
-    uuid: treeNode.uuid,
-  });
-  return usesExactTreeNodeId(mode, treeNode) && treeNode.uuid
-    ? { ...node, id: treeNode.uuid }
-    : node;
 }
 
 function materializeTreeNode(
   ctx: WalkContext,
   treeNode: MarkdownTreeNode,
-  root: ID,
-  parent: ID | undefined,
-  mode: IdMaterializationMode
+  path: string,
+  root: ID | undefined,
+  parent: ID | undefined
 ): [WalkContext, GraphNode] {
-  const baseNode = newMarkdownGraphNode(
-    treeNode,
-    treeNode.spans,
-    {
-      root,
-      relevance: treeNode.relevance,
-      argument: treeNode.argument,
-    },
-    mode
-  );
+  const id = rowKey(path, treeNode.uuid ?? v4());
+  const baseNode = newGraphNode(treeNode.spans, {
+    id,
+    root: root ?? id,
+    relevance: treeNode.relevance,
+    argument: treeNode.argument,
+  });
   const nodeBaseWithFields: GraphNode = {
     ...baseNode,
-    spans: treeNode.spans,
     parent,
-    docId: parent ? undefined : treeNode.docId,
     systemRole: parent ? undefined : treeNode.systemRole,
     ...(treeNode.blockKind !== undefined && { blockKind: treeNode.blockKind }),
     ...(treeNode.headingLevel !== undefined && {
@@ -101,29 +64,21 @@ function materializeTreeNode(
     }),
   };
 
+  assertUnusedNodeId(ctx, id);
   const [withVisible, childIDs] = treeNode.children.reduce(
     ([accCtx, accChildren], childNode) => {
       const [afterChild, materializedChild] = materializeTreeNode(
         accCtx,
         childNode,
-        root,
-        nodeBaseWithFields.id,
-        mode
+        path,
+        nodeBaseWithFields.root,
+        nodeBaseWithFields.id
       );
-      const childWithParentMetadata: GraphNode = {
-        ...materializedChild,
-        relevance: childNode.relevance,
-        argument: childNode.argument,
-      };
-      return [
-        walkUpsertNode(afterChild, childWithParentMetadata),
-        [...accChildren, childWithParentMetadata.id],
-      ];
+      return [afterChild, [...accChildren, materializedChild.id]];
     },
-    [ctx, [] as ID[]] as [WalkContext, ID[]]
+    [walkUpsertNode(ctx, nodeBaseWithFields), [] as ID[]] as [WalkContext, ID[]]
   );
 
-  assertUnusedTreeNodeId(withVisible, treeNode);
   const node: GraphNode = {
     ...nodeBaseWithFields,
     children: List(childIDs),
@@ -144,11 +99,11 @@ export type MaterializeResult = {
   topNodeIds: ID[];
 };
 
-function materializeTreeWithMode(
+export function materializeTree(
   trees: MarkdownTreeNode[],
   sourceId: SourceId,
-  options: MaterializeOptions,
-  mode: IdMaterializationMode
+  path: string,
+  options: MaterializeOptions = {}
 ): MaterializeResult {
   const baseContext: WalkContext = options.context ?? {
     knowledgeDBs: ImmutableMap<SourceId, KnowledgeData>(),
@@ -161,18 +116,12 @@ function materializeTreeWithMode(
       : baseContext;
   return trees.reduce<MaterializeResult>(
     (acc, treeNode) => {
-      const hasExplicitRootId = usesExactTreeNodeId(mode, treeNode);
-      const rootUuid = treeNode.uuid ?? v4();
-      const rootNodeID = rootUuid as ID;
-      const treeWithUuid = hasExplicitRootId
-        ? treeNode
-        : { ...treeNode, uuid: rootUuid };
       const [nextCtx, topNode] = materializeTreeNode(
         acc.context,
-        treeWithUuid,
-        rootNodeID,
+        treeNode,
+        path,
         undefined,
-        mode
+        undefined
       );
       return {
         context: nextCtx,
@@ -181,20 +130,4 @@ function materializeTreeWithMode(
     },
     { context: ctx, topNodeIds: [] }
   );
-}
-
-export function materializeTree(
-  trees: MarkdownTreeNode[],
-  sourceId: SourceId,
-  options: MaterializeOptions = {}
-): MaterializeResult {
-  return materializeTreeWithMode(trees, sourceId, options, "default");
-}
-
-export function materializeTreePreservingExplicitIds(
-  trees: MarkdownTreeNode[],
-  sourceId: SourceId,
-  options: MaterializeOptions
-): MaterializeResult {
-  return materializeTreeWithMode(trees, sourceId, options, "preserve-explicit");
 }

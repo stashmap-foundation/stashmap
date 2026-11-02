@@ -139,7 +139,7 @@ export function selectionMarkdown(editor: HTMLElement): string | null {
 export function linkStyleForHref(href: string, dead: boolean): CSSProperties {
   if (dead) return { color: "var(--base01)", cursor: "default" };
   const targetClass = classifyLinkHref(href);
-  if (targetClass === "entity") return { color: "var(--violet)" };
+  if (targetClass === "thing") return { color: "var(--violet)" };
   if (targetClass === "website" || targetClass === "feed") {
     return { textDecoration: "underline" };
   }

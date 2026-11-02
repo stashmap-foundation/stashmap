@@ -18,13 +18,17 @@ import {
   statusOf,
 } from "../infra/nostr/nostrPublish";
 import { buildDepositEvent } from "../nodesDocumentEvent";
-import { newTimestamp } from "../nostr";
+import {
+  KIND_DELETE,
+  KIND_KNOWLEDGE_DEPOSIT,
+  msTag,
+  newTimestamp,
+} from "../nostr";
 
 type Receipts = Record<string, Record<string, string>>;
 
 type Deposit = {
-  docId: string;
-  relativePath: string;
+  path: string;
   event: UnsignedEvent;
   fingerprint: string;
 };
@@ -48,7 +52,9 @@ export function publishHelp(): string {
     "Saves the workspace, then publishes each document as a deposit to",
     "every room relay that has not accepted its current content and tags.",
     "Documents with save warnings are not published.",
-    "Acceptances are kept per relay in published.json next to profile.json.",
+    "Acceptances are kept per relay and path in published.json next to",
+    "profile.json. A path that left the workspace, for example by a rename,",
+    "has its deposit deleted on every relay that accepted it.",
     "A relay that demands a login gets one, signed with the workspace key.",
     "A relay that cannot be reached, times out, or refuses the key is left",
     "out for the rest of the run; its documents are retried on the next run.",
@@ -101,7 +107,7 @@ function readReceipts(filePath: string): Receipts {
   const parsed: unknown = JSON.parse(fs.readFileSync(filePath, "utf8"));
   if (!isRecordOf(parsed, isDocumentRecord)) {
     throw new Error(
-      `${filePath} must map relay urls to document ids and fingerprints`
+      `${filePath} must map relay urls to document paths and fingerprints`
     );
   }
   return parsed;
@@ -119,11 +125,36 @@ function depositFor(
     createdAt
   );
   return {
-    docId: saved.document.docId,
-    relativePath: saved.document.relativePath,
+    path: saved.document.docId,
     event,
     fingerprint: fingerprintOf(event),
   };
+}
+
+function retractionFor(
+  depositPath: string,
+  pubkey: PublicKey,
+  createdAt: number
+): Deposit {
+  return {
+    path: depositPath,
+    event: {
+      kind: KIND_DELETE,
+      pubkey,
+      created_at: createdAt,
+      tags: [
+        ["a", `${KIND_KNOWLEDGE_DEPOSIT}:${pubkey}:${depositPath}`],
+        ["k", `${KIND_KNOWLEDGE_DEPOSIT}`],
+        msTag(),
+      ],
+      content: "",
+    },
+    fingerprint: "",
+  };
+}
+
+function isRetraction(deposit: Deposit): boolean {
+  return deposit.event.kind === KIND_DELETE;
 }
 
 function pendingRelays(
@@ -131,9 +162,24 @@ function pendingRelays(
   relayUrls: string[],
   deposit: Deposit
 ): string[] {
-  return relayUrls.filter(
-    (url) => receipts[url]?.[deposit.docId] !== deposit.fingerprint
+  return relayUrls.filter((url) =>
+    isRetraction(deposit)
+      ? receipts[url]?.[deposit.path] !== undefined
+      : receipts[url]?.[deposit.path] !== deposit.fingerprint
   );
+}
+
+function withReceipt(
+  relayReceipts: Record<string, string> | undefined,
+  deposit: Deposit
+): Record<string, string> {
+  return isRetraction(deposit)
+    ? Object.fromEntries(
+        Object.entries(relayReceipts ?? {}).filter(
+          ([receiptPath]) => receiptPath !== deposit.path
+        )
+      )
+    : { ...relayReceipts, [deposit.path]: deposit.fingerprint };
 }
 
 async function connectRelays(
@@ -225,7 +271,7 @@ function outcomeOf(
     rejected: statuses
       .filter(([, status]) => status.status === "rejected")
       .map(([relay, status]) => ({
-        path: path.join(workspaceDir, deposit.relativePath),
+        path: path.join(workspaceDir, deposit.path),
         relay,
         reason: status.reason ?? "rejected",
       })),
@@ -235,7 +281,9 @@ function outcomeOf(
 function progressLine(index: number, total: number, outcome: Outcome): string {
   const targets = outcome.accepted.length + outcome.rejected.length;
   return [
-    `[${index}/${total}] ${outcome.deposit.relativePath}  ${outcome.accepted.length}/${targets} relays`,
+    `[${index}/${total}] ${isRetraction(outcome.deposit) ? "deleted " : ""}${
+      outcome.deposit.path
+    }  ${outcome.accepted.length}/${targets} relays`,
     ...outcome.rejected.map(({ relay, reason }) => `${relay}: ${reason}`),
   ].join("  ");
 }
@@ -271,10 +319,7 @@ async function publishPending(
     );
     if (outcome.accepted.length > 0) {
       outcome.accepted.forEach((url) => {
-        receipts[url] = {
-          ...receipts[url],
-          [deposit.docId]: deposit.fingerprint,
-        };
+        receipts[url] = withReceipt(receipts[url], deposit);
       });
       writeJsonFile(run.publishedPath, receipts);
     }
@@ -296,13 +341,16 @@ async function publishPending(
 /* eslint-enable functional/immutable-data, no-await-in-loop, no-param-reassign */
 
 function summaryLine(outcomes: Outcome[]): string {
-  const accepted = outcomes.filter(
+  const deposits = outcomes.filter((outcome) => !isRetraction(outcome.deposit));
+  const accepted = deposits.filter(
     (outcome) => outcome.accepted.length > 0
   ).length;
-  const published =
-    accepted === outcomes.length
+  const retracted = outcomes.length - deposits.length;
+  const published = `${
+    accepted === deposits.length
       ? `Published ${accepted} documents.`
-      : `Published ${accepted} of ${outcomes.length} documents.`;
+      : `Published ${accepted} of ${deposits.length} documents.`
+  }${retracted > 0 ? ` Deleted ${retracted} old paths.` : ""}`;
   const rejections = outcomes.reduce(
     (count, outcome) => count + outcome.rejected.length,
     0
@@ -321,6 +369,7 @@ export async function runPublishCommand(
       changed_paths: string[];
       accepted_paths: string[];
       unaccepted_paths: string[];
+      retracted_paths: string[];
       rejections: Rejection[];
       warnings: string[];
     }
@@ -353,14 +402,28 @@ export async function runPublishCommand(
   const deposits = saved.documents
     .filter((entry) => entry.warnings.length === 0)
     .map((entry) => depositFor(entry, pubkey, createdAt));
-  const pending = deposits.filter(
+  const workspacePaths = new Set(
+    saved.documents.map((entry) => entry.document.docId)
+  );
+  const retractions = [
+    ...new Set(
+      Object.values(receipts).flatMap((relayReceipts) =>
+        Object.keys(relayReceipts)
+      )
+    ),
+  ]
+    .filter((receiptPath) => !workspacePaths.has(receiptPath))
+    .sort()
+    .map((receiptPath) => retractionFor(receiptPath, pubkey, createdAt));
+  const pending = [...deposits, ...retractions].filter(
     (deposit) => pendingRelays(receipts, roomRelays, deposit).length > 0
   );
+  const pendingDeposits = pending.filter((deposit) => !isRetraction(deposit));
   report(
     `Saved ${saved.documents.length} documents. Publishing ${
-      pending.length
+      pendingDeposits.length
     } to ${roomRelays.length} relays, ${
-      deposits.length - pending.length
+      deposits.length - pendingDeposits.length
     } unchanged, ${saved.documents.length - deposits.length} with warnings.`
   );
   const outcomes =
@@ -376,19 +439,25 @@ export async function runPublishCommand(
   report(summaryLine(outcomes));
 
   const pathOf = (deposit: Deposit): string =>
-    path.join(workspaceDir, deposit.relativePath);
+    path.join(workspaceDir, deposit.path);
+  const acceptedOutcomes = outcomes.filter(
+    (outcome) => outcome.accepted.length > 0
+  );
   return {
     changed_paths: saved.changed_paths,
-    accepted_paths: outcomes
-      .filter((outcome) => outcome.accepted.length > 0)
+    accepted_paths: acceptedOutcomes
+      .filter((outcome) => !isRetraction(outcome.deposit))
       .map((outcome) => pathOf(outcome.deposit)),
-    unaccepted_paths: pending
+    unaccepted_paths: pendingDeposits
       .filter(
         (deposit) =>
           pendingRelays(receipts, roomRelays, deposit).length ===
           roomRelays.length
       )
       .map(pathOf),
+    retracted_paths: acceptedOutcomes
+      .filter((outcome) => isRetraction(outcome.deposit))
+      .map((outcome) => pathOf(outcome.deposit)),
     rejections: outcomes.flatMap((outcome) => outcome.rejected),
     warnings: saved.warnings,
   };

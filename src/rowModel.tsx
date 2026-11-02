@@ -10,7 +10,7 @@ import {
   EMPTY_NODE_ID,
   getRefTargetInfo,
 } from "./core/connections";
-import { isCanonicalId } from "./core/entityRecognition";
+import { isThingAddress } from "./core/linkPath";
 import { nodeText, spansText } from "./core/nodeSpans";
 import { EditorNavigationTarget } from "./editor/linkOperations";
 import { searchTargetID } from "./localSearch";
@@ -143,11 +143,13 @@ export function getViewForNode(data: Data, path: ViewPath, nodeID: ID): View {
 }
 
 export function buildPaneTarget(
-  data: Pick<Data, "knowledgeDBs">,
+  data: Pick<Data, "knowledgeDBs" | "user">,
   row: Row
 ): EditorNavigationTarget {
   const targetID =
-    row.virtualType === "search" ? searchTargetID(row.node) : row.reference?.id;
+    row.virtualType === "search"
+      ? searchTargetID(row.node, data.user?.publicKey)
+      : row.reference?.id;
   const refInfo = targetID
     ? getRefTargetInfo(targetID, data.knowledgeDBs, row.sourceId)
     : undefined;
@@ -160,7 +162,7 @@ export function buildPaneTarget(
     : {
         sourceId: row.sourceId,
         rootNodeId: row.node.id,
-        ...(isCanonicalId(row.node.id) && {
+        ...(isThingAddress(row.node.id) && {
           fallbackLabel: nodeText(row.node),
         }),
       };

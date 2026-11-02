@@ -260,7 +260,7 @@ test("a link to another author's row opens that row of that file", async () => {
     [
       "# Trip to Rome <!-- id:trip -->",
       "",
-      `- Read [her tips](//${aliceNpub}/trips/rome.md#tips) first <!-- id:read -->`,
+      `- Read [her tips](/@${aliceNpub}/trips/rome.md#tips) first <!-- id:read -->`,
       "",
     ].join("\n")
   );

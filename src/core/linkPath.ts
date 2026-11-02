@@ -2,6 +2,7 @@ import { bech32, hex } from "@scure/base";
 import { LOCAL, pathOf, rowIdOf, rowKey, sourceAuthor } from "./nodeRef";
 
 const SAME_AUTHOR = "_";
+const AUTHOR_FOLDER = "@";
 const ADDRESS_SCHEME = "knowstr:";
 const THING_SCHEMES = ["wikidata:", "rgb:"];
 const WEBSITE_SCHEMES = ["https:", "http:"];
@@ -20,6 +21,7 @@ export function isValidPath(path: string): boolean {
     path.endsWith(".md") &&
     path.normalize("NFC") === path &&
     !FORBIDDEN_PATH_CHARS_RE.test(path) &&
+    !(segments.length === 1 && path.startsWith(AUTHOR_FOLDER)) &&
     segments.every(
       (segment) => segment !== "" && segment !== "." && segment !== ".."
     )
@@ -53,7 +55,11 @@ function decodedPath(pathname: string): string | undefined {
 }
 
 function addressParts(url: URL): AddressParts | undefined {
-  if (url.protocol !== ADDRESS_SCHEME || url.search !== "") {
+  if (
+    url.protocol !== ADDRESS_SCHEME ||
+    url.host !== SAME_AUTHOR ||
+    url.search !== ""
+  ) {
     return undefined;
   }
   const path = decodedPath(url.pathname);
@@ -61,7 +67,10 @@ function addressParts(url: URL): AddressParts | undefined {
   if (path === undefined || (rowId !== undefined && !isValidRowId(rowId))) {
     return undefined;
   }
-  return { author: url.host, path, rowId };
+  const [first, ...rest] = path.split("/");
+  return first.startsWith(AUTHOR_FOLDER)
+    ? { author: first.slice(AUTHOR_FOLDER.length), path: rest.join("/"), rowId }
+    : { author: SAME_AUTHOR, path, rowId };
 }
 
 export function classifyLinkHref(
@@ -89,7 +98,9 @@ export function classifyLinkHref(
     return "unsupported";
   }
   if (parts.path === "" && parts.author !== SAME_AUTHOR) {
-    return parts.rowId === undefined ? "person" : "unsupported";
+    return parts.rowId === undefined && parts.author !== ""
+      ? "person"
+      : "unsupported";
   }
   if (!isValidPath(parts.path)) return "unsupported";
   return parts.rowId === undefined ? "file" : "node";
@@ -199,7 +210,9 @@ export function linkHref(target: NodeRef, from: NodeRef): string {
     (targetAuthor !== undefined &&
       targetAuthor === authorPubkeyOf(from.sourceId));
   if (!sameAuthor && targetAuthor !== undefined) {
-    return `//${authorNpub(targetAuthor)}/${encodePath(targetPath)}${fragment}`;
+    return `/${AUTHOR_FOLDER}${authorNpub(targetAuthor)}/${encodePath(
+      targetPath
+    )}${fragment}`;
   }
   if (targetPath === pathOf(from.id) && fragment !== "") {
     return fragment;

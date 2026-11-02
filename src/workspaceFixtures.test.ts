@@ -75,7 +75,7 @@ test("deposit construction derives one ordered a tag per linked file and i tag p
       "- [Target](../source.md#target) <!-- id:block -->",
       "- ![Target](../source.md) <!-- id:embed -->",
       "- My target ~~[Target](../source.md#target)~~ <!-- id:reword -->",
-      `- ![Her pizza](//${alice}/pizza.md#dough) <!-- id:foreign -->`,
+      `- ![Her pizza](/@${alice}/pizza.md#dough) <!-- id:foreign -->`,
       "- ![feed](webcal://example.com/feed) <!-- id:feed -->",
       "- [web](https://example.com/#top) <!-- id:web -->",
       "- [self](#a-root) <!-- id:self -->",

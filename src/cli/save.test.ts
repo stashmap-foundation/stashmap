@@ -49,20 +49,30 @@ test("shared save reports document-shape lints without rejecting", async () => {
   write(workspaceDir, "empty.md", "");
   write(
     workspaceDir,
-    `${alice}/pizza.md`,
-    `# ![Pizza](//${alice}/pasta.md) <!-- id:a1 -->\n`
+    `@${alice}/pizza.md`,
+    `# ![Pizza](/@${alice}/pasta.md) <!-- id:a1 -->\n`
   );
   write(
     workspaceDir,
-    `${alice}/soup.md`,
-    `# ![Soup](//${alice}/soup.md) <!-- id:a1 -->\n`
+    `@${alice}/soup.md`,
+    `# ![Soup](/@${alice}/soup.md) <!-- id:a1 -->\n`
+  );
+  write(
+    workspaceDir,
+    `@${alice}/recipes/menu.md`,
+    "# ![Menu](menu.md) <!-- id:a1 -->\n"
+  );
+  write(
+    workspaceDir,
+    `notes/@${alice}/pizza.md`,
+    "# Just a folder named like a key <!-- id:a1 -->\n"
   );
 
   const result = await knowstrSave(workspaceDir);
 
   expect(result.warnings).toEqual([
+    `@${alice}/pizza.md: a file in @${alice}/ must have one root embedding /@${alice}/pizza.md`,
     "empty.md: shared documents need a root",
-    `${alice}/pizza.md: an arrangement must have one root embedding //${alice}/pizza.md`,
   ]);
   expect(result.changed_paths).toEqual([]);
 });
@@ -83,14 +93,17 @@ test("save rejects paths that differ only in case", async () => {
     : expect(saving).resolves.toBeDefined());
 });
 
-test("save rejects a path with a character that addresses can't name", async () => {
-  const { path: workspaceDir } = knowstrInit();
-  write(workspaceDir, "50% off.md", "# Sale\n");
+test.each(["50% off.md", "@npub1alice.md"])(
+  "save rejects the path %s, which addresses can't name",
+  async (name) => {
+    const { path: workspaceDir } = knowstrInit();
+    write(workspaceDir, name, "# Sale\n");
 
-  await expect(knowstrSave(workspaceDir)).rejects.toThrow(
-    "Workspace paths must never contain :, #, ? or %: 50% off.md"
-  );
-});
+    await expect(knowstrSave(workspaceDir)).rejects.toThrow(
+      `Workspace paths must never contain :, #, ? or %, and only folders start with @: ${name}`
+    );
+  }
+);
 
 test("save assigns node ids in place and adds no frontmatter", async () => {
   const { path: workspaceDir } = knowstrInit();

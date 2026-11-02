@@ -106,7 +106,9 @@ function checkPaths(paths: readonly string[]): void {
   const invalid = paths.filter((candidate) => !isValidPath(candidate));
   if (invalid.length > 0) {
     throw new Error(
-      `Workspace paths must never contain :, #, ? or %: ${invalid.join(", ")}`
+      `Workspace paths must never contain :, #, ? or %, and only folders start with @: ${invalid.join(
+        ", "
+      )}`
     );
   }
   const byFolded = paths.reduce(

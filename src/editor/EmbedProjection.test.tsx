@@ -510,7 +510,7 @@ Mine
     expect(bobDoc).toContain(`author: ${aliceNpub}`);
     expect(bobDoc).toContain("path: holidays.md");
     expect(bobDoc).toMatch(
-      new RegExp(`!\\[Paris\\]\\(//${aliceNpub}/holidays\\.md#[\\w-]+\\)`, "u")
+      new RegExp(`!\\[Paris\\]\\(/@${aliceNpub}/holidays\\.md#[\\w-]+\\)`, "u")
     );
     expect(bobDoc.match(/author: /gu)).toHaveLength(1);
   });

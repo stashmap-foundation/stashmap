@@ -328,7 +328,8 @@ test("publish tags a deposit with the files and things it links to", async () =>
       "- [Here](#a1) <!-- id:a1 -->",
       "- [Beta](../b.md) <!-- id:a2 -->",
       "- ![Sauce](sauce.md#x) <!-- id:a3 -->",
-      `- Ask [Alice](//${alice}) about [her pizza](//${alice}/pizza.md#dough) <!-- id:a4 -->`,
+      `- Ask [Alice](/@${alice}) about [her pizza](../@${alice}/pizza.md#dough) <!-- id:a4 -->`,
+      `- [Her sauce](/@${alice}/sauce.md), [mine](/notes/sauce.md) and [not an address](//${alice}/x.md) <!-- id:a7 -->`,
       "- [Spain](wikidata:Q29) and [trains](https://example.org/trains#today) <!-- id:a5 -->",
       "- ![Holidays](webcal://example.org/holidays.ics) <!-- id:a6 -->",
       "",
@@ -346,6 +347,7 @@ test("publish tags a deposit with the files and things it links to", async () =>
       `34774:${pubkey}:b.md`,
       `34774:${pubkey}:notes/sauce.md`,
       `34774:${"b".repeat(64)}:pizza.md`,
+      `34774:${"b".repeat(64)}:sauce.md`,
     ]
       .sort()
       .map((value) => ["a", value]),
@@ -439,15 +441,15 @@ test("publish leaves documents with save warnings unpublished", async () => {
   write(workspaceDir, "a.md", "# Alpha\n- one\n");
   write(
     workspaceDir,
-    `${alice}/pizza.md`,
-    `# ![Wrong](//${alice}/pasta.md) <!-- id:a1 -->\n`
+    `@${alice}/pizza.md`,
+    `# ![Wrong](/@${alice}/pasta.md) <!-- id:a1 -->\n`
   );
   const { pool, publish } = recordingPool();
 
   const result = await knowstrPublish(workspaceDir, pool);
 
   expect(result.warnings).toEqual([
-    `${alice}/pizza.md: an arrangement must have one root embedding //${alice}/pizza.md`,
+    `@${alice}/pizza.md: a file in @${alice}/ must have one root embedding /@${alice}/pizza.md`,
   ]);
   expect(result.accepted_paths).toEqual([path.join(workspaceDir, "a.md")]);
   expect(progress()[0]).toBe(

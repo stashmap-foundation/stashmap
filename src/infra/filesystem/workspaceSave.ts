@@ -42,17 +42,17 @@ function arrangementWarnings(
   roots: readonly (GraphNode | undefined)[]
 ): string[] {
   const [folder, ...rest] = document.docId.split("/");
-  const author = decodePublicKeyInputSync(folder);
-  if (!folder.startsWith("npub1") || !author || rest.length === 0) {
+  if (!folder.startsWith("@")) {
     return [];
   }
   const sourcePath = rest.join("/");
+  const author = decodePublicKeyInputSync(folder.slice(1));
   const target =
     roots.length === 1 ? embeddedTarget(roots[0], LOCAL) : undefined;
-  return target?.sourceId === author && target.id === sourcePath
+  return author && target?.sourceId === author && target.id === sourcePath
     ? []
     : [
-        `${document.docId}: an arrangement must have one root embedding //${folder}/${sourcePath}`,
+        `${document.docId}: a file in ${folder}/ must have one root embedding /${document.docId}`,
       ];
 }
 

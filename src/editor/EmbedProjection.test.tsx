@@ -438,6 +438,55 @@ Source
   `);
 });
 
+test("in an arrangement, #id and after= reach my own rows and a path reaches the author's", async () => {
+  const alice = nip19.npubEncode("b".repeat(64));
+  const arrangement = [
+    `# ![Pizza Margherita](/@${alice}/pizza.md) <!-- id:a1 -->`,
+    "",
+    "- [Pizza Margherita](pizza.md) <!-- id:a2 -->",
+    '  - Let the dough rest <!-- id:rest after="pizza.md#dough" -->',
+    '  - Knead it once more <!-- id:knead after="#rest" -->',
+    "- (!) [Mozzarella](pizza.md#mozzarella) <!-- id:a3 -->",
+    "- Before baking, see [the resting step](#rest) <!-- id:a4 -->",
+    "",
+  ].join("\n");
+  const workspacePath = writeWorkspace({});
+  fs.mkdirSync(pathModule.join(workspacePath, `@${alice}`));
+  fs.writeFileSync(
+    pathModule.join(workspacePath, `@${alice}`, "pizza.md"),
+    arrangement
+  );
+
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildDocumentRouteUrl(LOCAL, `@${alice}/pizza.md`),
+  });
+
+  const mozzarella = await screen.findByRole("link", { name: "Mozzarella" });
+  expect(mozzarella.getAttribute("data-href")).toBe("pizza.md#mozzarella");
+  expect(within(mozzarella).queryByText("†")).toBeNull();
+  await userEvent.click(
+    await screen.findByRole("link", { name: "the resting step" })
+  );
+
+  await waitFor(() => {
+    expect(window.location.pathname).toBe(
+      `/local/d/${encodeURIComponent(`@${alice}/pizza.md`)}`
+    );
+  });
+  expect(
+    (
+      await screen.findByRole("treeitem", { name: "Let the dough rest" })
+    ).getAttribute("data-node-id")
+  ).toBe(`@${alice}/pizza.md#rest`);
+  expect(
+    fs.readFileSync(
+      pathModule.join(workspacePath, `@${alice}`, "pizza.md"),
+      "utf8"
+    )
+  ).toContain('Knead it once more <!-- id:knead after="#rest" -->');
+});
+
 test("dragging from another user's document records knowstr_sources", async () => {
   const [alice, bob] = setup([ALICE, BOB]);
 

@@ -156,6 +156,12 @@ export function resolveLink(href: string, from: NodeRef): NodeRef | undefined {
   if (targetClass !== "node" && targetClass !== "file") {
     return undefined;
   }
+  if (href.startsWith("#")) {
+    return {
+      sourceId: from.sourceId,
+      id: rowKey(pathOf(from.id), href.slice(1)),
+    };
+  }
   const url = parseAddress(href, pathOf(from.id));
   const parts = url ? addressParts(url) : undefined;
   if (!parts) return undefined;
